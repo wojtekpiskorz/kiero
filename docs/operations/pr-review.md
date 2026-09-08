@@ -21,13 +21,13 @@ The reviewer reads `.agents/skills/thermo-nuclear-code-quality-review/SKILL.md`,
 - Prose goes through unslop: any prose the PR adds (docs, comments, titles) and the reviewer's own output. Polish product text is judged against `CONTEXT.md`, not against the English AI-tell list. Polish is the product language, not slop.
 - Deterministic findings are not the reviewer's job. This pre-application repository has no deterministic checks yet; A1 will add `checks.yml` and own mechanical findings from then on.
 
-Rounds are stateless. Each run recovers prior rounds from the PR thread (`gh pr view --comments`): findings whose fixes landed are verified where the fix actually lives (current diff, branch, or `origin/main`) and dropped; findings explicitly rejected or overruled on the thread stay closed. The full diff is re-inspected every round regardless.
+Rounds are stateless. Each run recovers prior rounds from the PR thread (`gh pr view --json body,comments`; the default human-readable view also fetches the status-check rollup, which the job token cannot read, so use the JSON form): findings whose fixes landed are verified where the fix actually lives (current diff, branch, or `origin/main`) and dropped; findings explicitly rejected or overruled on the thread stay closed. The full diff is re-inspected every round regardless.
 
 ## What it posts
 
 One advisory summary comment per PR, edited in place across pushes via `gh pr comment <PR> --edit-last --create-if-none --body-file -`. The summary states the reviewed PR head SHA. Inline comments (`mcp__github_inline_comment__create_inline_comment`) are reserved for high-conviction, actionable findings; if nothing is worth raising, the summary says that briefly instead of inventing nits.
 
-The review is publish-at-end: the summary is posted as the final action of the session. A run canceled by a newer push posts nothing, so an old run can never replace the current summary with stale output. Comment timestamps plus the recorded head SHA in the summary verify this.
+The review is publish-at-end: the summary is posted as the final action of the session. A run canceled by a newer push posts nothing, so a superseded run almost never replaces the current summary. Cancellation is asynchronous: a run at its final posting instant races the cancel and could edit the newer summary, but that window is seconds against a minutes-long run, and the head SHA recorded in each summary plus the comment's edit history exist to catch exactly that.
 
 ## Advisory-only status
 

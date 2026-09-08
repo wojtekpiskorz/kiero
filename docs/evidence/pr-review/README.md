@@ -28,7 +28,7 @@ Record for each: run URL, trigger event, PR head SHA (also check the "Record rev
 1. Push commit A to the PR branch; while the run for A is still in progress, push commit B.
 2. Confirm the run for A is canceled by the concurrency group (`ai-review-<PR number>`, cancel-in-progress).
 3. Confirm the run for B completes and the summary comment reflects B's head SHA.
-4. Inspect the comment's edit history and timestamps: the canceled run for A must not have replaced or updated the current summary. An old run can never overwrite the latest review.
+4. Inspect the comment's edit history and timestamps: the canceled run for A must not have replaced or updated the current summary. Cancellation is asynchronous, so a stale overwrite is possible only in a seconds-wide race at the posting instant; the head SHA recorded in each summary plus the edit history are the detection mechanism.
 
 Record: both run URLs (one canceled, one completed), both head SHAs, comment edit history link.
 
