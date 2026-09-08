@@ -68,3 +68,7 @@ NOT RUN. No disposable environment was available: the live repository secret is 
 ## Vendoring provenance
 
 Local byte-comparison (`cmp`) during implementation: all five files (both `SKILL.md`, both `LICENSE`, skills `README.md` provenance against the stated commit) verified against the Astroix checkout at `d4f1bc218261cf6c76984ca2c384df7f7b5bd80e`. The runner cannot repeat this (allowlisted tools only); the review records the limitation rather than claiming verification.
+
+## §8 choices
+
+`smoke-fixture.md` stays in the evidence tree after merge: it is the input half of the fixture-round record, and its body now carries the post-fix content with a pointer to the defect-round history.
