@@ -1,0 +1,486 @@
+/* Variant C — „Dziennik budowy”: journal rows, inline digests, slim capture. */
+
+.dz--root {
+  height: calc(100dvh - var(--proto-bar-h));
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+
+.dz__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--card);
+  border-bottom: 2px solid var(--ink);
+}
+
+.dz__brand h1 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.15;
+}
+
+.dz__firm {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dz__filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dz__filter {
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.dz__filter.is-on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+
+.dz__filter--card {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.dz__journal {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 10px 12px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.dz__day {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--paper);
+  border-bottom: 2px solid var(--ink);
+  padding: 10px 4px 4px;
+  margin-top: 8px;
+}
+
+.dz__day-label {
+  font-weight: 800;
+  font-size: 14.5px;
+}
+
+.dz__day-count {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.dz__row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 4px 8px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  position: relative;
+}
+
+.dz__row-time {
+  flex: none;
+  width: 44px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  padding-top: 3px;
+}
+
+.dz__row-author {
+  flex: none;
+  padding-top: 1px;
+}
+
+.dz__row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.dz__row-name {
+  font-weight: 800;
+  font-size: 13px;
+  margin-right: 6px;
+}
+
+.dz__row-dot {
+  position: absolute;
+  left: -4px;
+  top: 14px;
+}
+
+.dz__row--agent .dz__row-body {
+  background: #f3f0fa;
+  border-left: 4px solid #8a7fd0;
+  padding: 8px 10px;
+  border-radius: 0 8px 8px 0;
+}
+
+.dz__row--unread .dz__row-body {
+  border-left: 4px solid var(--accent);
+  padding-left: 8px;
+  border-radius: 0 8px 8px 0;
+}
+
+.dz__row--agent.dz__row--unread .dz__row-body {
+  border-left-color: var(--accent);
+}
+
+.dz__text {
+  margin: 2px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.dz__row-toggle {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.dz__row--open {
+  background: #e7e4dd;
+}
+
+.dz__source-inline {
+  padding: 8px 4px 14px 56px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.dz__answer {
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 4px 12px;
+}
+
+/* ---------- digest cards ---------- */
+
+.dz__digest {
+  margin: 6px 4px 14px 56px;
+  border: 1px solid var(--line-strong);
+  border-left: 5px solid var(--ink);
+  border-radius: 8px;
+  background: #fbfaf8;
+  padding: 8px 12px;
+}
+
+.dz__digest--cotrz {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.dz__digest header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.dz__digest h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.dz__digest header span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.dz__digest ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.dz__digest li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dz__digest-text {
+  font-size: 13.5px;
+  color: var(--ink-2);
+  flex: 1;
+  min-width: 160px;
+}
+
+.dz__digest-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+/* ---------- capture ---------- */
+
+.dz__capture {
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
+  display: grid;
+  gap: 6px;
+}
+
+.dz__capture--slim {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+}
+
+.dz__slim-mic {
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 12px 22px;
+  box-shadow: 0 3px 10px rgba(217, 72, 15, 0.35);
+}
+
+.dz__slim-text {
+  flex: 1;
+  text-align: left;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 14.5px;
+  font-weight: 600;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dz__slim-photo {
+  font-size: 17px;
+}
+
+.dz__input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.dz__photo-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  font-size: 19px;
+  flex: none;
+}
+
+.dz__input {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 11px 13px;
+  font-size: 15.5px;
+  line-height: 1.35;
+  min-height: 44px;
+  max-height: 132px;
+}
+
+.dz__mic {
+  width: 56px;
+  height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 20px;
+  flex: none;
+  box-shadow: 0 3px 10px rgba(217, 72, 15, 0.35);
+}
+
+.dz__mic--secondary {
+  background: var(--card);
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  box-shadow: none;
+}
+
+.dz__send {
+  height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13.5px;
+  padding: 0 18px;
+}
+
+.dz__send:disabled {
+  background: var(--line-strong);
+  box-shadow: none;
+}
+
+.dz__capture--recording {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--ink);
+  color: #fff;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+}
+
+.dz__rec-badge {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #ff8a5c;
+}
+
+.dz__rec-timer {
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.dz__rec-hint {
+  font-size: 12px;
+  color: #b9bdc2;
+  flex: 1;
+  min-width: 140px;
+}
+
+.dz__rec-stop {
+  background: #fff;
+  color: var(--ink);
+  border: none;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 11px 18px;
+}
+
+@media (max-width: 480px) {
+  .dz__send {
+    padding: 0 10px;
+    font-size: 12.5px;
+    min-width: 62px;
+  }
+
+  .dz__mic--secondary {
+    width: 48px;
+  }
+}
+
+/* ---------- project card ---------- */
+
+.dz__proj-meta {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 10px 14px;
+  line-height: 1.45;
+}
+
+.dz__card-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(20, 22, 25, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.dz__card-sheet {
+  background: var(--paper);
+  border-radius: 14px 14px 0 0;
+  width: min(560px, 100%);
+  max-height: calc(100dvh - var(--proto-bar-h) - 8px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dz__card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+
+.dz__card-head h2 {
+  margin: 0;
+  font-size: 15px;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.dz__card-close {
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
+.dz__card-body {
+  overflow-y: auto;
+  padding: 12px 14px calc(16px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 900px) {
+  .dz__card-scrim {
+    align-items: center;
+  }
+
+  .dz__card-sheet {
+    border-radius: 14px;
+  }
+
+  .dz__source-inline {
+    padding-left: 64px;
+  }
+
+  .dz__digest {
+    margin-left: 64px;
+  }
+}
