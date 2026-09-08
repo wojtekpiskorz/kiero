@@ -54,12 +54,17 @@ jobs:
         with:
           node-version: 24
       # fail fast and legibly when the secret is absent: an operational
-      # failure, never a completed review. Never print the value.
+      # failure, never a completed review. The emptiness check runs in the
+      # shell against the resolved env value (secrets are not usable in a
+      # step-level if here) and never prints the value.
       - name: Diagnose missing ZAI_API_KEY
-        if: ${{ secrets.ZAI_API_KEY == '' }}
+        env:
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
         run: |
-          echo "::error title=ZAI_API_KEY not configured::Advisory review cannot run: the repository Actions secret ZAI_API_KEY is not set. Configure it as a repository secret under Settings > Secrets and variables > Actions (the Z.AI Coding Plan key for https://api.z.ai/api/anthropic). The value stays server-side and must never appear in files, logs or comments. This job reports an operational failure, not a completed review."
-          exit 1
+          if [ -z "$ZAI_API_KEY" ]; then
+            echo "::error title=ZAI_API_KEY not configured::Advisory review cannot run: the repository Actions secret ZAI_API_KEY is not set. Configure it as a repository secret under Settings > Secrets and variables > Actions (the Z.AI Coding Plan key for https://api.z.ai/api/anthropic). The value stays server-side and must never appear in files, logs or comments. This job reports an operational failure, not a completed review."
+            exit 1
+          fi
       # the run record for "which head was reviewed": echoed into the job log
       # and passed into the prompt so the summary comment states it too
       - name: Record reviewed PR head SHA
