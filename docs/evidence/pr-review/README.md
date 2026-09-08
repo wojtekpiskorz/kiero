@@ -40,7 +40,7 @@ Record: both run URLs (one canceled, one completed), both head SHAs, comment edi
 
 ## 5. Fix round
 
-1. Apply the corrected content (prepared in `smoke-fixture.corrected.md`: defect fixed, slop rewritten plainly, Polish sentence unchanged) and push.
+1. Apply the corrected content (prepared as `smoke-fixture.corrected.md` in the implementation worktree only, never committed: defect fixed, slop rewritten plainly, Polish sentence unchanged) and push.
 2. Confirm the same summary comment is edited in place (no new thread), the corrected findings disappear, and any new high-conviction findings remain reportable.
 3. If any finding is explicitly rejected/overruled in the thread, push once more and confirm the reviewer keeps that ruling closed.
 
@@ -55,4 +55,4 @@ Only if a disposable environment is available (otherwise record as NOT RUN with 
 
 ## 8. Record
 
-Collect in this directory: run links for every scenario above, comment permalink and edit history, head SHAs per run, exact workflow configuration (commit of `.github/workflows/ai-review.yml` used), observed outcomes (including any provider/model failures: record them as operational failures, never as completed reviews), and any remaining setup blocker. Delete `smoke-fixture.corrected.md` after the fix push lands (the corrected content then lives in `smoke-fixture.md`), and delete `smoke-fixture.md` before merge if the coordinator prefers a clean evidence tree. Record whichever choice was made.
+Collect in this directory: run links for every scenario above, comment permalink and edit history, head SHAs per run, exact workflow configuration (commit of `.github/workflows/ai-review.yml` used), observed outcomes (including any provider/model failures: record them as operational failures, never as completed reviews), and any remaining setup blocker. `smoke-fixture.corrected.md` existed only in the local worktree and was never part of repository history; nothing to delete in the tree. Delete `smoke-fixture.md` before merge if the coordinator prefers a clean evidence tree. Record whichever choice was made.
