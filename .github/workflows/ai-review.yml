@@ -1,0 +1,106 @@
+name: AI review
+
+# advisory only: findings are comments and never gate the merge;
+# Kiero has no deterministic gates yet; A1 owns a separate checks.yml
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# rapid pushes supersede their review runs; cancel so quota follows the latest sha
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: advisory review (GLM · thermo-nuclear + unslop)
+    # drafts fire opened/synchronize too; skip them so WIP pushes don't burn
+    # coding-plan quota (ready_for_review re-triggers once the PR goes live).
+    # Fork PRs skip too: GitHub withholds secrets and write perms from them,
+    # so a run there can only fail red and read like a broken gate.
+    if: >-
+      ${{ !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.fork == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Z.AI GLM coding plan through its Anthropic-compatible endpoint
+      ANTHROPIC_BASE_URL: https://api.z.ai/api/anthropic
+      ANTHROPIC_AUTH_TOKEN: ${{ secrets.ZAI_API_KEY }}
+      # the endpoint serves only these two IDs; map every model class the CLI may request
+      ANTHROPIC_DEFAULT_OPUS_MODEL: glm-5.3
+      ANTHROPIC_DEFAULT_SONNET_MODEL: glm-5.3
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: glm-5.3-flash
+      API_TIMEOUT_MS: "3000000" # Z.AI-recommended long-turn timeout; the job clock is the real bound
+      # reasoning at max (GLM levels low/high/max). The endpoint defaults to
+      # max; this env overrides any lower effort the CLI sends explicitly.
+      CLAUDE_CODE_EFFORT_LEVEL: max
+    steps:
+      # full history so the reviewer can read surrounding files and history
+      # context; the checkout token must not persist as a write credential
+      # (the action's github_token does the posting, not git push)
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Node 24 standalone runtime for the pinned action: this pre-application
+      # repository has no package.json/lockfile, so no npm cache and no npm
+      # install steps (A1 owns application dependency setup in checks.yml)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # fail fast and legibly when the secret is absent: an operational
+      # failure, never a completed review. Never print the value.
+      - name: Diagnose missing ZAI_API_KEY
+        if: ${{ secrets.ZAI_API_KEY == '' }}
+        run: |
+          echo "::error title=ZAI_API_KEY not configured::Advisory review cannot run: the repository Actions secret ZAI_API_KEY is not set. Configure it as a repository secret under Settings > Secrets and variables > Actions (the Z.AI Coding Plan key for https://api.z.ai/api/anthropic). The value stays server-side and must never appear in files, logs or comments. This job reports an operational failure, not a completed review."
+          exit 1
+      # the run record for "which head was reviewed": echoed into the job log
+      # and passed into the prompt so the summary comment states it too
+      - name: Record reviewed PR head SHA
+        run: >-
+          echo "Advisory review of PR #${{ github.event.pull_request.number }}
+          at head ${{ github.event.pull_request.head.sha }} for
+          ${{ github.repository }}"
+      # SHA-pinned v1: the one action here that holds a PR-write token and a
+      # paid API key, so tag movement must not swap code under it silently
+      - uses: anthropics/claude-code-action@62529b7c89dbb8cfaa838f2c87f2f8459b46fe68 # v1
+        with:
+          # the input satisfies the action's env validation; the env pair above
+          # is what actually routes the CLI to Z.AI with Bearer auth
+          anthropic_api_key: ${{ secrets.ZAI_API_KEY }}
+          # the workflow's own token: skips the official Claude GitHub App
+          # exchange (401 when that app isn't installed, and its default-branch
+          # workflow check would skip the first run on PRs touching workflows);
+          # comments post as github-actions[bot]
+          github_token: ${{ github.token }}
+          # advisory only: fixes happen in the local review loop, never from CI
+          include_fix_links: false
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+            PR HEAD SHA: ${{ github.event.pull_request.head.sha }}
+
+            You are the advisory AI reviewer for this repository. This is a pre-application repository: deterministic checks do not exist yet (A1 will add checks.yml and own mechanical findings from then on). You are the judgment layer, and you must not invent findings to seem useful.
+
+            Read these files from the checked-out working directory first and conduct the review exactly as they direct:
+            - .agents/skills/thermo-nuclear-code-quality-review/SKILL.md: the review standard for engineering choices (abstraction quality, spaghetti growth, code-judo simplification). Its Output Expectations and Approval Bar govern your findings.
+            - .agents/skills/unslop/SKILL.md: apply to every piece of prose you read and write, your own comments, and any prose the PR adds (docs, comments, titles). Product text in Polish is not slop by nature: judge Polish domain wording against CONTEXT.md, not against the English AI-tell list.
+            - AGENTS.md: house rules the diff must respect, meaning process rules, language boundaries (English code/docs, Polish product text), secrets handling and scope.
+            - CONTEXT.md: the glossary; flag drift from its terms.
+
+            The PR branch is already checked out in the current working directory. Inspect it with `gh pr diff`, `gh pr view`, and by reading files; judge the diff in the context of the surrounding code, not in isolation.
+
+            Rounds are stateless: each run starts fresh, so recover your context from the PR thread before judging anything — `gh pr view <PR NUMBER> --comments`. When earlier rounds exist, your previous advisory summary is the last github-actions[bot] comment there (the one you will edit in place), and author replies and owner rulings sit in the same thread. Treat that thread as your memory of earlier rounds: findings whose fixes have landed are resolved — verify where the fix actually lives (the current diff, the branch, or `origin/main`; fixes can land out-of-band), then drop, never re-report; findings explicitly rejected or overruled on the thread stay closed. Review the full diff every round regardless: the thread narrows what you report, not what you inspect.
+
+            This review is advisory: you must not modify anything, and no finding blocks CI. The author applies feedback locally.
+
+            The action posts nothing on its own in this automation mode, so deliver the review yourself, as the final action of the session (a run canceled by a newer push then posts nothing): write the summary (thermo-nuclear priority order, high-conviction findings only; if nothing is worth raising, say that briefly instead of inventing nits) and post it with `gh pr comment <PR NUMBER> --edit-last --create-if-none --body-file -` (stdin). One advisory summary comment per PR, edited in place across pushes. State the PR HEAD SHA from above in the summary so the thread records which commit was reviewed. Highlight specific lines with `mcp__github_inline_comment__create_inline_comment` (confirmed: true). Only post GitHub comments; do not submit review text as messages.
+          claude_args: |
+            --model glm-5.3
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
