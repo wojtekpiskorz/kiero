@@ -629,6 +629,72 @@ button.chip:hover {
   }
 }
 
+.finding__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+
+.finding__edit {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 2px 0;
+}
+
+.finding__edit input {
+  flex: 1;
+  min-width: 160px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 14px;
+}
+
+.finding__edit button {
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+}
+
+.finding__history {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+
+.finding__history summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 650;
+  user-select: none;
+}
+
+.finding__history ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 3px;
+}
+
+.cited-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.cited-sources__label {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
 /* utility */
 .visually-hidden {
   position: absolute;

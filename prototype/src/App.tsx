@@ -5,6 +5,7 @@ import { useStore } from "./state/store";
 import { TasmaVariant } from "./variants/tasma/TasmaVariant";
 import { WarsztatVariant } from "./variants/warsztat/WarsztatVariant";
 import { DziennikVariant } from "./variants/dziennik/DziennikVariant";
+import { PlacVariant } from "./variants/plac/PlacVariant";
 
 export function App() {
   const { variant } = useStore();
@@ -13,6 +14,7 @@ export function App() {
       {variant === "A" && <TasmaVariant />}
       {variant === "B" && <WarsztatVariant />}
       {variant === "C" && <DziennikVariant />}
+      {variant === "D" && <PlacVariant />}
       <StateInspector />
       <PrototypeBar />
     </>

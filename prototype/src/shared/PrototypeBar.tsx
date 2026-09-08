@@ -9,9 +9,10 @@ export const VARIANT_NAMES: Record<VariantKey, string> = {
   A: "A · Taśma",
   B: "B · Warsztat",
   C: "C · Dziennik budowy",
+  D: "D · Plac budowy (kierunek)",
 };
 
-const ORDER: VariantKey[] = ["A", "B", "C"];
+const ORDER: VariantKey[] = ["A", "B", "C", "D"];
 
 export function PrototypeBar() {
   const s = useStore();
@@ -27,7 +28,7 @@ export function PrototypeBar() {
         return; // never intercept typing/navigation inside form fields
       }
       const idx = ORDER.indexOf(s.variant);
-      const next = e.key === "ArrowRight" ? ORDER[(idx + 1) % 3] : ORDER[(idx + 2) % 3];
+      const next = e.key === "ArrowRight" ? ORDER[(idx + 1) % ORDER.length] : ORDER[(idx + ORDER.length - 1) % ORDER.length];
       store.setVariant(next);
     };
     window.addEventListener("keydown", onKey);
@@ -35,7 +36,7 @@ export function PrototypeBar() {
   }, [s.variant]);
 
   const idx = ORDER.indexOf(s.variant);
-  const cycle = (dir: 1 | -1) => store.setVariant(ORDER[(idx + dir + 3) % 3]);
+  const cycle = (dir: 1 | -1) => store.setVariant(ORDER[(idx + dir + ORDER.length) % ORDER.length]);
 
   const unread = s.sources.filter(
     (src) => src.authorId !== s.actorId && !(s.readBy[src.id] ?? []).includes(s.actorId)

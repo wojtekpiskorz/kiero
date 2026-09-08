@@ -13,7 +13,7 @@ export interface Actor {
   role: "boss" | "agent";
 }
 
-export type ProjectId = "banan" | "kaczmarek";
+export type ProjectId = "banan" | "kaczmarek" | "omega";
 
 export interface Project {
   id: ProjectId;
@@ -74,6 +74,10 @@ export interface SourceMessage {
   replyTo: { sourceId: string; preview: string } | null;
   /** Waiting for connectivity; manual "Ponów" resumes the same source. */
   waitingOffline: boolean;
+  /** Agent answers cite the sources backing the finding. */
+  citesSourceIds?: string[];
+  /** Image extraction still running while text results are already published. */
+  imagePending?: boolean;
 }
 
 export type FindingMeaning =
@@ -94,15 +98,22 @@ export interface Finding {
   history?: { at: string; change: string; authorId: ActorId }[];
 }
 
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+}
+
 export interface Task {
   id: string;
   projectId: ProjectId;
   title: string;
-  state: "Do zrobienia" | "W toku" | "Wykonane";
+  state: "Do zrobienia" | "W toku" | "Wykonane" | "Anulowane";
   executor: string; // executor can be a subcontractor without a Kiero account
-  coordinator: ActorId;
+  coordinator: ActorId | null; // null → reminders go to all bosses
   due: string;
-  hasChecklist?: boolean;
+  dueTime?: string; // known hour without duration → 5-minute calendar marker
+  checklistItems?: ChecklistItem[];
   note?: string;
 }
 
@@ -165,6 +176,15 @@ export const PROJECTS: Record<ProjectId, Project> = {
     scope: "Naprawa dachu, wymiana obróbek, montaż osłony przeciwwietrznej",
     stage: "Realizacja",
     client: "Andrzej Kaczmarek",
+    openTasks: 1,
+  },
+  omega: {
+    id: "omega",
+    alias: "Omega",
+    address: "ul. Sokolska 90, Katowice",
+    scope: "Remont biura 40 m² — zakończony, zostały formalności",
+    stage: "Zakończony",
+    client: "Kancelaria Lex",
     openTasks: 1,
   },
 };
@@ -294,6 +314,39 @@ export const SEED_SOURCES: SourceMessage[] = [
     waitingOffline: false,
   },
   {
+    // Conflicting information — produces an open clarification, not a guess.
+    id: "s7",
+    authorId: "marek",
+    sentAt: "2026-09-07T20:11:00",
+    text: "Kaczmarek: blacharka przyjeżdża w czwartek, zamówiłem u Nowaka.",
+    attachments: [],
+    status: "opracowane",
+    feedback: [
+      { id: "f7a", text: "Dostawa blacharki: czwartek 10.09 — do potwierdzenia, Piotrek podał inny termin", scope: "kaczmarek" },
+    ],
+    fragments: [
+      { id: "fr7", scope: "kaczmarek", quote: "blacharka przyjeżdża w czwartek", basis: "fragment tekstu" },
+    ],
+    replyTo: null,
+    waitingOffline: false,
+  },
+  {
+    id: "s8",
+    authorId: "piotrek",
+    sentAt: "2026-09-07T20:40:00",
+    text: "Kaczmarek: w hurtowni mówią, że blacharka dopiero w piątek rano.",
+    attachments: [],
+    status: "opracowane",
+    feedback: [
+      { id: "f8a", text: "Sprzeczny termin dostawy blacharki — pytanie do wyjaśnienia", scope: "kaczmarek" },
+    ],
+    fragments: [
+      { id: "fr8", scope: "kaczmarek", quote: "blacharka dopiero w piątek rano", basis: "fragment tekstu" },
+    ],
+    replyTo: { sourceId: "s7", preview: "Kaczmarek: blacharka przyjeżdża w czwartek…" },
+    waitingOffline: false,
+  },
+  {
     id: "s4",
     authorId: "piotrek",
     sentAt: "2026-09-08T07:58:00",
@@ -339,9 +392,49 @@ export const SEED_SOURCES: SourceMessage[] = [
     replyTo: null,
     waitingOffline: false,
   },
+  {
+    // Photo with OCR text — discoverable through search.
+    id: "s9",
+    authorId: "piotrek",
+    sentAt: "2026-09-08T08:31:00",
+    text: "Faktura za piłę spalinową, do ubezpieczenia i księgowości.",
+    attachments: [
+      {
+        id: "p9",
+        kind: "photo",
+        label: "IMG_4481.jpg",
+        caption: "Faktura — piła spalinowa",
+        hue: 120,
+        ocrText: "FAKTURA VAT nr 128/09/2026 — Stihl MS 211 — razem 2 149,00 zł netto, 2 643,27 zł brutto",
+      },
+    ],
+    status: "opracowane",
+    feedback: [
+      { id: "f9a", text: "Odczytano fakturę: 2 643,27 zł brutto — zapisano jako wiedzę firmy", scope: "firma" },
+    ],
+    fragments: [
+      { id: "fr9", scope: "firma", quote: "obszar zdjęcia (OCR)", basis: "obszar zdjęcia" },
+    ],
+    replyTo: null,
+    waitingOffline: false,
+  },
+  {
+    // Full agent bubble: clarification about the contradictory delivery date.
+    id: "s10",
+    authorId: "kiero",
+    sentAt: "2026-09-08T08:44:00",
+    text: "Blacharka dla Kaczmarka: Marek napisał wczoraj „czwartek”, Piotrek godzinę później „piątek rano”. Który termin dostawy obowiązuje?",
+    attachments: [],
+    status: "opracowane",
+    feedback: null,
+    fragments: [],
+    replyTo: { sourceId: "s8", preview: "Kaczmarek: w hurtowni mówią, że blacharka dopiero…" },
+    citesSourceIds: ["s7", "s8"],
+    waitingOffline: false,
+  },
 ];
 
-export const FINDINGS: Record<ProjectId, Finding[]> = {
+export const SEED_FINDINGS: Record<ProjectId, Finding[]> = {
   banan: [
     {
       id: "fd1",
@@ -418,10 +511,45 @@ export const FINDINGS: Record<ProjectId, Finding[]> = {
       sourceIds: ["s2", "s4"],
       corroboration: "potwierdzone niezależnie przez Piotrka 8.09",
     },
+    {
+      id: "fd10",
+      label: "Wycena naprawy dachu",
+      value: "12 000–14 000 zł",
+      meaning: "propozycja",
+      unknownNote: null,
+      sourceIds: ["s1"],
+      history: [],
+    },
+    {
+      id: "fd11",
+      label: "Dostawa blacharki",
+      value: "nierozstrzygnięte: czwartek 10.09 (Marek) / piątek 11.09 (Piotrek)",
+      meaning: null,
+      unknownNote: "sprzeczność — oczekuje na odpowiedź szefa",
+      sourceIds: ["s7", "s8"],
+    },
+  ],
+  omega: [
+    {
+      id: "fd12",
+      label: "Klient",
+      value: "Kancelaria Lex",
+      meaning: null,
+      unknownNote: null,
+      sourceIds: [],
+    },
+    {
+      id: "fd13",
+      label: "Lokalizacja",
+      value: "ul. Sokolska 90, Katowice",
+      meaning: null,
+      unknownNote: null,
+      sourceIds: [],
+    },
   ],
 };
 
-export const TASKS: Task[] = [
+export const SEED_TASKS: Task[] = [
   {
     id: "t1",
     projectId: "banan",
@@ -430,8 +558,11 @@ export const TASKS: Task[] = [
     executor: "Marek",
     coordinator: "marek",
     due: "2026-09-10",
-    note: "Checklista (fuga, armatura, hydraulik) — widok w pełnym scenariuszu",
-    hasChecklist: true,
+    checklistItems: [
+      { id: "c1", label: "Policzyć metraż fugi i płytek", done: true },
+      { id: "c2", label: "Zapytać hydraulika o armaturę", done: false },
+      { id: "c3", label: "Ująć koszt wynajmu przecinarki", done: false },
+    ],
   },
   {
     id: "t2",
@@ -442,9 +573,31 @@ export const TASKS: Task[] = [
     coordinator: "piotrek",
     due: "2026-09-11",
   },
+  {
+    id: "t3",
+    projectId: "kaczmarek",
+    title: "Odbiór dachu z ekipą",
+    state: "Do zrobienia",
+    executor: "Ekipa Dach-Master (podwykonawca)",
+    coordinator: "marek",
+    due: "2026-09-09",
+    dueTime: "14:00",
+    note: "znana godzina bez czasu trwania — w Google jako znacznik 5 minut",
+  },
+  {
+    // Open obligation on a closed project; no coordinator → all bosses.
+    id: "t4",
+    projectId: "omega",
+    title: "Oddać klucze i protokół klientowi",
+    state: "Do zrobienia",
+    executor: "Marek",
+    coordinator: null,
+    due: "2026-09-01",
+    note: "projekt zakończony; zadanie po terminie; brak koordynatora — przypomnienia do obu szefów",
+  },
 ];
 
-export const EVENTS: WorkEvent[] = [
+export const SEED_EVENTS: WorkEvent[] = [
   {
     id: "e1",
     projectId: "banan",
@@ -459,7 +612,124 @@ export const EVENTS: WorkEvent[] = [
     when: "środa 9.09.2026",
     state: "Planowane",
   },
+  {
+    id: "e3",
+    projectId: "omega",
+    title: "Odbiór końcowy z klientem",
+    when: "wtorek 1.09.2026",
+    state: "Planowane",
+  },
 ];
+
+export interface Clarification {
+  id: string;
+  kind: "tax" | "date-conflict";
+  questionSourceId: string; // the agent bubble asking the question
+  projectId?: ProjectId;
+  findingId?: string; // finding this resolves when answered
+  status: "open" | "resolved";
+  answer?: string;
+  answeredBy?: ActorId;
+}
+
+export const SEED_CLARIFICATIONS: Clarification[] = [
+  {
+    id: "q1",
+    kind: "tax",
+    questionSourceId: "s5",
+    projectId: "banan",
+    findingId: "fd4",
+    status: "open",
+  },
+  {
+    id: "q2",
+    kind: "date-conflict",
+    questionSourceId: "s10",
+    projectId: "kaczmarek",
+    findingId: "fd11",
+    status: "open",
+  },
+];
+
+export type CalendarCopyStatus = "zapisano" | "oczekuje" | "blad" | "ukryte-osobiscie";
+
+export interface CalendarCopy {
+  id: string;
+  entity: "task" | "event";
+  refId: string;
+  title: string;
+  when: string;
+  marker5: boolean; // hour without known duration → five-minute marker
+  status: CalendarCopyStatus;
+  hiddenByActor: ActorId[];
+}
+
+export interface CalendarState {
+  connected: boolean;
+  attention: boolean; // connection needs attention (re-auth)
+  scopes: Record<ProjectId, boolean>;
+  copies: CalendarCopy[];
+}
+
+export const SEED_CALENDAR: CalendarState = {
+  connected: true,
+  attention: true,
+  scopes: { banan: true, kaczmarek: true, omega: false },
+  copies: [
+    {
+      id: "cc1",
+      entity: "event",
+      refId: "e1",
+      title: "Dostawa płytek — Banan",
+      when: "pt 11.09, 12:00",
+      marker5: true,
+      status: "oczekuje",
+      hiddenByActor: [],
+    },
+    {
+      id: "cc2",
+      entity: "event",
+      refId: "e2",
+      title: "Montaż osłony — Kaczmarek",
+      when: "śr 9.09 (cały dzień)",
+      marker5: false,
+      status: "zapisano",
+      hiddenByActor: [],
+    },
+    {
+      id: "cc3",
+      entity: "task",
+      refId: "t1",
+      title: "Wycena łazienki — Banan (zadanie)",
+      when: "czw 10.09 (cały dzień)",
+      marker5: false,
+      status: "blad",
+      hiddenByActor: [],
+    },
+    {
+      id: "cc4",
+      entity: "task",
+      refId: "t3",
+      title: "Odbiór dachu — Kaczmarek (zadanie)",
+      when: "śr 9.09, 14:00",
+      marker5: true,
+      status: "zapisano",
+      hiddenByActor: ["piotrek"], // personal hide
+    },
+  ],
+};
+
+export interface NotificationPrefs {
+  conversationMuted: boolean; // mute the shared conversation for this boss
+  reminderMuted: boolean; // mute task reminders only
+  snoozeUntil: string | null; // personal reminder snooze for one task
+}
+
+export const SEED_NOTIF: Record<ActorId, NotificationPrefs> = {
+  marek: { conversationMuted: false, reminderMuted: false, snoozeUntil: null },
+  piotrek: { conversationMuted: false, reminderMuted: true, snoozeUntil: "2026-09-09T08:00" },
+  kiero: { conversationMuted: false, reminderMuted: false, snoozeUntil: null },
+};
 
 /** Which sources each boss has already seen (per-user read state). */
 export const SEED_READ_BY: Record<string, ActorId[]> = {

@@ -44,6 +44,7 @@ export function StateInspector() {
               ["normal", "Zwykły"],
               ["ai-fail", "Awaria AI"],
               ["offline", "Brak sieci"],
+              ["partial", "Częściowa analiza"],
             ] as [ProcessingMode, string][]
           ).map(([mode, label]) => (
             <button
@@ -59,16 +60,22 @@ export function StateInspector() {
       </section>
 
       <section className="inspector__section">
-        <h4>Przerwanie nagrania</h4>
-        <button
-          className="inspector__toggle"
-          disabled={s.recorder.status !== "recording"}
-          onClick={() => store.interruptRecording()}
-        >
-          Przerwij nagrywanie (zachowaj fragment)
-        </button>
+        <h4>Przerwania i aktualizacja PWA</h4>
+        <div className="inspector__row">
+          <button
+            className="inspector__toggle"
+            disabled={s.recorder.status !== "recording"}
+            onClick={() => store.interruptRecording()}
+          >
+            Przerwij nagrywanie
+          </button>
+          <button className="inspector__toggle" onClick={() => store.requestPwaUpdate()}>
+            Zaproponuj aktualizację PWA
+          </button>
+        </div>
         <p className="inspector__note">
-          Symuluje blokadę ekranu / rozmowę. Zachowany fragment pozostaje szkicem do odsłuchu i wysłania.
+          Przerwane nagrywanie zostawia zachowany fragment jako szkic. Aktualizacja PWA czeka, dopóki trwa nagrywanie
+          lub wysyłka, i zachowuje szkic przed przeładowaniem.
         </p>
       </section>
 

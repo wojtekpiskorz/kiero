@@ -5,16 +5,15 @@ import { useEffect, useRef, useState } from "react";
 import {
   ACTORS,
   Attachment,
-  EVENTS,
+  Clarification,
   FeedbackItem,
-  FINDINGS,
   Finding,
   Fragment,
   ProjectId,
   PROJECTS,
   SourceMessage,
-  TASKS,
   Task,
+  TODAY_ISO,
   WorkEvent,
 } from "../../data/fixtures";
 import { statusLabel, store, useStore } from "../../state/store";
@@ -186,7 +185,7 @@ export function AgentFeedback({ source }: { source: SourceMessage }) {
   return (
     <details className="agent-feedback">
       <summary>
-        Kiero: {source.feedback.length === 1 ? source.feedback[0].text : `${source.feedback.length} ustalenia`}
+        Kiero: {source.feedback.length === 1 ? source.feedback[0].text : `${source.feedback.length} ustaleń`}
       </summary>
       <ul>
         {source.feedback.map((f: FeedbackItem) => (
@@ -197,6 +196,14 @@ export function AgentFeedback({ source }: { source: SourceMessage }) {
             {f.text}
           </li>
         ))}
+        {source.imagePending && (
+          <li>
+            <span className="badge badge--unknown">zdjęcie w toku</span>
+            <button className="finding__source-link" onClick={() => store.finishImageAnalysis(source.id)}>
+              dokończ analizę zdjęcia (skrót scenariusza)
+            </button>
+          </li>
+        )}
       </ul>
     </details>
   );
@@ -250,6 +257,17 @@ export function SourceDetail({
             {(a as Extract<Attachment, { kind: "audio" }>).transcript}
           </details>
         ))}
+      {source.attachments
+        .filter((a) => a.kind === "photo" && a.ocrText)
+        .map((a) => {
+          const photo = a as Extract<Attachment, { kind: "photo" }>;
+          return (
+            <details className="transcript" key={a.id}>
+              <summary>Tekst odczytany ze zdjęcia ({photo.label})</summary>
+              {photo.ocrText}
+            </details>
+          );
+        })}
       <StatusLine source={source} />
       {source.fragments.length > 0 && (
         <section aria-label="Powiązane fragmenty">
@@ -274,28 +292,34 @@ export function SourceDetail({
   );
 }
 
-/** Pamięć projektu: current findings with sources and explicit gaps. */
+/** Pamięć projektu: current findings with sources, explicit gaps, change history. */
 export function ProjectSummary({
   projectId,
   onOpenSource,
+  onOpenTask,
 }: {
   projectId: ProjectId;
   onOpenSource: (sourceId: string) => void;
+  onOpenTask?: (taskId: string) => void;
 }) {
-  const findings = FINDINGS[projectId];
-  const tasks = TASKS.filter((t) => t.projectId === projectId);
-  const events = EVENTS.filter((e) => e.projectId === projectId);
-  const sources = useStore().sources;
+  const s = useStore();
+  const findings = s.findings[projectId];
+  const tasks = s.tasks.filter((t) => t.projectId === projectId);
+  const events = s.events.filter((e) => e.projectId === projectId);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const sourcePreview = (id: string) => {
-    const s = sources.find((x) => x.id === id);
-    if (!s) return null;
+    const src = s.sources.find((x) => x.id === id);
+    if (!src) return null;
     return (
       <button className="finding__source-link" onClick={() => onOpenSource(id)}>
-        źródło: {ACTORS[s.authorId].short}, {formatPlShortDate(s.sentAt)}
+        źródło: {ACTORS[src.authorId].short}, {formatPlShortDate(src.sentAt)}
       </button>
     );
   };
+
+  const today = new Date(TODAY_ISO + "T12:00:00");
 
   return (
     <div className="summary">
@@ -309,11 +333,51 @@ export function ProjectSummary({
               {f.unknownNote && <span className="badge badge--unknown">{f.unknownNote}</span>}
               {f.corroboration && <span className="badge badge--corroborated">{f.corroboration}</span>}
             </div>
-            <span className="finding__value">{f.value}</span>
-            {f.sourceIds.length > 0 ? f.sourceIds.map(sourcePreview) : (
-              <span className="finding__source-link" style={{ textDecoration: "none", cursor: "default" }}>
-                ustalone przy zakładaniu projektu
-              </span>
+            {editing === f.id ? (
+              <form
+                className="finding__edit"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  store.editFinding(projectId, f.id, editValue);
+                  setEditing(null);
+                }}
+              >
+                <input value={editValue} onChange={(e) => setEditValue(e.target.value)} aria-label="Nowa wartość ustalenia" />
+                <button type="submit">Zapisz poprawkę</button>
+                <button type="button" onClick={() => setEditing(null)}>
+                  Anuluj
+                </button>
+              </form>
+            ) : (
+              <span className="finding__value">{f.value}</span>
+            )}
+            <div className="finding__links">
+              {f.sourceIds.length > 0 ? f.sourceIds.map(sourcePreview) : (
+                <span className="finding__source-link" style={{ textDecoration: "none", cursor: "default" }}>
+                  ustalone przy zakładaniu projektu
+                </span>
+              )}
+              <button
+                className="finding__source-link"
+                onClick={() => {
+                  setEditing(f.id);
+                  setEditValue(f.value);
+                }}
+              >
+                popraw bezpośrednio
+              </button>
+            </div>
+            {(f.history?.length ?? 0) > 0 && (
+              <details className="finding__history">
+                <summary>Historia zmian ({f.history!.length})</summary>
+                <ul>
+                  {f.history!.map((h, i) => (
+                    <li key={i}>
+                      {formatPlShortDate(h.at)} · {ACTORS[h.authorId].short}: {h.change}
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
           </div>
         ))}
@@ -321,19 +385,38 @@ export function ProjectSummary({
 
       <section className="summary__section" aria-label="Zadania">
         <h4>Zadania</h4>
-        {tasks.map((t: Task) => (
-          <div className="finding" key={t.id}>
-            <div className="finding__top">
-              <span className="finding__value" style={{ fontWeight: 600 }}>
-                {t.title}
+        {tasks.map((t: Task) => {
+          const overdue = t.state !== "Wykonane" && t.state !== "Anulowane" && new Date(t.due + "T23:59:00") < today;
+          const allChecked = (t.checklistItems ?? []).length > 0 && (t.checklistItems ?? []).every((c) => c.done);
+          return (
+            <div className="finding" key={t.id}>
+              <div className="finding__top">
+                <span className="finding__value" style={{ fontWeight: 600 }}>
+                  {t.title}
+                </span>
+                <span className="badge badge--meaning">{t.state}</span>
+                {overdue && <span className="badge badge--unknown">po terminie</span>}
+                {t.state === "Wykonane" && (t.checklistItems ?? []).some((c) => !c.done) && (
+                  <span className="badge badge--unknown">wykonane z nieodhaczonymi punktami</span>
+                )}
+                {t.state !== "Wykonane" && allChecked && (
+                  <span className="badge badge--corroborated">punkty odhaczone, zadanie otwarte</span>
+                )}
+              </div>
+              <span className="finding__source-link" style={{ textDecoration: "none", cursor: "default" }}>
+                wykonawca: {t.executor} · koordynator:{" "}
+                {t.coordinator ? ACTORS[t.coordinator].short : "brak — przypomnienia do wszystkich szefów"} · termin:{" "}
+                {formatPlIsoDate(t.due)}
+                {t.dueTime ? `, ${t.dueTime}` : ""}
               </span>
-              <span className="badge badge--meaning">{t.state}</span>
+              {onOpenTask && (
+                <button className="finding__source-link" onClick={() => onOpenTask(t.id)}>
+                  otwórz zadanie
+                </button>
+              )}
             </div>
-            <span className="finding__source-link" style={{ textDecoration: "none", cursor: "default" }}>
-              wykonawca: {t.executor} · koordynator: {ACTORS[t.coordinator].short} · termin: {formatPlIsoDate(t.due)}
-            </span>
-          </div>
-        ))}
+          );
+        })}
         {tasks.length === 0 && <p className="finding__source-link">Brak zadań.</p>}
       </section>
 
@@ -346,6 +429,9 @@ export function ProjectSummary({
                 {e.title}
               </span>
               <span className="badge badge--meaning">{e.state}</span>
+              {e.when.includes("1.09") && (
+                <span className="badge badge--unknown">termin minął — niepotwierdzone</span>
+              )}
             </div>
             <span className="finding__source-link" style={{ textDecoration: "none", cursor: "default" }}>
               {e.when}
@@ -394,20 +480,55 @@ export function dayLabel(key: string, todayIso: string): string {
   return dateFmt.format(new Date(key + "T12:00:00"));
 }
 
-/** Co teraz: open tasks + open clarification questions (shared fixture-level view). */
-export function coTerazItems(): { id: string; kind: "zadanie" | "pytanie"; text: string; projectId?: ProjectId }[] {
+/** Co teraz: open tasks + open clarification questions, read from live store state. */
+export function coTerazItems(): {
+  id: string;
+  kind: "zadanie" | "pytanie";
+  text: string;
+  projectId?: ProjectId;
+  taskId?: string;
+  overdue?: boolean;
+}[] {
+  const s = store.getState();
+  const today = new Date(TODAY_ISO + "T12:00:00");
   return [
-    ...TASKS.filter((t) => t.state !== "Wykonane").map((t) => ({
-      id: t.id,
-      kind: "zadanie" as const,
-      text: `${t.title} — ${t.executor}, termin ${formatPlIsoDate(t.due)}`,
-      projectId: t.projectId,
-    })),
-    {
-      id: "q1",
-      kind: "pytanie" as const,
-      text: "Podstawa podatku ceny robocizny 18 000 zł (Banan): netto czy brutto?",
-      projectId: "banan",
-    },
+    ...s.tasks
+      .filter((t) => t.state !== "Wykonane" && t.state !== "Anulowane")
+      .map((t) => ({
+        id: t.id,
+        kind: "zadanie" as const,
+        text: `${t.title} — ${t.executor}, termin ${formatPlIsoDate(t.due)}`,
+        projectId: t.projectId,
+        taskId: t.id,
+        overdue: new Date(t.due + "T23:59:00") < today,
+      })),
+    ...s.clarifications
+      .filter((c) => c.status === "open")
+      .map((c: Clarification) => ({
+        id: c.id,
+        kind: "pytanie" as const,
+        text:
+          c.kind === "tax"
+            ? "Podstawa podatku ceny robocizny 18 000 zł (Banan): netto czy brutto?"
+            : "Sprzeczny termin dostawy blacharki (Kaczmarek): czwartek czy piątek?",
+        projectId: c.projectId,
+      })),
   ];
+}
+
+/** Agent answers cite their evidence: links back to the backing sources. */
+export function CitedSources({ ids, onOpenSource }: { ids: string[]; onOpenSource: (id: string) => void }) {
+  const s = useStore();
+  const found = ids.map((id) => s.sources.find((x) => x.id === id)).filter(Boolean) as SourceMessage[];
+  if (found.length === 0) return null;
+  return (
+    <div className="cited-sources">
+      <span className="cited-sources__label">Na podstawie:</span>
+      {found.map((src) => (
+        <button key={src.id} className="chip" onClick={() => onOpenSource(src.id)}>
+          {ACTORS[src.authorId].short}, {formatPlShortDate(src.sentAt)} — {src.text.slice(0, 24)}…
+        </button>
+      ))}
+    </div>
+  );
 }

@@ -7,7 +7,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   COMPANY,
-  FINDINGS,
   ProjectId,
   PROJECTS,
   SourceMessage,
@@ -39,7 +38,7 @@ export function WarsztatVariant() {
 
   // One-line key facts for the mobile memory strip.
   const stripFacts = inProject
-    ? FINDINGS[s.pill as ProjectId]
+    ? s.findings[s.pill as ProjectId]
         .filter((f) => f.meaning || f.unknownNote)
         .slice(0, 2)
         .map((f) => `${f.label}: ${f.value}${f.unknownNote ? ` (${f.unknownNote})` : ""}`)
