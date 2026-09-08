@@ -2,6 +2,8 @@
 
 Build the complete accepted core behind an unstyled, functional PWA. The owner wants real data and real processing early, while full UX/UI is developed separately from the [UX/UI package](../handoffs/ux-ui/README.md). This package is an execution plan; no application implementation or provider proof has run during chartering.
 
+Live tracker: [Implementation map: Kiero core MVP and barebones PWA](https://github.com/wojtekpiskorz/kiero/issues/15). Its 49 native sub-issues contain the full implementation scopes; native blockers determine which work can start.
+
 Read in this order:
 
 1. [Execution charter](execution-charter.md) for scope, module ownership, parallel work and completion.

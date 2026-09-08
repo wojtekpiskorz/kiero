@@ -55,7 +55,9 @@
       "integration": [
         "A2 consumes the workspace exports and owns the schema/command baseline. A4 consumes the app host. I1 and E1 can run independently because they own environment evidence and static corpus assets."
       ],
-      "declaredPrerequisites": []
+      "declaredPrerequisites": [],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/16",
+      "issueNumber": 16
     },
     {
       "key": "A2",
@@ -122,7 +124,9 @@
       ],
       "declaredPrerequisites": [
         "A1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/17",
+      "issueNumber": 17
     },
     {
       "key": "A3",
@@ -196,7 +200,9 @@
       "declaredPrerequisites": [
         "A2",
         "I1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/18",
+      "issueNumber": 18
     },
     {
       "key": "A4",
@@ -239,7 +245,9 @@
       ],
       "declaredPrerequisites": [
         "A3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/19",
+      "issueNumber": 19
     },
     {
       "key": "B1",
@@ -283,7 +291,9 @@
       ],
       "declaredPrerequisites": [
         "A3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/20",
+      "issueNumber": 20
     },
     {
       "key": "B2",
@@ -324,7 +334,9 @@
       ],
       "declaredPrerequisites": [
         "B1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/21",
+      "issueNumber": 21
     },
     {
       "key": "B3",
@@ -367,7 +379,9 @@
       ],
       "declaredPrerequisites": [
         "B1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/22",
+      "issueNumber": 22
     },
     {
       "key": "B4",
@@ -412,7 +426,9 @@
       "declaredPrerequisites": [
         "B3",
         "B2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/23",
+      "issueNumber": 23
     },
     {
       "key": "C1",
@@ -455,7 +471,9 @@
       ],
       "declaredPrerequisites": [
         "B3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/24",
+      "issueNumber": 24
     },
     {
       "key": "C2",
@@ -497,7 +515,9 @@
       ],
       "declaredPrerequisites": [
         "B3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/25",
+      "issueNumber": 25
     },
     {
       "key": "C3",
@@ -538,7 +558,9 @@
       ],
       "declaredPrerequisites": [
         "C2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/26",
+      "issueNumber": 26
     },
     {
       "key": "C4",
@@ -583,7 +605,9 @@
       "declaredPrerequisites": [
         "C1",
         "C2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/27",
+      "issueNumber": 27
     },
     {
       "key": "C5",
@@ -627,7 +651,9 @@
         "C2",
         "D1",
         "E3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/28",
+      "issueNumber": 28
     },
     {
       "key": "D1",
@@ -671,7 +697,9 @@
       "declaredPrerequisites": [
         "A3",
         "B3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/29",
+      "issueNumber": 29
     },
     {
       "key": "D2",
@@ -715,7 +743,9 @@
       "declaredPrerequisites": [
         "D1",
         "I1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/30",
+      "issueNumber": 30
     },
     {
       "key": "D3",
@@ -760,7 +790,9 @@
       "declaredPrerequisites": [
         "D2",
         "B2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/31",
+      "issueNumber": 31
     },
     {
       "key": "D4",
@@ -804,7 +836,9 @@
       "declaredPrerequisites": [
         "A4",
         "D2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/32",
+      "issueNumber": 32
     },
     {
       "key": "D5",
@@ -847,7 +881,9 @@
       "declaredPrerequisites": [
         "D2",
         "I1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/33",
+      "issueNumber": 33
     },
     {
       "key": "D6",
@@ -894,7 +930,9 @@
         "E2",
         "I1",
         "E1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/34",
+      "issueNumber": 34
     },
     {
       "key": "E1",
@@ -934,7 +972,9 @@
       "integration": [
         "Produce versioned fixtures, expected-outcome schemas and scorer inputs consumed by D6 and E2-E6 P07 proofs; keep expected data outside provider implementation paths so tested adapters cannot rewrite the answer key."
       ],
-      "declaredPrerequisites": []
+      "declaredPrerequisites": [],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/35",
+      "issueNumber": 35
     },
     {
       "key": "E2",
@@ -978,7 +1018,9 @@
       "declaredPrerequisites": [
         "A3",
         "E1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/36",
+      "issueNumber": 36
     },
     {
       "key": "E3",
@@ -1028,7 +1070,9 @@
         "D1",
         "E2",
         "E1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/37",
+      "issueNumber": 37
     },
     {
       "key": "E4",
@@ -1076,7 +1120,9 @@
         "D5",
         "D6",
         "E3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/38",
+      "issueNumber": 38
     },
     {
       "key": "E5",
@@ -1125,7 +1171,9 @@
         "D1",
         "E2",
         "E1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/39",
+      "issueNumber": 39
     },
     {
       "key": "E6",
@@ -1175,7 +1223,9 @@
         "C4",
         "E3",
         "C5"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/40",
+      "issueNumber": 40
     },
     {
       "key": "F1",
@@ -1217,7 +1267,9 @@
       "declaredPrerequisites": [
         "B3",
         "D1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/41",
+      "issueNumber": 41
     },
     {
       "key": "F2",
@@ -1261,7 +1313,9 @@
       "declaredPrerequisites": [
         "F1",
         "E3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/42",
+      "issueNumber": 42
     },
     {
       "key": "F3",
@@ -1310,7 +1364,9 @@
         "A4",
         "I1",
         "B2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/43",
+      "issueNumber": 43
     },
     {
       "key": "F4",
@@ -1354,7 +1410,9 @@
         "F1",
         "C4",
         "F2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/44",
+      "issueNumber": 44
     },
     {
       "key": "G1",
@@ -1398,7 +1456,9 @@
       "declaredPrerequisites": [
         "B3",
         "I1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/45",
+      "issueNumber": 45
     },
     {
       "key": "G2",
@@ -1442,7 +1502,9 @@
       "declaredPrerequisites": [
         "C4",
         "G1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/46",
+      "issueNumber": 46
     },
     {
       "key": "G3",
@@ -1485,7 +1547,9 @@
       "declaredPrerequisites": [
         "G2",
         "A3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/47",
+      "issueNumber": 47
     },
     {
       "key": "G4",
@@ -1528,7 +1592,9 @@
       "declaredPrerequisites": [
         "G3",
         "A4"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/48",
+      "issueNumber": 48
     },
     {
       "key": "H1",
@@ -1580,7 +1646,9 @@
         "E3",
         "F1",
         "J1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/49",
+      "issueNumber": 49
     },
     {
       "key": "H2",
@@ -1630,7 +1698,9 @@
         "C3",
         "C4",
         "F4"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/50",
+      "issueNumber": 50
     },
     {
       "key": "H3",
@@ -1682,7 +1752,9 @@
         "E5",
         "D3",
         "C5"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/51",
+      "issueNumber": 51
     },
     {
       "key": "H4",
@@ -1732,7 +1804,9 @@
         "B4",
         "E3",
         "I2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/52",
+      "issueNumber": 52
     },
     {
       "key": "I1",
@@ -1775,7 +1849,9 @@
         "Own infra/environments/**, docs/evidence/environment/**, apps/*/wrangler.jsonc, convex.json and infra/bindings/**; report missing prerequisites to the map owner instead of silently changing downstream scope.",
         "This root ticket owns environment discovery/descriptors independently of A2. A3 reconciles the descriptor and chosen CLI/package versions with the certified runtime contracts. Resource-owning feature tickets provision their actual development bindings as part of their real integration proof; a missing credential or resource remains blocked, not a mock pass."
       ],
-      "declaredPrerequisites": []
+      "declaredPrerequisites": [],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/53",
+      "issueNumber": 53
     },
     {
       "key": "I2",
@@ -1818,7 +1894,9 @@
       ],
       "declaredPrerequisites": [
         "A3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/54",
+      "issueNumber": 54
     },
     {
       "key": "I3",
@@ -1866,7 +1944,9 @@
         "C3",
         "C4",
         "D3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/55",
+      "issueNumber": 55
     },
     {
       "key": "I4",
@@ -1927,7 +2007,9 @@
         "E4",
         "I2",
         "B2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/56",
+      "issueNumber": 56
     },
     {
       "key": "I5",
@@ -1973,7 +2055,9 @@
         "A3",
         "D3",
         "I2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/57",
+      "issueNumber": 57
     },
     {
       "key": "I6",
@@ -2020,7 +2104,9 @@
         "I5",
         "B2",
         "G3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/58",
+      "issueNumber": 58
     },
     {
       "key": "I7",
@@ -2070,7 +2156,9 @@
         "D4",
         "F3",
         "I2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/59",
+      "issueNumber": 59
     },
     {
       "key": "J1",
@@ -2123,7 +2211,9 @@
         "C2",
         "D1",
         "E3"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/60",
+      "issueNumber": 60
     },
     {
       "key": "J2",
@@ -2190,7 +2280,9 @@
         "H4",
         "C5",
         "H1"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/61",
+      "issueNumber": 61
     },
     {
       "key": "J3",
@@ -2233,7 +2325,9 @@
         "J2",
         "E1",
         "I2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/62",
+      "issueNumber": 62
     },
     {
       "key": "J4",
@@ -2291,7 +2385,9 @@
         "G4",
         "I7",
         "B2"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/63",
+      "issueNumber": 63
     },
     {
       "key": "J5",
@@ -2353,7 +2449,11 @@
         "I7",
         "I3",
         "I4"
-      ]
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/64",
+      "issueNumber": 64
     }
-  ]
+  ],
+  "implementationMap": "https://github.com/wojtekpiskorz/kiero/issues/15",
+  "nativeCoreEdges": 100
 }
