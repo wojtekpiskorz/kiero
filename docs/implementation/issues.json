@@ -6,15 +6,70 @@
   "prototypeCommit": "5e3dd7e40642a4bf3221f04abea575b8cd411aff",
   "architectureCommit": "efc03fecbc361d04260cf034d11aa3c3707bbda5",
   "roots": [
-    "A1",
-    "E1",
-    "I1"
+    "A0"
   ],
   "entries": [
     {
+      "key": "A0",
+      "title": "[A0] Set up advisory PR review with thermo-nuclear and unslop",
+      "blockedBy": [],
+      "declaredPrerequisites": [],
+      "ownedPaths": [
+        ".github/workflows/ai-review.yml",
+        ".agents/skills/thermo-nuclear-code-quality-review/**",
+        ".agents/skills/unslop/**",
+        ".agents/skills/README.md",
+        "AGENTS.md",
+        "CONTEXT.md",
+        "docs/operations/pr-review.md",
+        "docs/evidence/pr-review/**"
+      ],
+      "proofs": [],
+      "sources": [
+        "architecture"
+      ],
+      "problem": "Every core implementation PR needs the same advisory engineering and prose review used in Astroix from the start. Kiero main currently has no application workspace or review workflow, so setup must work before application bootstrap and before the independent corpus and environment PRs.",
+      "solution": "Install a Kiero-specific version of Astroix AI review: the vendored thermo-nuclear-code-quality-review and unslop skills, local repository rules and accepted glossary, and a standalone GitHub Actions workflow using the Z.AI Coding Plan through Claude Code Action. Review each eligible PR in its code and discussion context, then publish advisory comments. The owner requested this addition after the original charter. Establish this setup before A1, E1 and I1; those three remain independent after A0 closes. The source reference is the verified Astroix commit d4f1bc218261cf6c76984ca2c384df7f7b5bd80e.",
+      "acceptance": [
+        "Preserve the Astroix PR flow: pull_request opened, synchronize, reopened and ready_for_review; skip draft and fork PRs; cancel superseded runs through a per-PR concurrency group; use a 30-minute job timeout. Record the reviewed PR head SHA. Use pull_request, not a privileged pull_request_target job that executes PR code.",
+        "Use the repository Actions secret ZAI_API_KEY for https://api.z.ai/api/anthropic, with ANTHROPIC_AUTH_TOKEN and the action anthropic_api_key input. Match the reference configuration: glm-5.3 as reviewer and Opus/Sonnet mapping, glm-5.3-flash as Haiku mapping, max effort and API_TIMEOUT_MS=3000000. Verify the configured route during the actual smoke run and record failures rather than inventing a working model.",
+        "Start from anthropics/claude-code-action@62529b7c89dbb8cfaa838f2c87f2f8459b46fe68, the SHA pinned in the reference. Pass github.token explicitly so posting uses github-actions[bot] and does not require installing the Claude GitHub App. Keep contents: read, pull-requests: write, include_fix_links: false and an explicit inspection/comment tool allowlist. Record any necessary action-version change and its reason.",
+        "Vendor both skill directories including their LICENSE files, with upstream version/provenance in .agents/skills/README.md. Preserve the imported skill text; put Kiero-specific adaptation in the review prompt and repository instructions. Commit the accepted Kiero CONTEXT.md from the handoff snapshot without changing domain meanings. Create concise Kiero AGENTS.md rules compatible with the execution charter, including rtk, one issue per PR and independent parallel lanes.",
+        "The prompt applies thermo-nuclear review to engineering choices and unslop to changed prose and reviewer output, reads Kiero AGENTS.md and CONTEXT.md, and inspects the full diff plus relevant surrounding files. Recover prior rounds from PR comments, verify fixes wherever they landed, keep explicitly rejected or overruled findings closed, and avoid repeating deterministic check findings.",
+        "Post one advisory summary per PR and edit it across pushes using the reference gh pr comment --edit-last --create-if-none --body-file flow, with inline comments only for high-conviction actionable findings. Publish at the end of the run; a canceled or superseded run must not replace the current review. The reviewer does not edit code, push commits, merge, approve or request changes as a merge gate.",
+        "AI review is advisory and is not added to required status checks. Findings do not fail deterministic CI. Authentication, provider or runner failures remain visible as operational failures and cannot be reported as completed reviews. Missing ZAI_API_KEY yields a clear setup diagnosis without printing its value.",
+        "The A0 workflow runs in the pre-application repository with no dependency on A1 package.json, lockfile, build, fixtures or CRAP tooling. Use a suitable standalone Node runtime for the pinned action, matching Node 24 in the reference where supported. Omit Astroix-specific npm installs, e2e/fixture, crap:ci, thresholds and legacy product paths. A1 later owns deterministic checks.yml independently.",
+        "Treat same-repository PR contributors as trusted for the credential-bearing review job; draft/fork skipping and read/comment limits must remain explicit. Scope the Z.AI secret to the review invocation, keep checkout credentials from becoming persisted write credentials, and keep secret values out of files, prompts, comments and evidence.",
+        "After the owner adds ZAI_API_KEY, prove the workflow on a real Kiero PR and a subsequent push before closure. Integrate the setup into main through its own PR. Attach run and comment links, exact commit/configuration, observed outcomes and any remaining setup blocker. File presence or a skipped job is not successful activation."
+      ],
+      "tests": [
+        "Validate workflow syntax and pinned action inputs, all referenced skill/instruction paths and licenses in a fresh pre-A1 checkout. Confirm no application install, package script or Astroix-only path is required.",
+        "Exercise draft-to-ready, opened/synchronize and reopened handling; verify the current head is reviewed. Test rapid pushes and inspect canceled runs and comment timestamps to ensure old output cannot replace the latest summary.",
+        "Use a controlled real PR with a clear engineering defect and slopped prose to verify both skills are applied. Push the fix and verify the same summary comment is updated, corrected findings disappear and new high-conviction findings remain reportable. Verify owner rulings from the thread are respected.",
+        "Check draft and fork event conditions without supplying real secrets to an untrusted fork. Check missing-secret behavior in an isolated no-secret validation. Redact all authentication data from logs and evidence.",
+        "Inspect live required checks and workflow permissions. Confirm advisory review is not required for merge and cannot write repository code. Document any GitHub Actions permission restriction as a concrete setup blocker.",
+        "After integration, record main containing the workflow and the successful run/comment evidence. A1, E1 and I1 must start their PRs from a base that includes this setup."
+      ],
+      "integration": [
+        "Producer: standalone .github/workflows/ai-review.yml plus vendored review skills and Kiero instructions. Consumers: every later implementation PR, beginning with A1, E1 and I1.",
+        "A1 owns .github/workflows/checks.yml and future application dependency setup. Preserve A0 review files and accepted glossary when importing the handoff documents. This separation avoids an A0/A1 dependency cycle.",
+        "The owner supplies ZAI_API_KEY through the repository secret store. Provisioning this secret is separate from OPENROUTER_API_KEY, which remains the application model credential. Verify names and access without reading secret values.",
+        "Reference workflow: [Astroix AI review](https://github.com/wojtekpiskorz/astroix/blob/d4f1bc218261cf6c76984ca2c384df7f7b5bd80e/.github/workflows/ai-review.yml). Reference skills: [thermo-nuclear](https://github.com/wojtekpiskorz/astroix/blob/d4f1bc218261cf6c76984ca2c384df7f7b5bd80e/.agents/skills/thermo-nuclear-code-quality-review/SKILL.md), [unslop](https://github.com/wojtekpiskorz/astroix/blob/d4f1bc218261cf6c76984ca2c384df7f7b5bd80e/.agents/skills/unslop/SKILL.md), and [vendoring provenance](https://github.com/wojtekpiskorz/astroix/blob/d4f1bc218261cf6c76984ca2c384df7f7b5bd80e/.agents/skills/README.md). Local source: /Users/woji/Dev/playground/Astroix. Recheck any later upstream change before adapting it."
+      ],
+      "nonGoals": [
+        "Application implementation, Convex/Cloudflare provisioning, OpenRouter calls, deployment or final UX/UI.",
+        "Adding AI review to branch protection as a required merge gate, automatic fixes or merges, or importing Astroix product-specific tests and CRAP metrics.",
+        "Changing any existing accepted domain decision or editing the Astroix repository."
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/65",
+      "issueNumber": 65
+    },
+    {
       "key": "A1",
       "title": "[A1] Bootstrap the pinned core workspace and test commands",
-      "blockedBy": [],
+      "blockedBy": [
+        "A0"
+      ],
       "ownedPaths": [
         "package.json",
         "package-lock.json",
@@ -37,12 +92,13 @@
         "architecture"
       ],
       "problem": "The main branch has no production application or pinned toolchain. Parallel agents need one reproducible workspace and checks before they can safely implement modules.",
-      "solution": "Import the published handoff contracts into the application mainline without importing the throwaway UI implementation. Bootstrap npm workspaces for the declared deployment/module layout, strict TypeScript, React/Vite, Convex, Effect 4 RC and the selected TanStack packages. Pin published compatible packages and establish focused test/build commands.",
+      "solution": "Preserve the A0 review setup and glossary while importing the published handoff contracts into the application mainline without importing the throwaway UI implementation. Bootstrap npm workspaces for the declared deployment/module layout, strict TypeScript, React/Vite, Convex, Effect 4 RC and the selected TanStack packages. Pin published compatible packages and establish focused test/build commands.",
       "acceptance": [
         "Inspect the real checkout and package/runtime documentation; preserve unrelated untracked docs and local secrets. Record the selected versions and rationale. Effect 4 RC remains the selected major; a failed compatibility probe cannot silently substitute Effect 3.",
         "Create the app, gateway, executor and package skeletons named by the charter with stable exports. Provide workspace scripts for typecheck, focused tests and build, and environment-example names with no values.",
         "Prove clean install from the lockfile, strict compile and an executable empty app. CI uses the same pinned dependency graph. Server-only environment access cannot enter the client build.",
-        "Bootstrap is responsible for root dependencies and reusable fixture/test helpers. Later features own their declared paths. Ignore local env files and generated/deployment artifacts intentionally."
+        "Bootstrap is responsible for root dependencies and reusable fixture/test helpers. Later features own their declared paths. Ignore local env files and generated/deployment artifacts intentionally.",
+        "Start from integrated A0 so this issue PR receives the configured thermo-nuclear and unslop review. Preserve its workflow, vendored skills and accepted repository instructions."
       ],
       "tests": [
         "Fresh temporary checkout: npm ci, typecheck, initial test/build commands.",
@@ -53,9 +109,11 @@
         "No business modules, provider calls, final UI design or migration of prototype heuristics."
       ],
       "integration": [
-        "A2 consumes the workspace exports and owns the schema/command baseline. A4 consumes the app host. I1 and E1 can run independently because they own environment evidence and static corpus assets."
+        "A2 consumes the workspace exports and owns the schema/command baseline. A4 consumes the app host. After A0, I1 and E1 can run independently because they own environment evidence and static corpus assets."
       ],
-      "declaredPrerequisites": [],
+      "declaredPrerequisites": [
+        "A0"
+      ],
       "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/16",
       "issueNumber": 16
     },
@@ -937,7 +995,9 @@
     {
       "key": "E1",
       "title": "[E1] Build the independent Polish evaluation corpus and expected outcomes",
-      "blockedBy": [],
+      "blockedBy": [
+        "A0"
+      ],
       "ownedPaths": [
         "evals/corpus/**",
         "evals/expected/**",
@@ -958,7 +1018,8 @@
         "Expected results separate STT text, vision extraction, retrieval evidence, durable memory changes, clarifications and prohibited writes.",
         "A repeatable runner contract resets starting state per case and can report provider/model/prompt/schema versions, latency, attempts and cost.",
         "Pre-alpha acceptance is at least 48 of 50 correct in each of three complete runs with zero critical wrong amount, date, commitment, project attribution or source basis.",
-        "A correct required clarification counts as success; needless clarification on clear evidence fails that expected outcome."
+        "A correct required clarification counts as success; needless clarification on clear evidence fails that expected outcome.",
+        "Start from integrated A0 so this issue PR receives the configured thermo-nuclear and unslop review. Preserve its workflow, vendored skills and accepted repository instructions."
       ],
       "tests": [
         "Validate modality counts, unique IDs, asset availability, tenant isolation and complete expected/prohibited fields in CI.",
@@ -972,7 +1033,9 @@
       "integration": [
         "Produce versioned fixtures, expected-outcome schemas and scorer inputs consumed by D6 and E2-E6 P07 proofs; keep expected data outside provider implementation paths so tested adapters cannot rewrite the answer key."
       ],
-      "declaredPrerequisites": [],
+      "declaredPrerequisites": [
+        "A0"
+      ],
       "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/35",
       "issueNumber": 35
     },
@@ -1811,7 +1874,9 @@
     {
       "key": "I1",
       "title": "[I1] Verify CLI access and prepare isolated EU development resources",
-      "blockedBy": [],
+      "blockedBy": [
+        "A0"
+      ],
       "ownedPaths": [
         "infra/environments/**",
         "docs/evidence/environment/**",
@@ -1833,7 +1898,8 @@
         "Local, synthetic staging, and future alpha production identities/bindings cannot be confused by default commands.",
         "Convex/Cloudflare region and plan facts are measured from actual accessible tooling where possible and unverified claims remain explicit.",
         "No provider plan is changed and no paid or production service is created by this ticket.",
-        "A3 must have usable isolated Convex development project access and Cloudflare gateway/R2 bindings or a precise prerequisite before it can pass. Record each additional resource as reused, provisioned within already-authorized development scope, or explicitly pending; a descriptor alone is not a deployment proof."
+        "A3 must have usable isolated Convex development project access and Cloudflare gateway/R2 bindings or a precise prerequisite before it can pass. Record each additional resource as reused, provisioned within already-authorized development scope, or explicitly pending; a descriptor alone is not a deployment proof.",
+        "Start from integrated A0 so this issue PR receives the configured thermo-nuclear and unslop review. Preserve its workflow, vendored skills and accepted repository instructions."
       ],
       "tests": [
         "Run the preflight in a clean shell and CI-safe no-secret mode; prove missing CLI, missing auth, missing binding, wrong account, and unavailable capability yield actionable failures.",
@@ -1847,9 +1913,11 @@
       "integration": [
         "Produce environment binding contracts consumed by A3, D2/D5/D6, F3, G1, I2, I5, and I7; own the non-secret binding skeletons listed below; A3 consumes and validates them without a second writer.",
         "Own infra/environments/**, docs/evidence/environment/**, apps/*/wrangler.jsonc, convex.json and infra/bindings/**; report missing prerequisites to the map owner instead of silently changing downstream scope.",
-        "This root ticket owns environment discovery/descriptors independently of A2. A3 reconciles the descriptor and chosen CLI/package versions with the certified runtime contracts. Resource-owning feature tickets provision their actual development bindings as part of their real integration proof; a missing credential or resource remains blocked, not a mock pass."
+        "After A0, this ticket owns environment discovery/descriptors independently of A2. A3 reconciles the descriptor and chosen CLI/package versions with the certified runtime contracts. Resource-owning feature tickets provision their actual development bindings as part of their real integration proof; a missing credential or resource remains blocked, not a mock pass."
       ],
-      "declaredPrerequisites": [],
+      "declaredPrerequisites": [
+        "A0"
+      ],
       "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/53",
       "issueNumber": 53
     },
@@ -2454,6 +2522,12 @@
       "issueNumber": 64
     }
   ],
+  "reviewSetupReference": {
+    "repository": "wojtekpiskorz/astroix",
+    "commit": "d4f1bc218261cf6c76984ca2c384df7f7b5bd80e",
+    "workflow": ".github/workflows/ai-review.yml",
+    "secretName": "ZAI_API_KEY"
+  },
   "implementationMap": "https://github.com/wojtekpiskorz/kiero/issues/15",
-  "nativeCoreEdges": 100
+  "nativeCoreEdges": 103
 }

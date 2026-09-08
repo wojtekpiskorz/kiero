@@ -16,6 +16,10 @@ The application starts in the company conversation. Voice is a record/stop/send 
 
 The unstyled UI uses semantic forms, buttons, lists and plain status/error text. It must support keyboard use, phone capture and responsive overflow without a design-system project. Feature-local controls expose actual operations and state. Final typography, visual language, polished navigation and complete design assets belong to the UX/UI package. Simulated fixtures are suitable for deterministic tests; runtime workflows must reach the real backend and selected providers.
 
+## Advisory review setup
+
+A0 precedes the three implementation lanes. It installs and proves the Astroix-style thermo-nuclear and unslop workflow before A1, E1 and I1 create their PRs. Review comments are advisory; deterministic required checks remain separate. A0 owns `.github/workflows/ai-review.yml`, vendored review skills and initial Kiero instructions/glossary. It runs without application dependencies. A1 preserves this setup while adding `.github/workflows/checks.yml`, the workspace and the remaining handoff contracts. The reference and activation evidence are specified by A0 in the [issue manifest](issues.json).
+
 ## Initial module layout and ownership
 
 The bootstrap and contract tickets establish these paths before parallel consumers edit them. Paths describe deployment and domain ownership, not a requirement for one class or wrapper per operation.

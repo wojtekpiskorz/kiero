@@ -2,7 +2,7 @@
 
 Build the complete accepted core behind an unstyled, functional PWA. The owner wants real data and real processing early, while full UX/UI is developed separately from the [UX/UI package](../handoffs/ux-ui/README.md). This package is an execution plan; no application implementation or provider proof has run during chartering.
 
-Live tracker: [Implementation map: Kiero core MVP and barebones PWA](https://github.com/wojtekpiskorz/kiero/issues/15). Its 49 native sub-issues contain the full implementation scopes; native blockers determine which work can start.
+Live tracker: [Implementation map: Kiero core MVP and barebones PWA](https://github.com/wojtekpiskorz/kiero/issues/15). Its 50 native sub-issues contain the full implementation scopes; native blockers determine which work can start.
 
 Read in this order:
 
@@ -16,6 +16,10 @@ Read in this order:
 ## Start another agent
 
 > Implement one currently unassigned, open, unblocked issue from the Kiero core implementation map. First read its complete body, the execution charter, its linked contracts and the live checkout. Claim only that issue, create an issue-specific `codex/` worktree branch, and preserve unrelated changes. Deliver the issue's real behavior through its declared module interface and barebones Polish controls where specified. Use the selected Convex/Effect/Cloudflare/OpenRouter architecture and prove the stated integration. Record failures honestly and keep secrets server-side. Before editing a shared contract or another issue's paths, resolve ownership and add the necessary prerequisite rather than silently widening the task. Open one reviewable PR with focused evidence. Independent ready issues may run in parallel; their merges and shared generated files are coordinated. Reconcile live blockers after integration. Do not implement final styling or substitute prototype simulations for real behavior.
+
+## PR review before implementation
+
+A0 installs the Astroix-style advisory thermo-nuclear and unslop review. It is the first ready issue; A1, E1 and I1 depend on it and can run concurrently once it is integrated and proved. The review uses the repository Actions secret `ZAI_API_KEY`, separately from the application OpenRouter key. Add it interactively with `rtk proxy gh secret set ZAI_API_KEY --repo wojtekpiskorz/kiero`. The issue specifies the reference files and live PR evidence required for activation.
 
 ## First useful checkpoint
 
