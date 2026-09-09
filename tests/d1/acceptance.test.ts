@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { events } from "@kiero/contracts";
 import {
   MAX_AUTHOR_TEXT_LENGTH,
   MAX_FUTURE_SENT_AT_SKEW_MS,
@@ -15,6 +16,7 @@ import {
   canonicalAcceptancePayload,
   decideAcceptance,
   dedupeProjectHints,
+  registrationTargets,
   resolveSentAtMs,
   validateAuthorText,
   validateTimezoneSnapshot,
@@ -137,5 +139,37 @@ describe("one logical key, one source (replay vs conflict vs edit)", () => {
     expect(decideAcceptance({ acceptanceFingerprint: undefined }, "fp")).toEqual({
       decision: "conflict",
     });
+  });
+});
+
+describe("registration pre-flight (the structural atomicity gate)", () => {
+  it("resolves the composed registry targets before anything can be written", () => {
+    const result = registrationTargets();
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.targets.eventEntry.name).toBe("sources.sourceAccepted");
+      expect(result.targets.executor.jobKind).toBe("processing.extract_fragments");
+    }
+  });
+
+  it("fails closed with a typed unavailable error when the registry loses the event", () => {
+    // Contract drift simulation: the pre-flight must refuse BEFORE any insert
+    // could happen (a post-insert failure would commit a partial acceptance
+    // because the checked dispatch converts handler throws into envelopes).
+    const original = events["sources.sourceAccepted"];
+    if (original === undefined) {
+      throw new Error("fixture missing: sources.sourceAccepted not registered");
+    }
+    delete events["sources.sourceAccepted"];
+    try {
+      const result = registrationTargets();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error._tag).toBe("unavailable");
+        expect(result.error.code).toBe("source_accepted_event_missing");
+      }
+    } finally {
+      events["sources.sourceAccepted"] = original;
+    }
   });
 });

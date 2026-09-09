@@ -6,11 +6,20 @@
  * happen first, then the immutable source, its project links, the initial
  * processing run, the text extraction, the canonical `sources.sourceAccepted`
  * event and the durable `processing.extract_fragments` registration commit
- * together through the A3 transactional publication primitives. If anything
- * aborts — a thrown validation, a crash, a conflict — nothing commits, so an
- * accepted source can never exist without its durable processing
- * registration (no accepted orphan), and durable work can never exist
- * without the accepted source (no orphan work).
+ * together through the A3 transactional publication primitives.
+ *
+ * ATOMICITY IS STRUCTURAL, NOT WRITE-ORDER-DEPENDENT. The checked dispatch
+ * converts any handler throw into a sanitized `unavailable` envelope and a
+ * Convex mutation that RETURNS commits what it wrote — so "throw somewhere
+ * between the writes" would commit a partial acceptance (an accepted source
+ * with no event/job). Therefore every step that can throw (registry entry
+ * lookups, executor lookup, the payload/input/result schema decodes) runs in
+ * `registrationTargets()` BEFORE the first insert; between the first insert
+ * and the final registration only pre-validated writes and total decodes of
+ * transaction-generated values (Convex ids, `Date.now()`, literal empty
+ * arrays) remain. An abort at any point — validation return, pre-insert
+ * throw, post-insert crash of the mutation itself — leaves nothing
+ * committed: no accepted orphan, no orphan work.
  *
  * The text of a source is its own extraction: the author's words need no
  * model, so acceptance records the `text` extraction version (provider
@@ -25,13 +34,17 @@
 import { Schema } from "effect";
 import {
   errorResult,
+  events,
+  executors,
   okResult,
   sourcesOperations,
+  type ExecutorEntry,
   type ResultEnvelope,
 } from "@kiero/contracts";
 import {
   forbiddenError,
   idempotencyConflictError,
+  unavailableError,
   validationError,
   type RequestContext,
 } from "@kiero/runtime";
@@ -200,6 +213,66 @@ export function decideAcceptance(
 // The acceptance transaction (runs inside ONE Convex mutation).
 // ---------------------------------------------------------------------------
 
+/**
+ * A representative table id used only by the pre-insert decode templates: a
+ * string of exactly the kind this transaction will later hold (Convex
+ * document ids are strings to these branded schemas), so a template decode
+ * proves the registry schema still accepts the shapes the transaction
+ * produces — BEFORE anything is written.
+ */
+const REGISTRATION_TEMPLATE_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f";
+
+/** The registry targets one acceptance must be able to register against. */
+export interface RegistrationTargets {
+  /** The composed registry entry for `sources.sourceAccepted`. */
+  readonly eventEntry: (typeof events)["sources.sourceAccepted"];
+  /** The composed executor that owns `processing.extract_fragments`. */
+  readonly executor: ExecutorEntry;
+}
+
+/**
+ * Resolves everything that can THROW during registration — registry entry
+ * lookups, the executor lookup, and decode templates proving the event
+ * payload, job input and receipt schemas still accept the exact shapes this
+ * transaction produces. Callers MUST run this BEFORE the first insert: a
+ * failure here is a sanitized `unavailable` envelope with nothing written,
+ * while the same failure after the first insert would commit a partial
+ * acceptance (the checked dispatch converts handler throws into returned
+ * error envelopes, and a returning mutation commits its writes).
+ *
+ * Missing entries fail closed as typed errors; template mismatches (contract
+ * drift) throw before any write and reach the caller sanitized.
+ */
+export function registrationTargets(): { ok: true; targets: RegistrationTargets } | {
+  ok: false;
+  error: ReturnType<typeof unavailableError>;
+} {
+  const eventEntry = events["sources.sourceAccepted"];
+  if (eventEntry === undefined) {
+    return { ok: false, error: unavailableError(true, "source_accepted_event_missing") };
+  }
+  const executor = executors.find((candidate) => candidate.jobKind === "processing.extract_fragments");
+  if (executor === undefined) {
+    return { ok: false, error: unavailableError(true, "processing_executor_missing") };
+  }
+  // Decode templates (throw here, before any write, on contract drift):
+  // the event payload, the executor input and the receipt the transaction
+  // will construct from transaction-generated values.
+  Schema.decodeUnknownSync(eventEntry.payload)({
+    sourceId: REGISTRATION_TEMPLATE_ID,
+    attachmentIds: [],
+  });
+  Schema.decodeUnknownSync(executor.input)({
+    sourceId: REGISTRATION_TEMPLATE_ID,
+    extractionId: REGISTRATION_TEMPLATE_ID,
+  });
+  Schema.decodeUnknownSync(acceptSourceEntry.result)({
+    sourceId: REGISTRATION_TEMPLATE_ID,
+    fullyAcceptedAtMs: 0,
+  });
+  return { ok: true, targets: { eventEntry, executor } };
+}
+
 /** Slim row fields the transaction needs from a source row. */
 interface SourceRow {
   readonly _id: Id<"sources">;
@@ -325,7 +398,16 @@ export async function performAcceptance(
     linkedProjects.push(projectId);
   }
 
+  // --- pre-flight: every throwing step resolves BEFORE the first insert ----
+  const targets = registrationTargets();
+  if (!targets.ok) {
+    return errorResult(targets.error);
+  }
+
   // --- the atomic commit: source + links + run + extraction + event + job --
+  // From here on only pre-validated writes and total decodes of
+  // transaction-generated values remain (see the module docstring): an
+  // abort can no longer strand a partial acceptance.
   const sourceId = await tx.db.insert("sources", {
     companyId,
     authorUserId,

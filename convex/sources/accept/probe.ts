@@ -1,6 +1,7 @@
 /**
  * D1 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, exactly like the A3 platform probes).
+ * variable, exactly like the A3 platform probes; shared plumbing lives in
+ * ./probe_shared.ts).
  *
  * No business work happens here; these entries exist so the D1 evidence can
  * run against the REAL dev deployment without a development-auth shortcut:
@@ -26,39 +27,26 @@
 import { v } from "convex/values";
 import { Schema } from "effect";
 import { action, internalMutation, internalQuery } from "../../_generated/server";
-import { api, internal } from "../../_generated/api";
+import { internal } from "../../_generated/api";
 import {
   CommandEnvelope,
   errorResult,
   okResult,
   type ResultEnvelope,
 } from "@kiero/contracts";
-import { forbiddenError, unsupportedError, membershipPolicy, type RequestContext } from "@kiero/runtime";
+import { forbiddenError, membershipPolicy, type RequestContext } from "@kiero/runtime";
 import { bridgeIdentity, resolveRequestContext } from "../../platform/context";
 import { acceptSourceEntry, performAcceptance } from "./acceptance";
-import type { ActionCtx } from "../../_generated/server";
-
-const SERVICE_EMAIL = "platform-service@kiero.invalid";
-const ISOLATION_EMAIL = "d1-isolation@kiero.invalid";
-const ISOLATION_COMPANY = "Kiero Dev Proof B (D1 isolation)";
-
-function probeGuardEnabled(): boolean {
-  return process.env.KIERO_PROBE_ENABLED === "1";
-}
-
-function probeDisabled(): ResultEnvelope {
-  return errorResult(unsupportedError("sources.probe", "probe_guard_disabled"));
-}
-
-function unavailable(): ResultEnvelope {
-  return errorResult(forbiddenError("service_identity_unavailable"));
-}
-
-/** Resolves the service session (the A3 fixture) for the default actor. */
-async function serviceSessionId(ctx: ActionCtx): Promise<string | null> {
-  const session = await ctx.runQuery(api.platform.probe.serviceSession, {});
-  return session === null ? null : session.sessionId;
-}
+import {
+  ISOLATION_COMPANY,
+  ISOLATION_EMAIL,
+  SERVICE_EMAIL,
+  bridgeContextForEmail,
+  probeDisabled,
+  probeGuardEnabled,
+  serviceIdentityUnavailable,
+  serviceSessionId,
+} from "./probe_shared";
 
 // --- acceptance probes ---------------------------------------------------------
 
@@ -71,7 +59,7 @@ export const probeAcceptSource = action({
     }
     const sessionId = args.sessionId ?? (await serviceSessionId(ctx));
     if (sessionId === null) {
-      return unavailable();
+      return serviceIdentityUnavailable();
     }
     return ctx.runMutation(internal.sources.accept.commands.acceptSourceTransaction, {
       envelope: args.envelope,
@@ -119,7 +107,7 @@ export const probeCrashAcceptance = action({
     }
     const sessionId = args.sessionId ?? (await serviceSessionId(ctx));
     if (sessionId === null) {
-      return unavailable();
+      return serviceIdentityUnavailable();
     }
     return ctx.runMutation(internal.sources.accept.probe.crashAcceptance, {
       envelope: args.envelope,
@@ -130,41 +118,17 @@ export const probeCrashAcceptance = action({
 
 // --- fixtures -------------------------------------------------------------------
 
-/** Resolves the service account's session-based request context, or null. */
-async function serviceContext(
-  db: Parameters<typeof resolveRequestContext>[0],
-): Promise<{ context: RequestContext } | null> {
-  const user = await db
-    .query("users")
-    .withIndex("by_email", (q) => q.eq("email", SERVICE_EMAIL))
-    .first();
-  if (user === null) {
-    return null;
-  }
-  const session = await db
-    .query("sessions")
-    .withIndex("by_user_started", (q) => q.eq("userId", user._id))
-    .order("desc")
-    .filter((q) => q.eq(q.field("revokedAtMs"), undefined))
-    .first();
-  if (session === null) {
-    return null;
-  }
-  const context = await resolveRequestContext(db, bridgeIdentity(session._id, Date.now()));
-  return context === null ? null : { context };
-}
-
 /** Ensures one project in the service company (guarded; idempotent by name). */
 export const seedProject = internalMutation({
   args: { displayName: v.string() },
   handler: async (ctx, args) => {
-    const resolved = await serviceContext(ctx.db);
-    if (resolved === null) {
-      return unavailable();
+    const context = await bridgeContextForEmail(ctx.db, SERVICE_EMAIL);
+    if (context === null) {
+      return serviceIdentityUnavailable();
     }
-    const companyId = ctx.db.normalizeId("companies", resolved.context.actor.companyId);
+    const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
     if (companyId === null) {
-      return unavailable();
+      return serviceIdentityUnavailable();
     }
     const existing = await ctx.db
       .query("projects")
@@ -201,14 +165,14 @@ export const probeSeedProject = action({
 export const seedUpload = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const resolved = await serviceContext(ctx.db);
-    if (resolved === null) {
-      return unavailable();
+    const context = await bridgeContextForEmail(ctx.db, SERVICE_EMAIL);
+    if (context === null) {
+      return serviceIdentityUnavailable();
     }
-    const companyId = ctx.db.normalizeId("companies", resolved.context.actor.companyId);
-    const userId = ctx.db.normalizeId("users", resolved.context.actor.userId);
+    const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
+    const userId = ctx.db.normalizeId("users", context.actor.userId);
     if (companyId === null || userId === null) {
-      return unavailable();
+      return serviceIdentityUnavailable();
     }
     const uploadId = await ctx.db.insert("uploads", {
       companyId,
@@ -420,7 +384,7 @@ export const probeAcceptanceState = action({
     }
     const sessionId = args.sessionId ?? (await serviceSessionId(ctx));
     if (sessionId === null) {
-      return unavailable();
+      return serviceIdentityUnavailable();
     }
     return ctx.runQuery(internal.sources.accept.probe.acceptanceState, {
       serviceSessionId: sessionId,
