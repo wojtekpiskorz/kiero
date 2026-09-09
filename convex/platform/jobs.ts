@@ -137,6 +137,11 @@ async function executeJob(ctx: MutationCtx, jobKey: string): Promise<void> {
       await ctx.scheduler.runAfter(0, outcome.action, { jobKey });
       return;
     }
+    case "delegated": {
+      // Terminal state is recorded by the workflow's onComplete hook, not
+      // here; the row stays `running` until the workflow reports.
+      return;
+    }
   }
 }
 

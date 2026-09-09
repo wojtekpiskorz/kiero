@@ -40,7 +40,7 @@ import { internal } from "../_generated/api";
 import { errorResult, newDurableJobKey, okResult, type ResultEnvelope } from "@kiero/contracts";
 import { notFoundError, unsupportedError } from "@kiero/runtime";
 import { dispatchMutationCommand } from "./dispatch";
-import { publishEvent } from "./publish";
+import { publishEvent, registerDurableJob } from "./publish";
 import { restartProofPipeline, startProofPipeline } from "./pipeline";
 import { vWorkflowId } from "@convex-dev/workflow";
 import { workflow } from "./pipeline";
@@ -343,7 +343,7 @@ export const probeFailPublication = action({
 export const failPublication = internalMutation({
   args: { message: v.string() },
   handler: async (ctx, args) => {
-    const { publishEvent, registerDurableJob } = await import("./publish");
+    // publishEvent/registerDurableJob are imported statically at the top.
     const company = await ctx.db.query("companies").first();
     if (company === null) {
       throw new Error("probe: no company fixture");
