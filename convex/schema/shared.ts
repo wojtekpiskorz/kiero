@@ -11,7 +11,7 @@
  *   file maps each of them to a Convex validator through an explicit,
  *   type-checked table: every entry's declared Convex type must equal the
  *   schema's Encoded (wire) type exactly, or this file does not compile.
- *   There is deliberately no general-purpose Schema→Validator compiler —
+ *   There is deliberately no general-purpose Schema→Validator compiler:
  *   only this checked mapping.
  *
  * The runtime half of the proof (decoded value → encode → Convex JSON wire →
@@ -37,11 +37,21 @@ import {
   TemporalValue,
 } from "@kiero/contracts";
 
-/** The wire representation of a semantic value schema. */
-type Encoded<S> = Schema.Codec.Encoded<S>;
+/**
+ * The wire representation of a semantic value or vocabulary schema. Exported
+ * so domain fragments can pin their hand-written closed unions to the
+ * contracts side; the mechanism lives here, the vocabularies stay in the
+ * owning fragment.
+ */
+export type Encoded<S> = Schema.Codec.Encoded<S>;
 
-/** A required Convex validator whose TypeScript type must match `T` exactly. */
-type ValueValidator<T> = Validator<T, "required", string>;
+/**
+ * A required Convex validator whose TypeScript type must match `T` exactly.
+ * Annotating a `v.*` expression with this type makes vocabulary drift (a
+ * missing, extra or misspelled literal) fail typecheck instead of passing
+ * silently.
+ */
+export type ValueValidator<T> = Validator<T, "required", string>;
 
 // ---------------------------------------------------------------------------
 // The one proved conversion path: Effect Schema semantic values → Convex
@@ -69,6 +79,7 @@ const temporalValueValidator: ValueValidator<Encoded<typeof TemporalValue>> =
       dateOnlyValidator,
       v.object({ _tag: v.literal("date_time"), value: v.string() }),
       v.object({
+        _tag: v.literal("range"),
         start: v.union(v.null(), dateOnlyValidator),
         end: v.union(v.null(), dateOnlyValidator),
       }),

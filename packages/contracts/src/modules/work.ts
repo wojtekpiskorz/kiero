@@ -1,9 +1,9 @@
 /**
- * Work module surface (architecture "Deep modules": Projects and work — the
+ * Work module surface (architecture "Deep modules": Projects and work, the
  * work half). Implements lanes: C4, F4 (reminders read side).
  *
  * Separate task and event semantics, independent parent/checklist completion,
- * executor/coordinator split, temporal findings bound by reference — a task
+ * executor/coordinator split, temporal findings bound by reference: a task
  * and an event may share one dated finding without owning divergent copies.
  *
  * State vocabularies from issue 9:
@@ -17,6 +17,7 @@
 
 import { Schema } from "effect";
 import { tableIdSchema } from "../tableIds";
+import { RevisionCounter } from "../actor";
 import { operationEntry, eventEntry } from "./registration";
 
 export const TaskState = Schema.Literals([
@@ -53,7 +54,7 @@ export const workOperations = {
       coordinatorMembershipId: Schema.NullOr(tableIdSchema("memberships")),
       /** Binding to the temporal finding that carries the deadline, if any. */
       deadlineFindingId: Schema.NullOr(tableIdSchema("findings")),
-      expectedRevision: Schema.Number,
+      expectedRevision: RevisionCounter,
     }),
     result: Schema.Struct({ taskId: tableIdSchema("tasks") }),
     errorKinds: ["forbidden", "not_found", "validation", "conflict"],
@@ -63,7 +64,7 @@ export const workOperations = {
     name: "work.changeTaskState",
     input: Schema.Struct({
       taskId: tableIdSchema("tasks"),
-      expectedRevision: Schema.Number,
+      expectedRevision: RevisionCounter,
       state: TaskState,
       /** Required when (and only when) the new state is `waiting`. */
       waitingReason: Schema.optionalKey(Schema.NonEmptyString),
@@ -79,7 +80,7 @@ export const workOperations = {
       itemId: Schema.NullOr(tableIdSchema("checklistItems")),
       description: Schema.NonEmptyString,
       state: ChecklistItemState,
-      expectedRevision: Schema.Number,
+      expectedRevision: RevisionCounter,
     }),
     result: Schema.Struct({ itemId: tableIdSchema("checklistItems") }),
     errorKinds: ["forbidden", "not_found", "validation", "conflict"],
@@ -93,7 +94,7 @@ export const workOperations = {
       title: Schema.NonEmptyString,
       /** Binding to the temporal finding that carries the known time, if any. */
       timeFindingId: Schema.NullOr(tableIdSchema("findings")),
-      expectedRevision: Schema.Number,
+      expectedRevision: RevisionCounter,
     }),
     result: Schema.Struct({ eventId: tableIdSchema("events") }),
     errorKinds: ["forbidden", "not_found", "validation", "conflict"],
@@ -103,7 +104,7 @@ export const workOperations = {
     name: "work.changeEventState",
     input: Schema.Struct({
       eventId: tableIdSchema("events"),
-      expectedRevision: Schema.Number,
+      expectedRevision: RevisionCounter,
       state: EventOccurrenceState,
     }),
     result: Schema.Struct({ eventId: tableIdSchema("events") }),

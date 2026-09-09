@@ -4,7 +4,7 @@
  * This file is NOT a vitest suite (root config runs only `*.test.ts`); the
  * root `tsc -p tsconfig.json` includes it and must keep it compiling. It
  * exercises the candidate interfaces the way later lanes will, with precise
- * inferred types and NO unchecked type assertions — a placeholder that can
+ * inferred types and NO unchecked type assertions: a placeholder that can
  * only compile via `as` would itself be a contract defect.
  */
 

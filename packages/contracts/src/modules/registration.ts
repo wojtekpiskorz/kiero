@@ -5,7 +5,7 @@
  * own fragment and registers: which operations it provides, which events it
  * publishes or consumes, and which durable job kinds it executes. Until a
  * lane implements an entry, dispatching it fails closed with the
- * `unsupported` closed error — a registration never claims business work.
+ * `unsupported` closed error: a registration never claims business work.
  *
  * The composed registry (see `./registry`) checks at construction that every
  * registered name actually exists in a module surface, so a typo'd

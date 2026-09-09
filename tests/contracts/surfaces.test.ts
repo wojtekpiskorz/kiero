@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
 import {
   ClosedError,
+  assertNoDuplicateExecutors,
   CommandEnvelope,
   DurableJobEnvelope,
   DomainEventEnvelope,
@@ -80,6 +81,16 @@ describe("composed registry integrity", () => {
     }
     const jobKinds = executors.map((e) => e.jobKind);
     expect(new Set(jobKinds).size).toBe(jobKinds.length);
+  });
+
+  it("fails loudly when two executors claim one job kind", () => {
+    const first = executors[0];
+    if (first === undefined) {
+      throw new Error("expected at least one registered executor");
+    }
+    const duplicated = [...executors, first];
+    expect(() => assertNoDuplicateExecutors(duplicated)).toThrowError(/duplicate executor/);
+    expect(() => assertNoDuplicateExecutors(executors)).not.toThrow();
   });
 });
 

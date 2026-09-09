@@ -106,30 +106,32 @@ describe("temporal values", () => {
 
   it("preserves justified open bounds in ranges and rejects fully open ones", () => {
     const openEnd = decodeTemporal({
-      shape: { start: { _tag: "day", day: "2026-01-05" }, end: null },
+      shape: { _tag: "range", start: { _tag: "day", day: "2026-01-05" }, end: null },
       originalExpression: "od 5 stycznia",
       role: "proposed",
     });
     expect(openEnd.shape).toEqual({
+      _tag: "range",
       start: { _tag: "day", day: "2026-01-05" },
       end: null,
     });
     expectSchemaError(() =>
       decodeTemporal({
-        shape: { start: null, end: null },
+        shape: { _tag: "range", start: null, end: null },
         originalExpression: "kiedyś",
         role: "proposed",
       }),
     );
     const quarter = decodeTemporal({
       shape: {
+        _tag: "range",
         start: { _tag: "month", month: "2026-01" },
         end: { _tag: "month", month: "2026-03" },
       },
       originalExpression: "pierwszy kwartał",
       role: "internal",
     });
-    if (!("start" in quarter.shape)) {
+    if (quarter.shape._tag !== "range") {
       throw new Error("expected a range shape");
     }
     expect(quarter.shape.start).toEqual({ _tag: "month", month: "2026-01" });
@@ -144,12 +146,14 @@ describe("temporal values", () => {
     );
   });
 
-  it("range schema encodes bounds back to null-able dates", () => {
+  it("range schema encodes bounds back to null-able tagged dates", () => {
     const range = Schema.decodeUnknownSync(DateRange)({
+      _tag: "range",
       start: { _tag: "day", day: "2026-01-05" },
       end: null,
     });
     expect(Schema.encodeSync(DateRange)(range)).toEqual({
+      _tag: "range",
       start: { _tag: "day", day: "2026-01-05" },
       end: null,
     });

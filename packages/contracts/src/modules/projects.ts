@@ -1,5 +1,5 @@
 /**
- * Projects module surface (architecture "Deep modules": Projects and work —
+ * Projects module surface (architecture "Deep modules": Projects and work,
  * the projects half). Implements lanes: C1.
  *
  * Stable identity, firm-unique codenames reserved through rename/closure,
@@ -11,6 +11,8 @@
 
 import { Schema } from "effect";
 import { tableIdSchema } from "../tableIds";
+import { RevisionCounter } from "../actor";
+import { LocalDate } from "../values/temporal";
 import { operationEntry, eventEntry } from "./registration";
 
 /** Fixed project stage vocabulary; no stage is added for a pause (issue 9). */
@@ -28,12 +30,7 @@ export type ProjectStage = Schema.Schema.Type<typeof ProjectStage>;
 /** Separate pause mark with reason and optional resume date (issue 9). */
 export const ProjectPause = Schema.Struct({
   reason: Schema.NonEmptyString,
-  resumeOn: Schema.NullOr(
-    Schema.String.pipe(
-      Schema.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/)),
-      Schema.brand("LocalDate"),
-    ),
-  ),
+  resumeOn: Schema.NullOr(LocalDate),
 });
 export type ProjectPause = Schema.Schema.Type<typeof ProjectPause>;
 
@@ -67,7 +64,7 @@ export const projectsOperations = {
     name: "projects.changeStage",
     input: Schema.Struct({
       projectId: tableIdSchema("projects"),
-      expectedRevision: Schema.Number,
+      expectedRevision: RevisionCounter,
       stage: ProjectStage,
     }),
     result: Schema.Struct({ projectId: tableIdSchema("projects") }),
@@ -78,7 +75,7 @@ export const projectsOperations = {
     name: "projects.setPause",
     input: Schema.Struct({
       projectId: tableIdSchema("projects"),
-      expectedRevision: Schema.Number,
+      expectedRevision: RevisionCounter,
       pause: Schema.NullOr(ProjectPause),
     }),
     result: Schema.Struct({ projectId: tableIdSchema("projects") }),

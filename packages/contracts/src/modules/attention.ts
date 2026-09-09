@@ -3,7 +3,7 @@
  * Implements lanes: F1 (read state/preferences), F2 (intents/batching),
  * F3 (push), F4 (reminders/snooze).
  *
- * Read state belongs to the logical source and the user — seeing the original
+ * Read state belongs to the logical source and the user: seeing the original
  * in any view marks it everywhere for that person. Reminders are based on
  * tasks, never on conversation read state. Quiet hours defer push delivery
  * without hiding information. A reminder for a contested date stays suspended

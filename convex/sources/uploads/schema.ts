@@ -16,20 +16,33 @@
 
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
-import { shared } from "../../schema/shared";
+import { shared, type Encoded, type ValueValidator } from "../../schema/shared";
+import { MediaRepresentationRole, UploadStage } from "@kiero/contracts";
+
+// Vocabulary pins: drift against the contracts-side schemas fails typecheck.
+
+const uploadStage: ValueValidator<Encoded<typeof UploadStage>> = v.union(
+  v.literal("draft"),
+  v.literal("uploading"),
+  v.literal("finalized"),
+  v.literal("orphaned"),
+  v.literal("failed"),
+);
+
+const mediaRepresentationRole: ValueValidator<Encoded<typeof MediaRepresentationRole>> =
+  v.union(
+    v.literal("received"),
+    v.literal("retained"),
+    v.literal("thumbnail"),
+    v.literal("processing"),
+  );
 
 export const uploadsTables = {
   /** Resumable upload ledger; reconciles R2 completion with Convex acceptance. */
   uploads: defineTable({
     companyId: shared.companyId,
     userId: shared.userId,
-    stage: v.union(
-      v.literal("draft"),
-      v.literal("uploading"),
-      v.literal("finalized"),
-      v.literal("orphaned"),
-      v.literal("failed"),
-    ),
+    stage: uploadStage,
     partCount: v.float64(),
     createdAtMs: shared.tsMs,
     finalizedAtMs: v.optional(shared.tsMs),
@@ -53,12 +66,7 @@ export const uploadsTables = {
   /** Versioned representation of an attachment (received/retained/thumbnail). */
   mediaRepresentations: defineTable({
     attachmentId: shared.attachmentId,
-    role: v.union(
-      v.literal("received"),
-      v.literal("retained"),
-      v.literal("thumbnail"),
-      v.literal("processing"),
-    ),
+    role: mediaRepresentationRole,
     objectKey: v.string(),
     contentHash: v.string(),
     transformVersion: v.string(),

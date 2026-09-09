@@ -11,7 +11,15 @@
 
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
-import { shared } from "../../schema/shared";
+import { shared, type Encoded, type ValueValidator } from "../../schema/shared";
+import { MembershipRole } from "@kiero/contracts";
+
+// Vocabulary pin: roles must equal the contracts-side MembershipRole
+// literals exactly, or this file fails typecheck.
+const membershipRole: ValueValidator<Encoded<typeof MembershipRole>> = v.union(
+  v.literal("admin"),
+  v.literal("member"),
+);
 
 export const membershipTables = {
   /** The firm: shared projects and knowledge of the bosses ("Firma", CONTEXT.md). */
@@ -27,7 +35,7 @@ export const membershipTables = {
   memberships: defineTable({
     companyId: shared.companyId,
     userId: shared.userId,
-    role: v.union(v.literal("admin"), v.literal("member")),
+    role: membershipRole,
     state: v.union(v.literal("active"), v.literal("revoked")),
     createdAtMs: shared.tsMs,
     revokedAtMs: v.optional(shared.tsMs),

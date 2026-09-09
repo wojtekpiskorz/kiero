@@ -64,11 +64,12 @@ export const TABLE_ID_NAMES = [
   "tasks",
   "checklistItems",
   "events",
-  // platform (durable execution)
+  // platform (durable execution + outbox)
   "processingRuns",
   "processingSteps",
   "processingAttempts",
   "durableJobs",
+  "outboxEvents",
   // attention/read-state
   "readStates",
   // attention/preferences
@@ -116,7 +117,7 @@ export type TableId<T extends TableIdName> = Schema.Schema.Type<
  * Normalizes an unknown value into a branded table id without a cast.
  *
  * This checks only that the value is a string; it does NOT prove the id
- * exists in the table or that the string is a well-formed Convex id —
+ * exists in the table or that the string is a well-formed Convex id:
  * Convex generates ids and validates them server-side (`ctx.db.normalizeId`),
  * which is part of the A3 runtime proof. The brand ties the reference to one
  * table so cross-table misuse fails to compile.

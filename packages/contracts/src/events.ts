@@ -4,7 +4,7 @@
  * Operations publish their durable side-effect intents together with the
  * state change (atomic outbox write). The event carries its own id and the
  * company scope; the payload is validated by each module's event schema
- * before it is written. Delivery is a separate, retryable step — see the
+ * before it is written. Delivery is a separate, retryable step; see the
  * architecture's source processing/publication protocol, steps 7–9.
  *
  * Candidate contract until A3 certifies the runtime composition.

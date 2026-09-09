@@ -58,7 +58,7 @@ export const operationsOperations = {
     name: "operations.emitDiagnosticEvent",
     input: Schema.Struct({
       kind: Schema.NonEmptyString,
-      /** Redacted, bounded technical metadata only — never raw content. */
+      /** Redacted, bounded technical metadata only, never raw content. */
       technicalMetadata: Schema.Array(
         Schema.Struct({ key: Schema.NonEmptyString, value: Schema.String }),
       ),

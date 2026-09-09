@@ -14,7 +14,22 @@ import schema from "../../convex/schema";
 import { extensionsTables } from "../../convex/memory/extensions/schema";
 import { acceptTables } from "../../convex/sources/accept/schema";
 import { workTables } from "../../convex/work/schema";
-import { TABLE_ID_NAMES } from "@kiero/contracts";
+import {
+  ChecklistItemState,
+  DurableJobKind,
+  DurableJobState,
+  EventOccurrenceState,
+  ExportState,
+  ExtensionFieldKind,
+  MediaRepresentationRole,
+  MembershipRole,
+  OutboxDeliveryState,
+  ProjectStage,
+  PublicationState,
+  TABLE_ID_NAMES,
+  TaskState,
+  UploadStage,
+} from "@kiero/contracts";
 import { type GenericValidator } from "convex/values";
 
 const tables = schema.tables;
@@ -69,11 +84,24 @@ function memberLiterals(validator: GenericValidator, table: string): string[] {
 }
 
 describe("schema composition", () => {
-  it("composes exactly the closed table inventory (50 tables)", () => {
+  it("composes exactly the closed table inventory (51 tables)", () => {
     const composed = Object.keys(tables).sort();
     const inventory = [...TABLE_ID_NAMES].sort();
     expect(composed).toEqual(inventory);
-    expect(composed).toHaveLength(50);
+    expect(composed).toHaveLength(51);
+  });
+
+  it("gives the domain event envelope a durable outbox home", () => {
+    expect(Object.keys(tables)).toContain("outboxEvents");
+    const fields = objectFields(tableOrFail("outboxEvents").validator, "outboxEvents");
+    for (const name of ["eventId", "companyId", "eventName", "envelopeJson", "deliveryState", "attempts"]) {
+      expect(fieldOf(fields, "outboxEvents", name).isOptional, name).toBe("required");
+    }
+    expect(indexFields(tables.outboxEvents, "outboxEvents", "by_delivery")).toEqual([
+      "deliveryState",
+      "nextAttemptAtMs",
+    ]);
+    expect(indexFields(tables.outboxEvents, "outboxEvents", "by_dedup")).toEqual(["dedupKey"]);
   });
 
   it("every fragment table carries a genuine pinned object validator", () => {
@@ -209,3 +237,150 @@ describe("independent parent and checklist state", () => {
     expect(taskFields.parentTaskId?.isOptional).toBe("optional");
   });
 });
+
+describe("fragment vocabulary pins equal the contracts vocabularies", () => {
+  it("every pinned closed union carries exactly the contracts-side literals", () => {
+    // The pins are compile-time checks (ValueValidator<Encoded<typeof X>>);
+    // this compares both sides at runtime too, through the actual table
+    // validators and the actual contracts schemas.
+    const cases: ReadonlyArray<{
+      readonly table: GenericValidator;
+      readonly tableName: string;
+      readonly path: readonly string[];
+      readonly schema: { readonly ast: unknown };
+    }> = [
+      { table: workTables.tasks.validator, tableName: "tasks", path: ["state"], schema: TaskState },
+      {
+        table: workTables.checklistItems.validator,
+        tableName: "checklistItems",
+        path: ["state"],
+        schema: ChecklistItemState,
+      },
+      {
+        table: workTables.events.validator,
+        tableName: "events",
+        path: ["state"],
+        schema: EventOccurrenceState,
+      },
+      {
+        table: tableOrFail("projects").validator,
+        tableName: "projects",
+        path: ["stage"],
+        schema: ProjectStage,
+      },
+      {
+        table: tableOrFail("uploads").validator,
+        tableName: "uploads",
+        path: ["stage"],
+        schema: UploadStage,
+      },
+      {
+        table: tableOrFail("mediaRepresentations").validator,
+        tableName: "mediaRepresentations",
+        path: ["role"],
+        schema: MediaRepresentationRole,
+      },
+      {
+        table: tableOrFail("changeSets").validator,
+        tableName: "changeSets",
+        path: ["state"],
+        schema: PublicationState,
+      },
+      {
+        table: tableOrFail("memberships").validator,
+        tableName: "memberships",
+        path: ["role"],
+        schema: MembershipRole,
+      },
+      {
+        table: tableOrFail("exports").validator,
+        tableName: "exports",
+        path: ["state"],
+        schema: ExportState,
+      },
+      {
+        table: tableOrFail("durableJobs").validator,
+        tableName: "durableJobs",
+        path: ["kind"],
+        schema: DurableJobKind,
+      },
+      {
+        table: tableOrFail("durableJobs").validator,
+        tableName: "durableJobs",
+        path: ["state"],
+        schema: DurableJobState,
+      },
+      {
+        table: tableOrFail("outboxEvents").validator,
+        tableName: "outboxEvents",
+        path: ["deliveryState"],
+        schema: OutboxDeliveryState,
+      },
+    ];
+
+    for (const entry of cases) {
+      let current: GenericValidator = entry.table;
+      for (const step of entry.path) {
+        const fields = objectFields(current, entry.tableName);
+        current = fieldOf(fields, entry.tableName, step);
+      }
+      const tableName = `${entry.tableName}.${entry.path.join(".")}`;
+      expect(
+        memberLiterals(current, entry.tableName).sort(),
+        tableName,
+      ).toEqual(schemaLiterals(entry.schema, entry.tableName));
+    }
+
+    // The nested extension field-kind pin travels through the array element.
+    const fieldsField = fieldOf(
+      objectFields(extensionsTables.extensionVersions.validator, "extensionVersions"),
+      "extensionVersions",
+      "fields",
+    );
+    if (fieldsField.kind !== "array") {
+      throw new Error("extensionVersions.fields must be an array validator");
+    }
+    const kindField = fieldOf(
+      objectFields(fieldsField.element, "extensionVersions.fields"),
+      "extensionVersions.fields",
+      "kind",
+    );
+    expect(memberLiterals(kindField, "extensionVersions.fields.kind").sort()).toEqual(
+      schemaLiterals(ExtensionFieldKind, "ExtensionFieldKind"),
+    );
+  });
+});
+
+function tableOrFail(name: string): { validator: GenericValidator } {
+  const table = tables[name];
+  if (table === undefined) {
+    throw new Error(`missing table ${name}`);
+  }
+  return table;
+}
+
+/** Extracts the string literals of a union-of-literals schema AST. */
+function schemaLiterals(schema: { readonly ast: unknown }, name: string): string[] {
+  const ast = schema.ast;
+  if (typeof ast !== "object" || ast === null || !("_tag" in ast) || ast._tag !== "Union") {
+    throw new Error(`${name}: expected a union-of-literals schema`);
+  }
+  if (!("types" in ast) || !Array.isArray(ast.types)) {
+    throw new Error(`${name}: expected union members`);
+  }
+  const out: string[] = [];
+  for (const member of ast.types) {
+    if (
+      typeof member !== "object" ||
+      member === null ||
+      !("_tag" in member) ||
+      member._tag !== "Literal" ||
+      !("literal" in member) ||
+      typeof member.literal !== "string"
+    ) {
+      throw new Error(`${name}: expected string literal members`);
+    }
+    out.push(member.literal);
+  }
+  return out.sort();
+}

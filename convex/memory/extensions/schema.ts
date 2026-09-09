@@ -13,23 +13,27 @@
 
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
-import { shared } from "../../schema/shared";
+import { shared, type Encoded, type ValueValidator } from "../../schema/shared";
+import { ExtensionFieldKind } from "@kiero/contracts";
+
+/** Field kinds inside a version snapshot; pinned to the contracts vocabulary. */
+const fieldKind: ValueValidator<Encoded<typeof ExtensionFieldKind>> = v.union(
+  v.literal("text"),
+  v.literal("quantity"),
+  v.literal("boolean"),
+  v.literal("enum"),
+  v.literal("financial"),
+  v.literal("temporal"),
+  v.literal("entity_ref"),
+  v.literal("object"),
+  v.literal("list"),
+);
 
 /** One field shape inside a definition version (bounded snapshot). */
 const fieldShape = v.object({
   fieldId: v.string(),
   label: v.string(),
-  kind: v.union(
-    v.literal("text"),
-    v.literal("quantity"),
-    v.literal("boolean"),
-    v.literal("enum"),
-    v.literal("financial"),
-    v.literal("temporal"),
-    v.literal("entity_ref"),
-    v.literal("object"),
-    v.literal("list"),
-  ),
+  kind: fieldKind,
   options: v.optional(v.array(v.object({ optionId: v.string(), label: v.string() }))),
   description: v.optional(v.string()),
 });

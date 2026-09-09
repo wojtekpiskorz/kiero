@@ -8,9 +8,10 @@
  * spread when a new fragment is added (a coordinated change).
  *
  * Composition checks at construction time that no two fragments claim the
- * same table name and that the composed inventory matches the closed
- * `TableIdName` union in `@kiero/contracts` — drift fails loudly here, long
- * before deployment.
+ * same table name and that the composed tables and the closed
+ * `TABLE_ID_NAMES` inventory in `@kiero/contracts` are equal in BOTH
+ * directions. Drift of either side fails loudly here, long before
+ * deployment.
  *
  * Candidate until A3 proves the runtime conversion and certifies the freeze.
  */
@@ -81,6 +82,13 @@ for (const table of Object.keys(composed)) {
   if (!contractInventory.has(table)) {
     throw new Error(
       `Schema composition: table ${table} is absent from the @kiero/contracts table inventory`,
+    );
+  }
+}
+for (const table of TABLE_ID_NAMES) {
+  if (!(table in composed)) {
+    throw new Error(
+      `Schema composition: inventory table ${table} has no owning fragment`,
     );
   }
 }

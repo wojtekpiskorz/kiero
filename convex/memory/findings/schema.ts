@@ -17,7 +17,24 @@
 
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
-import { shared, semanticValueFields, semanticValueValidators } from "../../schema/shared";
+import {
+  shared,
+  semanticValueFields,
+  semanticValueValidators,
+  type Encoded,
+  type ValueValidator,
+} from "../../schema/shared";
+import { PublicationState } from "@kiero/contracts";
+
+// Vocabulary pin: the change-set lifecycle must equal the contracts-side
+// PublicationState literals exactly, or this file fails typecheck.
+const publicationState: ValueValidator<Encoded<typeof PublicationState>> = v.union(
+  v.literal("prepared"),
+  v.literal("publishing"),
+  v.literal("published"),
+  v.literal("failed"),
+  v.literal("superseded"),
+);
 
 export const findingsTables = {
   /** Stable finding identity within one semantic scope (firm or project memory). */
@@ -82,13 +99,7 @@ export const findingsTables = {
   changeSets: defineTable({
     companyId: shared.companyId,
     sourceId: shared.sourceId,
-    state: v.union(
-      v.literal("prepared"),
-      v.literal("publishing"),
-      v.literal("published"),
-      v.literal("failed"),
-      v.literal("superseded"),
-    ),
+    state: publicationState,
     preparedAtMs: shared.tsMs,
     publishedAtMs: v.optional(shared.tsMs),
     failedReason: v.optional(v.string()),

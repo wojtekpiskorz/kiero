@@ -1,5 +1,5 @@
 /**
- * Calendar module surface (architecture "Deep modules": Integrations — the
+ * Calendar module surface (architecture "Deep modules": Integrations, the
  * Calendar half; see CONTEXT.md "Kalendarz Kiero w Google").
  * Implements lanes: G1 (connection), G2 (projection), G3 (reconciliation).
  *

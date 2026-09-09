@@ -3,7 +3,7 @@
  *
  * Identity/membership separation, one active firm in v1, explicit linking,
  * last-admin constraints, device/session revocation, background and media
- * checks — all owned inside the implementing lane (B1–B4). This file only
+ * checks; all owned inside the implementing lane (B1–B4). This file only
  * names the checked operations and events; until those lanes land, dispatch
  * fails closed with `unsupported`.
  */

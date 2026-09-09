@@ -71,18 +71,21 @@ export type DateOnly = Schema.Schema.Type<typeof DateOnly>;
 export const ZonedDateTime = Schema.DateTimeZonedFromString;
 export type ZonedDateTime = Schema.Schema.Type<typeof ZonedDateTime>;
 
-const DateRangeBounds = Schema.Struct({
+const RangeBounds = Schema.TaggedStruct("range", {
   start: Schema.NullOr(DateOnly),
   end: Schema.NullOr(DateOnly),
 });
+type RangeBounds = Schema.Schema.Type<typeof RangeBounds>;
 
-/** A range of dates; a bound of `null` is open and stays open. */
-export const DateRange = DateRangeBounds.pipe(
-  Schema.refine(
-    (value): value is Schema.Schema.Type<typeof DateRangeBounds> =>
-      value.start !== null || value.end !== null,
-  ),
-);
+const hasAtLeastOneBound = (value: RangeBounds): value is RangeBounds =>
+  value.start !== null || value.end !== null;
+
+/**
+ * A range of dates; a bound of `null` is open and stays open. Tagged like
+ * the other variants so `TemporalValue.shape` is uniformly discriminable on
+ * `_tag` (day | month | year | date_time | range).
+ */
+export const DateRange = RangeBounds.pipe(Schema.refine(hasAtLeastOneBound));
 export type DateRange = Schema.Schema.Type<typeof DateRange>;
 
 /** Meaning of a temporal statement (see issue 8: propozycja / wewnętrzny plan / uzgodniony / faktyczny). */

@@ -1,7 +1,7 @@
 /**
  * Actor context and command/result envelopes.
  *
- * The server resolves the actor from the authenticated session — never from
+ * The server resolves the actor from the authenticated session, never from
  * client input. An agent plan is untrusted input: when the agent acts, the
  * context records the boss on whose behalf it acts (`via: "agent"`), and the
  * same checked domain operations run. Commands carry the revisions they

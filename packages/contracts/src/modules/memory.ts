@@ -13,7 +13,9 @@
 
 import { Schema } from "effect";
 import { tableIdSchema } from "../tableIds";
+import { RevisionCounter } from "../actor";
 import { KnowledgeState } from "../values/knowledge";
+import { ExtensionFieldId, ExtensionFieldKind } from "../values/extension";
 import { MoneyValue } from "../values/money";
 import { TemporalValue } from "../values/temporal";
 import { ExtensionValue } from "../values/extension";
@@ -78,7 +80,7 @@ export const memoryOperations = {
     input: Schema.Struct({
       changeSetId: tableIdSchema("changeSets"),
       expectedRevisions: Schema.Array(
-        Schema.Struct({ findingId: tableIdSchema("findings"), revision: Schema.Number }),
+        Schema.Struct({ findingId: tableIdSchema("findings"), revision: RevisionCounter }),
       ),
     }),
     result: Schema.Struct({
@@ -91,7 +93,7 @@ export const memoryOperations = {
     name: "memory.correctFinding",
     input: Schema.Struct({
       findingId: tableIdSchema("findings"),
-      expectedRevision: Schema.Number,
+      expectedRevision: RevisionCounter,
       value: FindingValue,
       knowledgeState: KnowledgeState,
       reason: Schema.NonEmptyString,
@@ -127,21 +129,9 @@ export const memoryOperations = {
       name: Schema.NonEmptyString,
       fields: Schema.Array(
         Schema.Struct({
-          fieldId: Schema.String.pipe(
-            Schema.check(Schema.isPattern(/^[a-z][a-z0-9_]{0,63}$/)),
-          ),
+          fieldId: ExtensionFieldId,
           label: Schema.NonEmptyString,
-          kind: Schema.Literals([
-            "text",
-            "quantity",
-            "boolean",
-            "enum",
-            "financial",
-            "temporal",
-            "entity_ref",
-            "object",
-            "list",
-          ]),
+          kind: ExtensionFieldKind,
         }),
       ),
     }),

@@ -13,7 +13,29 @@
 
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
-import { shared } from "../schema/shared";
+import { shared, type Encoded, type ValueValidator } from "../schema/shared";
+import {
+  ChecklistItemState,
+  EventOccurrenceState,
+  TaskState,
+} from "@kiero/contracts";
+
+// Vocabulary pins: each closed union must equal its contracts-side schema's
+// encoded literals exactly, or this file fails typecheck.
+
+const taskState: ValueValidator<Encoded<typeof TaskState>> = v.union(
+  v.literal("todo"),
+  v.literal("in_progress"),
+  v.literal("waiting"),
+  v.literal("done"),
+  v.literal("cancelled"),
+);
+
+const checklistItemState: ValueValidator<Encoded<typeof ChecklistItemState>> =
+  v.union(v.literal("open"), v.literal("checked"));
+
+const eventOccurrenceState: ValueValidator<Encoded<typeof EventOccurrenceState>> =
+  v.union(v.literal("planned"), v.literal("occurred"), v.literal("cancelled"));
 
 export const workTables = {
   /** Action to do ("Zadanie", CONTEXT.md); arises from findings or boss input. */
@@ -22,13 +44,7 @@ export const workTables = {
     projectId: shared.projectId,
     title: v.string(),
     /** Do zrobienia / W toku / Czeka / Wykonane / Anulowane (issue 9). */
-    state: v.union(
-      v.literal("todo"),
-      v.literal("in_progress"),
-      v.literal("waiting"),
-      v.literal("done"),
-      v.literal("cancelled"),
-    ),
+    state: taskState,
     /** Saved obstacle reason; required when state is `waiting`. */
     waitingReason: v.optional(v.string()),
     /** Executor may be a subcontractor without a Kiero account. */
@@ -51,7 +67,7 @@ export const workTables = {
   checklistItems: defineTable({
     taskId: shared.taskId,
     description: v.string(),
-    state: v.union(v.literal("open"), v.literal("checked")),
+    state: checklistItemState,
     revisionCounter: shared.revisionCounter,
     checkedAtMs: v.optional(shared.tsMs),
     createdAtMs: shared.tsMs,
@@ -63,11 +79,7 @@ export const workTables = {
     projectId: shared.projectId,
     title: v.string(),
     /** Planowane / Odbyło się / Anulowane; a passed date never implies occurrence. */
-    state: v.union(
-      v.literal("planned"),
-      v.literal("occurred"),
-      v.literal("cancelled"),
-    ),
+    state: eventOccurrenceState,
     /** Reference to the temporal finding that carries the known time, if any. */
     timeFindingId: v.optional(shared.findingId),
     revisionCounter: shared.revisionCounter,

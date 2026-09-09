@@ -4,9 +4,9 @@
  *
  * Rules encoded here:
  *
- * - Extension values are typed payloads — text, quantity with unit, boolean,
+ * - Extension values are typed payloads: text, quantity with unit, boolean,
  *   enum option, financial, temporal, entity reference, object of scalar
- *   fields, bounded list of scalar items — never one free-text blob.
+ *   fields, bounded list of scalar items, never one free-text blob.
  * - Objects and lists are bounded to scalar members (no recursive nesting);
  *   an item that needs its own responsibility/deadline becomes its own
  *   related task instead.

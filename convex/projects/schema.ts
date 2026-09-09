@@ -11,7 +11,20 @@
 
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
-import { shared } from "../schema/shared";
+import { shared, type Encoded, type ValueValidator } from "../schema/shared";
+import { ProjectStage } from "@kiero/contracts";
+
+// Vocabulary pin: the stage union must equal the contracts-side ProjectStage
+// literals exactly, or this file fails typecheck.
+const projectStage: ValueValidator<Encoded<typeof ProjectStage>> = v.union(
+  v.literal("inquiry"),
+  v.literal("offer_preparation"),
+  v.literal("awaiting_decision"),
+  v.literal("agreed"),
+  v.literal("in_progress"),
+  v.literal("completed"),
+  v.literal("cancelled"),
+);
 
 export const projectsTables = {
   /** Person or organization in the company catalog, distinct from user accounts. */
@@ -44,15 +57,7 @@ export const projectsTables = {
     displayName: v.string(),
     clientId: v.optional(shared.contactId),
     /** Fixed stage vocabulary (issue 9); no stage is added for a pause. */
-    stage: v.union(
-      v.literal("inquiry"),
-      v.literal("offer_preparation"),
-      v.literal("awaiting_decision"),
-      v.literal("agreed"),
-      v.literal("in_progress"),
-      v.literal("completed"),
-      v.literal("cancelled"),
-    ),
+    stage: projectStage,
     stageRevision: shared.revisionCounter,
     /** Separate pause mark with reason and optional resume date. */
     paused: v.optional(

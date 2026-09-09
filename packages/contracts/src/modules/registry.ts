@@ -8,7 +8,7 @@
  * access-revocation cleanup, reanalysis, deletion purge and Calendar outcome
  * reconciliation. Constructing the registry checks that every registered
  * operation/event name exists in exactly one module surface and that no
- * executor claims a job kind twice — a typo'd edge fails here, not silently
+ * executor claims a job kind twice: a typo'd edge fails here, not silently
  * in production.
  *
  * Registrations are candidates: they declare seams, not implementations.
@@ -207,7 +207,25 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
 
 // Fail fast on impossible registrations (module surface name drift).
 
-const registeredJobKinds = new Set<string>(executors.map((executor) => executor.jobKind));
+/**
+ * Throws if two executors claim the same job kind. Exported so the
+ * construction-time guarantee itself is under test: a silent Set collapse
+ * here would let two lanes believe they own one job kind.
+ */
+export function assertNoDuplicateExecutors(list: readonly ExecutorEntry[]): Set<string> {
+  const seen = new Set<string>();
+  for (const executor of list) {
+    if (seen.has(executor.jobKind)) {
+      throw new Error(
+        `Contract registry: duplicate executor for job kind ${executor.jobKind}`,
+      );
+    }
+    seen.add(executor.jobKind);
+  }
+  return seen;
+}
+
+const registeredJobKinds = assertNoDuplicateExecutors(executors);
 for (const entry of eventConsumers) {
   if (!(entry.eventName in events)) {
     throw new Error(`Contract registry: consumer references unknown event ${entry.eventName}`);

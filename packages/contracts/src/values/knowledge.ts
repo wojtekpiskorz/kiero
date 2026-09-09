@@ -11,7 +11,7 @@
  *   lives on extraction records and never upgrades a statement's meaning).
  *
  * Omission in a patch means "no change". Clearing, withdrawal and conflict
- * are explicit operations with their own provenance — an arbitrary model
+ * are explicit operations with their own provenance: an arbitrary model
  * `null` never erases a fact. Candidate contract until A3 certifies it.
  */
 

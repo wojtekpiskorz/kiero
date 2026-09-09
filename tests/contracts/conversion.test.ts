@@ -37,7 +37,7 @@ import { semanticValueValidators } from "../../convex/schema/shared";
  *
  * `wire` is `convexToJson`, whose parameter type is the pinned Convex
  * `Value`. Passing it here forces the schema's Encoded type to be assignable
- * to `Value` at every concrete call site — a semantic value whose wire form
+ * to `Value` at every concrete call site: a semantic value whose wire form
  * is not a legal Convex value fails to compile in this file. (Where generic
  * inference cannot resolve the schema's exact codec shape, call sites pin
  * D/E explicitly via the schema's own Type/Encoded accessors.)
@@ -89,6 +89,7 @@ describe("semantic value conversion through the pinned validators", () => {
     });
     roundTrip(TemporalValue, convexToJson, {
       shape: {
+        _tag: "range",
         start: { _tag: "month", month: "2026-01" },
         end: { _tag: "month", month: "2026-03" },
       },

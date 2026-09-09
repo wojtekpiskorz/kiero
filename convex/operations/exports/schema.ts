@@ -14,19 +14,24 @@
 
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
-import { shared } from "../../schema/shared";
+import { shared, type Encoded, type ValueValidator } from "../../schema/shared";
+import { ExportState } from "@kiero/contracts";
+
+// Vocabulary pin: the archive lifecycle must equal the contracts-side
+// ExportState literals exactly, or this file fails typecheck.
+const exportState: ValueValidator<Encoded<typeof ExportState>> = v.union(
+  v.literal("requested"),
+  v.literal("building"),
+  v.literal("available"),
+  v.literal("expired"),
+  v.literal("invalidated"),
+);
 
 export const exportsTables = {
   /** One firm export archive lifecycle. */
   exports: defineTable({
     companyId: shared.companyId,
-    state: v.union(
-      v.literal("requested"),
-      v.literal("building"),
-      v.literal("available"),
-      v.literal("expired"),
-      v.literal("invalidated"),
-    ),
+    state: exportState,
     requestedByUserId: shared.userId,
     snapshotAtMs: v.optional(shared.tsMs),
     availableUntilMs: v.optional(shared.tsMs),

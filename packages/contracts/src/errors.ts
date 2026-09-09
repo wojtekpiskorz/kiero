@@ -3,7 +3,7 @@
  *
  * Every operation result carries either a payload or one of these errors.
  * The union is closed: adding a kind is a coordinated contract change. The
- * payload is sanitized by construction — there is no field for stacks,
+ * payload is sanitized by construction: there is no field for stacks,
  * provider payloads, internal paths or raw exception messages. A `message`
  * here is stable, safe-to-show text (Polish user-facing copy in the product),
  * not a forwarded internal error string.
@@ -61,7 +61,7 @@ const decodeClosedError = Schema.decodeUnknownSync(ClosedError);
 
 /**
  * Constructs the fail-closed error for a not-yet-implemented operation.
- * Built by decoding through the schema — no unchecked construction.
+ * Built by decoding through the schema: no unchecked construction.
  */
 export function notImplemented(operationName: string): ClosedError {
   return decodeClosedError({
