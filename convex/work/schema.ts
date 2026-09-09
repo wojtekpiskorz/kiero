@@ -55,7 +55,7 @@ export const workTables = {
     deadlineFindingId: v.optional(shared.findingId),
     /** Set when this task was split out of a checklist item. */
     parentTaskId: v.optional(shared.taskId),
-    revisionCounter: shared.revisionCounter,
+    revisionCounter: shared.counter,
     createdAtMs: shared.tsMs,
     updatedAtMs: shared.tsMs,
     stateChangedAtMs: shared.tsMs,
@@ -68,7 +68,7 @@ export const workTables = {
     taskId: shared.taskId,
     description: v.string(),
     state: checklistItemState,
-    revisionCounter: shared.revisionCounter,
+    revisionCounter: shared.counter,
     checkedAtMs: v.optional(shared.tsMs),
     createdAtMs: shared.tsMs,
   }).index("by_task", ["taskId"]),
@@ -82,7 +82,7 @@ export const workTables = {
     state: eventOccurrenceState,
     /** Reference to the temporal finding that carries the known time, if any. */
     timeFindingId: v.optional(shared.findingId),
-    revisionCounter: shared.revisionCounter,
+    revisionCounter: shared.counter,
     createdAtMs: shared.tsMs,
     updatedAtMs: shared.tsMs,
   })

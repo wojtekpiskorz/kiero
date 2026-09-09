@@ -52,7 +52,7 @@ export const extensionsTables = {
   /** Append-only version snapshots. No row here is ever rewritten. */
   extensionVersions: defineTable({
     definitionId: shared.extensionDefinitionId,
-    version: shared.revisionCounter,
+    version: shared.counter,
     name: v.string(),
     fields: v.array(fieldShape),
     changeNote: v.string(),
@@ -64,7 +64,7 @@ export const extensionsTables = {
     companyId: shared.companyId,
     definitionId: shared.extensionDefinitionId,
     usedVersionId: shared.extensionVersionId,
-    usageCount: shared.revisionCounter,
+    usageCount: shared.counter,
     lastUsedAtMs: shared.tsMs,
   }).index("by_company_definition", ["companyId", "definitionId"]),
 } as const;

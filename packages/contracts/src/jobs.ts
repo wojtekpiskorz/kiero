@@ -13,7 +13,7 @@
  */
 
 import { Schema } from "effect";
-import { tableIdSchema, DurableJobKeySchema } from "./tableIds";
+import { tableIdSchema, DurableJobKeySchema, IdempotencyKeySchema } from "./tableIds";
 
 /** Closed vocabulary of durable job kinds. New kinds are a coordinated change. */
 export const DurableJobKind = Schema.Literals([
@@ -80,7 +80,7 @@ export const DurableJobEnvelope = Schema.Struct({
   provenance: JobProvenance,
   policy: RetryPolicy,
   /** Idempotency key of the command that requested the job, when there was one. */
-  idempotencyKey: Schema.optionalKey(Schema.String),
+  idempotencyKey: Schema.optionalKey(IdempotencyKeySchema),
   state: DurableJobState,
 });
 export type DurableJobEnvelope = Schema.Schema.Type<typeof DurableJobEnvelope>;

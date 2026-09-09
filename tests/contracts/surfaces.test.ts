@@ -8,33 +8,42 @@
 
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
+import { featureEntry } from "@kiero/contracts";
 import {
-  ClosedError,
+  assertFeaturesCoherent,
   assertNoDuplicateExecutors,
+  ClosedError,
   CommandEnvelope,
-  DurableJobEnvelope,
   DomainEventEnvelope,
+  DurableJobEnvelope,
   EventIdSchema,
-  IdempotencyKeySchema,
-  ResultEnvelope,
-  errorResult,
   events,
-  executors,
   eventConsumers,
+  executors,
+  FeatureId,
+  features,
+  IdempotencyKeySchema,
   newEventId,
   newIdempotencyKey,
   notImplemented,
   okResult,
   operations,
+  errorResult,
+  ResultEnvelope,
+  OutboxEnvelope,
   parseTableId,
 } from "@kiero/contracts";
+import type { FeatureEntry } from "@kiero/contracts";
 
 describe("composed registry integrity", () => {
   it("declares every module surface with unique names", () => {
     const operationNames = Object.keys(operations);
     const eventNames = Object.keys(events);
-    expect(operationNames.length).toBeGreaterThan(30);
-    expect(eventNames.length).toBeGreaterThan(20);
+    // Exact counts: an accidentally deleted surface entry fails here.
+    // (53/39 are the real registry sizes; naive greps of `kind: "operation"`
+    // overcount by one because registration.ts declares the interface field.)
+    expect(operationNames).toHaveLength(53);
+    expect(eventNames).toHaveLength(39);
     for (const name of operationNames) {
       expect(operations[name]?.name).toBe(name);
       expect(name).toMatch(/^[a-z][a-z0-9_]*\.[a-z][a-zA-Z0-9_]*$/);
@@ -81,6 +90,32 @@ describe("composed registry integrity", () => {
     }
     const jobKinds = executors.map((e) => e.jobKind);
     expect(new Set(jobKinds).size).toBe(jobKinds.length);
+  });
+
+  it("registers coherent initial features and rejects incoherent ones", () => {
+    // The initial seams all declare executable job kinds and reference only
+    // declared events (checked at import time by the registry itself).
+    expect(features).toHaveLength(6);
+    // Deliberately incoherent feature: unknown operation and job kind.
+    const drifted: readonly FeatureEntry[] = [
+      ...features,
+      featureEntry({
+        kind: "feature",
+        featureId: Schema.decodeUnknownSync(FeatureId)("drifted.feature"),
+        providesOperations: ["drifted.nonexistentOperation"],
+        publishesEvents: [],
+        consumesEvents: ["drifted.nonexistentEvent"],
+        executesJobs: [],
+      }),
+    ];
+    const registeredJobKinds = new Set(executors.map((executor) => executor.jobKind));
+    expect(() => assertFeaturesCoherent(drifted, operations, events, registeredJobKinds)).toThrowError(
+      /unknown operation drifted.nonexistentOperation/,
+    );
+    // Coherent against the real registry inputs.
+    expect(() =>
+      assertFeaturesCoherent(features, operations, events, registeredJobKinds),
+    ).not.toThrow();
   });
 
   it("fails loudly when two executors claim one job kind", () => {
@@ -151,7 +186,7 @@ describe("envelopes decode end to end", () => {
     ).toThrow();
   });
 
-  it("a domain event and outbox state decode", () => {
+  it("a domain event and its outbox state decode", () => {
     const event = Schema.decodeUnknownSync(DomainEventEnvelope)({
       eventId: newEventId(),
       name: "sources.sourceAccepted",
@@ -160,6 +195,22 @@ describe("envelopes decode end to end", () => {
       payload: { sourceId: "s1", attachmentIds: [] },
     });
     expect(event.name).toBe("sources.sourceAccepted");
+    // The outbox stores the event in its wire (encoded) form.
+    const outbox = Schema.decodeUnknownSync(OutboxEnvelope)({
+      event: Schema.encodeSync(DomainEventEnvelope)(event),
+      deliveryState: "pending",
+      deduplicationKey: "sources.sourceAccepted:s1",
+      attempts: 0,
+    });
+    expect(outbox.deliveryState).toBe("pending");
+    expect(outbox.attempts).toBe(0);
+    expect(() =>
+      Schema.decodeUnknownSync(OutboxEnvelope)({
+        event: Schema.encodeSync(DomainEventEnvelope)(event),
+        deliveryState: "delivered",
+        attempts: -1,
+      }),
+    ).toThrow();
   });
 
   it("a durable job envelope decodes with provenance and policy", () => {

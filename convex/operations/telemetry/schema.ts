@@ -19,7 +19,7 @@ export const telemetryTables = {
   auditRecords: defineTable({
     companyId: v.optional(shared.companyId),
     actorUserId: v.optional(shared.userId),
-    gmGrantId: v.optional(v.id("gmAccessGrants")),
+    gmGrantId: v.optional(shared.gmAccessGrantId),
     operationName: v.string(),
     changeSetId: v.optional(shared.changeSetId),
     processingRunId: v.optional(shared.processingRunId),

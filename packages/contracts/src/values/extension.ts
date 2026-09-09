@@ -56,6 +56,17 @@ export type ScalarExtensionValue = Schema.Schema.Type<typeof ScalarExtensionValu
 const MAX_OBJECT_FIELDS = 32;
 const MAX_LIST_ITEMS = 64;
 
+/**
+ * Bounded mutable array: the encoded wire form must use mutable arrays to
+ * match the Convex value model. WARNING (single-sourced here): the length
+ * check is piped AFTER `Schema.mutable` because piping checks before
+ * `Schema.mutable` rebuilds the schema WITHOUT them on effect 4.0.0-rc.112.
+ */
+const boundedMutableArray = <S extends Schema.Codec<unknown, unknown, never, never>>(
+  element: S,
+  maxLength: number,
+) => Schema.mutable(Schema.Array(element)).pipe(Schema.check(Schema.isMaxLength(maxLength)));
+
 /** One field assignment inside an object value. */
 export const ObjectFieldValue = Schema.Struct({
   fieldId: ExtensionFieldId,
@@ -71,16 +82,10 @@ export type ObjectFieldValue = Schema.Schema.Type<typeof ObjectFieldValue>;
 export const ExtensionValue = Schema.Union([
   ScalarExtensionValue,
   Schema.TaggedStruct("object", {
-    // mutable first, then the bound check: piping checks before
-    // Schema.mutable would rebuild the schema without them (rc.112).
-    fields: Schema.mutable(Schema.Array(ObjectFieldValue)).pipe(
-      Schema.check(Schema.isMaxLength(MAX_OBJECT_FIELDS)),
-    ),
+    fields: boundedMutableArray(ObjectFieldValue, MAX_OBJECT_FIELDS),
   }),
   Schema.TaggedStruct("list", {
-    items: Schema.mutable(Schema.Array(ScalarExtensionValue)).pipe(
-      Schema.check(Schema.isMaxLength(MAX_LIST_ITEMS)),
-    ),
+    items: boundedMutableArray(ScalarExtensionValue, MAX_LIST_ITEMS),
   }),
 ]);
 export type ExtensionValue = Schema.Schema.Type<typeof ExtensionValue>;
@@ -109,9 +114,10 @@ export const ExtensionFieldShape = Schema.Struct({
   label: Schema.NonEmptyString,
   kind: ExtensionFieldKind,
   options: Schema.optionalKey(
-    Schema.mutable(
-      Schema.Array(Schema.Struct({ optionId: ExtensionFieldId, label: Schema.NonEmptyString })),
-    ).pipe(Schema.check(Schema.isMaxLength(MAX_LIST_ITEMS))),
+    boundedMutableArray(
+      Schema.Struct({ optionId: ExtensionFieldId, label: Schema.NonEmptyString }),
+      MAX_LIST_ITEMS,
+    ),
   ),
   description: Schema.optionalKey(Schema.String),
 });
@@ -122,9 +128,7 @@ export const ExtensionDefinitionVersionValue = Schema.Struct({
   definitionId: tableIdSchema("extensionDefinitions"),
   version: Schema.Number.pipe(Schema.check(Schema.isInt()), Schema.check(Schema.isGreaterThan(0))),
   name: Schema.NonEmptyString,
-  fields: Schema.mutable(Schema.Array(ExtensionFieldShape)).pipe(
-    Schema.check(Schema.isMaxLength(MAX_OBJECT_FIELDS)),
-  ),
+  fields: boundedMutableArray(ExtensionFieldShape, MAX_OBJECT_FIELDS),
   changeNote: Schema.String,
 });
 export type ExtensionDefinitionVersionValue =

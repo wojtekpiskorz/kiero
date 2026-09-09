@@ -22,7 +22,7 @@
 
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
-import { convexToJson, jsonToConvex, type JSONValue } from "convex/values";
+import { convexToJson, jsonToConvex, type JSONValue, type Value } from "convex/values";
 import {
   ExtensionValue,
   FindingValue,
@@ -55,6 +55,10 @@ function roundTrip<D, E>(
   // internal fields (e.g. BigDecimal normalization) that make structural
   // equality flaky without changing the value.
   expect(Schema.encodeSync(schema)(decodedAgain)).toEqual(encoded);
+}
+
+function encodeFixture<D, E>(schema: Schema.Codec<D, E, never, never>, fixture: unknown): E {
+  return Schema.encodeSync(schema)(Schema.decodeUnknownSync(schema)(fixture));
 }
 
 describe("semantic value conversion through the pinned validators", () => {
@@ -169,24 +173,43 @@ describe("semantic value conversion through the pinned validators", () => {
     }
   });
 
-  it("encoded semantic values serialize through the pinned convex wire", () => {
+  it("encoded semantic values of all five families serialize through the pinned convex wire", () => {
     // The pinned convexToJson signature only accepts Convex values, so a
     // non-Convex payload (Date, symbol, class instance like BigDecimal)
-    // cannot reach it through this typed boundary at all. Runtime evidence:
-    // the encoder output of every semantic value is a plain Convex value.
-    const encoded: Schema.Codec.Encoded<typeof MoneyValue> = Schema.encodeSync(MoneyValue)(
-      Schema.decodeUnknownSync(MoneyValue)({
+    // cannot reach it through this typed boundary at all. Every family's
+    // encoded fixture is stored in a Value-typed list, so a wire form that
+    // stops being a legal Convex value fails to compile here.
+    const cases: ReadonlyArray<[name: string, encoded: Value]> = [
+      ["knowledgeState", encodeFixture(KnowledgeState, { _tag: "unknown", reason: "klient nie podał" })],
+      ["temporalValue:day", encodeFixture(TemporalValue, {
+        shape: { _tag: "day", day: "2026-01-09" },
+        originalExpression: "jutro",
+        role: "agreed",
+      })],
+      ["temporalValue:date_time", encodeFixture(TemporalValue, {
+        shape: { _tag: "date_time", value: "2026-01-05T10:30:00.000+01:00[Europe/Warsaw]" },
+        originalExpression: "o 10:30",
+        role: "actual",
+      })],
+      ["moneyValue:exact", encodeFixture(MoneyValue, {
         role: "agreed_price",
         amount: { _tag: "exact", value: "10" },
         currency: "PLN",
         currencyOrigin: "stated",
         taxBasis: "gross",
         certainty: "exact",
-      }),
-    );
-    const json = convexToJson(encoded);
-    expect(typeof json).toBe("object");
-    // JSON.stringify must also succeed: the encoded form is plain wire data.
-    expect(() => JSON.stringify(json)).not.toThrow();
+      })],
+      ["extensionValue:object", encodeFixture(ExtensionValue, {
+        _tag: "object",
+        fields: [{ fieldId: "width_mm", value: { _tag: "quantity", amount: "600", unit: "mm" } }],
+      })],
+      ["findingValue:text_note", encodeFixture(FindingValue, { _tag: "text_note", text: "kolor bananowy" })],
+    ];
+    for (const [name, encoded] of cases) {
+      const json = convexToJson(encoded);
+      expect(typeof json === "object" || typeof json === "string", name).toBe(true);
+      // JSON.stringify must also succeed: the encoded form is plain wire data.
+      expect(() => JSON.stringify(json), name).not.toThrow();
+    }
   });
 });

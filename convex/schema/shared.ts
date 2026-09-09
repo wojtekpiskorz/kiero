@@ -170,7 +170,16 @@ export const semanticValueValidators = {
   findingValue: findingValueValidator,
 } as const;
 
-/** Optional-table-field variants of the same validators. */
+/**
+ * Optional-table-field variants of the same validators. Each entry is
+ * `v.optional` of the EXACT validator object in `semanticValueValidators`,
+ * so the pair cannot drift; there is no second conversion path.
+ *
+ * Current consumers: `temporalValue` (findingRevisions.effectiveFrom). The
+ * remaining entries have no consuming column yet; they stay so that later
+ * fragments take the optional variant from here instead of hand-building an
+ * unchecked copy of a proved validator.
+ */
 export const semanticValueFields = {
   knowledgeState: v.optional(knowledgeStateValidator),
   temporalValue: v.optional(temporalValueValidator),
@@ -224,9 +233,14 @@ export const shared = {
   calendarConnectionId: v.id("calendarConnections"),
   calendarCopyId: v.id("calendarCopies"),
   exportId: v.id("exports"),
+  gmAccessGrantId: v.id("gmAccessGrants"),
 
-  // Revision references (optimistic concurrency and immutable history).
-  revisionCounter: v.float64(),
+  /**
+   * Monotonic non-negative counter: revisions, versions, attempt counts and
+   * sequence numbers alike (document counts stay far below 2^53). Named
+   * neutrally because most uses are plain counters, not revision references.
+   */
+  counter: v.float64(),
 
   // Trusted system time, epoch milliseconds.
   tsMs: v.float64(),

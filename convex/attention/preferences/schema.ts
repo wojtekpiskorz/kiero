@@ -23,5 +23,5 @@ export const preferencesTables = {
     quietHoursStartMinute: v.optional(v.float64()),
     quietHoursEndMinute: v.optional(v.float64()),
     updatedAtMs: shared.tsMs,
-  }).index("by_user", ["companyId", "userId"]),
+  }).index("by_company_user", ["companyId", "userId"]),
 } as const;

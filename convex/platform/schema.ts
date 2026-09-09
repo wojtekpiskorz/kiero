@@ -94,7 +94,7 @@ export const platformTables = {
   processingSteps: defineTable({
     runId: shared.processingRunId,
     stepKind: v.string(),
-    sequence: shared.revisionCounter,
+    sequence: shared.counter,
     state: v.union(
       v.literal("pending"),
       v.literal("running"),
@@ -109,7 +109,7 @@ export const platformTables = {
   /** Attempt history of one step; actual provider route is recorded. */
   processingAttempts: defineTable({
     stepId: shared.processingStepId,
-    attempt: shared.revisionCounter,
+    attempt: shared.counter,
     outcome: v.union(
       v.literal("succeeded"),
       v.literal("failed"),
@@ -134,8 +134,8 @@ export const platformTables = {
     state: durableJobState,
     /** Job input, encoded through the kind's input schema. */
     inputJson: v.string(),
-    attempts: shared.revisionCounter,
-    maxAttempts: shared.revisionCounter,
+    attempts: shared.counter,
+    maxAttempts: shared.counter,
     createdAtMs: shared.tsMs,
     updatedAtMs: shared.tsMs,
   })
@@ -155,7 +155,7 @@ export const platformTables = {
     /** Full DomainEventEnvelope, encoded through the event's payload schema. */
     envelopeJson: v.string(),
     deliveryState: outboxDeliveryState,
-    attempts: shared.revisionCounter,
+    attempts: shared.counter,
     dedupKey: v.optional(v.string()),
     nextAttemptAtMs: v.optional(shared.tsMs),
     createdAtMs: shared.tsMs,

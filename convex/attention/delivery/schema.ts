@@ -57,7 +57,7 @@ export const deliveryTables = {
   /** External delivery attempt history with known/unknown outcomes. */
   notificationAttempts: defineTable({
     intentId: shared.notificationIntentId,
-    attempt: shared.revisionCounter,
+    attempt: shared.counter,
     // Deliberately NOT one vocabulary with the attention.intentDelivered
     // event outcome: an attempt may end `unknown` (provider timeout after an
     // uncertain side effect), while the intentDelivered event outcome is

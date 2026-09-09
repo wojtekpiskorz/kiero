@@ -46,7 +46,7 @@ export const findingsTables = {
     currentRevisionId: v.optional(shared.findingRevisionId),
     /** Current knowledge state, stored through the proved semantic conversion. */
     knowledgeState: semanticValueValidators.knowledgeState,
-    revisionCounter: shared.revisionCounter,
+    revisionCounter: shared.counter,
     updatedAtMs: shared.tsMs,
   })
     .index("by_company_scope_key", ["companyId", "scopeProjectId", "semanticKey"])
@@ -55,7 +55,7 @@ export const findingsTables = {
   /** Immutable snapshot of one recorded revision. Never edited, only superseded. */
   findingRevisions: defineTable({
     findingId: shared.findingId,
-    revision: shared.revisionCounter,
+    revision: shared.counter,
     value: semanticValueValidators.findingValue,
     knowledgeState: semanticValueValidators.knowledgeState,
     /** Present only when evidence establishes when the agreement applied. */
@@ -112,7 +112,7 @@ export const findingsTables = {
     changeSetId: shared.changeSetId,
     memberRevisionIds: v.array(shared.findingRevisionId),
     expectedRevisions: v.array(
-      v.object({ findingId: shared.findingId, revision: shared.revisionCounter }),
+      v.object({ findingId: shared.findingId, revision: shared.counter }),
     ),
     state: v.union(
       v.literal("prepared"),

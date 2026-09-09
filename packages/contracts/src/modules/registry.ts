@@ -21,10 +21,12 @@ import {
   FeatureId,
   eventConsumerEntry,
   executorEntry,
+  featureEntry,
   type AnyEventEntry,
   type AnyOperationEntry,
   type EventConsumerEntry,
   type ExecutorEntry,
+  type FeatureEntry,
 } from "./registration";
 import { accessOperations, accessEvents } from "./access";
 import { sourcesOperations, sourcesEvents } from "./sources";
@@ -205,6 +207,62 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("processing.analyze", "operations.reanalysisRequested", "processing.analyze_change_plan"),
 ];
 
+/**
+ * The initial feature registrations: one per declared seam, naming what the
+ * feature provides, publishes, consumes and executes. Later lanes add theirs
+ * here (or in their own composed registries) through `featureEntry`.
+ */
+export const features: readonly FeatureEntry[] = [
+  featureEntry({
+    kind: "feature",
+    featureId: decodeFeatureId("access.cleanup"),
+    providesOperations: [],
+    publishesEvents: [],
+    consumesEvents: ["access.membershipRevoked", "access.sessionRevoked"],
+    executesJobs: ["access.cleanup_revocation"],
+  }),
+  featureEntry({
+    kind: "feature",
+    featureId: decodeFeatureId("memory.recompute"),
+    providesOperations: [],
+    publishesEvents: [],
+    consumesEvents: ["sources.sourceWithdrawn", "memory.dependentsMarkedStale"],
+    executesJobs: ["memory.recompute_dependents"],
+  }),
+  featureEntry({
+    kind: "feature",
+    featureId: decodeFeatureId("deletion.purge"),
+    providesOperations: [],
+    publishesEvents: [],
+    consumesEvents: ["sources.sourcePurged"],
+    executesJobs: ["deletion.purge_source"],
+  }),
+  featureEntry({
+    kind: "feature",
+    featureId: decodeFeatureId("calendar.reconcile"),
+    providesOperations: [],
+    publishesEvents: [],
+    consumesEvents: ["calendar.copyOutcomeRecorded"],
+    executesJobs: ["calendar.reconcile_outcome"],
+  }),
+  featureEntry({
+    kind: "feature",
+    featureId: decodeFeatureId("processing.extract"),
+    providesOperations: [],
+    publishesEvents: [],
+    consumesEvents: ["sources.sourceAccepted"],
+    executesJobs: ["processing.extract_fragments"],
+  }),
+  featureEntry({
+    kind: "feature",
+    featureId: decodeFeatureId("processing.analyze"),
+    providesOperations: [],
+    publishesEvents: [],
+    consumesEvents: ["operations.reanalysisRequested"],
+    executesJobs: ["processing.analyze_change_plan"],
+  }),
+];
+
 // Fail fast on impossible registrations (module surface name drift).
 
 /**
@@ -225,6 +283,36 @@ export function assertNoDuplicateExecutors(list: readonly ExecutorEntry[]): Set<
   return seen;
 }
 
+/**
+ * Throws if a feature registration references an operation, event or job
+ * kind that no module surface or executor declared. Exported so the
+ * construction-time guarantee itself is under test.
+ */
+export function assertFeaturesCoherent(
+  list: readonly FeatureEntry[],
+  knownOperations: Readonly<Record<string, unknown>>,
+  knownEvents: Readonly<Record<string, unknown>>,
+  knownJobKinds: ReadonlySet<string>,
+): void {
+  for (const feature of list) {
+    for (const name of feature.providesOperations) {
+      if (!(name in knownOperations)) {
+        throw new Error(`Contract registry: feature ${feature.featureId} provides unknown operation ${name}`);
+      }
+    }
+    for (const name of [...feature.publishesEvents, ...feature.consumesEvents]) {
+      if (!(name in knownEvents)) {
+        throw new Error(`Contract registry: feature ${feature.featureId} references unknown event ${name}`);
+      }
+    }
+    for (const kind of feature.executesJobs) {
+      if (!knownJobKinds.has(kind)) {
+        throw new Error(`Contract registry: feature ${feature.featureId} executes unregistered job kind ${kind}`);
+      }
+    }
+  }
+}
+
 const registeredJobKinds = assertNoDuplicateExecutors(executors);
 for (const entry of eventConsumers) {
   if (!(entry.eventName in events)) {
@@ -236,3 +324,4 @@ for (const entry of eventConsumers) {
     );
   }
 }
+assertFeaturesCoherent(features, operations, events, registeredJobKinds);

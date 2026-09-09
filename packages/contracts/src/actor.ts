@@ -10,7 +10,7 @@
  */
 
 import { Schema } from "effect";
-import { tableIdSchema, IdempotencyKeySchema } from "./tableIds";
+import { tableIdSchema, IdempotencyKeySchema, type TableIdName } from "./tableIds";
 import { ClosedError } from "./errors";
 
 /** Membership role inside a company ("Członkostwo w firmie", CONTEXT.md). */
@@ -41,8 +41,13 @@ export const RevisionCounter = Schema.Number.pipe(
 );
 export type RevisionCounter = Schema.Schema.Type<typeof RevisionCounter>;
 
-/** The closed table inventory ids may reference in an expectation. */
-export const ExpectedRecordTable = Schema.Literals([
+/**
+ * The closed set of tables a revision expectation may reference. The
+ * `satisfies` check ties every member to the live table inventory: renaming
+ * or removing one of these tables breaks compilation here instead of
+ * silently accepting dead names.
+ */
+const EXPECTED_RECORD_TABLES = [
   "findings",
   "tasks",
   "checklistItems",
@@ -51,7 +56,9 @@ export const ExpectedRecordTable = Schema.Literals([
   "sources",
   "extensionDefinitions",
   "clarifications",
-]);
+] as const satisfies readonly TableIdName[];
+
+export const ExpectedRecordTable = Schema.Literals(EXPECTED_RECORD_TABLES);
 export type ExpectedRecordTable = Schema.Schema.Type<typeof ExpectedRecordTable>;
 
 /**

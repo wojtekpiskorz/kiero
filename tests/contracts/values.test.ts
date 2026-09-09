@@ -171,8 +171,19 @@ describe("money values", () => {
       certainty: "exact",
     });
     expect(decoded.taxBasis).toBe("not_specified");
-    expect(String(decoded.amount)).not.toContain("net");
-    expect(Schema.encodeSync(MoneyValue)(decoded).taxBasis).toBe("not_specified");
+    // Assert on the encoded wire form: the exact amount stays a decimal
+    // string and nothing about net/gross is invented alongside it.
+    const encoded = Schema.encodeSync(MoneyValue)(decoded);
+    expect(encoded.taxBasis).toBe("not_specified");
+    expect(encoded.amount).toEqual({ _tag: "exact", value: "1234.56" });
+    expect(Object.keys(encoded).sort()).toEqual([
+      "amount",
+      "certainty",
+      "currency",
+      "currencyOrigin",
+      "role",
+      "taxBasis",
+    ]);
   });
 
   it("decodes exact decimals without float error and rejects malformed decimals", () => {

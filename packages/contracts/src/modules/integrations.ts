@@ -12,18 +12,21 @@
 import { Schema } from "effect";
 import { operationEntry, eventEntry } from "./registration";
 
+/** Server-approved provider route ids; the concrete model order lives server-side. */
+export const ProviderRoute = Schema.Literals([
+  "chat_analysis",
+  "vision_extraction",
+  "speech_to_text",
+  "embedding",
+]);
+export type ProviderRoute = Schema.Schema.Type<typeof ProviderRoute>;
+
 export const integrationsOperations = {
   "integrations.executeModelCall": operationEntry({
     kind: "operation",
     name: "integrations.executeModelCall",
     input: Schema.Struct({
-      /** Server-approved route id; the concrete model order lives server-side. */
-      routeId: Schema.Literals([
-        "chat_analysis",
-        "vision_extraction",
-        "speech_to_text",
-        "embedding",
-      ]),
+      routeId: ProviderRoute,
       /** Payload validated by the provider adapter for the chosen route. */
       payload: Schema.Unknown,
     }),
@@ -56,7 +59,7 @@ export const integrationsEvents = {
     kind: "event",
     name: "integrations.providerCallCompleted",
     payload: Schema.Struct({
-      routeId: Schema.NonEmptyString,
+      routeId: ProviderRoute,
       actualModel: Schema.NonEmptyString,
       outcome: Schema.Literals(["succeeded", "failed", "timeout_unknown"]),
     }),

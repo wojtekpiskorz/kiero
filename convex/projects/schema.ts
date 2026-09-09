@@ -69,7 +69,7 @@ export const projectsTables = {
     clientId: v.optional(shared.contactId),
     /** Fixed stage vocabulary (issue 9); no stage is added for a pause. */
     stage: projectStage,
-    stageRevision: shared.revisionCounter,
+    stageRevision: shared.counter,
     /** Separate pause mark with reason and optional resume date. */
     paused: v.optional(
       v.object({ reason: v.string(), resumeOn: v.union(v.null(), v.string()) }),
