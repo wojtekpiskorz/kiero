@@ -26,6 +26,7 @@
  */
 
 import { calendarComplete, calendarStart, type CalendarBridgeEnv } from "./client";
+import { answerOrNull } from "../../../../convex/calendar/connection/answers";
 import type { GatewayRoute } from "../platform/routes";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -36,10 +37,10 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 /** Minimal Polish status page (barebones: semantic HTML, no styling). */
-function polishStatusPage(title: string, detail: string, ok: boolean): Response {
+function polishStatusPage(title: string, detail: string, status: number): Response {
   const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Kiero — Kalendarz</title></head><body><section aria-labelledby="k"><h1 id="k">Kalendarz Kiero w Google</h1><p role="status">${title}</p><p>${detail}</p><p><a href="/">Wróć do Kiero</a></p></section></body></html>`;
   return new Response(html, {
-    status: ok ? 200 : 400,
+    status,
     headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
   });
 }
@@ -79,7 +80,7 @@ export const calendarOAuthRoutes: readonly GatewayRoute[] = [
         return polishStatusPage(
           "Nieprawidłowe połączenie.",
           "Ten link jest niekompletny. Zacznij połączenie od nowa w Kiero.",
-          false,
+          400,
         );
       }
       const outcome = await calendarComplete(env, { state, code, error });
@@ -91,21 +92,31 @@ export const calendarOAuthRoutes: readonly GatewayRoute[] = [
         return polishStatusPage(
           "Połączenie kalendarza nie zostało ukończone.",
           "Wróć do Kiero i sprawdź stan połączenia kalendarza.",
-          false,
+          400,
         );
       }
       const value =
         typeof result.value === "object" && result.value !== null
           ? (result.value as Record<string, unknown>)
           : {};
-      const connected = value.connected === true;
-      return polishStatusPage(
-        connected ? "Kalendarz Kiero jest połączony." : "Połączenie kalendarza nie zostało ukończone.",
-        connected
-          ? "Możesz wrócić do Kiero i korzystać z terminów w swoim kalendarzu Google."
-          : "Wróć do Kiero i sprawdź stan połączenia kalendarza.",
-        connected,
-      );
+      if (value.connected === true) {
+        return polishStatusPage(
+          "Kalendarz Kiero jest połączony.",
+          "Możesz wrócić do Kiero i korzystać z terminów w swoim kalendarzu Google.",
+          200,
+        );
+      }
+      // The same typed reason the direct Convex callback page renders (the
+      // shared answer vocabulary); an unknown code gets the honest generic.
+      const answer = typeof value.code === "string" ? answerOrNull(value.code) : null;
+      if (answer === null) {
+        return polishStatusPage(
+          "Połączenie kalendarza nie zostało ukończone.",
+          "Wróć do Kiero i sprawdź stan połączenia kalendarza.",
+          400,
+        );
+      }
+      return polishStatusPage(answer.polishTitle, answer.polishDetail, answer.status);
     },
   },
 ];

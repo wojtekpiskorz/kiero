@@ -8,12 +8,16 @@
  * never fabricates a URL without it, both legs fail closed and sanitized
  * when the backend is unconfigured/unreachable or answers garbage, and the
  * callback completion carries exactly the service credential + Google's
- * query — no token values are echoed into errors.
+ * query — no token values are echoed into errors. The callback ROUTE
+ * additionally renders the typed completion code through the SAME answer
+ * vocabulary the direct Convex callback page uses (shared module
+ * convex/calendar/connection/answers.ts).
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import { calendarComplete, calendarStart } from "../../apps/gateway/src/calendar-oauth/client";
+import { calendarOAuthRoutes } from "../../apps/gateway/src/calendar-oauth/routes";
 
 /** A clearly-labeled fake Convex site (test fixture, never real). */
 interface FakeSite {
@@ -181,5 +185,59 @@ describe("calendarComplete (the service-credential leg)", () => {
       state: "s2",
       error: "access_denied",
     });
+  });
+});
+
+describe("the gateway callback route renders the typed reason", () => {
+  async function renderCallback(query: string): Promise<Response> {
+    const route = calendarOAuthRoutes.find(
+      (candidate) => candidate.path === "/platform/calendar/oauth/callback",
+    );
+    if (route === undefined) {
+      throw new Error("callback route not registered");
+    }
+    return (await route.handle(
+      new Request(`https://gateway.example/platform/calendar/oauth/callback?${query}`),
+      configured(),
+    )) as Response;
+  }
+
+  it("renders the connected success page", async () => {
+    fake.respond = { status: 200, body: { _tag: "ok", value: { code: "connected", connected: true } } };
+    const response = await renderCallback("state=s&code=c");
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain("Kalendarz Kiero jest połączony.");
+  });
+
+  it("maps the typed code through the shared answer vocabulary", async () => {
+    fake.respond = { status: 200, body: { _tag: "ok", value: { code: "scopes_missing", connected: false } } };
+    const response = await renderCallback("state=s&code=c");
+    const html = await response.text();
+    expect(response.status).toBe(400);
+    expect(html).toContain("Brak wymaganych uprawnień.");
+  });
+
+  it("keeps the upstream statuses (an uncertain creation is a 200 page)", async () => {
+    fake.respond = { status: 200, body: { _tag: "ok", value: { code: "creation_unknown", connected: false } } };
+    const response = await renderCallback("state=s&code=c");
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain("niepewny");
+  });
+
+  it("falls back to the honest generic page for an unknown code", async () => {
+    fake.respond = { status: 200, body: { _tag: "ok", value: { code: "something_new", connected: false } } };
+    const response = await renderCallback("state=s&code=c");
+    const html = await response.text();
+    expect(response.status).toBe(400);
+    expect(html).toContain("Połączenie kalendarza nie zostało ukończone.");
+  });
+
+  it("rejects an incomplete callback link without calling the backend", async () => {
+    const response = await renderCallback("");
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain("niekompletny");
+    expect(fake.requests).toHaveLength(0);
   });
 });

@@ -34,7 +34,7 @@ import {
   type RequestContext,
 } from "@kiero/runtime";
 import { internalMutation } from "../../_generated/server";
-import type { MutationCtx } from "../../_generated/server";
+import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { publishEvent } from "../../platform/publish";
 import { earliestActiveMembership, type MembershipViewWithTime } from "../../access/membership/cores";
@@ -177,6 +177,33 @@ function bridgedMembershipView(row: Doc<"memberships">): MembershipViewWithTime 
   };
 }
 
+/**
+ * The user's earliest-active company over the v1 active-firm rule
+ * (earliestActiveMembership, the house rule the canonical resolution
+ * applies), as a plain Convex id; null when the user has no active firm.
+ * Shared by the callback's membership re-check and the refresh/status
+ * revocation paths — one definition of "this row's firm is still the
+ * user's firm".
+ */
+export async function earliestActiveCompanyId(
+  db: QueryCtx["db"],
+  userId: Id<"users">,
+): Promise<Id<"companies"> | null> {
+  const memberships = await db
+    .query("memberships")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .collect();
+  const views: MembershipViewWithTime[] = [];
+  for (const membership of memberships) {
+    const view = bridgedMembershipView(membership);
+    if (view !== null) {
+      views.push(view);
+    }
+  }
+  const active = earliestActiveMembership(views);
+  return active === null ? null : db.normalizeId("companies", active.companyId);
+}
+
 // ---------------------------------------------------------------------------
 // Start authorization.
 // ---------------------------------------------------------------------------
@@ -200,11 +227,24 @@ export async function performStartAuthorization(
   nowMs: number,
 ): Promise<ResultEnvelope> {
   const existing = await rowByUser(ctx.db, args.userId);
-  const decision = decideStartAuthorization(
+  let decision = decideStartAuthorization(
     existing === null ? null : connectionView(existing),
     { mode: args.mode, acknowledgeUnknownCreation: args.acknowledgeUnknownCreation },
     nowMs,
   );
+  if (
+    decision.kind === "refuse" &&
+    decision.code === "already_connected" &&
+    existing !== null &&
+    existing.companyId !== args.companyId
+  ) {
+    // The live binding belongs to a firm the actor no longer actively
+    // belongs to (the canonical chain resolved their CURRENT firm; the
+    // status read reports the row as the membership-lost stop): the
+    // restart re-scopes the row instead of refusing — otherwise a
+    // re-joined boss could never reconnect (round-2 major 1).
+    decision = { kind: "start" };
+  }
   if (decision.kind === "refuse") {
     return errorResult(conflictError(decision.code));
   }
@@ -230,6 +270,28 @@ export async function performStartAuthorization(
       // An error reason never survives a new attempt.
       reconnectReason: undefined,
       ...flow,
+      // The flow is scoped to the actor's CURRENT firm (the canonical
+      // chain resolved it): a boss who left the row's firm and joined
+      // another re-scopes the row HERE, or the callback's membership
+      // re-check would hold the stale firm against them forever. A
+      // re-scope also drops the old firm's calendar/account/credential
+      // knowledge: the new firm's first confirmed connection creates a
+      // dedicated calendar named for IT (issue #45), and no cross-firm
+      // binding can survive a failed flow (the switch-restore path needs
+      // a known calendar id, which a re-scope clears).
+      ...(existing.companyId !== args.companyId
+        ? {
+            companyId: args.companyId,
+            googleCalendarId: undefined,
+            googleAccountSubject: undefined,
+            googleAccountEmail: undefined,
+            grantedScopes: undefined,
+            cleanupStatus: undefined,
+            credentialCiphertext: undefined,
+            credentialStorage: "none" as const,
+            accessTokenExpiresAtMs: undefined,
+          }
+        : {}),
     });
   }
   const authorizationUrl = buildAuthorizationUrl({
@@ -255,7 +317,10 @@ export const startFlowTransaction = internalMutation({
   },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
     const config = calendarOAuthConfig(process.env);
-    if (config.clientId === null) {
+    if (config.clientId === null || config.clientSecret === null) {
+      // Refuse BEFORE any consent walk: without BOTH client names the
+      // exchange can never run, so a flow started now could only die at
+      // the callback (minor-3: refuse earlier, honestly).
       return errorResult(
         conflictError("google_client_not_configured"),
       );
@@ -348,22 +413,11 @@ export const prepareCallbackTransaction = internalMutation({
       return { status: "finish_error", reason: "authorization_expired" };
     }
     // Membership re-check at the callback over the v1 active-firm rule
-    // (earliestActiveMembership, the same house rule the canonical
-    // resolution applies): a revoked boss never completes a connection.
-    const memberships = await ctx.db
-      .query("memberships")
-      .withIndex("by_user", (q) => q.eq("userId", row.userId))
-      .collect();
-    const views: MembershipViewWithTime[] = [];
-    for (const membership of memberships) {
-      const view = bridgedMembershipView(membership);
-      if (view !== null) {
-        views.push(view);
-      }
-    }
-    const active = earliestActiveMembership(views);
-    const rowCompanyId = parseTableId("companies", row.companyId);
-    if (rowCompanyId === null || active === null || active.companyId !== rowCompanyId) {
+    // (earliestActiveCompanyId -> earliestActiveMembership, the same house
+    // rule the canonical resolution applies): a revoked boss never
+    // completes a connection.
+    const activeCompanyId = await earliestActiveCompanyId(ctx.db, row.userId);
+    if (activeCompanyId === null || activeCompanyId !== row.companyId) {
       // Membership loss is a STOP, not a flow failure: unlike an expired
       // flow, it never restores the previous binding — the user's company
       // scope is gone, so the connection (and its credentials) must not
@@ -609,7 +663,16 @@ export async function performDisconnect(
   return { ok: true, state: "disconnected" };
 }
 
-/** Internal entry the membership-loss stop path uses (B3-join ready). */
+/**
+ * The membership-loss stop mutation (state `disconnected`, reason
+ * `membership_lost`, credentials cleared, unconfirmed cleanup recorded).
+ * Called by the refresh capability's re-check (./functions.ts) whenever it
+ * finds a connected row whose firm is no longer the user's active firm.
+ * The DURABLE fan-out — B3's membership-revocation event stopping the
+ * calendar connection without waiting for a refresh — is a named
+ * prerequisite on the access lane (see the G1 report); G1 does not edit
+ * B3's files.
+ */
 export const disconnectForMembershipTransaction = internalMutation({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => performDisconnect(ctx, { userId: args.userId, initiator: "membership_loss" }, Date.now()),
@@ -673,8 +736,11 @@ function normalizedUserId(ctx: MutationCtx, context: RequestContext): Id<"users"
 
 /**
  * `calendar.disconnectCalendar`: the same stop core as the UI path, entered
- * through the typed dispatch. A foreign connection id is not the actor's
- * business: not_found, no existence leak.
+ * through the typed dispatch. Ownership is the ACTOR'S OWN row (user id);
+ * a foreign row is not the actor's business: not_found, no existence leak.
+ * The row's firm may legitimately differ from the actor's current firm
+ * (membership lost — the status read reports the stop, and disconnect is
+ * the one operation that must keep working for such a row).
  */
 export async function performDisconnectCalendar(
   ctx: MutationCtx,
@@ -685,12 +751,8 @@ export async function performDisconnectCalendar(
   if (id === null) {
     return errorResult(notFoundError("calendarConnections"));
   }
-  const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
-  if (companyId === null) {
-    return errorResult(notFoundError("calendarConnections"));
-  }
   const row = await ctx.db.get(id);
-  if (row === null || row.userId !== normalizedUserId(ctx, context) || row.companyId !== companyId) {
+  if (row === null || row.userId !== normalizedUserId(ctx, context)) {
     return errorResult(notFoundError("calendarConnections"));
   }
   const outcome = await performDisconnect(

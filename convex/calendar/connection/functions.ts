@@ -35,12 +35,16 @@ import { resolveRequestContext } from "../../platform/context";
 import {
   availableActions,
   decideRefreshOutcome,
-  type AuthorizationMode,
   type ConnectionAction,
   type ReconnectReason,
 } from "./cores";
 import { openCredential, sealCredential } from "./credentialStore";
-import { calendarOAuthConfig, callbackRedirectUri, performStartAuthorization } from "./operations";
+import {
+  calendarOAuthConfig,
+  callbackRedirectUri,
+  earliestActiveCompanyId,
+  performStartAuthorization,
+} from "./operations";
 import { dispatchCalendarCommand } from "./dispatch";
 import {
   GOOGLE_CALENDAR_API_BASE,
@@ -132,7 +136,10 @@ export const startAuthorization = mutation({
       return errorResult(forbiddenError("no_company_scope", "company"));
     }
     const config = calendarOAuthConfig(process.env);
-    if (config.clientId === null) {
+    if (config.clientId === null || config.clientSecret === null) {
+      // Refuse BEFORE any consent walk: without BOTH client names the
+      // exchange can never run (the same honest earlier refusal the HTTP
+      // start applies).
       return errorResult(conflictError("google_client_not_configured"));
     }
     const redirectUri = callbackRedirectUri(
@@ -148,7 +155,7 @@ export const startAuthorization = mutation({
       {
         userId: resolved.userId,
         companyId: resolved.companyId,
-        mode: (args.mode ?? "connect") as AuthorizationMode,
+        mode: args.mode ?? "connect",
         acknowledgeUnknownCreation: args.acknowledgeUnknownCreation ?? false,
         redirectUri,
         clientId: config.clientId,
@@ -191,6 +198,15 @@ export interface CalendarConnectionStatus {
  * canonical chain. A verified person without an active firm sees
  * `unavailable_no_company` — sign-in and identity are never this table's
  * business (disconnect leaves every login method untouched).
+ *
+ * Membership re-check (issue #45: membership loss follows the stop/cleanup
+ * path): a row whose firm is no longer the actor's active firm reads as
+ * the honest membership-lost STOP even before any write persists it — no
+ * credential capability, no stale binding data, reconnect offered (the
+ * restart re-scopes the row to the actor's current firm). The durable
+ * stop lands on the next persisting operation (refresh, callback,
+ * dispatch); the event-driven fan-out from B3's revocation is a named
+ * prerequisite on the access lane.
  */
 export const calendarStatus = query({
   args: {},
@@ -249,6 +265,37 @@ export const calendarStatus = query({
         ...base,
       };
     }
+    const activeCompanyId = ctx.db.normalizeId("companies", context.actor.companyId);
+    if (activeCompanyId !== null && row.companyId !== activeCompanyId) {
+      // The row belongs to a firm the actor no longer actively belongs to:
+      // report the stopped view (queries cannot persist; the durable stop
+      // lands on the next persisting operation — refresh, callback,
+      // dispatch — and on the access lane's revocation fan-out once wired).
+      return {
+        state: "error",
+        connectionId: row._id,
+        availableActions: availableActions({
+          state: "error",
+          authorizationMode: null,
+          authorizationExpiresAtMs: null,
+          googleCalendarId: null,
+          googleAccountSubject: null,
+          reconnectReason: "membership_lost",
+        }),
+        googleCalendarId: null,
+        googleAccountEmail: null,
+        connectedAtMs: null,
+        disconnectedAtMs: row.disconnectedAtMs ?? null,
+        authorizationExpiresAtMs: null,
+        reconnectReason: "membership_lost",
+        cleanupStatus: row.cleanupStatus ?? null,
+        lastSuccessfulContactMs: null,
+        grantedScopes: null,
+        credentialStorage: null,
+        credentialCapability: "absent",
+        ...base,
+      };
+    }
     const credential =
       row.state === "connected"
         ? await openCredential(row.credentialStorage, row.credentialCiphertext, process.env)
@@ -298,16 +345,29 @@ export const dispatchCalendar = mutation({
 
 /** One refresh attempt's typed result for the projection/reconciliation lanes. */
 export interface RefreshResult {
-  readonly outcome: "refreshed" | "definitely_lost" | "unknown" | "no_connection" | "no_credential";
+  readonly outcome:
+    | "refreshed"
+    | "definitely_lost"
+    | "unknown"
+    | "membership_lost"
+    | "no_connection"
+    | "no_credential";
 }
 
 /**
  * The credential capability action: ONE bounded refresh attempt against the
- * configured token endpoint. Uncertain outcomes are reported and recorded
- * (updatedAtMs only) — never retried here; a definite invalid_grant marks
- * the connection `error/refresh_failed` (the documented >1-week
- * Testing-mode shape). G2 must treat `unknown` as "do not publish, do not
- * retry blindly" and hand the decision to reconciliation (G3).
+ * configured token endpoint. The membership re-check runs FIRST: a
+ * connected row whose firm is no longer the user's active firm is STOPPED
+ * here (credentials cleared, unconfirmed cleanup recorded, the
+ * `calendar.disconnected` event published) and answers `membership_lost` —
+ * G2 must treat that as "stop publishing; the user reconnects for their
+ * current firm".
+ *
+ * Uncertain outcomes are reported and recorded (updatedAtMs only) — never
+ * retried here; a definite invalid_grant marks the connection
+ * `error/refresh_failed` (the documented >1-week Testing-mode shape). G2
+ * must treat `unknown` as "do not publish, do not retry blindly" and hand
+ * the decision to reconciliation (G3).
  */
 export const refreshCredentials = internalAction({
   args: { connectionId: v.string() },
@@ -318,6 +378,16 @@ export const refreshCredentials = internalAction({
     );
     if (loaded === null) {
       return { outcome: "no_connection" };
+    }
+    // The revocation path (issue #45: membership loss follows the
+    // stop/cleanup path): the row's firm must still be the user's active
+    // firm, or the connection stops before any Google leg runs.
+    if (loaded.activeCompanyId === null || loaded.activeCompanyId !== loaded.companyId) {
+      await ctx.runMutation(
+        internal.calendar.connection.operations.disconnectForMembershipTransaction,
+        { userId: loaded.userId },
+      );
+      return { outcome: "membership_lost" };
     }
     // Only the SEALED material crossed back from the query (function outputs
     // are logged too); the action opens it here, in memory.
@@ -382,7 +452,9 @@ export const refreshCredentials = internalAction({
 
 /**
  * Loads a connected row's credential for the refresh action. Returns the
- * SEALED material only (query outputs are logged; the action opens it).
+ * SEALED material only (query outputs are logged; the action opens it),
+ * plus the row's firm and the user's active firm for the membership
+ * re-check (earliestActiveCompanyId, the house rule).
  */
 export const connectionCredentialForRefresh = internalQuery({
   args: { connectionId: v.string() },
@@ -397,6 +469,9 @@ export const connectionCredentialForRefresh = internalQuery({
     }
     return {
       state: row.state,
+      companyId: row.companyId,
+      userId: row.userId,
+      activeCompanyId: await earliestActiveCompanyId(ctx.db, row.userId),
       sealed:
         row.credentialStorage === undefined ||
         row.credentialStorage === "none" ||

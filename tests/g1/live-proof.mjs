@@ -49,6 +49,8 @@ const SZEF2 = person("szef2");
 const SZEF3 = person("szef3");
 const SZEF4 = person("szef4");
 const SZEF5 = person("szef5");
+const SZEF6 = person("szef6");
+const SZEF7 = person("szef7");
 
 const results = [];
 function check(id, condition, detail) {
@@ -658,6 +660,142 @@ let szef4 = null;
   check("14c the bridge-completed connection is recorded like the browser leg",
     status?.state === "connected" && status?.googleAccountEmail === `g1-google-15@kiero.invalid`,
     JSON.stringify({ state: status?.state, account: status?.googleAccountEmail }));
+}
+
+// --- Phase 15: firm change re-scopes the row (the rejoin happy path) ----------
+let szef6 = null;
+{
+  szef6 = await signInFixture(SZEF6, 6);
+  // szef6's FIRST (earliest-active) membership: member of szef3's firm B.
+  const invited = await invite(szef3.client, { email: SZEF6, role: "member" });
+  const setCode = await anon().action("access/membership/probe:b3ProofSetInvitationCode", {
+    invitationId: invited.value.invitationId,
+    code: FIXTURE_CODE,
+  });
+  const accepted = await admit(szef6.client, "access.acceptInvitation", {
+    invitationId: invited.value.invitationId,
+    verificationCode: FIXTURE_CODE,
+  });
+  row("szef6 member of firm B", `${isOk(accepted)} (${setCode?._tag})`);
+
+  const flow1 = await startFlow(szef6);
+  const done1 = await httpCallback(flow1.state, proofCode(16));
+  check("15a szef6 connects for firm B", done1.status === 200, `status=${done1.status}`);
+  const status1 = await statusOf(szef6.client);
+  const szef6ConnectionId = status1?.connectionId;
+  check("15b connected with a dedicated calendar for firm B",
+    status1?.state === "connected" && status1?.googleCalendarId === "kiero-proof-calendar",
+    JSON.stringify({ state: status1?.state, cal: status1?.googleCalendarId }));
+  const firmBRow = (await proofState(null))?.value?.connections?.find(
+    (c) => c.connectionId === szef6ConnectionId,
+  );
+  row("szef6 row firm (firm B)", firmBRow?.companyId);
+  check("15c exactly one calendar created so far for that Google account",
+    (await proofState(calendarCreateKey(16)))?.value?.effectCount === 1,
+    `count=${(await proofState(calendarCreateKey(16)))?.value?.effectCount}`);
+
+  // Revoked from B, then founds firm Y: the active firm becomes Y while the
+  // row still records B.
+  const overview = await szef3.client.query("access/membership/functions:membershipOverview", {});
+  const szef6Membership = (overview?.members ?? []).find((m) => m.email === SZEF6);
+  const revoked = await dispatchMembership(szef3.client, "access.revokeMembership", {
+    membershipId: szef6Membership?.membershipId,
+  });
+  check("15d szef3 revoked szef6 from firm B", isOk(revoked), errCode(revoked));
+  // B3's revocation cleanup revoked szef6's session: a fresh sign-in (new
+  // session, same person) is the honest path before founding firm Y.
+  szef6 = await signInFixture(SZEF6, 6);
+  const created = await admit(szef6.client, "access.createCompany", {
+    name: `Firma Y G1 ${RUN}`,
+    timezone: "Europe/Warsaw",
+    defaultCurrency: "PLN",
+  });
+  const firmY = created?.value?.companyId;
+  row("szef6 founded firm Y", firmY);
+
+  const stopped = await statusOf(szef6.client);
+  check("15e the status read reports the membership-lost stop for the stale-firm row",
+    stopped?.state === "error" &&
+      stopped?.reconnectReason === "membership_lost" &&
+      stopped?.credentialCapability === "absent" &&
+      stopped?.availableActions?.includes("reconnect"),
+    JSON.stringify({ state: stopped?.state, reason: stopped?.reconnectReason, capability: stopped?.credentialCapability }));
+
+  const flow2 = await startFlow(szef6);
+  check("15f the restart under the new firm is admitted (the row re-scopes)",
+    flow2.state !== undefined, flow2.failed ? errCode(flow2.failed) : "started");
+  // The SAME Google account: only a fresh create (not a reuse of firm B's
+  // calendar) proves the stale binding was dropped with the re-scope.
+  const done2 = await httpCallback(flow2.state, proofCode(16));
+  check("15g the callback completes for the new firm", done2.status === 200, `status=${done2.status}`);
+  const after = (await proofState(null))?.value?.connections?.find(
+    (c) => c.connectionId === szef6ConnectionId,
+  );
+  check("15h the row is now scoped to firm Y", after?.companyId === firmY,
+    JSON.stringify({ companyId: after?.companyId }));
+  const status2 = await statusOf(szef6.client);
+  check("15i connected for the new firm with the same Google account",
+    status2?.state === "connected" && status2?.googleAccountEmail === "g1-google-16@kiero.invalid",
+    JSON.stringify({ state: status2?.state, account: status2?.googleAccountEmail }));
+  check("15j a FRESH calendar was created for the new firm (no cross-firm reuse)",
+    (await proofState(calendarCreateKey(16)))?.value?.effectCount === 2,
+    `count=${(await proofState(calendarCreateKey(16)))?.value?.effectCount}`);
+}
+
+// --- Phase 16: connected row, membership lost -> the refresh stop -------------
+let szef7 = null;
+{
+  szef7 = await signInFixture(SZEF7, 7);
+  const invited = await invite(szef3.client, { email: SZEF7, role: "member" });
+  const setCode = await anon().action("access/membership/probe:b3ProofSetInvitationCode", {
+    invitationId: invited.value.invitationId,
+    code: FIXTURE_CODE,
+  });
+  const accepted = await admit(szef7.client, "access.acceptInvitation", {
+    invitationId: invited.value.invitationId,
+    verificationCode: FIXTURE_CODE,
+  });
+  row("szef7 member of firm B", `${isOk(accepted)} (${setCode?._tag})`);
+
+  const flow = await startFlow(szef7);
+  const done = await httpCallback(flow.state, proofCode(17));
+  check("16a szef7 (member of firm B) connects", done.status === 200, `status=${done.status}`);
+  const status = await statusOf(szef7.client);
+  const szef7ConnectionId = status?.connectionId;
+  check("16b connected with ready credentials",
+    status?.state === "connected" && status?.credentialCapability === "ready",
+    JSON.stringify({ state: status?.state, capability: status?.credentialCapability }));
+  const memberRefresh = await proofRefresh(szef7ConnectionId);
+  check("16c refresh while still a member succeeds",
+    memberRefresh?.value?.outcome === "refreshed",
+    JSON.stringify({ outcome: memberRefresh?.value?.outcome }));
+
+  // Revoked while CONNECTED: the refresh capability is the immediate check.
+  const overview = await szef3.client.query("access/membership/functions:membershipOverview", {});
+  const szef7Membership = (overview?.members ?? []).find((m) => m.email === SZEF7);
+  const revoked = await dispatchMembership(szef3.client, "access.revokeMembership", {
+    membershipId: szef7Membership?.membershipId,
+  });
+  check("16d the administrator revoked szef7 while connected", isOk(revoked), errCode(revoked));
+
+  const refreshed = await proofRefresh(szef7ConnectionId);
+  check("16e refresh reports membership_lost (the revocation path)",
+    refreshed?.value?.outcome === "membership_lost",
+    JSON.stringify({ outcome: refreshed?.value?.outcome }));
+  const szef7Row = (await proofState(null))?.value?.connections?.find(
+    (c) => c.connectionId === szef7ConnectionId,
+  );
+  check("16f the row is durably stopped: disconnected/membership_lost, credentials gone, unconfirmed cleanup",
+    szef7Row?.state === "disconnected" &&
+      szef7Row?.reconnectReason === "membership_lost" &&
+      szef7Row?.credentialStorage === "none" &&
+      (szef7Row?.credentialCiphertext ?? null) === null &&
+      szef7Row?.cleanupStatus === "unconfirmed",
+    JSON.stringify({ state: szef7Row?.state, reason: szef7Row?.reconnectReason, storage: szef7Row?.credentialStorage, cleanup: szef7Row?.cleanupStatus }));
+  const again = await proofRefresh(szef7ConnectionId);
+  check("16g a second refresh after the stop is an honest no_connection",
+    again?.value?.outcome === "no_connection",
+    JSON.stringify({ outcome: again?.value?.outcome }));
 }
 
 // --- Summary -------------------------------------------------------------------

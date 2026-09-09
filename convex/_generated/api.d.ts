@@ -38,6 +38,7 @@ import type * as access_membership_operations from "../access/membership/operati
 import type * as access_membership_policy from "../access/membership/policy.js";
 import type * as access_membership_probe from "../access/membership/probe.js";
 import type * as auth from "../auth.js";
+import type * as calendar_connection_answers from "../calendar/connection/answers.js";
 import type * as calendar_connection_cores from "../calendar/connection/cores.js";
 import type * as calendar_connection_credentialStore from "../calendar/connection/credentialStore.js";
 import type * as calendar_connection_dispatch from "../calendar/connection/dispatch.js";
@@ -125,6 +126,7 @@ declare const fullApi: ApiFromModules<{
   "access/membership/policy": typeof access_membership_policy;
   "access/membership/probe": typeof access_membership_probe;
   auth: typeof auth;
+  "calendar/connection/answers": typeof calendar_connection_answers;
   "calendar/connection/cores": typeof calendar_connection_cores;
   "calendar/connection/credentialStore": typeof calendar_connection_credentialStore;
   "calendar/connection/dispatch": typeof calendar_connection_dispatch;
