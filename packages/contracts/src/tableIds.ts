@@ -42,6 +42,11 @@ export const TABLE_ID_NAMES = [
   "invitations",
   // access/gm
   "gmAccessGrants",
+  // access/linking (B2: verified linking ceremonies, email changes,
+  // manual-recovery ledger)
+  "linkingAttempts",
+  "emailChangeRequests",
+  "accountRecoveries",
   // projects
   "contacts",
   "contactRoles",

@@ -15,8 +15,18 @@
  *
  * `createOrUpdateUser` is REPLACED by the Kiero policy (./userPolicy.ts):
  * the library default would implicitly link accounts by verified email,
- * which the accepted identity rules forbid — linking requires both
- * proofs and is B2's operation.
+ *   which the accepted identity rules forbid — linking requires both
+ *   proofs and is B2's operation. The B2 amendment below keeps that rule
+ *   and adds the two explicit ceremony hooks (./linking/authHook.ts):
+ *
+ * - a Google sign-in that RESUMES an account records the fresh Google
+ *   proof when that account's ceremony awaits it (no-op otherwise);
+ * - the `method_conflict` rejection consults the linking module first:
+ *   when an active ceremony proves BOTH methods, the sign-in BECOMES the
+ *   explicit link commit (returning the ceremony's user id is the
+ *   library's supported manual-linking mechanism — the provider account
+ *   row attaches in the same transaction). Without a ceremony the
+ *   original B1 rejection stands, unchanged.
  *
  * Sessions: total and inactivity lifetimes are pinned to the accepted
  * 30-day rule. The app-side live-session registry (./resolution.ts)
@@ -46,9 +56,13 @@ import {
   type UserPolicyUser,
 } from "./userPolicy";
 import {
+  commitIssuanceAttempt,
   ISSUANCE_RATE_LIMITED_MARKER,
-  decideIssuance,
 } from "./issuanceLimit";
+import {
+  googleLinkFromCallbackHook,
+  recordGoogleProofHook,
+} from "../linking/authHook";
 
 /** One-time email code: 8 digits, valid for 15 minutes. */
 const OTP_CODE_LENGTH = 8;
@@ -171,34 +185,53 @@ const authConfig: ConvexAuthConfig = {
       // collection filter (same pattern as the users lookup below).
       if (args.type === "email") {
         const identifier = `issuance:email_code:${normalizeEmail(input.profile.email)}`;
-        const limitRow = await ctx.db
-          .query("authRateLimits")
-          .filter((q) => q.eq(q.field("identifier"), identifier))
-          .first();
-        const limit = decideIssuance(
-          limitRow === null
-            ? null
-            : { lastAttemptTime: limitRow.lastAttemptTime, attemptsLeft: limitRow.attemptsLeft },
+        // B2 amendment: the row read/write is the ONE shared budget core
+        // (./issuanceLimit.ts commitIssuanceAttempt); this inline adapter is
+        // the generic-callback db half. A blocked attempt writes nothing
+        // (rewriting the row would keep pushing the recovery window and
+        // starve the honest user).
+        const throttled = await commitIssuanceAttempt(
+          {
+            throttleRow: async (id) => {
+              const row = await ctx.db
+                .query("authRateLimits")
+                .filter((q) => q.eq(q.field("identifier"), id))
+                .first();
+              return row === null
+                ? null
+                : {
+                    id: row._id,
+                    lastAttemptTime: row.lastAttemptTime,
+                    attemptsLeft: row.attemptsLeft,
+                  };
+            },
+            insertThrottleRow: async (id, row) => {
+              await ctx.db.insert("authRateLimits", {
+                identifier: id,
+                lastAttemptTime: row.lastAttemptTime,
+                attemptsLeft: row.attemptsLeft,
+              });
+            },
+            patchThrottleRow: async (rowId, row) => {
+              // normalizeId is the proved bridge back to the branded id
+              // (the surface carries plain strings, like the policy).
+              const id = ctx.db.normalizeId("authRateLimits", rowId);
+              if (id === null) {
+                throw new Error("issuance throttle: nieprawidłowy identyfikator");
+              }
+              await ctx.db.patch(id, {
+                lastAttemptTime: row.lastAttemptTime,
+                attemptsLeft: row.attemptsLeft,
+              });
+            },
+          },
+          identifier,
           Date.now(),
         );
-        if (!limit.allowed) {
-          // No write on a blocked attempt: rewriting the row would keep
-          // pushing the recovery window and starve the honest user.
+        if (!throttled) {
           throw new Error(
             `${ISSUANCE_RATE_LIMITED_MARKER} Zbyt wiele próśb o kod na ten adres. Odczekaj kilka minut i spróbuj ponownie.`,
           );
-        }
-        if (limitRow === null) {
-          await ctx.db.insert("authRateLimits", {
-            identifier,
-            lastAttemptTime: limit.next.lastAttemptTime,
-            attemptsLeft: limit.next.attemptsLeft,
-          });
-        } else {
-          await ctx.db.patch(limitRow._id, {
-            lastAttemptTime: limit.next.lastAttemptTime,
-            attemptsLeft: limit.next.attemptsLeft,
-          });
         }
       }
 
@@ -232,11 +265,36 @@ const authConfig: ConvexAuthConfig = {
       });
 
       if (decision.action === "reject") {
+        // B2 amendment — the explicit linking ceremony (issue #21): before
+        // the method-conflict rejection stands, the linking module decides
+        // whether an active ceremony proves BOTH methods for this address.
+        // Only Google-direction sign-ins reach this branch with a proof
+        // that can commit (the OAuth proof is happening now); email legs
+        // verify through the linking module's own code channel.
+        if (input.method === "google") {
+          const link = await googleLinkFromCallbackHook(ctx, {
+            rawProfile: args.profile,
+            usersWithEmail: found,
+            nowMs: Date.now(),
+          });
+          if (link.committed) {
+            // The ceremony committed atomically (users.googleSubject +
+            // ceremony state) inside the hook; returning this user id is
+            // the library's supported manual linking — the provider
+            // account row attaches to the SAME account in this transaction.
+            const linkedUserId = ctx.db.normalizeId("users", link.userId);
+            if (linkedUserId === null) {
+              throw new Error("createOrUpdateUser: nieprawidłowy identyfikator osoby");
+            }
+            return linkedUserId;
+          }
+        }
         // Polish product copy: the address belongs to an identity using a
         // different sign-in method; no detail about that identity is
-        // disclosed. Verified method linking is B2's operation.
+        // disclosed. Verified method linking is B2's operation (account
+        // settings; both proofs). Twin literal pinned by tests/b1+b2.
         throw new Error(
-          `${METHOD_CONFLICT_MARKER} Konto z tym adresem e-mail używa innej metody logowania. Zaloguj się pierwotną metodą; łączenie metod będzie dostępne później.`,
+          `${METHOD_CONFLICT_MARKER} Konto z tym adresem e-mail używa innej metody logowania. Zaloguj się pierwotną metodą; metody połączysz w ustawieniach konta, potwierdzając obie.`,
         );
       }
       if (decision.action === "resume") {
@@ -248,6 +306,17 @@ const authConfig: ConvexAuthConfig = {
         }
         if (args.profile.emailVerified === true) {
           await ctx.db.patch(userId, { emailVerificationTime: Date.now() });
+        }
+        // B2 amendment — record the fresh Google proof when the resumed
+        // account's ceremony awaits it (no ceremony: one bounded lookup,
+        // no writes). This is the google leg of an email-direction
+        // ceremony; everything else is untouched.
+        if (input.method === "google") {
+          await recordGoogleProofHook(ctx, {
+            userId: decision.userId,
+            rawProfile: args.profile,
+            nowMs: Date.now(),
+          });
         }
         return userId;
       }
