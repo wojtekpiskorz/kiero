@@ -132,7 +132,7 @@ export const accessOperations = {
       adminMembershipId: tableIdSchema("memberships"),
       demotedMembershipId: tableIdSchema("memberships"),
     }),
-    errorKinds: ["forbidden", "not_found", "conflict"],
+    errorKinds: ["forbidden", "not_found", "validation"],
   }),
   "access.linkVerifiedMethod": operationEntry({
     kind: "operation",

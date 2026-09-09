@@ -198,9 +198,9 @@ describe("the B3 contract entries (closed error vocabulary)", () => {
       "not_found",
     ]);
     expect([...accessOperations["access.transferAdministration"].errorKinds].sort()).toEqual([
-      "conflict",
       "forbidden",
       "not_found",
+      "validation",
     ]);
   });
 
