@@ -13,7 +13,7 @@
  *   precision and role: proposed / internal / agreed / actual.
  * - Ranges keep justified bounds; an open bound stays open (encoded `null`).
  *
- * Candidate contract until A3 certifies the runtime conversion.
+ * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";
@@ -81,16 +81,45 @@ type RangeBounds = Schema.Schema.Type<typeof RangeBounds>;
 const hasAtLeastOneBound = atLeastOneBound<RangeBounds>((value) => [value.start, value.end]);
 
 /**
+ * Period-start key of one date bound: `YYYY` < `YYYY-MM` < `YYYY-MM-DD`
+ * lexicographically, which is exactly interval-start order across
+ * precisions (the year 2026 starts before any month of 2026, which starts
+ * before any day of that month). Cross-precision bound ordering compares
+ * these keys; equal keys are in order (a bound and the period containing it).
+ */
+export function dateOnlyPeriodStart(bound: DateOnly): string {
+  switch (bound._tag) {
+    case "day":
+      return bound.day;
+    case "month":
+      return bound.month;
+    case "year":
+      return bound.year;
+  }
+}
+
+const boundsInOrder = (value: RangeBounds): value is RangeBounds =>
+  value.start === null ||
+  value.end === null ||
+  dateOnlyPeriodStart(value.start) <= dateOnlyPeriodStart(value.end);
+
+/**
  * A range of dates; a bound of `null` is open and stays open. Tagged like
  * the other variants so `TemporalValue.shape` is uniformly discriminable on
  * `_tag` (day | month | year | date_time | range).
  *
- * Ordering across precisions (day vs month vs year bounds, and date-vs
- * date_time values generally) is deliberately NOT enforced here: comparing
- * partially-known dates is a semantic decision, deferred to A3's runtime
- * certification of this baseline.
+ * Cross-precision bound ordering (A3 certification, resolving the A2
+ * deferral): when both bounds are present, the start's period must not begin
+ * after the end's period. Comparison is by period START, so
+ * start=2026-05-10/end=2026-05 is rejected (the month begins before the
+ * day) while start=2026-05/end=2026-05-10 is accepted. Ordering between a
+ * plain date and a zoned date/time remains a presentation-layer concern and
+ * is not encoded here.
  */
-export const DateRange = RangeBounds.pipe(Schema.refine(hasAtLeastOneBound));
+export const DateRange = RangeBounds.pipe(
+  Schema.refine(hasAtLeastOneBound),
+  Schema.refine(boundsInOrder),
+);
 export type DateRange = Schema.Schema.Type<typeof DateRange>;
 
 /** Meaning of a temporal statement (see issue 8: propozycja / wewnętrzny plan / uzgodniony / faktyczny). */

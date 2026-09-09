@@ -1,5 +1,5 @@
 /**
- * Typed extension definition tables (candidate fragment, A2).
+ * Typed extension definition tables (A2 candidate, certified by A3).
  *
  * Owning implementer: C3 (versioned typed extensions and catalog reuse).
  * Definitions are bounded data, never executable schema code. Field IDs are

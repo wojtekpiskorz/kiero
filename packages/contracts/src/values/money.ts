@@ -13,7 +13,7 @@
  *   net and gross may coexist as separate findings, and changing the basis
  *   creates a revision rather than rewriting history.
  *
- * Candidate contract until A3 certifies the runtime conversion.
+ * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema, BigDecimal } from "effect";

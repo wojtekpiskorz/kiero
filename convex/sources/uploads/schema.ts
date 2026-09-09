@@ -1,5 +1,5 @@
 /**
- * Upload and retained-media tables (candidate fragment, A2).
+ * Upload and retained-media tables (A2 candidate, certified by A3).
  *
  * Owning implementers: D2 (resumable uploads and atomic acceptance),
  * D5 (photo normalization and retained representations), D3 (range reads).

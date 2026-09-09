@@ -1,5 +1,5 @@
 /**
- * Per-person source read state (candidate fragment, A2).
+ * Per-person source read state (A2 candidate, certified by A3).
  *
  * Owning implementer: F1. Read state belongs to the logical source and the
  * user: seeing the original message in any view marks it everywhere for that

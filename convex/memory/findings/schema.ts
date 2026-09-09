@@ -1,6 +1,6 @@
 /**
  * Memory findings, revisions, provenance and publication tables
- * (candidate fragment, A2).
+ * (A2 candidate, certified by A3).
  *
  * Owning implementers: C2 (atomic findings/revisions/provenance/corrections),
  * C5 (withdrawal and dependency-aware recomputation), E3 (change plans).

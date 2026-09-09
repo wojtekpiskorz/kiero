@@ -1,5 +1,5 @@
 /**
- * Recovery manifest table (candidate fragment, A2).
+ * Recovery manifest table (A2 candidate, certified by A3).
  *
  * Owning implementers: I5 (scheduled complete backups), I6 (quarantine
  * restore drill). A backup is complete only after the database snapshot and

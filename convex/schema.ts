@@ -1,5 +1,5 @@
 /**
- * Convex schema composition entry (candidate, A2).
+ * Convex schema composition entry (A2 candidate, amended by A3).
  *
  * This file composes the modular domain fragments and nothing else: table
  * definitions and indexes live in each domain's schema fragment, shared
@@ -13,7 +13,11 @@
  * directions. Drift of either side fails loudly here, long before
  * deployment.
  *
- * Candidate until A3 proves the runtime conversion and certifies the freeze.
+ * A3 certification amendment: `defineSchema` now receives the literal
+ * spread (not the checked `Record`) so per-table INDEX types survive into
+ * the generated data model — `withIndex("by_dedup", ...)` and friends
+ * typecheck against real index names instead of only system indexes. The
+ * runtime uniqueness/inventory checks are unchanged and still run first.
  */
 
 import { defineSchema, type TableDefinition } from "convex/server";
@@ -93,4 +97,27 @@ for (const table of TABLE_ID_NAMES) {
   }
 }
 
-export default defineSchema(composed);
+// The literal spread preserves each fragment's per-table index types; the
+// loop above guarantees the spread introduces no unexpected key.
+export default defineSchema({
+  ...identityTables,
+  ...membershipTables,
+  ...gmTables,
+  ...projectsTables,
+  ...findingsTables,
+  ...extensionsTables,
+  ...workTables,
+  ...acceptTables,
+  ...uploadsTables,
+  ...platformTables,
+  ...searchTables,
+  ...readStateTables,
+  ...preferencesTables,
+  ...deliveryTables,
+  ...calendarConnectionTables,
+  ...calendarProjectionTables,
+  ...exportsTables,
+  ...deletionTables,
+  ...backupsTables,
+  ...telemetryTables,
+});

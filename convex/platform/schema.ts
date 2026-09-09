@@ -1,5 +1,6 @@
 /**
- * Platform durable-execution tables (candidate fragment, A2).
+ * Platform durable-execution tables (A2 candidate fragment, amended by A3
+ * during certification).
  *
  * Owning implementer: A3 (executor composition proof), H4 (inspection/
  * retry), D6/E2 (pipeline stages). Convex Workflow / the native scheduler is
@@ -10,7 +11,16 @@
  * are opaque to the schema (workflow-owned strings); attempts keep provider
  * routing evidence for GM inspection.
  *
- * Tables: processingRuns, processingSteps, processingAttempts, durableJobs.
+ * A3 certification amendments to the A2 candidate (see the certification
+ * note in docs/implementation/contracts/README.md):
+ * - `durableJobs.by_jobKey` index (job-key dedup lookup inside the
+ *   registration transaction) and `lastErrorKind`/`finishedAtMs` outcome
+ *   columns (sanitized closed error kind only).
+ * - `externalEffects`: the observable ledger the external echo stand-in
+ *   writes; the no-duplicate-effect proof counts rows here, per dedup key.
+ *
+ * Tables: processingRuns, processingSteps, processingAttempts, durableJobs,
+ * outboxEvents, externalEffects.
  */
 
 import { defineTable } from "convex/server";
@@ -34,8 +44,8 @@ const durableJobKind: ValueValidator<Encoded<typeof DurableJobKind>> = v.union(
   v.literal("processing.normalize_photo"),
   v.literal("memory.publish_change_set"),
   v.literal("memory.recompute_dependents"),
-  v.literal("notifications.evaluate_due_intents"),
-  v.literal("notifications.deliver_push"),
+  v.literal("attention.evaluate_due_intents"),
+  v.literal("attention.deliver_push"),
   v.literal("calendar.project_copy"),
   v.literal("calendar.reconcile_outcome"),
   v.literal("exports.build_archive"),
@@ -43,6 +53,7 @@ const durableJobKind: ValueValidator<Encoded<typeof DurableJobKind>> = v.union(
   v.literal("backups.verify_manifest"),
   v.literal("search.index_generation"),
   v.literal("access.cleanup_revocation"),
+  v.literal("platform.echo_delivery"),
 );
 
 const processingRunState: ValueValidator<Encoded<typeof ProcessingRunState>> =
@@ -131,15 +142,35 @@ export const platformTables = {
     companyId: v.optional(shared.companyId),
     sourceId: v.optional(shared.sourceId),
     processingRunId: v.optional(shared.processingRunId),
+    /**
+     * Semantic dedup identity shared with the outbox row/event that caused
+     * this job; lets the drain recognize work a publisher already
+     * registered atomically (no double registration from the edge).
+     */
+    dedupKey: v.optional(v.string()),
     state: durableJobState,
     /** Job input, encoded through the kind's input schema. */
     inputJson: v.string(),
     attempts: shared.counter,
     maxAttempts: shared.counter,
+    /** Sanitized closed error kind of the terminal/last failure, if any. */
+    lastErrorKind: v.optional(v.string()),
+    /** External delivery outcome when the job's effect left the transaction. */
+    externalOutcome: v.optional(
+      v.union(
+        v.literal("succeeded"),
+        v.literal("failed"),
+        v.literal("timeout"),
+        v.literal("unknown"),
+      ),
+    ),
     createdAtMs: shared.tsMs,
     updatedAtMs: shared.tsMs,
+    finishedAtMs: v.optional(shared.tsMs),
   })
     .index("by_kind_state", ["kind", "state"])
+    .index("by_jobKey", ["jobKey"])
+    .index("by_dedup", ["dedupKey"])
     .index("by_company", ["companyId"]),
 
   /**
@@ -163,4 +194,21 @@ export const platformTables = {
     .index("by_delivery", ["deliveryState", "nextAttemptAtMs"])
     .index("by_company", ["companyId"])
     .index("by_dedup", ["dedupKey"]),
+
+  /**
+   * A3 amendment: observable ledger of effects that left the transaction.
+   * Written by the external stand-in (the echo endpoint) itself, one row per
+   * HTTP call it actually received — it does not dedup. The
+   * no-duplicate-effect proof counts rows per `dedupKey`: correct replay and
+   * reconciliation leave exactly one.
+   */
+  externalEffects: defineTable({
+    dedupKey: v.string(),
+    serviceName: v.string(),
+    /** Sanitized bounded payload snapshot (never secrets or raw content). */
+    payload: v.string(),
+    receivedAtMs: shared.tsMs,
+  })
+    .index("by_dedup", ["dedupKey"])
+    .index("by_service", ["serviceName"]),
 } as const;

@@ -1,5 +1,5 @@
 /**
- * Derived search records (candidate fragment, A2).
+ * Derived search records (A2 candidate, certified by A3).
  *
  * Owning implementer: E5 (tenant-safe versioned retrieval).
  * Search indexes are disposable derived data, never authority. Entries carry

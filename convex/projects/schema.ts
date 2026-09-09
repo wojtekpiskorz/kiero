@@ -1,5 +1,5 @@
 /**
- * Projects and contacts tables (candidate fragment, A2).
+ * Projects and contacts tables (A2 candidate, certified by A3).
  *
  * Owning implementer: C1 (projects, contacts, aliases, lifecycle).
  * A project exists from the first client inquiry; ordinary names may collide

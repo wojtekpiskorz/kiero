@@ -9,7 +9,7 @@
  * semantics. Reanalysis is a linked NEW run; it can never overwrite a newer
  * correction.
  *
- * Candidate contract until A3 proves the executor composition.
+ * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";
@@ -23,8 +23,10 @@ export const DurableJobKind = Schema.Literals([
   "processing.normalize_photo",
   "memory.publish_change_set",
   "memory.recompute_dependents",
-  "notifications.evaluate_due_intents",
-  "notifications.deliver_push",
+  // A3 certification rename (one concept, one name): the module surface is
+  // `attention`, so the job kinds follow it (was `notifications.*`).
+  "attention.evaluate_due_intents",
+  "attention.deliver_push",
   "calendar.project_copy",
   "calendar.reconcile_outcome",
   "exports.build_archive",
@@ -32,6 +34,10 @@ export const DurableJobKind = Schema.Literals([
   "backups.verify_manifest",
   "search.index_generation",
   "access.cleanup_revocation",
+  // A3 certification amendment: the platform's own external-delivery proof
+  // executor (echo stand-in for provider calls; E2 later points the same
+  // mechanism at OpenRouter).
+  "platform.echo_delivery",
 ]);
 export type DurableJobKind = Schema.Schema.Type<typeof DurableJobKind>;
 

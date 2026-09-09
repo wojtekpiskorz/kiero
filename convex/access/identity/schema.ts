@@ -1,5 +1,5 @@
 /**
- * Access identity tables (candidate fragment, A2).
+ * Access identity tables (A2 candidate, certified by A3).
  *
  * Owning implementer: B1 (sign-in and sessions), B2 (verified linking).
  * Identity is separate from membership: a user row is a person's account;

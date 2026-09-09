@@ -1,5 +1,5 @@
 /**
- * Calendar connection table (candidate fragment, A2).
+ * Calendar connection table (A2 candidate, certified by A3).
  *
  * Owning implementer: G1 (optional authorization and connection lifecycle).
  * Connection lifecycle is separate from sign-in: a boss connects a personal

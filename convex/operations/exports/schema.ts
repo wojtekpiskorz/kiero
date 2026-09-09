@@ -1,5 +1,5 @@
 /**
- * Firm export tables (candidate fragment, A2).
+ * Firm export tables (A2 candidate, certified by A3).
  *
  * Owning implementer: I3 (consistent snapshots with protected downloads).
  * A firm export is a background archive (HTML index, versioned JSON,

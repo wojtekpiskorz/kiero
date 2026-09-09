@@ -7,7 +7,7 @@
  * before it is written. Delivery is a separate, retryable step; see the
  * architecture's source processing/publication protocol, steps 7–9.
  *
- * Candidate contract until A3 certifies the runtime composition.
+ * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";

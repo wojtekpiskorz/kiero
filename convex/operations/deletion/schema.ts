@@ -1,5 +1,5 @@
 /**
- * Permanent deletion ledger (candidate fragment, A2).
+ * Permanent deletion ledger (A2 candidate, certified by A3).
  *
  * Owning implementer: I4 (purge and derived-access invalidation).
  * Permanently deleted sources become inaccessible immediately; active or

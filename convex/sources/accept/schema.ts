@@ -1,6 +1,6 @@
 /**
  * Source acceptance, project links, extractions and fragments
- * (candidate fragment, A2).
+ * (A2 candidate, certified by A3).
  *
  * Owning implementers: D1 (accept and publish views), E3/E4 (extraction
  * joins), C5 (withdrawal reads), I3/I4 (export/deletion reads).

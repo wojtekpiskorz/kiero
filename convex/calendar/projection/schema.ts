@@ -1,5 +1,5 @@
 /**
- * Calendar projection and sync tables (candidate fragment, A2).
+ * Calendar projection and sync tables (A2 candidate, certified by A3).
  *
  * Owning implementers: G2 (deterministic projection, personal scope),
  * G3 (reconciliation of writes, unknown outcomes, reconnects).
