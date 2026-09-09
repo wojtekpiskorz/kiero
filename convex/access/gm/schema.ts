@@ -1,5 +1,5 @@
 /**
- * Audited GM access tables (candidate fragment, A2).
+ * Audited GM access tables (A2 candidate, certified by A3).
  *
  * Owning implementer: B4 (explicit audited GM access). GM is a global
  * operator permission separate from company membership; entry is explicit,

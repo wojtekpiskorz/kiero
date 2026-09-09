@@ -6,7 +6,7 @@
  * context records the boss on whose behalf it acts (`via: "agent"`), and the
  * same checked domain operations run. Commands carry the revisions they
  * expect to build on and an optional idempotency key; results are an
- * explicit ok/error envelope. Candidate contract until A3 certifies it.
+ * explicit ok/error envelope. Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";

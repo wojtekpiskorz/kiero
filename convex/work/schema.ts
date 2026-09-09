@@ -1,5 +1,5 @@
 /**
- * Work tables: tasks, checklists, events (candidate fragment, A2).
+ * Work tables: tasks, checklists, events (A2 candidate, certified by A3).
  *
  * Owning implementer: C4 (tasks, independent checklists, dated events).
  * Task completion is independent of checklist completion (a done task may

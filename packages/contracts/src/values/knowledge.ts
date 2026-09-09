@@ -12,7 +12,7 @@
  *
  * Omission in a patch means "no change". Clearing, withdrawal and conflict
  * are explicit operations with their own provenance: an arbitrary model
- * `null` never erases a fact. Candidate contract until A3 certifies it.
+ * `null` never erases a fact. Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";

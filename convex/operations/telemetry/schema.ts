@@ -1,5 +1,5 @@
 /**
- * Audit and diagnostic tables (candidate fragment, A2).
+ * Audit and diagnostic tables (A2 candidate, certified by A3).
  *
  * Owning implementer: I2 (redacted diagnostics, health, cost alerts).
  * Audit records are canonical protected data with actor and change/run

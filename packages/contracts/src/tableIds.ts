@@ -14,7 +14,7 @@
  *   values created through `newX` helpers below. Constructing them always
  *   goes through the schema (never a cast), so an invalid value cannot enter.
  *
- * These are candidate types until A3 certifies the runtime conversion.
+ * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";
@@ -70,6 +70,9 @@ export const TABLE_ID_NAMES = [
   "processingAttempts",
   "durableJobs",
   "outboxEvents",
+  // A3 certification amendment: observable external-effect ledger used by the
+  // no-duplicate-effect proof (the echo stand-in for external systems).
+  "externalEffects",
   // attention/read-state
   "readStates",
   // attention/preferences

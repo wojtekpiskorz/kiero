@@ -16,7 +16,7 @@
  *   become centimeters).
  * - Definitions are bounded data, never executable schema code.
  *
- * Candidate contract until A3 certifies the runtime conversion.
+ * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";

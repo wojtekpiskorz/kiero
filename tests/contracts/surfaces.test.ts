@@ -43,10 +43,11 @@ describe("composed registry integrity", () => {
     const operationNames = Object.keys(operations);
     const eventNames = Object.keys(events);
     // Exact counts: an accidentally deleted surface entry fails here.
-    // (53/39 are the real registry sizes; naive greps of `kind: "operation"`
+    // (56/40 are the real registry sizes since A3's certification amendment
+    // added the platform surface; naive greps of `kind: "operation"`
     // overcount by one because registration.ts declares the interface field.)
-    expect(operationNames).toHaveLength(53);
-    expect(eventNames).toHaveLength(39);
+    expect(operationNames).toHaveLength(56);
+    expect(eventNames).toHaveLength(40);
     for (const name of operationNames) {
       expect(operations[name]?.name).toBe(name);
       expect(name).toMatch(/^[a-z][a-z0-9_]*\.[a-z][a-zA-Z0-9_]*$/);
@@ -98,7 +99,8 @@ describe("composed registry integrity", () => {
   it("derives coherent features and rejects incoherent hand-written parts", () => {
     // One feature per executor; consumed edges and executed job kinds are
     // derived from the executor/consumer tables, never hand-written.
-    expect(features).toHaveLength(6);
+    // 7 executors since A3 added platform.echo.
+    expect(features).toHaveLength(7);
     expect(features.every((feature) => feature.providesOperations.length === 0)).toBe(true);
     // The sourceAccepted edge belongs to processing.extract (the executor of
     // processing.extract_fragments), not processing.analyze.
@@ -106,7 +108,10 @@ describe("composed registry integrity", () => {
     expect(extract?.consumesEvents).toEqual(["sources.sourceAccepted"]);
     const analyze = features.find((f) => f.featureId === "processing.analyze");
     expect(analyze?.consumesEvents).toEqual(["operations.reanalysisRequested"]);
-    // Deliberately incoherent hand-written part: unknown provided operation.
+    // Deliberately incoherent hand-written parts: one drifted entry with an
+    // unknown provided operation, one with an unknown published event (the
+    // two branches of assertFeaturesCoherent each get a fixture; A2 round 6
+    // left the event branch uncovered, resolved by A3).
     const drifted: readonly FeatureEntry[] = [
       ...features,
       featureEntry({
@@ -121,6 +126,23 @@ describe("composed registry integrity", () => {
     expect(() => assertFeaturesCoherent(drifted, operations, events)).toThrowError(
       /unknown operation drifted.nonexistentOperation/,
     );
+    expect(() =>
+      assertFeaturesCoherent(
+        [
+          ...features,
+          featureEntry({
+            kind: "feature",
+            featureId: Schema.decodeUnknownSync(FeatureId)("drifted.events"),
+            providesOperations: [],
+            publishesEvents: ["drifted.nonexistentEvent"],
+            consumesEvents: [],
+            executesJobs: [],
+          }),
+        ],
+        operations,
+        events,
+      ),
+    ).toThrowError(/unknown event drifted.nonexistentEvent/);
     expect(() => assertFeaturesCoherent(features, operations, events)).not.toThrow();
     // Cross-check: derived edges equal declared edges; dropping one feature
     // (and with it its executor coverage) must throw.

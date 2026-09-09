@@ -1,5 +1,5 @@
 /**
- * Personal notification preferences (candidate fragment, A2).
+ * Personal notification preferences (A2 candidate, certified by A3).
  *
  * Owning implementer: F1. Muting sources and quiet hours are personal:
  * they defer or suppress push delivery for one boss without changing task

@@ -38,6 +38,7 @@ import { calendarOperations, calendarEvents, CalendarRemoteOutcome } from "./cal
 import { operationsOperations, operationsEvents } from "./operations";
 import { searchOperations, searchEvents } from "./search";
 import { integrationsOperations, integrationsEvents } from "./integrations";
+import { platformOperations, platformEvents } from "./platform";
 
 interface Nameable {
   readonly name: string;
@@ -71,6 +72,7 @@ export const operations: Record<string, AnyOperationEntry> = collect<AnyOperatio
   operationsOperations,
   searchOperations,
   integrationsOperations,
+  platformOperations,
 );
 
 /** All declared events, keyed by event name. */
@@ -85,42 +87,49 @@ export const events: Record<string, AnyEventEntry> = collect<AnyEventEntry>(
   operationsEvents,
   searchEvents,
   integrationsEvents,
+  platformEvents,
 );
 
 // Executor input schemas (decode authority per job kind).
 
-const revokedAccessCleanupInput = Schema.Struct({
+export const revokedAccessCleanupInput = Schema.Struct({
   kind: Schema.Literals(["membership", "session"]),
   membershipId: Schema.NullOr(tableIdSchema("memberships")),
   sessionId: Schema.NullOr(tableIdSchema("sessions")),
   revokedAtMs: Schema.Number,
 });
 
-const recomputeDependentsInput = Schema.Struct({
+export const recomputeDependentsInput = Schema.Struct({
   rootFindingId: Schema.NullOr(tableIdSchema("findings")),
   sourceId: Schema.NullOr(tableIdSchema("sources")),
   cause: Schema.Literals(["source_withdrawn", "dependent_stale", "reanalysis"]),
 });
 
-const purgeSourceInput = Schema.Struct({
+export const purgeSourceInput = Schema.Struct({
   sourceId: tableIdSchema("sources"),
   deletionRecordId: tableIdSchema("deletionRecords"),
 });
 
-const reconcileOutcomeInput = Schema.Struct({
+export const reconcileOutcomeInput = Schema.Struct({
   copyId: tableIdSchema("calendarCopies"),
   lastKnownOutcome: CalendarRemoteOutcome,
 });
 
-const extractFragmentsInput = Schema.Struct({
+export const extractFragmentsInput = Schema.Struct({
   sourceId: tableIdSchema("sources"),
   extractionId: tableIdSchema("extractions"),
 });
 
-const analyzeChangePlanInput = Schema.Struct({
+export const analyzeChangePlanInput = Schema.Struct({
   sourceId: tableIdSchema("sources"),
   processingRunId: tableIdSchema("processingRuns"),
   reanalysisOfRunId: Schema.NullOr(tableIdSchema("processingRuns")),
+});
+
+// A3 certification amendment: the platform's external-delivery proof executor.
+export const echoDeliveryInput = Schema.Struct({
+  dedupKey: Schema.NonEmptyString,
+  message: Schema.NonEmptyString,
 });
 
 function decodeFeatureId(value: string): Schema.Schema.Type<typeof FeatureId> {
@@ -170,6 +179,14 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "processing.analyze_change_plan",
     input: analyzeChangePlanInput,
   }),
+  // A3 certification amendment: the platform's external-delivery proof
+  // executor (echo stand-in; business lanes keep their own kinds).
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("platform.echo"),
+    jobKind: "platform.echo_delivery",
+    input: echoDeliveryInput,
+  }),
 ];
 
 function consumer(eventName: string, jobKind: EventConsumerEntry["jobKind"]): EventConsumerEntry {
@@ -202,6 +219,9 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceAccepted", "processing.extract_fragments"),
   // Requested reanalysis runs as a linked new analysis run.
   consumer("operations.reanalysisRequested", "processing.analyze_change_plan"),
+  // A3 certification amendment: the platform's echo publication drains into
+  // its own durable delivery job through the same edge mechanism.
+  consumer("platform.echoRequested", "platform.echo_delivery"),
 ];
 
 /**

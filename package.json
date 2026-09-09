@@ -4,7 +4,9 @@
     "effect 4.0.0-rc.112 = the `rc` dist-tag; Effect 4 RC is the selected major, Effect 3 is not an acceptable substitute.",
     "@tanstack/ai is the published TanStack AI core package; @tanstack/ai-core does not exist on npm.",
     "@opentelemetry/api is the required peer of @tanstack/ai.",
-    "typescript 5.9.3 = last 5.x stable line; the 6/7 native line is a later coordinated decision, not a bootstrap substitution."
+    "typescript 5.9.3 = last 5.x stable line; the 6/7 native line is a later coordinated decision, not a bootstrap substitution.",
+    "A3 additions: @convex-dev/workflow 0.4.6 (+ its required peers convex-helpers 0.1.124 and @convex-dev/workpool 0.4.11) is the one canonical durable engine with the native scheduler; @convex-dev/react-query 0.1.0 is the chosen Convex TanStack Query integration; wrangler 4.130.0 (devDependency) enables container EU jurisdiction fields (I1 PENDING row).",
+    "Convex CLI stays invoked as `npx --yes convex@1.45.0` (matches the pinned convex package; no global binary)."
   ],
   "name": "kiero",
   "version": "0.1.0",
@@ -22,15 +24,24 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "build": "npm run build --workspace @kiero/web",
-    "dev": "npm run dev --workspace @kiero/web"
+    "dev": "npm run dev --workspace @kiero/web",
+    "convex:dev": "npx --yes convex@1.45.0 dev --configure=false",
+    "convex:deploy:dev": "npx --yes convex@1.45.0 dev --configure=false --once",
+    "convex:codegen": "npx --yes convex@1.45.0 codegen",
+    "verify:environments": "node infra/environments/shape-check.mjs",
+    "verify:corpus": "node evals/corpus/validate/validate.mjs && node evals/expected/scoring/probe/probe.mjs"
   },
   "dependencies": {
+    "@convex-dev/react-query": "0.1.0",
+    "@convex-dev/workflow": "0.4.6",
+    "@convex-dev/workpool": "0.4.11",
     "@opentelemetry/api": "1.9.1",
     "@tanstack/ai": "0.53.0",
     "@tanstack/ai-openrouter": "0.19.8",
     "@tanstack/react-query": "5.102.8",
     "@tanstack/react-router": "1.170.33",
     "convex": "1.45.0",
+    "convex-helpers": "0.1.124",
     "effect": "4.0.0-rc.112",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -42,6 +53,10 @@
     "@types/react-dom": "19.2.7",
     "typescript": "5.9.3",
     "vite": "8.2.2",
-    "vitest": "5.0.0"
+    "vitest": "5.0.0",
+    "wrangler": "4.130.0"
+  },
+  "overrides": {
+    "sharp": "0.35.4"
   }
 }

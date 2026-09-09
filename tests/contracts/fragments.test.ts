@@ -35,6 +35,7 @@ import {
   TaskState,
   UploadStage,
 } from "@kiero/contracts";
+import type { TableIdName } from "@kiero/contracts";
 import { type GenericValidator } from "convex/values";
 
 const tables = schema.tables;
@@ -89,11 +90,12 @@ function memberLiterals(validator: GenericValidator, table: string): string[] {
 }
 
 describe("schema composition", () => {
-  it("composes exactly the closed table inventory (51 tables)", () => {
+  it("composes exactly the closed table inventory (52 tables)", () => {
     const composed = Object.keys(tables).sort();
     const inventory = [...TABLE_ID_NAMES].sort();
     expect(composed).toEqual(inventory);
-    expect(composed).toHaveLength(51);
+    // 52 since the A3 certification amendment added externalEffects.
+    expect(composed).toHaveLength(52);
   });
 
   it("gives the domain event envelope a durable outbox home", () => {
@@ -396,7 +398,7 @@ describe("fragment vocabulary pins equal the contracts vocabularies", () => {
   });
 });
 
-function tableOrFail(name: string): { validator: GenericValidator } {
+function tableOrFail(name: TableIdName): { validator: GenericValidator } {
   const table = tables[name];
   if (table === undefined) {
     throw new Error(`missing table ${name}`);

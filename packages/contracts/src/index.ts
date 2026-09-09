@@ -47,4 +47,5 @@ export * from "./modules/calendar";
 export * from "./modules/operations";
 export * from "./modules/search";
 export * from "./modules/integrations";
+export * from "./modules/platform";
 export * from "./modules/registry";

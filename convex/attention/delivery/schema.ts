@@ -1,5 +1,5 @@
 /**
- * Durable notification delivery tables (candidate fragment, A2).
+ * Durable notification delivery tables (A2 candidate, certified by A3).
  *
  * Owning implementers: F2 (intents, batching, quiet hours), F3 (push
  * delivery). Intents are durable before any external delivery; rights,

@@ -1,0 +1,49 @@
+/**
+ * Executor implementation registry (A3 composition point).
+ *
+ * One file imports every executor implementation so parallel lanes register
+ * under their own owned files and this map stays the single dispatch table
+ * keyed by job kind. Kinds without an implementation here fail closed with
+ * the sanitized `unsupported` error in ./jobs.ts: a registration never
+ * claims business work (A2 honest-failure contract).
+ *
+ * Current implementations (platform mechanics only, no business work):
+ * - `platform.echo_delivery` (./echo.ts): the external-delivery proof
+ *   executor with uncertain-outcome recording and reconciliation.
+ * - `processing.analyze_change_plan` (./pipeline.ts): the mechanical
+ *   durable-pipeline proof executor over processingRuns/processingSteps
+ *   through @convex-dev/workflow.
+ */
+
+import type { FunctionReference } from "convex/server";
+import type { DurableJobKind } from "@kiero/contracts";
+import type { MutationCtx } from "../_generated/server";
+import type { Doc } from "../_generated/dataModel";
+import { echoExecutor } from "./echo";
+import { analyzeChangePlanExecutor } from "./pipeline";
+
+/** One durable job row (the executable counterpart of an outbox event). */
+export type DurableJobDoc = Doc<"durableJobs">;
+
+/** What one executor attempt decided. */
+export type JobOutcome =
+  | { readonly outcome: "succeeded" }
+  | { readonly outcome: "failed"; readonly errorKind: string; readonly retryable: boolean }
+  /** The effect leaves the transaction: the named action records the outcome. */
+  | { readonly outcome: "external"; readonly action: FunctionReference<"action", "internal"> }
+  /** Durable continuation (workflow): its onComplete records the outcome. */
+  | { readonly outcome: "delegated" };
+
+/** One executor implementation for a job kind. */
+export interface JobExecutor {
+  readonly jobKind: DurableJobKind;
+  execute(ctx: MutationCtx, job: DurableJobDoc, input: unknown): Promise<JobOutcome>;
+  onSucceeded?(ctx: MutationCtx, job: DurableJobDoc): Promise<void>;
+  onFailed?(ctx: MutationCtx, job: DurableJobDoc): Promise<void>;
+}
+
+/** The composed executor table. Later lanes append their own imports here. */
+export const jobExecutors: Record<string, JobExecutor> = {
+  [echoExecutor.jobKind]: echoExecutor,
+  [analyzeChangePlanExecutor.jobKind]: analyzeChangePlanExecutor,
+};

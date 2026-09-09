@@ -33,7 +33,23 @@ jobs:
         run: npm ci
       - name: Strict typecheck (root and every workspace)
         run: npm run typecheck
-      - name: Bootstrap smoke test (pinned versions)
+      - name: Test suite (contracts, values, platform runtime)
         run: npm run test
+      - name: Convex generated output present and unhand-edited (A3 policy)
+        run: |
+          set -eu
+          for f in api.d.ts api.js dataModel.d.ts server.d.ts server.js; do
+            test -f "convex/_generated/$f" || { echo "missing convex/_generated/$f"; exit 1; }
+            git ls-files --error-unmatch "convex/_generated/$f" >/dev/null || { echo "convex/_generated/$f is not committed"; exit 1; }
+          done
+          grep -q "THIS CODE IS AUTOMATICALLY GENERATED" convex/_generated/api.d.ts
+          grep -q "THIS CODE IS AUTOMATICALLY GENERATED" convex/_generated/server.d.ts
+          # Full regeneration needs an authenticated deployment (convex 1.45 CLI),
+          # so CI checks presence/integrity; the coordinating writer regenerates
+          # via `npm run convex:codegen` before every merge to main.
+      - name: Environment descriptors shape check (I1, wired by A3)
+        run: npm run verify:environments
+      - name: Evaluation corpus and scoring probe (E1, wired by A3)
+        run: npm run verify:corpus
       - name: Build the web app
         run: npm run build

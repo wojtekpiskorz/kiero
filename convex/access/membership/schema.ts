@@ -1,5 +1,5 @@
 /**
- * Access membership tables (candidate fragment, A2).
+ * Access membership tables (A2 candidate, certified by A3).
  *
  * Owning implementer: B3 (membership, invitations, administrator transfer).
  * A company is separate from the accounts of the bosses who belong to it;
