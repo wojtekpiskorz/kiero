@@ -4,13 +4,13 @@
  * Order of checks (each failure returns immediately, sanitized):
  *  1. the envelope decodes against `CommandEnvelope`;
  *  2. the operation exists in the composed registry (`unsupported` otherwise);
- *  3. an implementation is registered for it (`unsupported` otherwise — the
+ *  3. an implementation is registered for it (`unsupported` otherwise: the
  *     fail-closed placeholder contract);
  *  4. the request context resolves from a verified identity
- *     (`unauthenticated` otherwise — there is no other way in);
+ *     (`unauthenticated` otherwise, there is no other way in);
  *  5. the authorization seam allows the request (`forbidden` otherwise);
  *  6. the input decodes against the operation's contract schema
- *     (`validation` otherwise — and the handler is NEVER invoked, so invalid
+ *     (`validation` otherwise, and the handler is NEVER invoked, so invalid
  *     input reaches no domain effect);
  *  7. the handler runs; anything it throws is sanitized to `unavailable`.
  *
@@ -28,45 +28,49 @@ import { decodeInput } from "./decode";
 import { sanitizeUnknownError, unsupportedError } from "./errors";
 import type { AccessIntent, AccessPolicy, RequestContext } from "./context";
 
-/** Context resolution seam: verified identity -> request context (or null). */
-export type ResolveContext<Ctx> = (ctx: Ctx) => Promise<RequestContext | null>;
-
 /** Command metadata a handler may need beyond the decoded input. */
 export interface CommandMeta {
   /** The command's idempotency key, when the caller supplied one. */
   readonly idempotencyKey?: string;
 }
 
-/** One implemented operation handler: receives decoded input, returns an envelope. */
-export type OperationHandler<Ctx> = (
+/**
+ * One implemented operation handler: receives decoded input, returns an
+ * envelope. `Context` lets a dispatch carry extra resolved fields (e.g. the
+ * Convex-normalized company id) alongside the base request context.
+ */
+export type OperationHandler<Ctx, Context extends RequestContext = RequestContext> = (
   ctx: Ctx,
-  context: RequestContext,
+  context: Context,
   input: unknown,
   meta: CommandMeta,
 ) => Promise<ResultEnvelope>;
 
 /** One registered implementation: the handler plus the intent it runs under. */
-export interface OperationBinding<Ctx> {
+export interface OperationBinding<Ctx, Context extends RequestContext = RequestContext> {
   readonly intent: AccessIntent;
-  readonly run: OperationHandler<Ctx>;
+  readonly run: OperationHandler<Ctx, Context>;
 }
 
 /** The implementation registry: keys are full operation names. */
-export type HandlerRegistry<Ctx> = Record<string, OperationBinding<Ctx>>;
+export type HandlerRegistry<Ctx, Context extends RequestContext = RequestContext> = Record<
+  string,
+  OperationBinding<Ctx, Context>
+>;
 
 /** What a dispatch needs: resolution, policy and implemented handlers. */
-export interface CommandDeps<Ctx> {
-  readonly resolveContext: ResolveContext<Ctx>;
+export interface CommandDeps<Ctx, Context extends RequestContext = RequestContext> {
+  readonly resolveContext: (ctx: Ctx) => Promise<Context | null>;
   readonly policy: AccessPolicy;
-  readonly handlers: HandlerRegistry<Ctx>;
+  readonly handlers: HandlerRegistry<Ctx, Context>;
 }
 
 /**
  * Dispatches one command envelope through the checked path.
  * `unknown` envelope input is allowed: decoding is step 1.
  */
-export async function dispatchCommand<Ctx>(
-  deps: CommandDeps<Ctx>,
+export async function dispatchCommand<Ctx, Context extends RequestContext = RequestContext>(
+  deps: CommandDeps<Ctx, Context>,
   ctx: Ctx,
   envelope: unknown,
 ): Promise<ResultEnvelope> {

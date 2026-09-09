@@ -4,7 +4,7 @@
  * One file imports every executor implementation so parallel lanes register
  * under their own owned files and this map stays the single dispatch table
  * keyed by job kind. Kinds without an implementation here fail closed with
- * the sanitized `unsupported` error in ./jobs.ts — a registration never
+ * the sanitized `unsupported` error in ./jobs.ts: a registration never
  * claims business work (A2 honest-failure contract).
  *
  * Current implementations (platform mechanics only, no business work):

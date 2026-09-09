@@ -3,11 +3,11 @@
  *
  * The fixed route table the Worker serves for the platform lane:
  *
- * - `GET /platform/health` — local gateway health/version plus the backend
+ * - `GET /platform/health`: local gateway health/version plus the backend
  *   health through the verified bridge (later diagnostics build on this).
- * - `POST /platform/command` — forwards one command envelope through the
+ * - `POST /platform/command`: forwards one command envelope through the
  *   verified bridge (service identity -> canonical access check).
- * - anything else under `/platform/` — denied with the sanitized
+ * - anything else under `/platform/`: denied with the sanitized
  *   `unsupported` closed error (no route accidentally "works").
  *
  * Route providers register in `../composition/registry.ts`; later lanes add

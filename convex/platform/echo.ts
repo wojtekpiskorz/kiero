@@ -7,16 +7,18 @@
  * to E2):
  *
  * 1. the transactional half (execute) hands the effect to the delivery
- *    ACTION — external calls never run inside the transaction that commits
+ *    ACTION; external calls never run inside the transaction that commits
  *    the intent;
  * 2. the action performs one bounded HTTP POST to the configured external
  *    target and records the outcome: `succeeded` (2xx), `timeout`/`unknown`
  *    (deadline hit, ambiguous response, or the action itself dying), or
  *    `failed` (connection refused before anything was sent);
- * 3. uncertain outcomes block blind retries: the job fails with
- *    `externalOutcome: timeout|unknown` and only reconciliation — which
- *    OBSERVES the external system's recorded effects — may confirm delivery
- *    (no second call) or allow one (effect provably absent).
+ * 3. uncertain outcomes block blind retries everywhere the job can be
+ *    re-registered or replayed: registration skips it with
+ *    `uncertain_outcome` (@kiero/runtime), the executor skips it, and only
+ *    reconciliation, which OBSERVES the external system's recorded effects,
+ *    may confirm delivery (no second call) or allow one (effect provably
+ *    absent).
  *
  * The echo endpoint records every request it receives in `externalEffects`
  * before answering, so the no-duplicate-effect proof counts rows per dedup
@@ -26,14 +28,19 @@
 import { Schema } from "effect";
 import { v } from "convex/values";
 import { echoDeliveryInput } from "@kiero/contracts";
-import { backoffDelayMs, nextDeliveryState } from "@kiero/runtime";
+import { backoffDelayMs, nextDeliveryState, type ExternalOutcome } from "@kiero/runtime";
 import { internalMutation, internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
-import type { ActionCtx } from "../_generated/server";
+import type { MutationCtx } from "../_generated/server";
 import type { JobExecutor, JobOutcome, DurableJobDoc } from "./executors";
 
 const HTTP_TIMEOUT_MS = 2_000;
 const RETRY_BACKOFF_BASE_MS = 2_000;
+
+/** The decoded input of one echo delivery job (single typed reader). */
+function echoJobInput(job: DurableJobDoc): { dedupKey: string; message: string } {
+  return Schema.decodeUnknownSync(echoDeliveryInput)(JSON.parse(job.inputJson));
+}
 
 export const echoExecutor: JobExecutor = {
   jobKind: "platform.echo_delivery",
@@ -44,31 +51,7 @@ export const echoExecutor: JobExecutor = {
     // for this kind, re-checked in prepareAttempt).
     return { outcome: "external", action: internal.platform.echo.deliverEcho };
   },
-  onSucceeded: async (ctx, job) => {
-    await markOutboxForJob(ctx, job, "delivered");
-  },
-  onFailed: async (ctx, job) => {
-    await markOutboxForJob(ctx, job, "failed");
-  },
 };
-
-async function markOutboxForJob(
-  ctx: import("../_generated/server").MutationCtx,
-  job: DurableJobDoc,
-  deliveryState: "delivered" | "failed",
-): Promise<void> {
-  const input = JSON.parse(job.inputJson) as { dedupKey?: string };
-  if (input.dedupKey === undefined) {
-    return;
-  }
-  const row = await ctx.db
-    .query("outboxEvents")
-    .withIndex("by_dedup", (q) => q.eq("dedupKey", input.dedupKey))
-    .first();
-  if (row !== null) {
-    await ctx.db.patch(row._id, { deliveryState, attempts: job.attempts });
-  }
-}
 
 /** The external delivery action: one bounded HTTP POST, outcome recorded. */
 export const deliverEcho = internalAction({
@@ -157,7 +140,7 @@ export const prepareAttempt = internalMutation({
     if (job === null || job.state !== "running") {
       return null;
     }
-    const input = Schema.decodeUnknownSync(echoDeliveryInput)(JSON.parse(job.inputJson));
+    const input = echoJobInput(job);
     const row = await ctx.db
       .query("outboxEvents")
       .withIndex("by_dedup", (q) => q.eq("dedupKey", input.dedupKey))
@@ -168,6 +151,43 @@ export const prepareAttempt = internalMutation({
     return { dedupKey: input.dedupKey, message: input.message };
   },
 });
+
+/** One shared completion: job terminal state plus the outbox row's state. */
+async function completeDelivery(
+  ctx: MutationCtx,
+  job: DurableJobDoc,
+  dedupKey: string,
+  params: {
+    jobState: "succeeded" | "failed";
+    externalOutcome: ExternalOutcome;
+    deliveryState: "delivered" | "failed";
+    errorKind?: string;
+    finished: boolean;
+  },
+): Promise<void> {
+  const nowMs = Date.now();
+  await ctx.db.patch(job._id, {
+    state: params.jobState,
+    externalOutcome: params.externalOutcome,
+    ...(params.errorKind === undefined || params.errorKind === ""
+      ? {}
+      : { lastErrorKind: params.errorKind }),
+    updatedAtMs: nowMs,
+    ...(params.finished ? { finishedAtMs: nowMs } : {}),
+  });
+  const outboxRow = await ctx.db
+    .query("outboxEvents")
+    .withIndex("by_dedup", (q) => q.eq("dedupKey", dedupKey))
+    .first();
+  if (outboxRow !== null) {
+    await ctx.db.patch(outboxRow._id, {
+      deliveryState: params.deliveryState,
+      ...(params.errorKind === undefined || params.errorKind === ""
+        ? {}
+        : { lastErrorKind: params.errorKind }),
+    });
+  }
+}
 
 /** Records one delivery attempt's outcome; uncertain outcomes never retry. */
 export const completeAttempt = internalMutation({
@@ -191,39 +211,26 @@ export const completeAttempt = internalMutation({
       return;
     }
     const nowMs = Date.now();
-    const input = JSON.parse(job.inputJson) as { dedupKey: string };
-    const outboxRow = await ctx.db
-      .query("outboxEvents")
-      .withIndex("by_dedup", (q) => q.eq("dedupKey", input.dedupKey))
-      .first();
-
-    const terminalFailure = async () => {
-      await ctx.db.patch(job._id, {
-        state: "failed",
-        externalOutcome: args.outcome,
-        ...(args.errorKind === "" ? {} : { lastErrorKind: args.errorKind }),
-        updatedAtMs: nowMs,
-        finishedAtMs: nowMs,
-      });
-      if (outboxRow !== null) {
-        await ctx.db.patch(outboxRow._id, { deliveryState: "failed" });
-      }
-    };
+    const dedupKey = echoJobInput(job).dedupKey;
 
     if (args.outcome === "succeeded") {
-      await ctx.db.patch(job._id, {
-        state: "succeeded",
+      await completeDelivery(ctx, job, dedupKey, {
+        jobState: "succeeded",
         externalOutcome: "succeeded",
-        updatedAtMs: nowMs,
-        finishedAtMs: nowMs,
+        deliveryState: "delivered",
+        finished: true,
       });
-      if (outboxRow !== null) {
-        await ctx.db.patch(outboxRow._id, { deliveryState: "delivered" });
-      }
       return;
     }
     if (args.outcome === "failed" && !args.retryable) {
-      await terminalFailure();
+      // Deterministic failure (e.g. missing configuration): terminal.
+      await completeDelivery(ctx, job, dedupKey, {
+        jobState: "failed",
+        externalOutcome: args.outcome,
+        deliveryState: "failed",
+        ...(args.errorKind === "" ? {} : { errorKind: args.errorKind }),
+        finished: true,
+      });
       return;
     }
 
@@ -232,46 +239,43 @@ export const completeAttempt = internalMutation({
       nowMs,
       RETRY_BACKOFF_BASE_MS,
     );
-
-    switch (transition.to) {
-      case "delivered": {
-        return; // unreachable for non-succeeded outcomes
-      }
-      case "in_flight": {
-        await ctx.db.patch(job._id, {
-          state: "queued",
-          ...(args.errorKind === "" ? {} : { lastErrorKind: args.errorKind }),
-          updatedAtMs: nowMs,
+    if (transition.to === "in_flight") {
+      // Definite failure with attempts left: re-queue with backoff.
+      await ctx.db.patch(job._id, {
+        state: "queued",
+        ...(args.errorKind === "" ? {} : { lastErrorKind: args.errorKind }),
+        updatedAtMs: nowMs,
+      });
+      const outboxRow = await ctx.db
+        .query("outboxEvents")
+        .withIndex("by_dedup", (q) => q.eq("dedupKey", dedupKey))
+        .first();
+      if (outboxRow !== null) {
+        await ctx.db.patch(outboxRow._id, {
+          deliveryState: "pending",
+          nextAttemptAtMs: transition.nextAttemptAtMs,
         });
-        if (outboxRow !== null) {
-          await ctx.db.patch(outboxRow._id, {
-            deliveryState: "pending",
-            nextAttemptAtMs: transition.nextAttemptAtMs,
-          });
-        }
-        await ctx.scheduler.runAfter(
-          Math.max(transition.nextAttemptAtMs - nowMs, 0),
-          internal.platform.jobs.runDurableJob,
-          { jobKey: args.jobKey },
-        );
-        return;
       }
-      case "failed": {
-        // Uncertain (timeout/unknown) or attempts exhausted: record and stop;
-        // reconciliation owns the next move (uncertain) or none (terminal).
-        await ctx.db.patch(job._id, {
-          state: "failed",
-          externalOutcome: args.outcome,
-          ...(args.errorKind === "" ? {} : { lastErrorKind: args.errorKind }),
-          updatedAtMs: nowMs,
-          ...(transition.terminal ? { finishedAtMs: nowMs } : {}),
-        });
-        if (outboxRow !== null) {
-          await ctx.db.patch(outboxRow._id, { deliveryState: "failed" });
-        }
-        return;
-      }
+      await ctx.scheduler.runAfter(
+        Math.max(transition.nextAttemptAtMs - nowMs, 0),
+        internal.platform.jobs.runDurableJob,
+        { jobKey: args.jobKey },
+      );
+      return;
     }
+    if (transition.to === "failed") {
+      // Uncertain (timeout/unknown) or attempts exhausted: record and stop;
+      // reconciliation owns the next move (uncertain) or none (terminal).
+      await completeDelivery(ctx, job, dedupKey, {
+        jobState: "failed",
+        externalOutcome: args.outcome,
+        deliveryState: "failed",
+        ...(args.errorKind === "" ? {} : { errorKind: args.errorKind }),
+        finished: transition.terminal,
+      });
+      return;
+    }
+    // `delivered` is unreachable for non-succeeded outcomes.
   },
 });
 
@@ -291,37 +295,27 @@ export const reconcileDelivery = internalMutation({
     if (job === null || job.state === "succeeded" || job.state === "cancelled") {
       return { reconciled: "not_applicable" as const };
     }
-    const input = JSON.parse(job.inputJson) as { dedupKey: string };
+    const dedupKey = echoJobInput(job).dedupKey;
     const observed = await ctx.db
       .query("externalEffects")
-      .withIndex("by_dedup", (q) => q.eq("dedupKey", input.dedupKey))
+      .withIndex("by_dedup", (q) => q.eq("dedupKey", dedupKey))
       .first();
     const nowMs = Date.now();
     if (observed !== null) {
       // The effect happened; complete without another external call.
-      await ctx.db.patch(job._id, {
-        state: "succeeded",
+      await completeDelivery(ctx, job, dedupKey, {
+        jobState: "succeeded",
         externalOutcome: "succeeded",
-        updatedAtMs: nowMs,
-        finishedAtMs: nowMs,
+        deliveryState: "delivered",
+        finished: true,
       });
-      const outboxRow = await ctx.db
-        .query("outboxEvents")
-        .withIndex("by_dedup", (q) => q.eq("dedupKey", input.dedupKey))
-        .first();
-      if (outboxRow !== null) {
-        await ctx.db.patch(outboxRow._id, { deliveryState: "delivered" });
-      }
       return { reconciled: "confirmed_delivered" as const };
     }
     if (job.attempts >= job.maxAttempts) {
       return { reconciled: "max_attempts" as const };
     }
     // No effect was recorded: the delivery provably did not happen.
-    await ctx.db.patch(job._id, {
-      state: "queued",
-      updatedAtMs: nowMs,
-    });
+    await ctx.db.patch(job._id, { state: "queued", updatedAtMs: nowMs });
     await ctx.scheduler.runAfter(
       backoffDelayMs(job.attempts, RETRY_BACKOFF_BASE_MS),
       internal.platform.jobs.runDurableJob,
@@ -330,11 +324,3 @@ export const reconcileDelivery = internalMutation({
     return { reconciled: "retrying" as const };
   },
 });
-
-/** Runs one reconciliation from an authorized external caller (probe bridge). */
-export async function runReconcile(
-  ctx: ActionCtx,
-  jobKey: string,
-): Promise<{ reconciled: "not_applicable" | "confirmed_delivered" | "max_attempts" | "retrying" }> {
-  return ctx.runMutation(internal.platform.echo.reconcileDelivery, { jobKey });
-}

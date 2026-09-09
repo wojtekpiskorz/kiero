@@ -9,7 +9,7 @@
  */
 
 import { Schema } from "effect";
-import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
+import { errorResult, type ResultEnvelope } from "@kiero/contracts";
 import { validationError } from "./errors";
 
 /** The outcome of decoding untrusted input: either a value or a closed error. */
@@ -52,9 +52,4 @@ export async function validateStandard<T>(
     return { ok: true, value: result.value };
   }
   return { ok: false, error: errorResult(validationError("input_rejected_by_contract_schema")) };
-}
-
-/** Wraps a decoded value into an ok envelope (identity helper). */
-export function decodedOk(value: unknown): ResultEnvelope {
-  return okResult(value);
 }

@@ -4,19 +4,19 @@
  * Small public interface, deep internals (execution charter: "Effect
  * execution, checked runtime interfaces, durable stage registration"):
  *
- * - `dispatchCommand` — the one checked path every operation invocation takes
+ * - `dispatchCommand`: the one checked path every operation invocation takes
  *   (registry lookup, context resolution, authorization seam, contract input
  *   decode, sanitized handlers). Invalid input reaches no domain effect.
  * - `VerifiedIdentity`, `resolveContextFrom*`, `RequestContext`,
- *   `AccessPolicy`/`membershipPolicy` — the actor/session/tenant context and
+ *   `AccessPolicy`/`membershipPolicy`: the actor/session/tenant context and
  *   the authorization seam B1/B3 plug authoritative rules into.
  * - `decideEventPublication`, `decideJobRegistration`, `nextDeliveryState`,
- *   `backoffDelayMs`, `reconcileMayRetry` — the single definition of outbox
+ *   `backoffDelayMs`, `reconcileMayRetry`: the single definition of outbox
  *   idempotency, retry and uncertain-outcome rules used by the transactional
  *   publishers in `convex/platform/publish.ts`.
- * - `runDomainEffect` — Effect 4 RC execution inside Convex functions with a
+ * - `runDomainEffect`: Effect 4 RC execution inside Convex functions with a
  *   bounded deadline and defect sanitization.
- * - `toolJsonSchema` — the TanStack AI standard-schema -> JSON-schema
+ * - `toolJsonSchema`: the TanStack AI standard-schema -> JSON-schema
  *   conversion over A2 contract schemas (no provider calls).
  *
  * The Convex-coupled halves (real table access, the native scheduler, the

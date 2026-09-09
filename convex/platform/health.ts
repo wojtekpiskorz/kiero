@@ -4,8 +4,8 @@
  * `snapshot` is the live subscription target: it exposes runtime version,
  * the registered executors (from the A2/A3 composed registry) and outbox
  * counts, plus a monotone revision (total outbox rows) that changes whenever
- * any platform proof operation runs. Counts are global row counts only —
- * never row content — acceptable for the dev proof; I2 owns the real
+ * any platform proof operation runs. Counts are global row counts only,
+ * never row content: acceptable for the dev proof; I2 owns the real
  * redacted diagnostics surface before alpha.
  *
  * `outboxStateFor` is the tenant-scoped read the evidence scripts use:
@@ -93,6 +93,7 @@ export const outboxStateFor = internalQuery({
           deliveryState: row.deliveryState,
           attempts: row.attempts,
           ...(row.dedupKey === undefined ? {} : { dedupKey: row.dedupKey }),
+          ...(row.lastErrorKind === undefined ? {} : { lastErrorKind: row.lastErrorKind }),
         }))
         .sort((a, b) => a.eventId.localeCompare(b.eventId)),
       jobs: jobs

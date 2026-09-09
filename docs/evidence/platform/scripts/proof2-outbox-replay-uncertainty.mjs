@@ -53,6 +53,10 @@ async function outboxState(dedupKey) {
   return result.body.value;
 }
 
+function uncertainJobsTotalBefore(state) {
+  return state.jobs.filter((candidate) => candidate.kind === "platform.echo_delivery").length;
+}
+
 async function drainNow() {
   const drained = await client.action("platform/probe:probeDrainNow", {});
   if (drained._tag !== "ok") throw new Error(`drain failed: ${JSON.stringify(drained)}`);
@@ -162,6 +166,30 @@ record(
   `jobState=${uncertainJob.state} externalEffects=${uncertainEffectsBefore} (effect recorded by the external system before the deadline)`,
 );
 
+// --- O3a: replaying the UNCERTAIN-failure publisher with the SAME key is refused --
+
+const uncertainReplay = await bridgeCall(env, {
+  operation: "platform.probeEcho",
+  input: { message: "proof2 uncertain target" },
+  idempotencyKey: uncertainKey,
+});
+const stateAfterUncertainReplay = await outboxState(uncertain.body.value.dedupKey);
+const uncertainJobsAfterReplay = stateAfterUncertainReplay.jobs.filter(
+  (candidate) => candidate.jobKey === uncertainJob.jobKey,
+);
+record(
+  "O3a replay of an uncertain-failure publisher with the SAME dedup key is refused",
+  uncertainReplay.status === 200 &&
+    uncertainReplay.body.value.deduplicated === true &&
+    uncertainReplay.body.value.jobKey === uncertainJob.jobKey &&
+    stateAfterUncertainReplay.jobs.filter((candidate) => candidate.kind === "platform.echo_delivery")
+      .length === uncertainJobsTotalBefore(uncertainState) &&
+    uncertainJobsAfterReplay.length === 1
+    ? "PASS"
+    : "FAIL",
+  `deduplicated=${uncertainReplay.body?.value?.deduplicated} sameJobKey=${uncertainReplay.body?.value?.jobKey === uncertainJob.jobKey} echoJobs=${stateAfterUncertainReplay.jobs.filter((c) => c.kind === "platform.echo_delivery").length} (was ${uncertainJobsTotalBefore(uncertainState)})`,
+);
+
 // --- O4/O5: reconciliation confirms without a duplicate effect -------------------
 
 const reconcile = await client.action("platform/probe:probeReconcileDelivery", {
@@ -212,6 +240,31 @@ record(
   "O6 event consumer edge registers the durable analyze job (drain path)",
   analysisState.kind === "processing.analyze_change_plan" ? "PASS" : "FAIL",
   `jobKind=${analysisState.kind} state=${analysisState.state} (registered from operations.reanalysisRequested by the outbox drain)`,
+);
+
+// --- O7: an unprojected consumer edge fails LOUDLY (never silently in_flight) ----
+
+const unprojected = await client.action("platform/probe:probePublishEvent", {
+  eventName: "sources.sourceAccepted",
+  payload: { sourceId: seed.value.sourceId, attachmentIds: [] },
+});
+if (unprojected._tag !== "ok") throw new Error(`publish failed: ${JSON.stringify(unprojected)}`);
+await drainNow();
+const allState = await bridgeCall(env, { operation: "platform.outboxState", input: {} });
+const stranded = allState.body.value.events.find(
+  (event) => event.eventName === "sources.sourceAccepted" && event.deliveryState === "failed",
+);
+const extractJobs = allState.body.value.jobs.filter(
+  (candidate) => candidate.kind === "processing.extract_fragments",
+);
+record(
+  "O7 unprojected consumer edge fails loudly (row failed + consumer_projection_missing, no job)",
+  stranded !== undefined &&
+    stranded.lastErrorKind === "consumer_projection_missing" &&
+    extractJobs.length === 0
+    ? "PASS"
+    : "FAIL",
+  `event=${stranded?.eventName ?? "none"} state=${stranded?.deliveryState ?? "none"} lastErrorKind=${stranded?.lastErrorKind ?? "none"} extractJobs=${extractJobs.length}`,
 );
 
 process.exit(summarize() ? 0 : 1);

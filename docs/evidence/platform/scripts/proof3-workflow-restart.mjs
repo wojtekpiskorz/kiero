@@ -4,7 +4,7 @@
  * A pipeline with 5 mechanical stages hits an armed transient failure at
  * stage 3 (the arm marker is itself a journaled step). Observed: stages 1-2
  * recorded exactly once, run failed, marker armed; the operator disarms the
- * failure (the fix) and RESTARTS the workflow from its journal — stages 1-2
+ * failure (the fix) and RESTARTS the workflow from its journal: stages 1-2
  * replay as no-ops, stage 3 re-executes against the fixed condition and the
  * pipeline completes. The step ledger shows each stage exactly once (no
  * duplicate stage effects on replay) and the run ends succeeded.

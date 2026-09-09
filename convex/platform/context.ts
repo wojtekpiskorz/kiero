@@ -124,7 +124,7 @@ export const resolveServiceContext = internalQuery({
     return {
       actor: context.actor,
       resolvedAtMs: context.resolvedAtMs,
-      companyId: ctx.db.normalizeId("companies", context.actor.companyId),
+      normalizedCompanyId: ctx.db.normalizeId("companies", context.actor.companyId),
     };
   },
 });

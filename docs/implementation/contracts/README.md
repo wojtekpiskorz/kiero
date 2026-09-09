@@ -24,6 +24,19 @@ Defined by A2 ([issue #17](https://github.com/wojtekpiskorz/kiero/issues/17)).
 - Registration builder refactor (ruling item 2): knowingly carried. The platform surface was added with the existing entry pattern; a generic builder would churn all 10 module files with zero behavioral gain while no consumer lane has registered a feature yet. Better done when B/C/D lanes actually register; the registry's import-time checks keep the current pattern safe.
 - One-concept-one-name renames (ruling item 8): done where the scan found a real split (the `notifications.*` -> `attention.*` job kinds, amendment 5). No other one-concept-two-names pair was found across the operation/event surfaces; consumers should flag further candidates during their integration instead of churning the baseline now.
 
+**Post-certification repairs (PR #73 review round 1, 2026-09-09, before merge):**
+
+9. `outboxEvents` gains `lastErrorKind` (sanitized closed error kind of a
+   delivery failure) and `platform.outboxState` events expose it: the drain's
+   loud failure for unprojected consumer edges
+   (`consumer_projection_missing`) is machine-readable on the row instead of
+   a silent in_flight stranding. The registration decision now knows a
+   failure's nature: uncertain failures (`externalOutcome` timeout/unknown)
+   refuse re-registration (`uncertain_outcome` reason) so a replayed
+   publisher can never blind-retry a possibly-delivered external effect; the
+   rule lives in @kiero/runtime (single definition), and live rows O3a/O7 in
+   `docs/evidence/platform/README.md` prove both behaviors (31/31 rows).
+
 **Runtime facts proved against this baseline** (details in `docs/evidence/platform/README.md`): the single Effect-Schema -> Convex-validator conversion table survives real deployment; command envelopes decode through Effect Schema at the function boundary (Convex-level args validation is deliberately delegated to the contract schemas to keep ONE conversion path); `ctx.db.normalizeId` is the runtime id well-formedness bridge between branded contract ids and Convex `Id`s; the TanStack schema converter consumes `~standard.jsonSchema` (draft-07) attached by `Schema.toStandardJSONSchemaV1`.
 
 **Convex generated-file policy (proved):** `convex/_generated` is never hand-edited. Regeneration is `npm run convex:codegen` (`npx --yes convex@1.45.0 codegen`), which requires an authenticated deployment context (convex 1.45 CLI limitation), so CI checks presence/integrity of the committed output plus the strict typecheck that consumes it; the one coordinating writer regenerates and commits the output on every change to `convex/**` (merge flow).
@@ -76,7 +89,7 @@ There is deliberately **no general-purpose Schema→Validator compiler**. The on
 | `convex/schema/shared.ts` | shared values + proved conversion | A2 → A3 |
 | `convex/schema.ts` | composition entry | A2 → A3 |
 
-52 tables total since the A3 certification amendment (`externalEffects`); the inventory is the closed `TABLE_ID_NAMES` union in `@kiero/contracts`, and `convex/schema.ts` fails at import time if the composed tables and the inventory differ in either direction. `outboxEvents` (platform fragment) is the durable home of `DomainEventEnvelope`: publishers write it atomically with their state change, and the 8 registered consumer edges drain it through durable jobs.
+52 tables total since the A3 certification amendment (`externalEffects`); the inventory is the closed `TABLE_ID_NAMES` union in `@kiero/contracts`, and `convex/schema.ts` fails at import time if the composed tables and the inventory differ in either direction. `outboxEvents` (platform fragment) is the durable home of `DomainEventEnvelope`: publishers write it atomically with their state change, and the 9 registered consumer edges drain it through durable jobs.
 
 Lanes that create NEW tables (B2 `convex/access/linking/**`, D6 `convex/processing/audio/**`, F3 `convex/attention/push/**`, F4 `convex/attention/reminders/**`, G3 `convex/calendar/sync/**`, H4 `convex/operations/processing/**`, E5 additions) add their own fragment file and register the new table names in `TABLE_ID_NAMES` plus the composition import: a small coordinated change named in their issue, not a shared mega-schema edit.
 

@@ -2,13 +2,13 @@
  * The A3 proof function surface (guarded by the KIERO_PROBE_ENABLED
  * deployment variable).
  *
- * Everything here is platform mechanics for the composition proof — no
+ * Everything here is platform mechanics for the composition proof, no
  * business work:
  *
  * - `probeEcho`: the checked command through the full dispatch path; its
  *   transaction publishes the canonical event and registers the durable
  *   echo job atomically. Callable directly (fails `unauthenticated` until
- *   B1 ships auth — that failure is itself a proof row) and via the bridge.
+ *   B1 ships auth, and that failure is itself a proof row) and via the bridge.
  * - `probeSeed`: idempotent dev fixtures (proof company/user/session and a
  *   source row for pipeline runs).
  * - `probeKickAnalysis`: transaction creates the processing run row and
@@ -41,7 +41,7 @@ import { errorResult, newDurableJobKey, okResult, type ResultEnvelope } from "@k
 import { notFoundError, unsupportedError } from "@kiero/runtime";
 import { dispatchMutationCommand } from "./dispatch";
 import { publishEvent } from "./publish";
-import { restartProofPipeline, restartWorkflowInline, startProofPipeline } from "./pipeline";
+import { restartProofPipeline, startProofPipeline } from "./pipeline";
 import { vWorkflowId } from "@convex-dev/workflow";
 import { workflow } from "./pipeline";
 import { drainBatch } from "./outbox";
@@ -277,22 +277,6 @@ export const restartWorkflow = internalMutation({
   },
 });
 
-/** Direct action-side restart (inline, no workpool): disarm then restart. */
-export const restartWorkflowAction = action({
-  args: { workflowId: vWorkflowId, runId: v.id("processingRuns"), stage: v.number() },
-  handler: async (ctx, args): Promise<ResultEnvelope> => {
-    if (!probeGuardEnabled()) {
-      return probeDisabled();
-    }
-    await ctx.runMutation(internal.platform.pipeline.disarmFailure, {
-      runId: args.runId,
-      stage: args.stage,
-    });
-    await restartWorkflowInline(ctx, args.workflowId);
-    return okResult({ restarted: args.workflowId });
-  },
-});
-
 /** Run state for the workflow proof scripts (guarded action -> internal query). */
 export const probeRunState = action({
   args: { runId: v.id("processingRuns") },
@@ -343,7 +327,7 @@ export const probeWorkflowStatus = action({
  * The no-orphan proof: this guarded mutation publishes the canonical event
  * and registers the durable job, then THROWS before the transaction can
  * commit. Convex atomicity must roll back the event, the job registration
- * AND the scheduled work together — proving "fail after registration"
+ * AND the scheduled work together, proving "fail after registration"
  * cannot leave an accepted orphan.
  */
 export const probeFailPublication = action({
@@ -379,6 +363,41 @@ export const failPublication = internalMutation({
     });
     // Registration happened inside THIS transaction; throwing aborts it all.
     throw new Error("probe: deliberate failure after durable registration");
+  },
+});
+
+/**
+ * Publishes one registry event with a fresh dedup key (guarded). Used by
+ * the evidence scripts to exercise drain behavior for events whose consumer
+ * edge has no projection yet (the loud-failure proof).
+ */
+export const probePublishEvent = action({
+  args: { eventName: v.string(), payload: v.any() },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    if (!probeGuardEnabled()) {
+      return probeDisabled();
+    }
+    return ctx.runMutation(internal.platform.probe.publishRegistryEvent, {
+      eventName: args.eventName,
+      payload: args.payload,
+    });
+  },
+});
+
+export const publishRegistryEvent = internalMutation({
+  args: { eventName: v.string(), payload: v.any() },
+  handler: async (ctx, args) => {
+    const company = await ctx.db.query("companies").first();
+    if (company === null) {
+      return errorResult(notFoundError("companies", "fixture_company_missing"));
+    }
+    const publication = await publishEvent(ctx, {
+      companyId: company._id,
+      eventName: args.eventName,
+      payload: args.payload,
+      dedupKey: `probe.event:${args.eventName}:${newDurableJobKey()}`,
+    });
+    return okResult({ eventId: publication.eventId, deduplicated: publication.deduplicated });
   },
 });
 

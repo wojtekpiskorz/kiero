@@ -1,6 +1,6 @@
 /**
  * Outbox and durable-job decision tests (A3): idempotency, retry bounds,
- * uncertain-outcome rules — the pure decisions the Convex transactions use.
+ * uncertain-outcome rules: the pure decisions the Convex transactions use.
  */
 
 import { describe, expect, it } from "vitest";
@@ -11,6 +11,10 @@ import {
   nextDeliveryState,
   reconcileMayRetry,
 } from "@kiero/runtime";
+import {
+  CONSUMER_PROJECTION_MISSING,
+  projectEventToJobInput,
+} from "../../convex/platform/outbox";
 
 describe("publication idempotency", () => {
   it("inserts when no existing row carries the dedup key", () => {
@@ -29,26 +33,44 @@ describe("durable job registration decisions", () => {
   });
 
   it("never re-registers succeeded or active work", () => {
-    expect(decideJobRegistration("succeeded")).toEqual({
+    expect(decideJobRegistration({ state: "succeeded" })).toEqual({
       decision: "skip",
       reason: "already_succeeded",
     });
-    expect(decideJobRegistration("cancelled")).toEqual({
+    expect(decideJobRegistration({ state: "cancelled" })).toEqual({
       decision: "skip",
       reason: "already_succeeded",
     });
-    expect(decideJobRegistration("queued")).toEqual({
+    expect(decideJobRegistration({ state: "queued" })).toEqual({
       decision: "skip",
       reason: "active_attempt",
     });
-    expect(decideJobRegistration("running")).toEqual({
+    expect(decideJobRegistration({ state: "running" })).toEqual({
       decision: "skip",
       reason: "active_attempt",
     });
   });
 
   it("re-registers definite failures only (uncertainty reconciles instead)", () => {
-    expect(decideJobRegistration("failed")).toEqual({ decision: "register" });
+    expect(decideJobRegistration({ state: "failed" })).toEqual({ decision: "register" });
+    expect(decideJobRegistration({ state: "failed", externalOutcome: "failed" })).toEqual({
+      decision: "register",
+    });
+  });
+
+  it("REFUSES re-registration of uncertain failures (timeout/unknown after possible success)", () => {
+    expect(decideJobRegistration({ state: "failed", externalOutcome: "timeout" })).toEqual({
+      decision: "skip",
+      reason: "uncertain_outcome",
+    });
+    expect(decideJobRegistration({ state: "failed", externalOutcome: "unknown" })).toEqual({
+      decision: "skip",
+      reason: "uncertain_outcome",
+    });
+    // A succeeded external outcome on a failed row is not uncertainty.
+    expect(decideJobRegistration({ state: "failed", externalOutcome: "succeeded" })).toEqual({
+      decision: "register",
+    });
   });
 });
 
@@ -110,5 +132,25 @@ describe("delivery state machine", () => {
   it("reconciliation retries only a provably-undelivered effect", () => {
     expect(reconcileMayRetry("delivered")).toBe(false);
     expect(reconcileMayRetry("not_delivered")).toBe(true);
+  });
+});
+
+describe("drain event projection (three-way)", () => {
+  it("classifies projected, unconsumed and unprojected events", () => {
+    expect(projectEventToJobInput("platform.echoRequested", { message: "m" }, "dk")).toEqual({
+      kind: "job",
+      jobKind: "platform.echo_delivery",
+      input: { dedupKey: "dk", message: "m" },
+      dedupKey: "dk",
+    });
+    expect(projectEventToJobInput("operations.diagnosticEmitted", {}, "dk")).toEqual({
+      kind: "no_consumer",
+    });
+    // A registered edge without a projection reports itself loudly.
+    expect(projectEventToJobInput("sources.sourceAccepted", {}, "dk")).toEqual({
+      kind: "unprojected_edge",
+      jobKind: "processing.extract_fragments",
+    });
+    expect(CONSUMER_PROJECTION_MISSING).toBe("consumer_projection_missing");
   });
 });

@@ -54,30 +54,59 @@ export function decideEventPublication(
   return { decision: "deduplicated", existingEventId: existing.eventId };
 }
 
+/** The failure nature of an existing durable job row, when it failed. */
+export type JobFailureNature = "definite" | "uncertain";
+
 /** What a durable registration should do given the current row state. */
 export type JobRegistrationDecision =
   | { readonly decision: "register" }
-  | { readonly decision: "skip"; readonly reason: "already_succeeded" | "active_attempt" };
+  | {
+      readonly decision: "skip";
+      readonly reason: "already_succeeded" | "active_attempt" | "uncertain_outcome";
+    };
+
+/** The existing-row shape the registration decision is made from. */
+export interface ExistingJobRow {
+  readonly state: DurableJobState;
+  /**
+   * Outcome of the attempt that left the transaction, when there was one.
+   * `timeout`/`unknown` mark an UNCERTAIN failure: the external effect may
+   * have happened, so re-registration is forbidden until reconciliation
+   * observes the external system.
+   */
+  readonly externalOutcome?: ExternalOutcome;
+}
 
 /**
  * Decides a durable job registration against an existing row with the same
- * job key. Succeeded jobs replay as no-ops; an active attempt is never
- * duplicated (uncertain outcomes go through reconciliation instead).
+ * dedup identity. Succeeded jobs replay as no-ops; an active attempt is
+ * never duplicated; a failure re-registers ONLY when it is definite
+ * (`externalOutcome` failed or absent). Uncertain failures
+ * (`timeout`/`unknown`) skip with their own reason: the blind retry the
+ * protocol exists to prevent would duplicate the external effect, and only
+ * reconciliation (which observes the external system) may re-queue.
  */
 export function decideJobRegistration(
-  existingState: DurableJobState | null,
+  existing: ExistingJobRow | null,
 ): JobRegistrationDecision {
-  if (existingState === null) {
+  if (existing === null) {
     return { decision: "register" };
   }
-  if (existingState === "succeeded" || existingState === "cancelled") {
+  if (existing.state === "succeeded" || existing.state === "cancelled") {
     return { decision: "skip", reason: "already_succeeded" };
   }
-  if (existingState === "queued" || existingState === "running") {
+  if (existing.state === "queued" || existing.state === "running") {
     return { decision: "skip", reason: "active_attempt" };
   }
-  // failed: register again (bounded by maxAttempts at execution time).
+  if (existing.state === "failed" && isUncertain(existing)) {
+    return { decision: "skip", reason: "uncertain_outcome" };
+  }
+  // definite failure: register again (bounded by maxAttempts at execution time).
   return { decision: "register" };
+}
+
+function isUncertain(existing: ExistingJobRow): boolean {
+  return existing.externalOutcome === "timeout" || existing.externalOutcome === "unknown";
 }
 
 /** Bounded exponential backoff for delivery/job retries (capped at 1 minute). */
@@ -108,7 +137,7 @@ export type DeliveryTransition =
  * `succeeded` delivers. `failed` retries with backoff until `maxAttempts`,
  * then fails terminally. `timeout`/`unknown` NEVER auto-retry: the row moves
  * to `failed` with `terminal: false` semantics expressed by remaining
- * reconcilable — reconciliation decides retry from observed external state.
+ * reconcilable; reconciliation decides retry from observed external state.
  * (The outbox row keeps its attempts so the reconciler can distinguish a
  * terminal failure from an uncertain one.)
  */

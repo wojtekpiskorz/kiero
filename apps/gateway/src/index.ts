@@ -4,25 +4,17 @@
  * Routes resolve through the composition registry
  * (`./composition/registry.ts`); the platform lane's routes live in
  * `./platform/routes.ts` and call Convex through the verified bridge
- * (`./platform/bridge.ts`). Unknown paths — including unmatched
- * `/platform/*` paths — answer with the sanitized `unsupported` closed
+ * (`./platform/bridge.ts`). Unknown paths, including unmatched
+ * `/platform/*` paths, answer with the sanitized `unsupported` closed
  * error, never a fake success.
  */
 
-import { gatewayRegistry, matchRoute } from "./composition/registry";
+import { matchRoute } from "./composition/registry";
 import { unsupportedPlatformRoute } from "./platform/routes";
+import type { BridgeEnv } from "./platform/bridge";
 
-export interface Env {
-  /**
-   * Non-secret URL of the Convex deployment's HTTP actions (set per
-   * environment in wrangler.jsonc).
-   */
-  CONVEX_SITE_URL?: string;
-  /** Service credential for the Convex bridge (secret binding). */
-  KIERO_SERVICE_TOKEN?: string;
-}
-
-void gatewayRegistry;
+/** The Worker bindings the gateway routes consume (see platform/bridge.ts). */
+export type Env = BridgeEnv;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

@@ -15,7 +15,7 @@
  * Crash/restart semantics proved here (P06 at platform level): a workflow
  * whose stage N fails deterministically leaves stages 1..N-1 committed
  * exactly once; restarting from the journal resumes AFTER them without
- * re-executing committed stages — verified by counting step rows.
+ * re-executing committed stages, verified by counting step rows.
  */
 
 import { Effect, Schema } from "effect";
@@ -84,15 +84,7 @@ export const markFailure = internalMutation({
 export const disarmFailure = internalMutation({
   args: { runId: v.id("processingRuns"), stage: v.float64() },
   handler: async (ctx, args) => {
-    const marker = await ctx.db
-      .query("processingSteps")
-      .withIndex("by_run_sequence", (q) =>
-        q.eq("runId", args.runId).eq("sequence", FAILURE_MARKER_BASE + args.stage),
-      )
-      .first();
-    if (marker !== null) {
-      await ctx.db.delete(marker._id);
-    }
+    await disarmFailureMarker(ctx, args.runId, args.stage);
   },
 });
 
@@ -100,7 +92,7 @@ export const disarmFailure = internalMutation({
  * Deterministic Effect domain computation for one pipeline stage. With
  * `failWhileArmed`, the stage models a transient external failure: it throws
  * while the failure marker is armed, and succeeds once an operator disarms
- * it — so the recovery story (fix, then restart) is real, not a replay
+ * it, so the recovery story (fix, then restart) is real, not a replay
  * artifact.
  */
 export const computeStage = internalAction({
@@ -310,14 +302,6 @@ export async function startProofPipeline(
   return okResult({ runId, workflowId, jobKey });
 }
 
-/** Inline restart callable from an action context (no workpool). */
-export async function restartWorkflowInline(
-  ctx: import("../_generated/server").ActionCtx,
-  workflowId: WorkflowId,
-): Promise<void> {
-  await workflow.restart(ctx, workflowId);
-}
-
 /**
  * Recovery: disarm the injected transient failure, then restart the failed
  * workflow from its journal (committed stages replay as no-ops; the failing
@@ -329,21 +313,38 @@ export async function restartProofPipeline(
   runId: Id<"processingRuns">,
   stage: number,
 ): Promise<void> {
-  const marker = await ctx.db
-    .query("processingSteps")
-    .withIndex("by_run_sequence", (q) =>
-      q.eq("runId", runId).eq("sequence", FAILURE_MARKER_BASE + stage),
-    )
-    .first();
-  if (marker !== null) {
-    await ctx.db.delete(marker._id);
-  }
+  await disarmFailureMarker(ctx, runId, stage);
   // Restart from the failed compute step: journal replay would otherwise
   // re-throw the journaled step error instead of re-executing the (now
   // fixed) stage against the disarmed condition.
   await workflow.restart(ctx, workflowId, {
     from: internal.platform.pipeline.computeStage,
   });
+}
+
+/** The failure marker lookup shared by disarmFailure and restart. */
+async function findFailureMarker(
+  db: MutationCtx["db"],
+  runId: Id<"processingRuns">,
+  stage: number,
+) {
+  return db
+    .query("processingSteps")
+    .withIndex("by_run_sequence", (q) =>
+      q.eq("runId", runId).eq("sequence", FAILURE_MARKER_BASE + stage),
+    )
+    .first();
+}
+
+async function disarmFailureMarker(
+  ctx: MutationCtx,
+  runId: Id<"processingRuns">,
+  stage: number,
+): Promise<void> {
+  const marker = await findFailureMarker(ctx.db, runId, stage);
+  if (marker !== null) {
+    await ctx.db.delete(marker._id);
+  }
 }
 
 /** The registered executor for `processing.analyze_change_plan`. */

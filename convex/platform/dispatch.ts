@@ -126,23 +126,25 @@ export interface BridgeCtx {
   readonly serviceSessionId: string;
 }
 
+/**
+ * The resolved bridge context: the request context plus the
+ * Convex-normalized company id, which actions cannot compute themselves
+ * (no db handle). Carried ON the context, not in a closure.
+ */
+export type BridgeResolvedContext = RequestContext & {
+  readonly normalizedCompanyId: Id<"companies"> | null;
+};
+
 /** Dispatches one command envelope from the verified Worker bridge. */
 export async function dispatchBridgeCommand(
   ctx: BridgeCtx,
   envelope: unknown,
 ): Promise<ResultEnvelope> {
-  // resolveServiceContext returns the RequestContext plus the
-  // Convex-normalized company id (actions have no db handle to normalize).
-  let normalizedCompanyId: Id<"companies"> | null = null;
-  const resolveContext = async (): Promise<RequestContext | null> => {
-    const resolved = await ctx.action.runQuery(
-      internal.platform.context.resolveServiceContext,
-      { sessionId: ctx.serviceSessionId },
-    );
-    normalizedCompanyId = resolved === null ? null : resolved.companyId;
-    return resolved;
-  };
-  const deps: CommandDeps<BridgeCtx> = {
+  const resolveContext = async (): Promise<BridgeResolvedContext | null> =>
+    ctx.action.runQuery(internal.platform.context.resolveServiceContext, {
+      sessionId: ctx.serviceSessionId,
+    });
+  const deps: CommandDeps<BridgeCtx, BridgeResolvedContext> = {
     resolveContext,
     policy: membershipPolicy,
     handlers: {
@@ -157,13 +159,12 @@ export async function dispatchBridgeCommand(
           const { dedupKey } = Schema.decodeUnknownSync(
             probeOutboxStateEntry.input,
           )(input);
-          void context;
-          if (normalizedCompanyId === null) {
+          if (context.normalizedCompanyId === null) {
             return errorResult(validationError("tenant_scope_unresolved"));
           }
           return okResult(
             await bridge.action.runQuery(internal.platform.health.outboxStateFor, {
-              companyId: normalizedCompanyId,
+              companyId: context.normalizedCompanyId,
               ...(dedupKey === undefined ? {} : { dedupKey }),
             }),
           );

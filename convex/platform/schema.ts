@@ -189,6 +189,8 @@ export const platformTables = {
     attempts: shared.counter,
     dedupKey: v.optional(v.string()),
     nextAttemptAtMs: v.optional(shared.tsMs),
+    /** Sanitized closed error kind of the delivery failure, if any. */
+    lastErrorKind: v.optional(v.string()),
     createdAtMs: shared.tsMs,
   })
     .index("by_delivery", ["deliveryState", "nextAttemptAtMs"])
@@ -198,7 +200,7 @@ export const platformTables = {
   /**
    * A3 amendment: observable ledger of effects that left the transaction.
    * Written by the external stand-in (the echo endpoint) itself, one row per
-   * HTTP call it actually received — it does not dedup. The
+   * HTTP call it actually received; it does not dedup. The
    * no-duplicate-effect proof counts rows per `dedupKey`: correct replay and
    * reconciliation leave exactly one.
    */

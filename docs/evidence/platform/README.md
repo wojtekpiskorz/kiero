@@ -45,9 +45,9 @@ gitignored `.env.local` (proof2 also flips `KIERO_ECHO_TARGET` between
 `behavior=ok|slow` and redeploys, because Convex snapshots env vars into
 functions at deploy time).
 
-## Proof matrix (29 rows, all PASS)
+## Proof matrix (31 rows, all PASS)
 
-### proof0 — TanStack tool/schema adapter conversion (offline, P01)
+### proof0: TanStack tool/schema adapter conversion (offline, P01)
 
 | Row | Result | Evidence line |
 | --- | --- | --- |
@@ -60,7 +60,7 @@ Path proved: A2 `MoneyValue` (Effect Schema) -> `Schema.toStandardJSONSchemaV1`
 (draft-07) -> `convertSchemaToJsonSchema` from the pinned @tanstack/ai ->
 provider JSON Schema. Zero provider calls (OpenRouter is E2's).
 
-### proof1 — checked calls, sanitized errors, subscriptions (live, P01)
+### proof1: checked calls, sanitized errors, subscriptions (live, P01)
 
 | Row | Result | Evidence line |
 | --- | --- | --- |
@@ -79,20 +79,33 @@ V8 detail: the proof subscribes via `convexQuery(api.platform/health.health,
 (`hashFn`/`queryFn`), then triggers a real mutation and observes the cache
 update WITHOUT `invalidateQueries`. The adapter gates its live subscription
 path on `typeof window !== "undefined"`; the Node proof supplies minimal
-browser globals BEFORE the dynamic import (no adapter code is replaced) —
+browser globals BEFORE the dynamic import (no adapter code is replaced);
 recorded here because A4's web app gets this path for free in the browser.
 
-### proof2 — idempotent outbox/job mechanism, uncertain outcomes (live, P03/P06)
+### proof2: idempotent outbox/job mechanism, uncertain outcomes (live, P03/P06)
 
 | Row | Result | Evidence line |
 | --- | --- | --- |
-| O0 fail AFTER registration rolls back event+job+scheduled work | PASS | `events 97->97 jobs 97->97` (mutation threw) |
-| O1 transaction publishes canonical event AND durable job together | PASS | `eventId=3057b441... jobKey=job_1556e331...` |
+| O0 fail AFTER registration rolls back event+job+scheduled work | PASS | `events 100->100 jobs 100->100` (mutation threw) |
+| O1 transaction publishes canonical event AND durable job together | PASS | `eventId=c4d62f5c... jobKey=job_3aaf3686...` |
 | O2 replay of the SAME logical operation dedups | PASS | `sameEventId=true sameJobKey=true events=1 jobs=1` |
 | O3 timeout-after-possible-success recorded uncertain, no auto-retry | PASS | `jobState=failed externalEffects=1` |
+| O3a replay of an uncertain-failure publisher with the SAME dedup key is refused | PASS | `deduplicated=true sameJobKey=true echoJobs=99 (was 99)` |
 | O4 reconciliation observes the external system and confirms delivery | PASS | `reconciled=confirmed_delivered jobState=succeeded` |
 | O5 no duplicate external effect across replay+uncertainty+reconcile | PASS | `externalEffects = 1` |
 | O6 event consumer edge registers the durable analyze job (drain path) | PASS | `kind=processing.analyze_change_plan state=succeeded` |
+| O7 unprojected consumer edge fails loudly (row failed, no job) | PASS | `state=failed lastErrorKind=consumer_projection_missing extractJobs=0` |
+
+O3a (review repair 1): the uncertain job (failed + `externalOutcome: timeout`)
+sits unreconciled while the publisher is replayed with the SAME idempotency
+key; `decideJobRegistration` refuses re-registration (`uncertain_outcome`),
+so no second durable row exists and the external effect stays at one.
+O7 (review repair 2): an event whose registered consumer edge has no payload
+projection yet (`sources.sourceAccepted` -> `processing.extract_fragments`)
+is marked failed on the row with the machine-readable
+`consumer_projection_missing` error kind; the drain logs it and keeps
+processing, and no durable job is registered. Previously such rows were
+silently stranded in_flight.
 
 The external stand-in is the deployed echo endpoint: it records one
 `externalEffects` row per HTTP request BEFORE answering, then (per
@@ -100,9 +113,9 @@ The external stand-in is the deployed echo endpoint: it records one
 uncertain case: the effect happened but the caller timed out), or answers
 5xx. The delivery action enforces its deadline with an explicit
 `AbortController` (`AbortSignal.timeout` is not guaranteed in the Convex
-action runtime — found during the proof).
+action runtime, found during the proof).
 
-### proof3 — workflow crash/restart (live, P06)
+### proof3: workflow crash/restart (live, P06)
 
 | Row | Result | Evidence line |
 | --- | --- | --- |
@@ -114,11 +127,11 @@ action runtime — found during the proof).
 Failure model: the arm marker is itself a journaled workflow step; the
 stage computation throws while armed (a transient external condition), the
 operator disarms it and restarts FROM THE FAILED STEP (`restart(..., {from:
-computeStage})`) — plain journal replay would re-throw the journaled step
+computeStage})`); plain journal replay would re-throw the journaled step
 error instead of re-executing the fixed stage (found during the proof;
 recorded for D6/E2/E3 who own real pipelines).
 
-### proof4 — Worker bridge (real wrangler dev + real backend)
+### proof4: Worker bridge (real wrangler dev + real backend)
 
 | Row | Result | Evidence line |
 | --- | --- | --- |
@@ -143,9 +156,14 @@ recorded for D6/E2/E3 who own real pipelines).
 - `KIERO_SERVICE_TOKEN` was ROTATED at the end of the session (a local
   debug command echoed one value into a terminal transcript; the
   deployment variable and the gitignored `.env.local` were both replaced
-  and all 29 rows re-run green against the rotated credential).
+  and the full matrix was re-run green against the rotated credential).
+- Review repairs (PR #73 round 1, 2026-09-09): uncertain-outcome enforcement
+  moved into the pure registration decision (O3a), the drain's projection
+  became a three-way result with loud failure for unprojected edges (O7),
+  and the boundary errors now reuse @kiero/runtime's constructors. All five
+  proofs were re-run green after the repairs (31/31).
 - Seeded fixtures (dev deployment only): one company/user/membership/
-  service session/source row created by `platform/probe:probeSeed` — real
+  service session/source row created by `platform/probe:probeSeed`, real
   rows in B-lane tables, used by context resolution; no business work.
 
 ## NOT-RUN / honest limits
@@ -158,5 +176,5 @@ recorded for D6/E2/E3 who own real pipelines).
   canonical resolution seam.
 - The outbox drain loop is event-driven (publish schedules drain); under
   total scheduler loss, recovery is a manual `platform/probe:probeDrainNow`
-  — a cron table becomes worthwhile when business lanes publish (noted for
+  and a cron table becomes worthwhile when business lanes publish (noted for
   H4/I2, not added: `convex/crons.ts` is outside A3's owned paths).

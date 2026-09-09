@@ -4,7 +4,7 @@
  * BOTH primitives take the SAME mutation transaction the caller's state
  * change uses, so "transaction publishes a canonical record and registers
  * durable work atomically" is structural (architecture protocol steps 3, 7,
- * 9): if the transaction aborts — crash, conflict, validation throw — the
+ * 9): if the transaction aborts (crash, conflict, validation throw) the
  * rows, the envelope AND the scheduled work all roll back together. There
  * can be no accepted orphan (a committed record with no registered work)
  * and no orphan work (scheduled work with no record).
@@ -62,7 +62,7 @@ export interface EventPublicationResult {
 /**
  * Publishes one domain event: decodes the payload against the event's
  * registry schema, dedups on `dedupKey` (replays return the existing event),
- * writes the outbox row and schedules the drain — all in the caller's
+ * writes the outbox row and schedules the drain, all in the caller's
  * transaction.
  */
 export async function publishEvent(
@@ -146,7 +146,7 @@ export interface JobRegistrationResult {
  * Registers one durable job: decodes the input against the kind's executor
  * schema from the composed registry (the executor table is the decode
  * authority), dedups on `jobKey`, writes the `durableJobs` row and schedules
- * the executor — all in the caller's transaction.
+ * the executor, all in the caller's transaction.
  */
 export async function registerDurableJob(
   tx: MutationCtx,
@@ -172,7 +172,16 @@ export async function registerDurableJob(
       .query("durableJobs")
       .withIndex("by_jobKey", (q) => q.eq("jobKey", jobKey))
       .first());
-  const decision = decideJobRegistration(existing === null ? null : existing.state);
+  const decision = decideJobRegistration(
+    existing === null
+      ? null
+      : {
+          state: existing.state,
+          ...(existing.externalOutcome === undefined
+            ? {}
+            : { externalOutcome: existing.externalOutcome }),
+        },
+  );
   if (decision.decision === "skip") {
     return {
       jobKey:

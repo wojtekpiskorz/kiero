@@ -87,6 +87,8 @@ export const platformOperations = {
           deliveryState: OutboxDeliveryState,
           attempts: Schema.Number,
           dedupKey: Schema.optionalKey(Schema.String),
+          /** Sanitized closed error kind of the delivery failure, if any. */
+          lastErrorKind: Schema.optionalKey(Schema.String),
         }),
       ),
       jobs: Schema.Array(

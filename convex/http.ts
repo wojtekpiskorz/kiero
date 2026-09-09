@@ -3,7 +3,7 @@
  *
  * Convex serves the default export of the `http` module as the deployment's
  * HTTP router. Route handlers live in their owning lane files; this entry
- * only wires them (later lanes append their own route imports here — the
+ * only wires them (later lanes append their own route imports here, the
  * same composition pattern as `convex/schema.ts`).
  */
 

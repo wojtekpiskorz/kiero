@@ -6,7 +6,7 @@
  * `Authorization` is verified against the deployment's `KIERO_SERVICE_TOKEN`
  * variable (compared as SHA-256 digests so the secret is never handled in
  * the clear; upgradeable to signed credentials when B/E lanes productionize
- * — the canonical check after verification is unchanged). The verified
+ * (the canonical check after verification is unchanged). The verified
  * identity is the service account's session, resolved through the SAME
  * context resolution and authorization seam as user calls, and the command
  * dispatches through the checked path. Malformed bodies and unknown
@@ -17,24 +17,24 @@
  * `externalEffects` row per request BEFORE answering (its observable
  * effect), then behaves per `behavior`: `ok` answers immediately, `slow`
  * answers after a delay longer than the caller's deadline (the caller times
- * out after the effect happened — the uncertain-outcome case), `crash`
+ * out after the effect happened, the uncertain-outcome case), `crash`
  * answers with a 5xx (effect happened, clean answer did not arrive). This
  * endpoint is deliberately dumb: it does not dedup and knows nothing about
- * the caller's bookkeeping — exactly like a real external system.
+ * the caller's bookkeeping, exactly like a real external system.
  *
  * `/platform/health` (GET): public health/version info for diagnostics.
  */
 
-import { Schema } from "effect";
 import { v } from "convex/values";
 import { httpAction, internalMutation } from "../_generated/server";
 import { api, internal } from "../_generated/api";
+import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
 import {
-  ClosedError,
-  errorResult,
-  okResult,
-  type ResultEnvelope,
-} from "@kiero/contracts";
+  forbiddenError,
+  unauthenticatedError,
+  unsupportedError,
+  validationError,
+} from "@kiero/runtime";
 import { dispatchBridgeCommand } from "./dispatch";
 
 // --- credential verification ---------------------------------------------------
@@ -67,19 +67,7 @@ async function verifyServiceToken(authorizationHeader: string | null): Promise<b
   return equal;
 }
 
-function closedError(tag: ClosedError["_tag"], code: string): ClosedError {
-  const messages: Record<string, string> = {
-    unauthenticated: "Najpierw się zaloguj.",
-    validation: "Kiero nie przyjęło tych danych. Popraw je i spróbuj ponownie.",
-    unsupported: "Ta operacja nie jest jeszcze dostępna.",
-    forbidden: "Nie masz uprawnień do tej czynności.",
-  };
-  return Schema.decodeUnknownSync(ClosedError)({
-    _tag: tag,
-    code,
-    message: messages[tag] ?? "",
-  });
-}
+
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -118,20 +106,17 @@ function bridgeStatus(result: ResultEnvelope): number {
 export const bridgeHandler = httpAction(async (ctx, request) => {
   const authorized = await verifyServiceToken(request.headers.get("authorization"));
   if (!authorized) {
-    return jsonResponse(
-      401,
-      errorResult(closedError("unauthenticated", "service_credential_invalid")),
-    );
+    return jsonResponse(401, errorResult(unauthenticatedError("service_credential_invalid")));
   }
   let envelope: unknown;
   try {
     envelope = await request.json();
   } catch {
-    return jsonResponse(400, errorResult(closedError("validation", "bridge_body_not_json")));
+    return jsonResponse(400, errorResult(validationError("bridge_body_not_json")));
   }
   const session: unknown = await ctx.runQuery(api.platform.probe.serviceSession, {});
   if (!isRecord(session) || typeof session.sessionId !== "string") {
-    return jsonResponse(403, errorResult(closedError("forbidden", "service_identity_unavailable")));
+    return jsonResponse(403, errorResult(forbiddenError("service_identity_unavailable")));
   }
   const result = await dispatchBridgeCommand(
     { action: ctx, serviceSessionId: session.sessionId },
@@ -143,7 +128,10 @@ export const bridgeHandler = httpAction(async (ctx, request) => {
 /** The external echo stand-in endpoint handler (see module docs). */
 export const echoHandler = httpAction(async (ctx, request) => {
   if (process.env.KIERO_PROBE_ENABLED !== "1") {
-    return jsonResponse(404, errorResult(closedError("unsupported", "probe_guard_disabled")));
+    return jsonResponse(
+      404,
+      errorResult(unsupportedError("platform.echo", "probe_guard_disabled")),
+    );
   }
   let body: { dedupKey?: unknown; serviceName?: unknown; message?: unknown; behavior?: unknown };
   try {
