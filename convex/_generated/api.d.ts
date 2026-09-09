@@ -9,6 +9,8 @@
  */
 
 import type * as http from "../http.js";
+import type * as integrations_ai_dispatch from "../integrations/ai/dispatch.js";
+import type * as integrations_ai_record from "../integrations/ai/record.js";
 import type * as platform_context from "../platform/context.js";
 import type * as platform_dispatch from "../platform/dispatch.js";
 import type * as platform_echo from "../platform/echo.js";
@@ -30,6 +32,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   http: typeof http;
+  "integrations/ai/dispatch": typeof integrations_ai_dispatch;
+  "integrations/ai/record": typeof integrations_ai_record;
   "platform/context": typeof platform_context;
   "platform/dispatch": typeof platform_dispatch;
   "platform/echo": typeof platform_echo;
