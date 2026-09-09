@@ -1,0 +1,323 @@
+/**
+ * Live-session resolution: the B1 identity source for the A3 seam.
+ *
+ * This is the swap-in point the platform evidence names ("B1 swaps the
+ * identity source into the same canonical resolution seam"): Convex Auth
+ * issues a JWT whose `sub` is `<userId>|<authSessions id>`. The platform's
+ * generic `identityFromConvexAuth` (convex/platform/context.ts) cannot map
+ * that subject onto the app-owned `sessions` registry, so THIS module is
+ * the authoritative user-identity source:
+ *
+ *   verified JWT -> strict subject parse -> live authSessions row
+ *     -> app session registry row -> VerifiedIdentity(subject = registry
+ *     row id) -> A3's resolveRequestContext (user -> earliest active
+ *     membership -> company -> GM -> ActorContext).
+ *
+ * Every protected read rejects a session whose authSessions row is gone
+ * (signed out upstream — the JWT may still be cryptographically valid),
+ * whose registry row is revoked, or whose trusted activity time is older
+ * than the accepted 30-day inactivity rule. The upstream token's validity
+ * alone never grants access.
+ *
+ * The subject parse and the session-state decision are pure and pinned by
+ * unit tests (tests/b1); the db halves are thin adapters.
+ */
+
+import { Schema } from "effect";
+import type { Doc, Id } from "../../_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "../../_generated/server";
+import type { VerifiedIdentity, RequestContext } from "@kiero/runtime";
+import { resolveRequestContext } from "../../platform/context";
+
+/**
+ * The accepted inactivity rule: a session expires after 30 days without
+ * authenticated activity (issue #4 grilling; Convex Auth refresh tokens
+ * enforce the same window for token refresh — this is the read-side rule).
+ */
+export const SESSION_INACTIVITY_LIMIT_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** The auth surface any Convex ctx satisfies (structural, like A3's). */
+export type AuthReader = {
+  getUserIdentity(): Promise<{ readonly subject: string } | null>;
+};
+
+/** The read surface resolution needs. */
+export type IdentityDb = QueryCtx["db"];
+/** The write surface provisioning needs. */
+export type IdentityTx = MutationCtx["db"];
+
+/** Why a request did not resolve to a live session (machine-readable). */
+export type LiveSessionDenial =
+  | "no_identity"
+  | "malformed_subject"
+  | "auth_session_missing"
+  | "auth_session_expired"
+  | "registry_missing"
+  | "revoked"
+  | "inactive";
+
+/** The trusted snapshot of one live device session. */
+export interface LiveSessionSnapshot {
+  /** The app `sessions` registry row id (the VerifiedIdentity subject). */
+  readonly sessionId: Id<"sessions">;
+  readonly userId: Id<"users">;
+  readonly startedAtMs: number;
+  readonly lastSeenAtMs: number;
+  readonly deviceLabel: string;
+}
+
+export type LiveSessionResult =
+  | { readonly tag: "live"; readonly session: LiveSessionSnapshot }
+  | { readonly tag: "denied"; readonly reason: LiveSessionDenial };
+
+/** Convex Auth JWT subjects: `<userId>|<authSessions id>`, nothing else. */
+const ConvexAuthSubject = Schema.String.pipe(
+  Schema.check(Schema.isPattern(/^[^|]+\|[^|]+$/)),
+);
+
+export interface AuthSubjectParts {
+  readonly authUserId: string;
+  readonly authSessionId: string;
+}
+
+/** Strictly parses a Convex Auth subject; null for any malformed value. */
+export function parseConvexAuthSubject(subject: string): AuthSubjectParts | null {
+  const decoded = Schema.decodeUnknownOption(ConvexAuthSubject)(subject);
+  if (decoded._tag === "None") {
+    return null;
+  }
+  const [authUserId, authSessionId] = decoded.value.split("|");
+  if (authUserId === undefined || authSessionId === undefined) {
+    return null;
+  }
+  return { authUserId, authSessionId };
+}
+
+/** The registry-row fields the pure decision consumes. */
+export interface SessionRegistryView {
+  readonly revokedAtMs: number | null;
+  readonly lastSeenAtMs: number;
+}
+
+/** The upstream authSessions-row projection the decision consumes. */
+export interface AuthSessionView {
+  readonly userId: string;
+  readonly expirationTime: number;
+}
+
+/**
+ * The pure live-session decision over one registry row.
+ *
+ * Boundary: a session is inactive only AFTER a full 30 days elapsed
+ * (`now - lastSeen > limit`), so "just inside 30 days" stays live and
+ * "beyond 30 days" expires, deterministically.
+ */
+export function liveSessionDecision(
+  session: SessionRegistryView,
+  nowMs: number,
+): { readonly tag: "live" } | { readonly tag: "denied"; readonly reason: "revoked" | "inactive" } {
+  if (session.revokedAtMs !== null) {
+    return { tag: "denied", reason: "revoked" };
+  }
+  if (nowMs - session.lastSeenAtMs > SESSION_INACTIVITY_LIMIT_MS) {
+    return { tag: "denied", reason: "inactive" };
+  }
+  return { tag: "live" };
+}
+
+/** The pure upstream check over the mirrored authSessions row. */
+export function authSessionDecision(
+  authSession: AuthSessionView | null,
+  expectedUserId: string,
+  nowMs: number,
+): { readonly tag: "live" } | { readonly tag: "denied"; readonly reason: LiveSessionDenial } {
+  if (authSession === null) {
+    // Signed out (or session deleted) upstream; the JWT may still verify.
+    return { tag: "denied", reason: "auth_session_missing" };
+  }
+  if (authSession.userId !== expectedUserId) {
+    return { tag: "denied", reason: "malformed_subject" };
+  }
+  if (authSession.expirationTime <= nowMs) {
+    return { tag: "denied", reason: "auth_session_expired" };
+  }
+  return { tag: "live" };
+}
+
+function snapshotOf(row: Doc<"sessions">): LiveSessionSnapshot {
+  return {
+    sessionId: row._id,
+    userId: row.userId,
+    startedAtMs: row.startedAtMs,
+    lastSeenAtMs: row.lastSeenAtMs,
+    deviceLabel: row.deviceLabel,
+  };
+}
+
+async function registryRowByAuthSession(
+  db: IdentityDb,
+  authSessionId: Id<"authSessions">,
+): Promise<Doc<"sessions"> | null> {
+  return await db
+    .query("sessions")
+    .withIndex("by_authSession", (q) => q.eq("authSessionId", authSessionId))
+    .unique();
+}
+
+/**
+ * Resolves the current live session WITHOUT writes: the read path for
+ * protected queries and subscriptions. A missing registry row denies
+ * (`registry_missing`) — provisioning happens only in mutation contexts.
+ */
+export async function resolveLiveSession(
+  db: IdentityDb,
+  auth: AuthReader,
+  nowMs: number,
+): Promise<LiveSessionResult> {
+  const identity = await auth.getUserIdentity();
+  if (identity === null) {
+    return { tag: "denied", reason: "no_identity" };
+  }
+  const parts = parseConvexAuthSubject(identity.subject);
+  if (parts === null) {
+    return { tag: "denied", reason: "malformed_subject" };
+  }
+  const authSessionId = db.normalizeId("authSessions", parts.authSessionId);
+  if (authSessionId === null) {
+    return { tag: "denied", reason: "malformed_subject" };
+  }
+  const authSession = await db.get(authSessionId);
+  const upstream = authSessionDecision(
+    authSession === null
+      ? null
+      : { userId: authSession.userId, expirationTime: authSession.expirationTime },
+    parts.authUserId,
+    nowMs,
+  );
+  if (upstream.tag === "denied") {
+    return upstream;
+  }
+  const row = await registryRowByAuthSession(db, authSessionId);
+  if (row === null) {
+    return { tag: "denied", reason: "registry_missing" };
+  }
+  const decision = liveSessionDecision(
+    { revokedAtMs: row.revokedAtMs ?? null, lastSeenAtMs: row.lastSeenAtMs },
+    nowMs,
+  );
+  if (decision.tag === "denied") {
+    return decision;
+  }
+  return { tag: "live", session: snapshotOf(row) };
+}
+
+/**
+ * Resolves the current live session, PROVISIONING the registry row when a
+ * verified Convex Auth session has none yet, and bumping trusted activity
+ * time. This is the write path: sign-in bootstrap and the checked command
+ * dispatch (every command refreshes the session's activity).
+ */
+export async function provisionOrRefreshLiveSession(
+  tx: IdentityTx,
+  auth: AuthReader,
+  nowMs: number,
+  deviceLabel: string,
+): Promise<LiveSessionResult> {
+  const identity = await auth.getUserIdentity();
+  if (identity === null) {
+    return { tag: "denied", reason: "no_identity" };
+  }
+  const parts = parseConvexAuthSubject(identity.subject);
+  if (parts === null) {
+    return { tag: "denied", reason: "malformed_subject" };
+  }
+  const authSessionId = tx.normalizeId("authSessions", parts.authSessionId);
+  if (authSessionId === null) {
+    return { tag: "denied", reason: "malformed_subject" };
+  }
+  const authSession = await tx.get(authSessionId);
+  const upstream = authSessionDecision(
+    authSession === null
+      ? null
+      : { userId: authSession.userId, expirationTime: authSession.expirationTime },
+    parts.authUserId,
+    nowMs,
+  );
+  if (upstream.tag === "denied") {
+    return upstream;
+  }
+  const existing = await registryRowByAuthSession(tx, authSessionId);
+  if (existing === null) {
+    const user = await tx.normalizeId("users", parts.authUserId);
+    if (user === null || (await tx.get(user)) === null) {
+      // The verified token names no existing person row: fail closed
+      // instead of provisioning a registry row for a ghost.
+      return { tag: "denied", reason: "malformed_subject" };
+    }
+    const inserted = await tx.insert("sessions", {
+      userId: user,
+      startedAtMs: nowMs,
+      lastSeenAtMs: nowMs,
+      deviceLabel,
+      authSessionId,
+    });
+    const row = await tx.get(inserted);
+    if (row === null) {
+      return { tag: "denied", reason: "registry_missing" };
+    }
+    return { tag: "live", session: snapshotOf(row) };
+  }
+  const decision = liveSessionDecision(
+    { revokedAtMs: existing.revokedAtMs ?? null, lastSeenAtMs: existing.lastSeenAtMs },
+    nowMs,
+  );
+  if (decision.tag === "denied") {
+    return decision;
+  }
+  await tx.patch(existing._id, { lastSeenAtMs: nowMs });
+  return { tag: "live", session: { ...snapshotOf(existing), lastSeenAtMs: nowMs } };
+}
+
+/** Constructs the seam identity: subject IS the registry row id. */
+export function liveSessionIdentity(session: LiveSessionSnapshot, nowMs: number): VerifiedIdentity {
+  return { issuer: "convex-auth", subject: session.sessionId, verifiedAtMs: nowMs };
+}
+
+/**
+ * The full canonical chain from a verified Convex Auth token to an actor
+ * context (read-only; no provisioning, no activity bump). Returns null for
+ * any broken chain — a session without an active membership resolves to
+ * null, which the checked path fails `unauthenticated`.
+ */
+export async function resolveAccessContextFromConvexAuth(
+  db: IdentityDb,
+  auth: AuthReader,
+  nowMs: number,
+): Promise<RequestContext | null> {
+  const live = await resolveLiveSession(db, auth, nowMs);
+  if (live.tag === "denied") {
+    return null;
+  }
+  return await resolveRequestContext(db, liveSessionIdentity(live.session, nowMs));
+}
+
+/**
+ * The dispatch resolution (write path): provision-or-refresh first, then
+ * the same canonical A3 chain. This is the resolveContext B1 hands to
+ * `dispatchCommand` and the surface B2/B3/GM reuse for their boundaries.
+ */
+export async function resolveAccessContextWithProvisioning(
+  tx: IdentityTx,
+  auth: AuthReader,
+  nowMs: number,
+  deviceLabel: string,
+): Promise<RequestContext | null> {
+  const live = await provisionOrRefreshLiveSession(tx, auth, nowMs, deviceLabel);
+  if (live.tag === "denied") {
+    return null;
+  }
+  return await resolveRequestContext(tx, liveSessionIdentity(live.session, nowMs));
+}
+
+/** Default barebones device label (client labels are optional, bounded). */
+export const DEFAULT_DEVICE_LABEL = "Przeglądarka";

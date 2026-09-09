@@ -8,7 +8,19 @@
  * @module
  */
 
+import type * as access_identity_authEntry from "../access/identity/authEntry.js";
+import type * as access_identity_functions from "../access/identity/functions.js";
+import type * as access_identity_operations from "../access/identity/operations.js";
+import type * as access_identity_policy from "../access/identity/policy.js";
+import type * as access_identity_probe from "../access/identity/probe.js";
+import type * as access_identity_providerAvailability from "../access/identity/providerAvailability.js";
+import type * as access_identity_resolution from "../access/identity/resolution.js";
+import type * as access_identity_userPolicy from "../access/identity/userPolicy.js";
+import type * as auth from "../auth.js";
 import type * as http from "../http.js";
+import type * as integrations_email_copy from "../integrations/email/copy.js";
+import type * as integrations_email_resend from "../integrations/email/resend.js";
+import type * as integrations_email_send from "../integrations/email/send.js";
 import type * as platform_context from "../platform/context.js";
 import type * as platform_dispatch from "../platform/dispatch.js";
 import type * as platform_echo from "../platform/echo.js";
@@ -29,7 +41,19 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "access/identity/authEntry": typeof access_identity_authEntry;
+  "access/identity/functions": typeof access_identity_functions;
+  "access/identity/operations": typeof access_identity_operations;
+  "access/identity/policy": typeof access_identity_policy;
+  "access/identity/probe": typeof access_identity_probe;
+  "access/identity/providerAvailability": typeof access_identity_providerAvailability;
+  "access/identity/resolution": typeof access_identity_resolution;
+  "access/identity/userPolicy": typeof access_identity_userPolicy;
+  auth: typeof auth;
   http: typeof http;
+  "integrations/email/copy": typeof integrations_email_copy;
+  "integrations/email/resend": typeof integrations_email_resend;
+  "integrations/email/send": typeof integrations_email_send;
   "platform/context": typeof platform_context;
   "platform/dispatch": typeof platform_dispatch;
   "platform/echo": typeof platform_echo;
