@@ -36,35 +36,16 @@ import {
   validationError,
 } from "@kiero/runtime";
 import { dispatchBridgeCommand } from "./dispatch";
+import { verifyServiceBearerToken } from "../operations/telemetry/serviceToken";
 
 // --- credential verification ---------------------------------------------------
+// Round-1 repair: the digest-compare bearer check lives ONCE in
+// operations/telemetry/serviceToken.ts (no convex/server imports) and is
+// shared with the telemetry HTTP boundary. A mirror of credential-
+// comparison code is a hazard; there is exactly one definition now.
 
-async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/** Digest-compared bearer check; never logs or echoes either side. */
 async function verifyServiceToken(authorizationHeader: string | null): Promise<boolean> {
-  const expected = process.env.KIERO_SERVICE_TOKEN;
-  if (expected === undefined || expected === "") {
-    return false;
-  }
-  if (authorizationHeader === null || !authorizationHeader.startsWith("Bearer ")) {
-    return false;
-  }
-  const presented = authorizationHeader.slice("Bearer ".length);
-  const [presentedHash, expectedHash] = await Promise.all([
-    sha256Hex(presented),
-    sha256Hex(expected),
-  ]);
-  let equal = presentedHash.length === expectedHash.length;
-  for (let index = 0; index < presentedHash.length; index += 1) {
-    equal = presentedHash[index] === expectedHash[index] && equal;
-  }
-  return equal;
+  return verifyServiceBearerToken(authorizationHeader, process.env.KIERO_SERVICE_TOKEN);
 }
 
 
