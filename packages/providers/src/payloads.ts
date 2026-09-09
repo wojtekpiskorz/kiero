@@ -5,7 +5,7 @@
  * operation accepts per route id: bounded, serializable subsets of the typed
  * adapter requests, with NO model, provider or dimensions fields anywhere.
  * In-process consumers (E3+/D6/E5) call the typed adapter interfaces
- * directly; this surface exists so a checked Convex operation can prove and
+ * directly; these payload contracts exist so a checked Convex operation can prove and
  * exercise the routes without shipping schema code over the wire.
  */
 
@@ -27,14 +27,16 @@ const payloadBase64 = Schema.String.pipe(
 
 /**
  * `chat_analysis` payload: a plain-text turn (no tools/schema over the wire).
- * No output-token cap: recorded live finding — `max_completion_tokens` under
+ * System instructions are the typed request's `systemPrompt`, not a message
+ * role, so the wire payload offers only `user` and `assistant`. No
+ * output-token cap: recorded live finding — `max_completion_tokens` under
  * `require_parameters: true` excluded every GLM endpoint.
  */
 export const ChatAnalysisPayload = Schema.Struct({
   kind: Schema.Literal("chat_analysis"),
   messages: Schema.Array(
     Schema.Struct({
-      role: Schema.Literals(["system", "user", "assistant"]),
+      role: Schema.Literals(["user", "assistant"]),
       text: payloadText,
     }),
   ).pipe(Schema.check(Schema.isMinLength(1))),

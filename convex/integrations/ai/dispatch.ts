@@ -27,7 +27,7 @@
  * need a coordinated `DurableJobKind` addition in `@kiero/contracts`; the
  * processing pipeline lanes (D6/E3-E5) own those kinds, and their executors
  * reuse the provider package's classification and recording rather than the
- * reverse. `processingAttempts` remains the per-step recording surface once
+ * reverse. `processingAttempts` remains the per-step record once
  * steps exist.
  */
 
@@ -182,8 +182,10 @@ async function executePayload(
   const value = decodedPayload.value;
   switch (value.kind) {
     case "chat_analysis": {
+      // The wire payload offers only user/assistant turns; system
+      // instructions travel through the typed request's systemPrompt.
       const messages: ChatMessagePart[] = value.messages.map((message) => ({
-        role: message.role === "assistant" ? "assistant" : "user",
+        role: message.role,
         content: [{ kind: "text", text: message.text }],
       }));
       const call = await runChatTurn(credentials, { messages });

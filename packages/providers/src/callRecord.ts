@@ -39,6 +39,8 @@ export const UsageObservation = Schema.Struct({
   promptTokens: Schema.optionalKey(Schema.Number),
   completionTokens: Schema.optionalKey(Schema.Number),
   totalTokens: Schema.optionalKey(Schema.Number),
+  /** Reported audio duration in seconds (transcription routes). */
+  audioSeconds: Schema.optionalKey(Schema.Number),
   /** Reported request cost in USD/credits when the provider reports one. */
   costUsd: Schema.optionalKey(Schema.Number),
 });
@@ -60,7 +62,7 @@ export const ProviderCallAttempt = Schema.Struct({
   fallbackEligible: Schema.optionalKey(Schema.Boolean),
   startedAtMs: Schema.Number,
   finishedAtMs: Schema.Number,
-  /** First streamed output observed, when the adapter surfaced one. */
+  /** First streamed output observed, when the adapter reported one. */
   firstOutputAtMs: Schema.optionalKey(Schema.Number),
   usage: Schema.optionalKey(UsageObservation),
 });

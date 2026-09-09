@@ -5,9 +5,9 @@
  * STT routing differs from chat (STT research facts): provider order and
  * allowlists from chat routing do NOT apply to transcription requests, so the
  * accepted order (`microsoft/mai-transcribe-2` first, `openai/whisper-large-v3`
- * backup) is applied by THIS application-owned bounded loop, one model per
- * attempt, exactly like the chat adapter. The JSON base64 request shape is
- * used (not 25MB-limited multipart).
+ * backup) is applied by this application-owned bounded loop, one model per
+ * attempt, over the shared ordered-route runner (./runner.ts). The JSON
+ * base64 request shape is used (not 25MB-limited multipart).
  *
  * Honest limitation recorded for D6: this JSON endpoint returns text and
  * usage only — no segment/word timestamps. Segment timing must come from the
@@ -24,12 +24,8 @@ import {
   type ModelRoute,
 } from "./routing";
 import { classifySdkFailure, providerFailure, type ProviderFailure } from "./failures";
-import {
-  newCallRecord,
-  sealCallRecord,
-  ProviderCallAttempt as ProviderCallAttemptSchema,
-  type ProviderCallRecord,
-} from "./callRecord";
+import { runOrderedRoute } from "./runner";
+import type { ProviderCallRecord } from "./callRecord";
 import type { OpenRouterCredentials } from "./chat";
 
 /** Audio container formats the JSON transcription body accepts. */
@@ -87,6 +83,26 @@ export function decodeTranscription(
   return decoded._tag === "Some" ? { ok: true, value: decoded.value } : { ok: false };
 }
 
+/** Maps the wire usage fields onto the record's usage observation. */
+function usageObservation(value: SttTranscription) {
+  if (value.usage === undefined) {
+    return undefined;
+  }
+  const usage: { totalTokens?: number; audioSeconds?: number; costUsd?: number } = {};
+  if (value.usage.totalTokens !== undefined) {
+    usage.totalTokens = value.usage.totalTokens;
+  }
+  // Audio duration is duration, not tokens: it gets its own record field so
+  // a 30-second segment never appears as `usageTokens: 30`.
+  if (value.usage.seconds !== undefined) {
+    usage.audioSeconds = value.usage.seconds;
+  }
+  if (value.usage.cost !== undefined) {
+    usage.costUsd = value.usage.cost;
+  }
+  return usage;
+}
+
 /** Runs ONE transcription attempt against one model (no fallback decisions). */
 export async function sttAttempt(
   credentials: OpenRouterCredentials,
@@ -124,9 +140,9 @@ export async function sttAttempt(
 }
 
 /**
- * Runs one transcription over an ordered (server-owned) STT route with the
- * same bounded classification discipline as chat: eligible failures advance
- * to the backup model, incompatible output fails closed.
+ * Runs one transcription over an ordered (server-owned) STT route: the
+ * shared ordered-route runner owns the loop, records, eligibility
+ * short-circuit and record seal; this adapter supplies only the attempt.
  */
 export async function transcriptionWithRoute(
   credentials: OpenRouterCredentials,
@@ -134,66 +150,19 @@ export async function transcriptionWithRoute(
   request: SttRequest,
   attemptFunction: typeof sttAttempt = sttAttempt,
 ): Promise<SttCallResult> {
-  const builder = newCallRecord("speech_to_text");
-  let lastFailure: ProviderFailure = providerFailure("provider_unavailable");
-  for (const model of route.order) {
-    const startedAtMs = Date.now();
+  return runOrderedRoute("speech_to_text", route, async (model) => {
     const attempt = await attemptFunction(credentials, model, request);
-    const finishedAtMs = Date.now();
     if (!attempt.ok) {
-      lastFailure = attempt.failure;
-      builder.attempts.push(
-        Schema.decodeUnknownSync(ProviderCallAttemptSchema)({
-          routeId: "speech_to_text",
-          routingConfigVersion: builder.routingConfigVersion,
-          requestedModel: model,
-          outcome: "failed",
-          failureKind: attempt.failure.kind,
-          fallbackEligible: attempt.failure.fallbackEligible,
-          startedAtMs,
-          finishedAtMs,
-        }),
-      );
-      if (!attempt.failure.fallbackEligible) {
-        return {
-          outcome: { outcome: "failed", failure: attempt.failure },
-          record: sealCallRecord(builder),
-        };
-      }
-      continue;
+      return { ok: false as const, failure: attempt.failure };
     }
-    builder.attempts.push(
-      Schema.decodeUnknownSync(ProviderCallAttemptSchema)({
-        routeId: "speech_to_text",
-        routingConfigVersion: builder.routingConfigVersion,
-        requestedModel: model,
-        outcome: "succeeded",
-        startedAtMs,
-        finishedAtMs,
-        ...(attempt.value.usage === undefined
-          ? {}
-          : {
-              usage: {
-                ...(attempt.value.usage.totalTokens === undefined &&
-                attempt.value.usage.seconds === undefined
-                  ? {}
-                  : {
-                      totalTokens:
-                        attempt.value.usage.totalTokens ?? attempt.value.usage.seconds,
-                    }),
-                ...(attempt.value.usage.cost === undefined
-                  ? {}
-                  : { costUsd: attempt.value.usage.cost }),
-              },
-            }),
-      }),
-    );
+    const usage = usageObservation(attempt.value);
     return {
-      outcome: { outcome: "succeeded", value: attempt.value },
-      record: sealCallRecord(builder),
+      ok: true as const,
+      value: attempt.value,
+      ...(attempt.observedModel === undefined ? {} : { observedModel: attempt.observedModel }),
+      ...(usage === undefined ? {} : { usage }),
     };
-  }
-  return { outcome: { outcome: "failed", failure: lastFailure }, record: sealCallRecord(builder) };
+  });
 }
 
 /** The public STT entry point: the frozen accepted transcription route. */

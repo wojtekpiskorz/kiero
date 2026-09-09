@@ -13,6 +13,9 @@
  *   `@tanstack/ai-openrouter` adapter with tools (decoded against the
  *   caller's Effect Schema) and strict structured output through the A3
  *   conversion (`toolJsonSchema` / `toolJsonSchemaForStructuredOutput`).
+ * - `runOrderedRoute`: the ONE ordered-route runner every role adapter uses
+ *   (the bounded fallback loop, per-attempt records, eligibility
+ *   short-circuit, record seal); a new role supplies only its attempt.
  * - `runVisionExtraction`: image-extraction request shapes over the vision
  *   order (GLM -> Gemini; never the text-only route).
  * - `runTranscription`: STT over the transcription endpoint (MAI-Transcribe 2
@@ -35,6 +38,7 @@
 export * from "./routing";
 export * from "./failures";
 export * from "./callRecord";
+export * from "./runner";
 export * from "./chat";
 export * from "./vision";
 export * from "./stt";

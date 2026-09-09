@@ -47,12 +47,8 @@ import {
   providerFailure,
   type ProviderFailure,
 } from "./failures";
-import {
-  newCallRecord,
-  sealCallRecord,
-  ProviderCallAttempt as ProviderCallAttemptSchema,
-  type ProviderCallRecord,
-} from "./callRecord";
+import { runOrderedRoute } from "./runner";
+import type { ProviderCallRecord } from "./callRecord";
 
 /** Server-side OpenRouter credentials; never constructed from client input. */
 export interface OpenRouterCredentials {
@@ -71,7 +67,7 @@ export type ChatContent =
 /**
  * One conversation message in the typed request shape. System instructions
  * travel only through `ChatRequest.systemPrompt` (the adapter maps them to
- * the provider's system surface); tool-result turns belong to the consumer's
+ * the provider's system messages); tool-result turns belong to the consumer's
  * loop (E3+/E6), not to this single-turn interface.
  */
 export interface ChatMessagePart {
@@ -177,8 +173,14 @@ function toModelMessages(messages: readonly ChatMessagePart[]): ModelMessage[] {
   }));
 }
 
-/** Harvests one adapter event stream into the raw observation. */
-async function harvestStream(
+/**
+ * Harvests one adapter event stream into the raw observation. Exported for
+ * the focused verification fixtures (tests/e2), like `decodeEmbedding` and
+ * `decodeTranscription`: synthetic AG-UI event sequences drive the REAL
+ * harvest (text/argument accumulation, observed model, usage, failure code)
+ * offline, including fragmented deltas.
+ */
+export async function harvestStream(
   stream: AsyncIterable<AdapterYieldChunk>,
 ): Promise<StreamObservation> {
   const observation: StreamObservation = { text: "", toolCalls: [], failed: false };
@@ -430,15 +432,16 @@ function decodeObservation(
 }
 
 /**
- * Runs one chat-shaped call over an ordered route (server-owned). Each model
- * in the order gets ONE bounded attempt; only classified eligible failures
- * advance to the next model; incompatible output and configuration failures
- * are terminal. Every attempt is recorded with its requested and observed
- * model under the calling role's route id.
+ * Runs one chat-shaped call over an ordered route (server-owned): the shared
+ * ordered-route runner owns the loop, records, eligibility short-circuit and
+ * record seal; this adapter supplies only the per-model attempt (one bounded
+ * request through the TanStack adapter, then the typed decode of the
+ * harvested stream — incompatible output fails closed with its observed
+ * routing metadata still recorded).
  *
  * `route` is a server-side parameter so verification probes (and only they)
  * can exercise the fallback order against controlled first positions; the
- * public entry points always pass the frozen configuration routes. No client
+ * public entry point always passes the frozen configuration route. No client
  * input reaches this parameter.
  */
 export async function chatWithRoute(
@@ -448,89 +451,30 @@ export async function chatWithRoute(
   request: ChatRequest,
   attemptFunction: typeof chatAttempt = chatAttempt,
 ): Promise<ChatCallResult> {
-  const builder = newCallRecord(recordRouteId);
-  let lastFailure: ProviderFailure = providerFailure("provider_unavailable");
-  for (const model of route.order) {
-    const startedAtMs = Date.now();
+  return runOrderedRoute(recordRouteId, route, async (model) => {
     const attempt = await attemptFunction(credentials, model, request);
-    const finishedAtMs = Date.now();
     if (!attempt.ok) {
-      lastFailure = attempt.failure;
-      builder.attempts.push(
-        Schema.decodeUnknownSync(ProviderCallAttemptSchema)({
-          routeId: recordRouteId,
-          routingConfigVersion: builder.routingConfigVersion,
-          requestedModel: model,
-          outcome: "failed",
-          failureKind: attempt.failure.kind,
-          fallbackEligible: attempt.failure.fallbackEligible,
-          startedAtMs,
-          finishedAtMs,
-        }),
-      );
-      if (!attempt.failure.fallbackEligible) {
-        return {
-          outcome: { outcome: "failed", failure: attempt.failure },
-          record: sealCallRecord(builder),
-        };
-      }
-      continue;
+      return { ok: false as const, failure: attempt.failure };
     }
-    const decoded = decodeObservation(request, attempt.observation);
+    const observation = attempt.observation;
+    const decoded = decodeObservation(request, observation);
     if (!decoded.ok) {
-      builder.attempts.push(
-        Schema.decodeUnknownSync(ProviderCallAttemptSchema)({
-          routeId: recordRouteId,
-          routingConfigVersion: builder.routingConfigVersion,
-          requestedModel: model,
-          ...(attempt.observation.observedModel === undefined
-            ? {}
-            : { observedModel: attempt.observation.observedModel }),
-          outcome: "failed",
-          failureKind: decoded.failure.kind,
-          fallbackEligible: decoded.failure.fallbackEligible,
-          startedAtMs,
-          finishedAtMs,
-          ...(attempt.observation.firstOutputAtMs === undefined
-            ? {}
-            : { firstOutputAtMs: attempt.observation.firstOutputAtMs }),
-          ...(attempt.observation.usage === undefined
-            ? {}
-            : { usage: attempt.observation.usage }),
-        }),
-      );
       return {
-        outcome: { outcome: "failed", failure: decoded.failure },
-        record: sealCallRecord(builder),
+        ok: false as const,
+        failure: decoded.failure,
+        ...(observation.observedModel === undefined ? {} : { observedModel: observation.observedModel }),
+        ...(observation.firstOutputAtMs === undefined ? {} : { firstOutputAtMs: observation.firstOutputAtMs }),
+        ...(observation.usage === undefined ? {} : { usage: observation.usage }),
       };
     }
-    builder.attempts.push(
-      Schema.decodeUnknownSync(ProviderCallAttemptSchema)({
-        routeId: recordRouteId,
-        routingConfigVersion: builder.routingConfigVersion,
-        requestedModel: model,
-        ...(attempt.observation.observedModel === undefined
-          ? {}
-          : { observedModel: attempt.observation.observedModel }),
-        outcome: "succeeded",
-        startedAtMs,
-        finishedAtMs,
-        ...(attempt.observation.firstOutputAtMs === undefined
-          ? {}
-          : { firstOutputAtMs: attempt.observation.firstOutputAtMs }),
-        ...(attempt.observation.usage === undefined
-          ? {}
-          : { usage: attempt.observation.usage }),
-      }),
-    );
     return {
-      outcome: { outcome: "succeeded", value: decoded.value },
-      record: sealCallRecord(builder),
+      ok: true as const,
+      value: decoded.value,
+      ...(observation.observedModel === undefined ? {} : { observedModel: observation.observedModel }),
+      ...(observation.firstOutputAtMs === undefined ? {} : { firstOutputAtMs: observation.firstOutputAtMs }),
+      ...(observation.usage === undefined ? {} : { usage: observation.usage }),
     };
-  }
-  // Every position failed with an eligible failure: the last observed one
-  // stands (recorded per attempt above).
-  return { outcome: { outcome: "failed", failure: lastFailure }, record: sealCallRecord(builder) };
+  });
 }
 
 /** The public chat entry point: the frozen accepted chat route. */

@@ -83,23 +83,3 @@ export const PROVIDER_ROUTING = {
 } as const satisfies Record<string, ModelRoute>;
 
 export type ProviderRouteId = keyof typeof PROVIDER_ROUTING;
-
-/** The accepted chat route (server callers never construct their own). */
-export function chatRoute(): ModelRoute {
-  return PROVIDER_ROUTING.chat_analysis;
-}
-
-/** The accepted vision route (GLM then Gemini; DeepSeek excluded). */
-export function visionRoute(): ModelRoute {
-  return PROVIDER_ROUTING.vision_extraction;
-}
-
-/** The accepted STT route (MAI first, Whisper backup). */
-export function speechToTextRoute(): ModelRoute {
-  return PROVIDER_ROUTING.speech_to_text;
-}
-
-/** The accepted embedding route (single versioned candidate). */
-export function embeddingRoute(): ModelRoute {
-  return PROVIDER_ROUTING.embedding;
-}

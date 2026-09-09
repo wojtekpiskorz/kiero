@@ -274,6 +274,11 @@ describe("bounded ordered fallback (STT)", () => {
       expect(result.outcome.value.text).toBe("proba transkrypcji");
     }
     expect(result.record.attempts).toHaveLength(2);
-    expect(result.record.attempts[1]?.usage?.costUsd).toBe(0.0001);
+    const usage = result.record.attempts[1]?.usage;
+    expect(usage?.costUsd).toBe(0.0001);
+    // Audio seconds are duration, not tokens (review finding 2): they land
+    // in their own record field and never in totalTokens.
+    expect(usage?.audioSeconds).toBe(1.2);
+    expect(usage?.totalTokens).toBeUndefined();
   });
 });

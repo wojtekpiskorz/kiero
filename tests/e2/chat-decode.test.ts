@@ -6,17 +6,23 @@
  * TEXT_MESSAGE_* / TOOL_CALL_* / RUN_FINISHED / RUN_ERROR, with the observed
  * model and usage on the run events), as read from the pinned adapter source
  * (0.19.8). They are NOT recorded live provider responses; no network runs
- * here. The assertions cover the acceptance criteria: every provider
- * response and tool argument passes its Effect Schema before a checked
- * domain operation can consume it, and malformed output is rejected (typed
- * fail-closed), including the adapter's own lenient empty-input behavior on
- * malformed tool-argument JSON.
+ * here. The fixtures drive the REAL exported `harvestStream` (the
+ * export-for-fixtures pattern, like `decodeEmbedding`/`decodeTranscription`),
+ * so the full offline chain is exercised: event harvest -> typed decode ->
+ * ordered-route recording. The assertions cover the acceptance criteria:
+ * every provider response and tool argument passes its Effect Schema before
+ * a checked domain operation can consume it, and malformed output is
+ * rejected (typed fail-closed), including the adapter's own lenient
+ * empty-input behavior on malformed tool-argument JSON.
  */
 
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
+import type { AdapterYieldChunk } from "@tanstack/ai";
 import {
   chatWithRoute,
+  classifyChatFailure,
+  harvestStream,
   type ChatRequest,
   type OpenRouterCredentials,
   type ProviderFailure,
@@ -41,46 +47,159 @@ const ProbeOutput = Schema.Struct({
   odp: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 });
 
-type AttemptResult =
-  | { ok: true; observation: StreamObservation }
-  | { ok: false; failure: ProviderFailure };
+/** Wraps plain fixture objects as the adapter's chunk iterable. */
+async function* eventsOf(events: unknown[]): AsyncIterable<AdapterYieldChunk> {
+  for (const event of events) {
+    yield event as AdapterYieldChunk;
+  }
+}
 
-/** Builds a fake attempt function from a per-model script. */
-function fakeAttempts(script: Record<string, AttemptResult | Error>) {
+/** AG-UI fixture builders matching the pinned adapter's emissions. */
+function runStarted(model = "model-a"): unknown {
+  return { type: "RUN_STARTED", runId: "r1", threadId: "t1", model, timestamp: 1 };
+}
+function textDelta(delta: string): unknown {
+  return { type: "TEXT_MESSAGE_CONTENT", messageId: "m1", delta, timestamp: 2 };
+}
+function toolStart(id: string, name: string): unknown {
+  return { type: "TOOL_CALL_START", toolCallId: id, toolCallName: name, timestamp: 2 };
+}
+function toolArgs(id: string, delta: string): unknown {
+  return { type: "TOOL_CALL_ARGS", toolCallId: id, delta, timestamp: 2 };
+}
+function toolEnd(id: string, name: string, input: unknown = {}): unknown {
+  return { type: "TOOL_CALL_END", toolCallId: id, toolCallName: name, input, timestamp: 3 };
+}
+function runFinished(model = "model-a", usage?: unknown): unknown {
+  return {
+    type: "RUN_FINISHED",
+    runId: "r1",
+    threadId: "t1",
+    model,
+    finishReason: "stop",
+    ...(usage === undefined ? {} : { usage }),
+    timestamp: 4,
+  };
+}
+function runError(code?: string | number): unknown {
+  return {
+    type: "RUN_ERROR",
+    runId: "r1",
+    threadId: "t1",
+    message: "provider text",
+    ...(code === undefined ? {} : { code }),
+    timestamp: 4,
+  };
+}
+
+/**
+ * Builds a fake chat attempt that replaces ONLY the network adapter: the
+ * REAL harvestStream consumes the fixture events, exactly like chatAttempt
+ * consumes the adapter's stream.
+ */
+function fakeStreamAttempts(script: Record<string, unknown[]>) {
   const calls: string[] = [];
-  const attempt = async (_creds: OpenRouterCredentials, model: string) => {
+  const attempt = async (
+    _creds: OpenRouterCredentials,
+    model: string,
+    _request: ChatRequest,
+  ): Promise<
+    | { ok: true; observation: StreamObservation }
+    | { ok: false; failure: ProviderFailure }
+  > => {
     calls.push(model);
     const scripted = script[model];
     if (scripted === undefined) {
       throw new Error(`unexpected attempt for ${model}`);
     }
-    if (scripted instanceof Error) {
-      throw scripted;
+    const observation = await harvestStream(eventsOf(scripted));
+    if (observation.failed) {
+      return { ok: false, failure: classifyChatFailure(observation.failureCode) };
     }
-    return scripted;
+    return { ok: true, observation };
   };
   return { attempt, calls };
 }
 
-function textObservation(overrides: Partial<StreamObservation> = {}): StreamObservation {
-  return {
-    observedModel: "model-a",
-    text: "odp",
-    toolCalls: [],
-    firstOutputAtMs: 1_000,
-    usage: { promptTokens: 5, completionTokens: 1, totalTokens: 6, costUsd: 0.000001 },
-    failed: false,
-    ...overrides,
-  };
-}
+const tinyUsage = {
+  promptTokens: 5,
+  completionTokens: 1,
+  totalTokens: 6,
+  cost: 0.000001,
+};
 
-function runTextObservation(): StreamObservation {
-  return textObservation();
-}
+describe("the real event harvest (offline, synthetic streams)", () => {
+  it("accumulates fragmented text deltas and captures first output", async () => {
+    const observation = await harvestStream(
+      eventsOf([
+        runStarted("model-a"),
+        textDelta('{"od'),
+        textDelta('p":'),
+        textDelta('"tak"}'),
+        runFinished("model-a", tinyUsage),
+      ]),
+    );
+    expect(observation.text).toBe('{"odp":"tak"}');
+    expect(observation.observedModel).toBe("model-a");
+    expect(observation.firstOutputAtMs).toBeTypeOf("number");
+    expect(observation.usage).toEqual({
+      promptTokens: 5,
+      completionTokens: 1,
+      totalTokens: 6,
+      costUsd: 0.000001,
+    });
+  });
 
-describe("chat provider output decode", () => {
+  it("accumulates fragmented tool-argument deltas keyed by call id", async () => {
+    const observation = await harvestStream(
+      eventsOf([
+        runStarted(),
+        toolStart("call-1", "record_finding"),
+        toolStart("call-2", "other"),
+        toolArgs("call-2", '{"x":1}'),
+        toolArgs("call-1", '{"findingKey":"dea'),
+        toolArgs("call-1", 'dline","knowledgeState":"known"}'),
+        toolEnd("call-1", "record_finding"),
+        runFinished(),
+      ]),
+    );
+    expect(observation.toolCalls).toHaveLength(2);
+    const first = observation.toolCalls.find((call) => call.id === "call-1");
+    expect(first?.name).toBe("record_finding");
+    expect(JSON.parse(first?.rawArguments ?? "{}")).toEqual({
+      findingKey: "deadline",
+      knowledgeState: "known",
+    });
+  });
+
+  it("captures the failure code from RUN_ERROR and keeps provider text out", async () => {
+    const observation = await harvestStream(eventsOf([runStarted(), runError(404)]));
+    expect(observation.failed).toBe(true);
+    expect(observation.failureCode).toBe(404);
+    expect(JSON.stringify(observation)).not.toContain("provider text");
+  });
+
+  it("drains tool calls the stream ended without closing", async () => {
+    const observation = await harvestStream(
+      eventsOf([runStarted(), toolStart("call-1", "record_finding"), toolArgs("call-1", '{"a":1}')]),
+    );
+    expect(observation.toolCalls).toHaveLength(1);
+    expect(observation.toolCalls[0]?.rawArguments).toBe('{"a":1}');
+  });
+
+  it("lets the later run event correct the observed model", async () => {
+    const observation = await harvestStream(
+      eventsOf([runStarted("requested/model"), textDelta("x"), runFinished("observed/model")]),
+    );
+    expect(observation.observedModel).toBe("observed/model");
+  });
+});
+
+describe("chat provider output decode (harvest -> decode -> record)", () => {
   it("decodes a plain text turn and records the observed model/usage", async () => {
-    const fake = fakeAttempts({ "model-a": { ok: true, observation: runTextObservation() } });
+    const fake = fakeStreamAttempts({
+      "model-a": [runStarted("model-a"), textDelta("odp"), runFinished("model-a", tinyUsage)],
+    });
     const result = await chatWithRoute(
       credentials,
       "chat_analysis",
@@ -106,18 +225,15 @@ describe("chat provider output decode", () => {
   });
 
   it("decodes tool arguments through the declared Effect Schema", async () => {
-    const observation = textObservation({
-      text: "",
-      toolCalls: [
-        {
-          id: "call-1",
-          name: "record_finding",
-          rawArguments:
-            '{"findingKey":"deadline","knowledgeState":"known"}',
-        },
+    const fake = fakeStreamAttempts({
+      "model-a": [
+        runStarted(),
+        toolStart("call-1", "record_finding"),
+        toolArgs("call-1", '{"findingKey":"deadline","knowledgeState":"known"}'),
+        toolEnd("call-1", "record_finding"),
+        runFinished(),
       ],
     });
-    const fake = fakeAttempts({ "model-a": { ok: true, observation } });
     const request: ChatRequest = {
       messages: [{ role: "user", content: [{ kind: "text", text: "ustal" }] }],
       tools: [
@@ -146,15 +262,18 @@ describe("chat provider output decode", () => {
 
   it("rejects malformed tool-argument JSON even though the adapter yields empty input", async () => {
     // The pinned adapter silently substitutes input: {} when tool-argument
-    // JSON fails to parse; Kiero's decode uses the RAW accumulated argument
-    // text, so this fixture must fail closed with NO second-model attempt.
-    const observation = textObservation({
-      text: "",
-      toolCalls: [
-        { id: "call-1", name: "record_finding", rawArguments: '{"findingKey": "deadline", ' },
+    // JSON fails to parse (fixture TOOL_CALL_END carries that empty input);
+    // Kiero's decode uses the RAW accumulated argument text from the real
+    // harvest, so this must fail closed with NO second-model attempt.
+    const fake = fakeStreamAttempts({
+      "model-a": [
+        runStarted(),
+        toolStart("call-1", "record_finding"),
+        toolArgs("call-1", '{"findingKey": "deadline", '),
+        toolEnd("call-1", "record_finding", {}),
+        runFinished(),
       ],
     });
-    const fake = fakeAttempts({ "model-a": { ok: true, observation } });
     const request: ChatRequest = {
       messages: [{ role: "user", content: [{ kind: "text", text: "ustal" }] }],
       tools: [{ name: "record_finding", description: "record", input: ProbeToolInput }],
@@ -169,13 +288,15 @@ describe("chat provider output decode", () => {
   });
 
   it("rejects an undeclared tool name (unknown_tool, fail closed)", async () => {
-    const observation = textObservation({
-      text: "",
-      toolCalls: [
-        { id: "call-1", name: "drop_all_tables", rawArguments: "{}" },
+    const fake = fakeStreamAttempts({
+      "model-a": [
+        runStarted(),
+        toolStart("call-1", "drop_all_tables"),
+        toolArgs("call-1", "{}"),
+        toolEnd("call-1", "drop_all_tables"),
+        runFinished(),
       ],
     });
-    const fake = fakeAttempts({ "model-a": { ok: true, observation } });
     const request: ChatRequest = {
       messages: [{ role: "user", content: [{ kind: "text", text: "ustal" }] }],
       tools: [{ name: "record_finding", description: "record", input: ProbeToolInput }],
@@ -189,17 +310,15 @@ describe("chat provider output decode", () => {
   });
 
   it("rejects tool arguments outside the declared enum vocabulary", async () => {
-    const observation = textObservation({
-      text: "",
-      toolCalls: [
-        {
-          id: "call-1",
-          name: "record_finding",
-          rawArguments: '{"findingKey":"deadline","knowledgeState":"maybe"}',
-        },
+    const fake = fakeStreamAttempts({
+      "model-a": [
+        runStarted(),
+        toolStart("call-1", "record_finding"),
+        toolArgs("call-1", '{"findingKey":"deadline","knowledgeState":"maybe"}'),
+        toolEnd("call-1", "record_finding"),
+        runFinished(),
       ],
     });
-    const fake = fakeAttempts({ "model-a": { ok: true, observation } });
     const request: ChatRequest = {
       messages: [{ role: "user", content: [{ kind: "text", text: "ustal" }] }],
       tools: [{ name: "record_finding", description: "record", input: ProbeToolInput }],
@@ -211,9 +330,16 @@ describe("chat provider output decode", () => {
     }
   });
 
-  it("decodes structured output through the pinned schema", async () => {
-    const observation = textObservation({ text: '{"odp":"tak"}' });
-    const fake = fakeAttempts({ "model-a": { ok: true, observation } });
+  it("decodes structured output assembled from fragmented text deltas", async () => {
+    const fake = fakeStreamAttempts({
+      "model-a": [
+        runStarted(),
+        textDelta('{"od'),
+        textDelta('p":"ta'),
+        textDelta('k"}'),
+        runFinished(),
+      ],
+    });
     const result = await chatWithRoute(
       credentials,
       "chat_analysis",
@@ -231,8 +357,9 @@ describe("chat provider output decode", () => {
   });
 
   it("rejects malformed structured-output JSON (fail closed, no fallback)", async () => {
-    const observation = textObservation({ text: '{"odp": "tak' });
-    const fake = fakeAttempts({ "model-a": { ok: true, observation } });
+    const fake = fakeStreamAttempts({
+      "model-a": [runStarted(), textDelta('{"odp": "tak'), runFinished()],
+    });
     const result = await chatWithRoute(
       credentials,
       "chat_analysis",
@@ -251,8 +378,9 @@ describe("chat provider output decode", () => {
   });
 
   it("rejects schema-mismatching structured output (image claims, wrong shape)", async () => {
-    const observation = textObservation({ text: '{"claim":"obiecal rurke"}' });
-    const fake = fakeAttempts({ "model-a": { ok: true, observation } });
+    const fake = fakeStreamAttempts({
+      "model-a": [runStarted(), textDelta('{"claim":"obiecal rurke"}'), runFinished()],
+    });
     const result = await chatWithRoute(
       credentials,
       "chat_analysis",
@@ -269,31 +397,23 @@ describe("chat provider output decode", () => {
     }
   });
 
-  it("accumulates fragmented tool-argument deltas and text deltas", async () => {
-    const observation = textObservation({
-      text: "",
-      toolCalls: [
-        {
-          id: "call-1",
-          name: "record_finding",
-          rawArguments: '{"findingKey":"deadline","knowledgeState":"known"}',
-        },
-      ],
+  it("classifies a code-less stream failure as eligible route unavailability", async () => {
+    // The pinned adapter reports HTTP-level failures as RUN_ERROR events
+    // without a numeric code; classification must still walk the order.
+    const fake = fakeStreamAttempts({
+      "model-a": [runStarted(), runError()],
+      "model-b": [runStarted("model-b"), textDelta("odp"), runFinished("model-b")],
     });
-    // Simulate fragmentation by constructing the same observation the stream
-    // harvest would build from TOOL_CALL_ARGS deltas split mid-token.
-    const pieces = ['{"findingKey":"dea', 'dline","knowledgeState":"kn', 'own"}'];
-    const joined = pieces.join("");
-    expect(joined).toBe(
-      '{"findingKey":"deadline","knowledgeState":"known"}',
+    const result = await chatWithRoute(
+      credentials,
+      "chat_analysis",
+      route,
+      { messages: [{ role: "user", content: [{ kind: "text", text: "pytanie" }] }] },
+      fake.attempt,
     );
-    observation.toolCalls[0]!.rawArguments = joined;
-    const fake = fakeAttempts({ "model-a": { ok: true, observation } });
-    const request: ChatRequest = {
-      messages: [{ role: "user", content: [{ kind: "text", text: "ustal" }] }],
-      tools: [{ name: "record_finding", description: "record", input: ProbeToolInput }],
-    };
-    const result = await chatWithRoute(credentials, "chat_analysis", route, request, fake.attempt);
     expect(result.outcome.outcome).toBe("succeeded");
+    expect(fake.calls).toEqual(["model-a", "model-b"]);
+    expect(result.record.attempts[0]?.failureKind).toBe("provider_unavailable");
+    expect(result.record.attempts[1]?.observedModel).toBe("model-b");
   });
 });

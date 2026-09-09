@@ -26,12 +26,8 @@ import {
   type ModelRoute,
 } from "./routing";
 import { classifySdkFailure, providerFailure, type ProviderFailure } from "./failures";
-import {
-  newCallRecord,
-  sealCallRecord,
-  ProviderCallAttempt as ProviderCallAttemptSchema,
-  type ProviderCallRecord,
-} from "./callRecord";
+import { runOrderedRoute } from "./runner";
+import type { ProviderCallRecord } from "./callRecord";
 import type { OpenRouterCredentials } from "./chat";
 
 /** Which side of retrieval the text belongs to (provider task hint). */
@@ -126,10 +122,7 @@ export async function embeddingAttempt(
   credentials: OpenRouterCredentials,
   model: string,
   request: EmbeddingRequest,
-): Promise<
-  | { ok: true; value: EmbeddingResult }
-  | { ok: false; failure: ProviderFailure }
-> {
+): Promise<{ ok: true; value: EmbeddingResult } | { ok: false; failure: ProviderFailure }> {
   const client = new OpenRouter({
     apiKey: credentials.apiKey,
     timeoutMs: EMBEDDING_ATTEMPT_DEADLINE_MS,
@@ -157,10 +150,11 @@ export async function embeddingAttempt(
 }
 
 /**
- * Runs one embedding over an ordered (server-owned) route. The accepted
- * embedding route has a single model, so in practice this is one bounded
- * attempt; the loop keeps the same classification/recording discipline as
- * the other adapters for when a coordinated order change ever lands.
+ * Runs one embedding over an ordered (server-owned) route: the shared
+ * ordered-route runner owns the loop, records, eligibility short-circuit and
+ * record seal. The accepted embedding route has a single model, so in
+ * practice this is one bounded attempt; the runner keeps the same discipline
+ * for when a coordinated order change ever lands.
  */
 export async function embeddingWithRoute(
   credentials: OpenRouterCredentials,
@@ -168,54 +162,20 @@ export async function embeddingWithRoute(
   request: EmbeddingRequest,
   attemptFunction: typeof embeddingAttempt = embeddingAttempt,
 ): Promise<EmbeddingCallResult> {
-  const builder = newCallRecord("embedding");
-  let lastFailure: ProviderFailure = providerFailure("provider_unavailable");
-  for (const model of route.order) {
-    const startedAtMs = Date.now();
+  return runOrderedRoute("embedding", route, async (model) => {
     const attempt = await attemptFunction(credentials, model, request);
-    const finishedAtMs = Date.now();
     if (!attempt.ok) {
-      lastFailure = attempt.failure;
-      builder.attempts.push(
-        Schema.decodeUnknownSync(ProviderCallAttemptSchema)({
-          routeId: "embedding",
-          routingConfigVersion: builder.routingConfigVersion,
-          requestedModel: model,
-          outcome: "failed",
-          failureKind: attempt.failure.kind,
-          fallbackEligible: attempt.failure.fallbackEligible,
-          startedAtMs,
-          finishedAtMs,
-        }),
-      );
-      if (!attempt.failure.fallbackEligible) {
-        return {
-          outcome: { outcome: "failed", failure: attempt.failure },
-          record: sealCallRecord(builder),
-        };
-      }
-      continue;
+      return { ok: false as const, failure: attempt.failure };
     }
-    builder.attempts.push(
-      Schema.decodeUnknownSync(ProviderCallAttemptSchema)({
-        routeId: "embedding",
-        routingConfigVersion: builder.routingConfigVersion,
-        requestedModel: model,
-        observedModel: attempt.value.observedModel,
-        outcome: "succeeded",
-        startedAtMs,
-        finishedAtMs,
-        ...(Object.keys(attempt.value.usage).length === 0
-          ? {}
-          : { usage: attempt.value.usage }),
-      }),
-    );
     return {
-      outcome: { outcome: "succeeded", value: attempt.value },
-      record: sealCallRecord(builder),
+      ok: true as const,
+      value: attempt.value,
+      observedModel: attempt.value.observedModel,
+      ...(Object.keys(attempt.value.usage).length === 0
+        ? {}
+        : { usage: attempt.value.usage }),
     };
-  }
-  return { outcome: { outcome: "failed", failure: lastFailure }, record: sealCallRecord(builder) };
+  });
 }
 
 /** The public embedding entry point: the frozen accepted embedding route. */

@@ -53,7 +53,7 @@ export interface ProviderFailure {
 /**
  * Failures for which the accepted order's next model may be tried.
  * Everything else (auth, credits, parameter rejection, incompatible output)
- * is terminal for the call: recorded, surfaced, never retried into another
+ * is terminal for the call: recorded, reported, never retried into another
  * model.
  */
 const FALLBACK_ELIGIBLE: ReadonlySet<ProviderFailureKind> = new Set([
@@ -86,7 +86,7 @@ export function classifyStatus(status: number): ProviderFailure {
 }
 
 /**
- * Classifies a failure surfaced by the TanStack adapter as an AG-UI
+ * Classifies a failure reported by the TanStack adapter as an AG-UI
  * RUN_ERROR event (or a thrown error) using only its machine-readable
  * `code` — never the message text, which is provider-controlled.
  *
