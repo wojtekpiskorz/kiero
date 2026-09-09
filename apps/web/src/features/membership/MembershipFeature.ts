@@ -23,9 +23,10 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from "react";
+import { Schema } from "effect";
 import { ConvexAuthProvider, useAuthActions } from "@convex-dev/auth/react";
-import { useAction, useMutation, useQuery } from "convex/react";
-import type { ResultEnvelope } from "@kiero/contracts";
+import { useAction, useMutation, useQuery_experimental as useQueryState } from "convex/react";
+import { accessOperations, type ResultEnvelope } from "@kiero/contracts";
 import { api } from "../../../../../convex/_generated/api";
 import type {
   CompanyInvitationView,
@@ -36,7 +37,12 @@ import type {
 import { useAppServices } from "../../app/providers";
 import { createConvexClient } from "../sign-in/client";
 import { AuthenticatedGate } from "../sign-in/SignInGate";
-import { failureHint, membershipCopy, signInCopy } from "./state";
+import {
+  failureHint,
+  invitationDeliveryFailedNotice,
+  membershipCopy,
+  signInCopy,
+} from "./state";
 
 /** One command envelope (the checked dispatch input shape). */
 function envelopeOf(operation: string, input: unknown) {
@@ -65,6 +71,26 @@ function describe(result: ResultEnvelope, okText: string): Notice {
     case "ok":
       return { kind: "ok", text: okText };
   }
+}
+
+/** The contract entry the issuance receipt decodes against (typed read). */
+const createInvitationResult = accessOperations["access.createInvitation"].result;
+
+/**
+ * The issuance notice: the ok-result's honest delivery state decides.
+ * `delivery_failed` (no mail provider, provider refused) surfaces the
+ * existing hint as an ERROR notice — the invitation row exists, the code
+ * did NOT reach the mailbox, and the administrator must not believe it did.
+ */
+function invitationNotice(result: ResultEnvelope): Notice {
+  if (result._tag === "error") {
+    const hint = failureHint(result.error.code);
+    return { kind: "error", text: hint ?? result.error.message };
+  }
+  const receipt = Schema.decodeUnknownSync(createInvitationResult)(result.value);
+  return receipt.delivery === "sent"
+    ? { kind: "ok", text: membershipCopy.invitationSent }
+    : { kind: "error", text: invitationDeliveryFailedNotice };
 }
 
 function NoticeArea({ notice }: { notice: Notice | null }): ReactNode {
@@ -114,14 +140,48 @@ function MembershipGate(): ReactNode {
 // ---------------------------------------------------------------------------
 
 function MembershipSurface(): ReactNode {
-  const overview = useQuery(api.access.membership.functions.membershipOverview, {});
-  if (overview === undefined) {
+  const overview = useQueryState({
+    query: api.access.membership.functions.membershipOverview,
+    args: {},
+  });
+  const { signOut } = useAuthActions();
+  const [signingOut, setSigningOut] = useState(false);
+
+  // B1's SessionPanel pattern: this query errors exactly when THIS session
+  // stopped resolving — the revocation lifecycle this feature ships makes
+  // that path ORDINARY (membership revoked -> the durable cleanup revokes
+  // the registry row while the token still verifies; upstream signed out;
+  // 30-day inactivity). The honest fallback is the session-ended state
+  // with a way back to sign-in, never a spinner over an erroring query.
+  if (overview.status === "error") {
+    return createElement(
+      "div",
+      { role: "alert" },
+      createElement("p", null, signInCopy.sessionEndedNotice),
+      createElement(
+        "button",
+        {
+          type: "button",
+          disabled: signingOut,
+          onClick: () => {
+            setSigningOut(true);
+            void signOut().catch(() => {
+              setSigningOut(false);
+            });
+          },
+        },
+        signInCopy.signInAgain,
+      ),
+    );
+  }
+  if (overview.status !== "success") {
     return createElement("p", { role: "status" }, membershipCopy.checkingSession);
   }
-  if (overview.state === "no_company") {
-    return createElement(AdmissionSurface, { overview });
+  const data = overview.data;
+  if (data.state === "no_company") {
+    return createElement(AdmissionSurface, { overview: data });
   }
-  return createElement(CompanySurface, { overview });
+  return createElement(CompanySurface, { overview: data });
 }
 
 // ---------------------------------------------------------------------------
@@ -292,7 +352,7 @@ function CompanySurface({ overview }: { readonly overview: Extract<MembershipOve
       const result = await invite({
         envelope: envelopeOf("access.createInvitation", { email: inviteEmail, role: inviteRole }),
       });
-      setNotice(describe(result, "Zaproszenie utworzone. Kod zaproszenia wysłaliśmy na podany adres."));
+      setNotice(invitationNotice(result));
     } catch {
       setNotice({ kind: "error", text: signInCopy.failures.network });
     } finally {

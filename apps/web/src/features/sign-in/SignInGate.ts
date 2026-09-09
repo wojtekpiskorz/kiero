@@ -1,21 +1,22 @@
 /**
- * The shared, JSX-free sign-in card and session bootstrap (B1 surface).
+ * The shared, JSX-free sign-in walk (B1 surface): card, session bootstrap
+ * and the authenticated gate.
  *
- * Why this file exists: host-mounted features compose the sign-in product
- * from ONE implementation instead of transcribing it. The JSX original
- * (./SignInFeature.tsx) cannot be imported through the host feature
- * registry chain — that chain is compiled by the root node test programs,
- * which run without a JSX flag — so this module carries the same walk over
- * the same exported state machine and copy (./state.ts) using
- * createElement only. The mounted membership feature (B3,
- * apps/web/src/features/membership) renders `SignInCard` for visitors and
- * `SessionGate` with its authenticated continuation for members.
+ * Why this file exists: the host feature registry chain is compiled by the
+ * root node test programs, which run without a JSX flag, so the mounted
+ * sign-in surface must be createElement-based. This module IS that
+ * surface, and the JSX twin (./SignInFeature.tsx) composes it too — one
+ * walk over the exported state machine and copy (./state.ts), never two
+ * that age separately. Host features render `AuthenticatedGate` with
+ * their own continuation; the standalone root passes its session panel.
  *
  * Behavior is B1's, verbatim: email-code two-step (send code, then code +
  * the same email), Google only when the deployment reports it configured,
  * distinct copy for wrong/expired codes, rate limiting, delivery failures
  * and the method-conflict policy message; then registry provisioning with
- * honest denial views before any authenticated surface renders.
+ * B1's honest denial views — including the requiresSignIn distinction
+ * (only sessions that truly ended offer the sign-in-again path) — before
+ * any authenticated continuation renders with the provisioned session id.
  */
 
 import {
@@ -34,6 +35,7 @@ import {
   pendingLabel,
   sessionDeniedView,
   signInCopy,
+  type SessionDeniedView,
   type SignInFailure,
   type SignInState,
 } from "./state";
@@ -179,10 +181,12 @@ export function SignInCard(): ReactNode {
  * The authentication gate: sign-in card for visitors; for the freshly
  * authenticated, registry provisioning (B1's `ensureSessionRegistry`,
  * idempotent) with honest denial views, then the caller's authenticated
- * continuation. Host features pass their own surface as `continuation`.
+ * continuation. The continuation receives the provisioned session id —
+ * B1's standalone root needs it for its device-session panel; host
+ * features may ignore it.
  */
 export function AuthenticatedGate({ continuation }: {
-  readonly continuation: () => ReactNode;
+  readonly continuation: (sessionId: string) => ReactNode;
 }): ReactNode {
   const { isAuthenticated, isLoading } = useConvexAuth();
   if (isLoading) {
@@ -195,11 +199,11 @@ export function AuthenticatedGate({ continuation }: {
 }
 
 function SessionBootstrap({ continuation }: {
-  readonly continuation: () => ReactNode;
+  readonly continuation: (sessionId: string) => ReactNode;
 }): ReactNode {
   const ensureSession = useMutation(api.access.identity.functions.ensureSessionRegistry);
-  const [ready, setReady] = useState(false);
-  const [deniedNotice, setDeniedNotice] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [denied, setDenied] = useState<SessionDeniedView | null>(null);
   const { signOut } = useAuthActions();
 
   useEffect(() => {
@@ -211,14 +215,14 @@ function SessionBootstrap({ continuation }: {
           return;
         }
         if (result.state === "live") {
-          setReady(true);
+          setSessionId(result.sessionId);
         } else {
-          setDeniedNotice(sessionDeniedView(result.reason).notice);
+          setDenied(sessionDeniedView(result.reason));
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setDeniedNotice(sessionDeniedView("no_identity").notice);
+          setDenied(sessionDeniedView("no_identity"));
         }
       });
     return () => {
@@ -226,16 +230,22 @@ function SessionBootstrap({ continuation }: {
     };
   }, [ensureSession]);
 
-  if (deniedNotice !== null) {
+  if (denied !== null) {
+    // B1's distinction, verbatim: only denials whose only sensible next
+    // step is signing in again offer the button; registry_missing shows
+    // its notice (the bootstrap retries on the next mount) without a
+    // sign-out.
     return createElement(
-      "section",
-      null,
-      createElement("p", { role: "alert" }, deniedNotice),
-      createElement("button", { type: "button", onClick: () => void signOut() }, signInCopy.signInAgain),
+      "div",
+      { role: "alert" },
+      createElement("p", null, denied.notice),
+      denied.requiresSignIn
+        ? createElement("button", { type: "button", onClick: () => void signOut() }, signInCopy.signInAgain)
+        : null,
     );
   }
-  if (!ready) {
+  if (sessionId === null) {
     return createElement("p", { role: "status" }, signInCopy.verifying);
   }
-  return createElement(continuation);
+  return continuation(sessionId);
 }

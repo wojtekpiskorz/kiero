@@ -16,13 +16,10 @@ export { signInCopy };
 /** Polish copy for the membership surface (stable product text). */
 export const membershipCopy = {
   title: "Firma i członkostwo",
-  intro:
-    "Zarządzaj firmą, jej członkami i zaproszeniami. Dostęp do firmy odbywa się wyłącznie przez zaproszenie.",
   connectionUnconfigured:
     "Aplikacja nie jest połączona z backendem (VITE_CONVEX_URL nie jest ustawiony).",
   connectionMisconfigured: "Adres backendu jest nieprawidłowy — aplikacja działa bez połączenia.",
   checkingSession: "Sprawdzamy Twoją sesję…",
-  verifyingSession: "Rejestrujemy sesję tego urządzenia…",
   signedInAs: (email: string): string => `Zalogowano jako ${email}.`,
   signOut: "Wyloguj się",
   // Admission (no company yet)
@@ -92,7 +89,7 @@ export const membershipCopy = {
   } as const,
   revokeInvitation: "Cofnij zaproszenie",
   noInvitations: "Brak zaproszeń.",
-  operationPending: "Wykonujemy…",
+  invitationSent: "Zaproszenie utworzone. Kod zaproszenia wysłaliśmy na podany adres.",
 } as const;
 
 /**
@@ -132,3 +129,12 @@ export function failureHint(code: MembershipFailureCode | undefined): string | n
   }
   return codeHints[code] ?? null;
 }
+
+/**
+ * The honest delivery-failure notice for an ISSUED invitation whose email
+ * could not be delivered (the ok-result's `delivery: "delivery_failed"`
+ * leg). Named so the invite form surfaces it without a null check; the
+ * fallback only fires on table drift.
+ */
+export const invitationDeliveryFailedNotice: string =
+  codeHints.delivery_failed ?? "Zaproszenie utworzono, ale wiadomości nie udało się wysłać.";
