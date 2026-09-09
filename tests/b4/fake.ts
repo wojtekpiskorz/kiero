@@ -175,13 +175,6 @@ export function fakeGmTx(db: FakeGmDb): GmTx {
       );
       return open.length > 0 ? activationViewOf(open[0]!) : null;
     },
-    latestActivationOf: async (companyId) => {
-      const rows = db.activations
-        .filter((row) => row.companyId === companyId)
-        .sort((a, b) => b.activatedAtMs - a.activatedAtMs);
-      const row = rows[0];
-      return row === undefined ? null : activationViewOf(row);
-    },
     membershipsOfCompany: async (companyId) =>
       db.memberships
         .filter((row) => row.companyId === companyId)

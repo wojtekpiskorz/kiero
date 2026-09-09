@@ -387,8 +387,8 @@ export async function performGmActivateCompany(
   if (company === null) {
     return await refuseGmAccess(tx, authority, "access.gmActivateCompany", basis.value, null, COMPANY_NOT_FOUND);
   }
-  const existing = await tx.latestActivationOf(input.companyId);
-  if (existing !== null && existing.endedAtMs === null) {
+  const existing = await tx.openActivationOf(input.companyId);
+  if (existing !== null) {
     await audit(tx, {
       authority,
       companyId: input.companyId,

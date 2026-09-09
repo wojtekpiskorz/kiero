@@ -302,6 +302,7 @@ describe("the B4 contract entries (closed error vocabulary)", () => {
     expect([...accessOperations["access.enterGmMode"].errorKinds].sort()).toEqual([
       "conflict",
       "forbidden",
+      "validation",
     ]);
     expect([...accessOperations["access.gmInspectCompany"].errorKinds].sort()).toEqual([
       "forbidden",
@@ -312,6 +313,7 @@ describe("the B4 contract entries (closed error vocabulary)", () => {
       "conflict",
       "forbidden",
       "not_found",
+      "validation",
     ]);
   });
 

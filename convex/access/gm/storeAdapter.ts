@@ -98,21 +98,6 @@ export function gmStore(db: GmDb): GmStore {
         .sort((a, b) => b.activatedAtMs - a.activatedAtMs);
       return open[0] === undefined ? null : activationViewOf(open[0]);
     },
-    latestActivationOf: async (companyId) => {
-      const id = db.normalizeId("companies", companyId);
-      if (id === null) {
-        return null;
-      }
-      const rows = await db
-        .query("gmCompanyActivations")
-        .withIndex("by_company_open", (q) => q.eq("companyId", id))
-        .collect();
-      // Same ruling as openActivationOf: ordering by activatedAtMs in JS.
-      // (An index-order ".order('desc').first()" here returned the row with
-      // the greatest endedAtMs — a CLOSED row — and missed the open one.)
-      const sorted = rows.sort((a, b) => b.activatedAtMs - a.activatedAtMs);
-      return sorted[0] === undefined ? null : activationViewOf(sorted[0]);
-    },
     membershipsOfCompany: async (companyId) => {
       const id = db.normalizeId("companies", companyId);
       if (id === null) {

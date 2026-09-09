@@ -75,7 +75,6 @@ export interface GmStore {
   companyById(companyId: string): Promise<GmCompanyView | null>;
   openActivationOf(companyId: string): Promise<GmActivationView | null>;
   /** The latest activation row of any state (re-activation conflict check). */
-  latestActivationOf(companyId: string): Promise<GmActivationView | null>;
   membershipsOfCompany(companyId: string): Promise<GmMembershipRow[]>;
   recentRunsOfCompany(companyId: string, limit: number): Promise<GmRunRow[]>;
   recentJobsOfCompany(companyId: string, limit: number): Promise<GmJobRow[]>;

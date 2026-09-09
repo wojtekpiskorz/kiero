@@ -158,8 +158,9 @@ export const accessOperations = {
     input: Schema.Struct({ reason: Schema.NonEmptyString }),
     result: Schema.Struct({ grantId: tableIdSchema("gmAccessGrants") }),
     // B4 amendment (issue #23): entering twice in one session is an honest
-    // conflict, not a silent grant swap.
-    errorKinds: ["forbidden", "conflict"],
+    // conflict, not a silent grant swap; a whitespace-only reason passes
+    // NonEmptyString at decode but dies in the transaction's trim check.
+    errorKinds: ["forbidden", "conflict", "validation"],
   }),
   "access.exitGmMode": operationEntry({
     kind: "operation",
@@ -276,7 +277,8 @@ export const accessOperations = {
       basis: Schema.NonEmptyString,
     }),
     result: Schema.Struct({ activationId: tableIdSchema("gmCompanyActivations") }),
-    errorKinds: ["forbidden", "not_found", "conflict"],
+    // validation: whitespace-only basis (decode passes, trim check rejects).
+    errorKinds: ["forbidden", "not_found", "conflict", "validation"],
   }),
   // Administrator restoration: promotes one ACTIVE member of the target
   // firm to administrator under GM authority (audited), when the firm lost
@@ -305,7 +307,8 @@ export const accessOperations = {
       basis: Schema.NonEmptyString,
     }),
     result: Schema.Struct({ endedAtMs: Schema.Number }),
-    errorKinds: ["forbidden", "not_found", "conflict"],
+    // validation: whitespace-only basis (decode passes, trim check rejects).
+    errorKinds: ["forbidden", "not_found", "conflict", "validation"],
   }),
 } as const;
 
