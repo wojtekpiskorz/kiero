@@ -289,7 +289,6 @@ export async function cancelLinkingCore(
 /** What the account screen shows about linking state. */
 export interface LinkingStatusView {
   readonly email: string;
-  readonly displayName: string;
   readonly googleLinked: boolean;
   readonly emailCodeLinked: boolean;
   readonly activeAttempt: {
@@ -316,7 +315,6 @@ export async function linkingStatusCore(
   const emailCodeLinked = await store.hasEmailCodeCredential(args.userId);
   return {
     email: account.email,
-    displayName: account.email.split("@")[0] ?? account.email,
     googleLinked: account.googleSubject !== null,
     emailCodeLinked,
     activeAttempt:

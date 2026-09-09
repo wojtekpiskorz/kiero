@@ -25,7 +25,7 @@
  *   no supported resolution in B2 (GM-assisted recovery is B4's).
  *
  * The decision halves are pure and unit-tested (tests/b2); the Convex
- * db-halves in ./cores.ts are thin adapters over fake-able surfaces.
+ * db-halves in storeAdapter.ts are thin adapters over fake-able surfaces.
  */
 
 import { Schema } from "effect";
