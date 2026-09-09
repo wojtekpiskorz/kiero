@@ -54,14 +54,12 @@ function compareValue(expected, actual, where) {
       ["maxAmount", expected.maxAmount, actual.maxAmount],
     ];
     for (const [name, exp, act] of fields) {
-      if (normDecimal(exp ?? "") !== normDecimal(act ?? "") && (exp ?? "") !== (act ?? "")) {
-        {
-          issues.push({
-            category: "amount",
-            critical: true,
-            detail: `${where}: ${name} mismatch (expected ${exp ?? "absent"}, got ${act ?? "absent"})`,
-          });
-        }
+      if (normDecimal(exp ?? "") !== normDecimal(act ?? "")) {
+        issues.push({
+          category: "amount",
+          critical: true,
+          detail: `${where}: ${name} mismatch (expected ${exp ?? "absent"}, got ${act ?? "absent"})`,
+        });
       }
     }
     if (expected.vatBasis !== actual.vatBasis) {
