@@ -629,10 +629,54 @@ record(
   `marked=${JSON.stringify(marked.value?.markedFindingIds?.length)} w1 chain=${w1chain.length} reason="${w1last?.knowledgeState?.reason}"`,
 );
 
-// --- A14: final consistency sweep ------------------------------------------------
+// --- A14: a withdrawn evidence witness fails the set (the one marking rule) ------
+// S1 is withdrawn now. A plan whose evidence cites S1 still PREPARES (prepare
+// checks tenancy, not lifecycle), but its publish must refuse AND mark the
+// set failed: the staged plan can never publish as-is, so by_company_state
+// must not show it as actionable prepared.
+const staleEvidencePlan = {
+  sourceId: S2,
+  plannedRevisions: [
+    {
+      findingId: null,
+      scope: { _tag: "company" },
+      semanticKey: "po.wycofaniu",
+      value: { _tag: "text_note", text: "nie powinno powstać" },
+      knowledgeState: known,
+      effectiveFrom: null,
+      evidence: [evidence(S1, F1, "support")],
+      derivesFrom: [],
+    },
+  ],
+};
+const staleEvidencePrepared = await memory("memory.prepareChangeSet", staleEvidencePlan);
+const staleEvidencePublish = await memory("memory.publishChangeSet", {
+  changeSetId: staleEvidencePrepared._tag === "ok" ? staleEvidencePrepared.value.changeSetId : "",
+  expectedRevisions: [],
+});
+const st9 = await state();
+const staleEvidenceSet = st9.value.changeSets.find(
+  (c) => c.changeSetId === (staleEvidencePrepared._tag === "ok" ? staleEvidencePrepared.value.changeSetId : ""),
+);
+const a14ok =
+  staleEvidencePrepared._tag === "ok" &&
+  staleEvidencePublish._tag === "error" &&
+  staleEvidencePublish.error._tag === "conflict" &&
+  staleEvidencePublish.error.code === "evidence_source_no_longer_active" &&
+  staleEvidenceSet.state === "failed" &&
+  staleEvidenceSet.failedReason === "evidence_source_no_longer_active" &&
+  findingBy(st9.value, "po.wycofaniu") === undefined &&
+  projectionConsistent(st9.value) === null;
+record(
+  "A14 publishing against a withdrawn evidence witness refuses AND marks the set failed (never actionable prepared)",
+  a14ok ? "PASS" : "FAIL",
+  `publish=${staleEvidencePublish.error?.code} set=${staleEvidenceSet?.state}/${staleEvidenceSet?.failedReason}`,
+);
+
+// --- A15: final consistency sweep ------------------------------------------------
 const stFinal = await state();
 const sweep = projectionConsistent(stFinal.value);
-const a14ok =
+const a15ok =
   sweep === null &&
   stFinal.value.findings.length === 5 &&
   stFinal.value.groups.every(
@@ -640,8 +684,8 @@ const a14ok =
   ) &&
   stFinal.value.groups.filter((g) => g.state === "prepared").length === 1; // the crashed one
 record(
-  "A14 final state: every current projection equals its latest revision after every path",
-  a14ok ? "PASS" : "FAIL",
+  "A15 final state: every current projection equals its latest revision after every path",
+  a15ok ? "PASS" : "FAIL",
   sweep === null ? `findings=${stFinal.value.findings.length}` : sweep,
 );
 

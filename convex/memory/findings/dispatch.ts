@@ -13,7 +13,7 @@
  * or nothing does.
  */
 
-import { okResult, type ResultEnvelope } from "@kiero/contracts";
+import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
 import {
   dispatchCommand,
   membershipPolicy,
@@ -23,20 +23,22 @@ import {
 } from "@kiero/runtime";
 import { bridgeIdentity, identityFromConvexAuth, resolveRequestContext } from "../../platform/context";
 import type { MutationCtx } from "../../_generated/server";
+import { performPrepareChangeSet } from "./prepare";
+import { performPublishChangeSet } from "./publish";
 import {
   performCorrectFinding,
-  performPrepareChangeSet,
-  performPublishChangeSet,
   performRaiseClarification,
   performResolveClarification,
-  readCurrentFindingsRows,
-  type CorrectFindingInput,
-  type PrepareChangeSetInput,
-  type PublishChangeSetInput,
-  type RaiseClarificationInput,
-  type ReadCurrentFindingsInput,
-  type ResolveClarificationInput,
-} from "./core";
+} from "./corrections";
+import { readCurrentFindingsRows } from "./read";
+import type {
+  CorrectFindingInput,
+  PrepareChangeSetInput,
+  PublishChangeSetInput,
+  RaiseClarificationInput,
+  ReadCurrentFindingsInput,
+  ResolveClarificationInput,
+} from "./semantics";
 
 /**
  * Handler table for memory findings mutation-transaction dispatches
@@ -65,7 +67,7 @@ export function memoryHandlers(): HandlerRegistry<MutationCtx> {
           context,
           input as ReadCurrentFindingsInput,
         );
-        return rows.ok ? okResult({ rows: rows.rows }) : rows.error;
+        return rows.ok ? okResult({ rows: rows.rows }) : errorResult(rows.error);
       },
     },
     "memory.prepareChangeSet": {

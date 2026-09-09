@@ -36,7 +36,8 @@ import {
 } from "../../platform/context";
 import { internalMutation, mutation, query } from "../../_generated/server";
 import { dispatchMemoryCommand } from "./dispatch";
-import { readCurrentFindingsEntry, readCurrentFindingsRows } from "./core";
+import { readCurrentFindingsEntry } from "./semantics";
+import { readCurrentFindingsRows } from "./read";
 import { performWithdrawalMarking } from "./withdrawal";
 
 /** The client command path: Convex Auth identity, checked dispatch. */
@@ -69,10 +70,12 @@ export const readCurrentFindings = query({
       scope: args.scope,
     });
     const rows = await readCurrentFindingsRows(ctx.db, context, decoded);
-    if (!rows.ok && rows.error._tag === "error") {
-      throw new ConvexError(rows.error.error);
+    if (!rows.ok) {
+      // The error alternative carries the ClosedError itself: no envelope
+      // branch can fall through to empty rows.
+      throw new ConvexError(rows.error);
     }
-    return rows.ok ? rows.rows : [];
+    return rows.rows;
   },
 });
 

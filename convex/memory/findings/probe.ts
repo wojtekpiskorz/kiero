@@ -47,7 +47,8 @@ import {
   serviceIdentityUnavailable,
 } from "../../sources/probe_shared";
 import { dispatchMemoryCommand } from "./dispatch";
-import { readCurrentFindingsEntry, readCurrentFindingsRows } from "./core";
+import { readCurrentFindingsEntry } from "./semantics";
+import { readCurrentFindingsRows } from "./read";
 
 const PROOF_TZ = "Europe/Warsaw";
 const PROOF_SENT_AT_MS = Date.parse("2026-09-08T16:30:00.000Z"); // 18:30 Warsaw
@@ -296,7 +297,7 @@ export const readState = internalQuery({
       scope: args.scope,
     });
     const rows = await readCurrentFindingsRows(ctx.db, context, decoded);
-    return rows.ok ? okResult({ rows: rows.rows }) : rows.error;
+    return rows.ok ? okResult({ rows: rows.rows }) : errorResult(rows.error);
   },
 });
 

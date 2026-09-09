@@ -25,7 +25,7 @@ import {
 } from "@kiero/contracts";
 import { dispatchCommand, membershipPolicy, type RequestContext } from "@kiero/runtime";
 import { memoryHandlers } from "../../convex/memory/findings/dispatch";
-import { prepareChangeSetEntry } from "../../convex/memory/findings/core";
+import { prepareChangeSetEntry } from "../../convex/memory/findings/semantics";
 import { findingsTables } from "../../convex/memory/findings/schema";
 import type { MutationCtx } from "../../convex/_generated/server";
 import type { GenericValidator } from "convex/values";

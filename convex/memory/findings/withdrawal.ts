@@ -37,7 +37,7 @@ import { decideWithdrawalMarking, explicitUnknown, sourceWithdrawnReason, type E
 import type { MutationCtx } from "../../_generated/server";
 import type { Id, Doc } from "../../_generated/dataModel";
 import { publishEvent } from "../../platform/publish";
-import { normalizedCompany } from "./core";
+import { normalizedCompany } from "./references";
 
 const encodeKnowledgeState = Schema.encodeSync(KnowledgeState);
 
