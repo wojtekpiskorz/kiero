@@ -13,7 +13,18 @@
 
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
-import { shared } from "../../schema/shared";
+import { shared, type Encoded, type ValueValidator } from "../../schema/shared";
+import { CalendarRemoteOutcome } from "@kiero/contracts";
+
+// Vocabulary pin: the copy's remote outcome must equal the contracts-side
+// CalendarRemoteOutcome literals exactly (unknown stays first-class), or this
+// file fails typecheck.
+const calendarRemoteOutcome: ValueValidator<Encoded<typeof CalendarRemoteOutcome>> =
+  v.union(
+    v.literal("confirmed"),
+    v.literal("absent"),
+    v.literal("unknown"),
+  );
 
 export const calendarProjectionTables = {
   /** One projected calendar entry for one user's connection. */
@@ -28,11 +39,7 @@ export const calendarProjectionTables = {
     /** Desired state follows this finding revision; drift triggers sync. */
     desiredRevisionId: shared.findingRevisionId,
     hidden: v.boolean(),
-    remoteOutcome: v.union(
-      v.literal("confirmed"),
-      v.literal("absent"),
-      v.literal("unknown"),
-    ),
+    remoteOutcome: calendarRemoteOutcome,
     updatedAtMs: shared.tsMs,
   })
     .index("by_connection", ["connectionId"])

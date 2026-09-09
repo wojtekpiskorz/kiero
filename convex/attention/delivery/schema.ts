@@ -58,6 +58,11 @@ export const deliveryTables = {
   notificationAttempts: defineTable({
     intentId: shared.notificationIntentId,
     attempt: shared.revisionCounter,
+    // Deliberately NOT one vocabulary with the attention.intentDelivered
+    // event outcome: an attempt may end `unknown` (provider timeout after an
+    // uncertain side effect), while the intentDelivered event outcome is
+    // terminal-only (delivered/suppressed/failed). Do not merge or pin them
+    // together.
     outcome: v.union(
       v.literal("delivered"),
       v.literal("failed"),

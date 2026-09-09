@@ -15,6 +15,15 @@ import { tableIdSchema } from "../tableIds";
 import { ExportState } from "../media";
 import { operationEntry, eventEntry } from "./registration";
 
+/** Lifecycle of one processing run (a reanalysis links to the run it repeats). */
+export const ProcessingRunState = Schema.Literals([
+  "running",
+  "succeeded",
+  "failed",
+  "superseded",
+]);
+export type ProcessingRunState = Schema.Schema.Type<typeof ProcessingRunState>;
+
 export const operationsOperations = {
   "operations.inspectProcessingRun": operationEntry({
     kind: "operation",
@@ -22,7 +31,7 @@ export const operationsOperations = {
     input: Schema.Struct({ processingRunId: tableIdSchema("processingRuns") }),
     result: Schema.Struct({
       processingRunId: tableIdSchema("processingRuns"),
-      state: Schema.Literals(["running", "succeeded", "failed", "superseded"]),
+      state: ProcessingRunState,
     }),
     errorKinds: ["forbidden", "not_found"],
   }),

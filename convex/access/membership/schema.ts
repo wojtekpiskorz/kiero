@@ -47,7 +47,7 @@ export const membershipTables = {
   invitations: defineTable({
     companyId: shared.companyId,
     email: v.string(),
-    role: v.union(v.literal("admin"), v.literal("member")),
+    role: membershipRole,
     state: v.union(
       v.literal("pending"),
       v.literal("accepted"),

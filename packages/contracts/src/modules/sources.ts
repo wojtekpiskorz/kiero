@@ -14,6 +14,10 @@ import { tableIdSchema } from "../tableIds";
 import { UploadStage, MediaRepresentationRole } from "../media";
 import { operationEntry, eventEntry } from "./registration";
 
+/** Kind of media an attachment carries; a source may mix text, audio and images. */
+export const MediaKind = Schema.Literals(["audio", "image"]);
+export type MediaKind = Schema.Schema.Type<typeof MediaKind>;
+
 export const sourcesOperations = {
   "sources.prepareUpload": operationEntry({
     kind: "operation",
@@ -21,7 +25,7 @@ export const sourcesOperations = {
     input: Schema.Struct({
       draftId: Schema.String,
       parts: Schema.Number.pipe(Schema.check(Schema.isInt()), Schema.check(Schema.isGreaterThan(0))),
-      mediaKinds: Schema.Array(Schema.Literals(["audio", "image"])),
+      mediaKinds: Schema.Array(MediaKind),
     }),
     result: Schema.Struct({ uploadId: tableIdSchema("uploads"), stage: UploadStage }),
     errorKinds: ["forbidden", "validation"],

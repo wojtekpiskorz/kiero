@@ -13,6 +13,13 @@ import { Schema } from "effect";
 import { tableIdSchema } from "../tableIds";
 import { operationEntry, eventEntry } from "./registration";
 
+/**
+ * Knowledge about one copy's state in Google. `unknown` is a first-class
+ * outcome: an unresolved POST/GET is never treated as success or absence.
+ */
+export const CalendarRemoteOutcome = Schema.Literals(["confirmed", "absent", "unknown"]);
+export type CalendarRemoteOutcome = Schema.Schema.Type<typeof CalendarRemoteOutcome>;
+
 /** What a calendar copy projects: a task's deadline or an event's time. */
 export const CalendarSubject = Schema.TaggedUnion({
   task: { taskId: tableIdSchema("tasks") },
@@ -54,7 +61,7 @@ export const calendarOperations = {
     input: Schema.Struct({ copyId: tableIdSchema("calendarCopies") }),
     result: Schema.Struct({
       copyId: tableIdSchema("calendarCopies"),
-      remoteOutcome: Schema.Literals(["confirmed", "absent", "unknown"]),
+      remoteOutcome: CalendarRemoteOutcome,
     }),
     errorKinds: ["forbidden", "not_found", "unavailable"],
   }),
@@ -88,7 +95,7 @@ export const calendarEvents = {
     name: "calendar.copyOutcomeRecorded",
     payload: Schema.Struct({
       copyId: tableIdSchema("calendarCopies"),
-      outcome: Schema.Literals(["confirmed", "absent", "unknown"]),
+      outcome: CalendarRemoteOutcome,
     }),
   }),
 } as const;

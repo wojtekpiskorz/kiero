@@ -20,6 +20,7 @@ import {
   DurableJobKind,
   DurableJobState,
   OutboxDeliveryState,
+  ProcessingRunState,
 } from "@kiero/contracts";
 
 // Vocabulary pins: the job kind and state unions must equal their
@@ -43,6 +44,14 @@ const durableJobKind: ValueValidator<Encoded<typeof DurableJobKind>> = v.union(
   v.literal("search.index_generation"),
   v.literal("access.cleanup_revocation"),
 );
+
+const processingRunState: ValueValidator<Encoded<typeof ProcessingRunState>> =
+  v.union(
+    v.literal("running"),
+    v.literal("succeeded"),
+    v.literal("failed"),
+    v.literal("superseded"),
+  );
 
 const durableJobState: ValueValidator<Encoded<typeof DurableJobState>> = v.union(
   v.literal("queued"),
@@ -72,12 +81,7 @@ export const platformTables = {
     promptVersion: v.string(),
     schemaVersion: v.string(),
     modelConfigurationVersion: v.string(),
-    state: v.union(
-      v.literal("running"),
-      v.literal("succeeded"),
-      v.literal("failed"),
-      v.literal("superseded"),
-    ),
+    state: processingRunState,
     /** Opaque workflow checkpoint, owned by the durable engine. */
     checkpoint: v.optional(v.string()),
     startedAtMs: shared.tsMs,

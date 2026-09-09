@@ -15,15 +15,20 @@ import { extensionsTables } from "../../convex/memory/extensions/schema";
 import { acceptTables } from "../../convex/sources/accept/schema";
 import { workTables } from "../../convex/work/schema";
 import {
+  CalendarRemoteOutcome,
   ChecklistItemState,
+  ContactKind,
+  ContactRole,
   DurableJobKind,
   DurableJobState,
   EventOccurrenceState,
   ExportState,
   ExtensionFieldKind,
+  MediaKind,
   MediaRepresentationRole,
   MembershipRole,
   OutboxDeliveryState,
+  ProcessingRunState,
   ProjectStage,
   PublicationState,
   TABLE_ID_NAMES,
@@ -291,6 +296,42 @@ describe("fragment vocabulary pins equal the contracts vocabularies", () => {
         tableName: "memberships",
         path: ["role"],
         schema: MembershipRole,
+      },
+      {
+        table: tableOrFail("invitations").validator,
+        tableName: "invitations",
+        path: ["role"],
+        schema: MembershipRole,
+      },
+      {
+        table: tableOrFail("contacts").validator,
+        tableName: "contacts",
+        path: ["kind"],
+        schema: ContactKind,
+      },
+      {
+        table: tableOrFail("contactRoles").validator,
+        tableName: "contactRoles",
+        path: ["role"],
+        schema: ContactRole,
+      },
+      {
+        table: tableOrFail("attachments").validator,
+        tableName: "attachments",
+        path: ["kind"],
+        schema: MediaKind,
+      },
+      {
+        table: tableOrFail("calendarCopies").validator,
+        tableName: "calendarCopies",
+        path: ["remoteOutcome"],
+        schema: CalendarRemoteOutcome,
+      },
+      {
+        table: tableOrFail("processingRuns").validator,
+        tableName: "processingRuns",
+        path: ["state"],
+        schema: ProcessingRunState,
       },
       {
         table: tableOrFail("exports").validator,

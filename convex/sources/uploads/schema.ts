@@ -17,7 +17,7 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 import { shared, type Encoded, type ValueValidator } from "../../schema/shared";
-import { MediaRepresentationRole, UploadStage } from "@kiero/contracts";
+import { MediaKind, MediaRepresentationRole, UploadStage } from "@kiero/contracts";
 
 // Vocabulary pins: drift against the contracts-side schemas fails typecheck.
 
@@ -27,6 +27,11 @@ const uploadStage: ValueValidator<Encoded<typeof UploadStage>> = v.union(
   v.literal("finalized"),
   v.literal("orphaned"),
   v.literal("failed"),
+);
+
+const mediaKind: ValueValidator<Encoded<typeof MediaKind>> = v.union(
+  v.literal("audio"),
+  v.literal("image"),
 );
 
 const mediaRepresentationRole: ValueValidator<Encoded<typeof MediaRepresentationRole>> =
@@ -53,7 +58,7 @@ export const uploadsTables = {
   attachments: defineTable({
     uploadId: shared.uploadId,
     sourceId: v.optional(shared.sourceId),
-    kind: v.union(v.literal("audio"), v.literal("image")),
+    kind: mediaKind,
     /** Server-owned object identity; stale retries cannot replace finalized bytes. */
     objectKey: v.string(),
     receivedBytes: v.optional(v.float64()),

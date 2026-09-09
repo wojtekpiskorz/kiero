@@ -15,6 +15,14 @@ import { RevisionCounter } from "../actor";
 import { LocalDate } from "../values/temporal";
 import { operationEntry, eventEntry } from "./registration";
 
+/** Contact catalog kind: a person or an organization (CONTEXT.md "Kontakt"). */
+export const ContactKind = Schema.Literals(["person", "organization"]);
+export type ContactKind = Schema.Schema.Type<typeof ContactKind>;
+
+/** One contact's relationship to a project: client, executor or supplier. */
+export const ContactRole = Schema.Literals(["client", "executor", "supplier"]);
+export type ContactRole = Schema.Schema.Type<typeof ContactRole>;
+
 /** Fixed project stage vocabulary; no stage is added for a pause (issue 9). */
 export const ProjectStage = Schema.Literals([
   "inquiry",
@@ -86,7 +94,7 @@ export const projectsOperations = {
     name: "projects.upsertContact",
     input: Schema.Struct({
       contactId: Schema.NullOr(tableIdSchema("contacts")),
-      kind: Schema.Literals(["person", "organization"]),
+      kind: ContactKind,
       displayName: Schema.NonEmptyString,
     }),
     result: Schema.Struct({ contactId: tableIdSchema("contacts") }),
@@ -98,7 +106,7 @@ export const projectsOperations = {
     input: Schema.Struct({
       projectId: tableIdSchema("projects"),
       contactId: tableIdSchema("contacts"),
-      role: Schema.Literals(["client", "executor", "supplier"]),
+      role: ContactRole,
     }),
     result: Schema.Struct({ contactRoleId: tableIdSchema("contactRoles") }),
     errorKinds: ["forbidden", "not_found", "validation"],

@@ -12,10 +12,21 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 import { shared, type Encoded, type ValueValidator } from "../schema/shared";
-import { ProjectStage } from "@kiero/contracts";
+import { ContactKind, ContactRole, ProjectStage } from "@kiero/contracts";
 
-// Vocabulary pin: the stage union must equal the contracts-side ProjectStage
-// literals exactly, or this file fails typecheck.
+// Vocabulary pins: each closed union must equal its contracts-side schema's
+// encoded literals exactly, or this file fails typecheck.
+const contactKind: ValueValidator<Encoded<typeof ContactKind>> = v.union(
+  v.literal("person"),
+  v.literal("organization"),
+);
+
+const contactRole: ValueValidator<Encoded<typeof ContactRole>> = v.union(
+  v.literal("client"),
+  v.literal("executor"),
+  v.literal("supplier"),
+);
+
 const projectStage: ValueValidator<Encoded<typeof ProjectStage>> = v.union(
   v.literal("inquiry"),
   v.literal("offer_preparation"),
@@ -30,7 +41,7 @@ export const projectsTables = {
   /** Person or organization in the company catalog, distinct from user accounts. */
   contacts: defineTable({
     companyId: shared.companyId,
-    kind: v.union(v.literal("person"), v.literal("organization")),
+    kind: contactKind,
     displayName: v.string(),
     aliases: v.optional(v.array(v.string())),
     /** Bounded contact channels (phone/email), plain strings. */
@@ -45,7 +56,7 @@ export const projectsTables = {
     companyId: shared.companyId,
     projectId: shared.projectId,
     contactId: shared.contactId,
-    role: v.union(v.literal("client"), v.literal("executor"), v.literal("supplier")),
+    role: contactRole,
     createdAtMs: shared.tsMs,
   })
     .index("by_project_role", ["projectId", "role"])
