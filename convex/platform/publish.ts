@@ -186,9 +186,7 @@ export async function registerDurableJob(
       ? null
       : {
           state: existing.state,
-          ...(existing.externalOutcome === undefined
-            ? {}
-            : { externalOutcome: existing.externalOutcome }),
+          externalOutcome: existing.externalOutcome,
         },
   );
   if (decision.decision === "skip") {
@@ -200,6 +198,14 @@ export async function registerDurableJob(
   }
 
   if (existing !== null) {
+    if (existing.kind !== registration.kind) {
+      // A dedup key colliding across job kinds would silently re-queue the
+      // row under the old kind and the old executor would run it; fail like
+      // the unknown-executor and malformed-id cases above.
+      throw new Error(
+        `registerDurableJob: dedup key collision across job kinds (${existing.kind} vs ${registration.kind})`,
+      );
+    }
     // Re-registration of a definitely-failed row: ONE row per dedup key.
     // Re-queue the existing row and keep its attempt count, so total
     // executions stay bounded by the row's maxAttempts across replays.

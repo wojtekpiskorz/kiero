@@ -34,26 +34,26 @@ describe("durable job registration decisions", () => {
   });
 
   it("never re-registers succeeded or active work", () => {
-    expect(decideJobRegistration({ state: "succeeded" })).toEqual({
+    expect(decideJobRegistration({ externalOutcome: undefined, state: "succeeded" })).toEqual({
       decision: "skip",
       reason: "already_succeeded",
     });
-    expect(decideJobRegistration({ state: "cancelled" })).toEqual({
+    expect(decideJobRegistration({ externalOutcome: undefined, state: "cancelled" })).toEqual({
       decision: "skip",
       reason: "already_succeeded",
     });
-    expect(decideJobRegistration({ state: "queued" })).toEqual({
+    expect(decideJobRegistration({ externalOutcome: undefined, state: "queued" })).toEqual({
       decision: "skip",
       reason: "active_attempt",
     });
-    expect(decideJobRegistration({ state: "running" })).toEqual({
+    expect(decideJobRegistration({ externalOutcome: undefined, state: "running" })).toEqual({
       decision: "skip",
       reason: "active_attempt",
     });
   });
 
   it("re-registers definite failures only (uncertainty reconciles instead)", () => {
-    expect(decideJobRegistration({ state: "failed" })).toEqual({ decision: "register" });
+    expect(decideJobRegistration({ externalOutcome: undefined, state: "failed" })).toEqual({ decision: "register" });
     expect(decideJobRegistration({ state: "failed", externalOutcome: "failed" })).toEqual({
       decision: "register",
     });
@@ -164,7 +164,7 @@ describe("the one uncertain-failure predicate (single definition)", () => {
     expect(isUncertainJobFailure({ state: "failed", externalOutcome: "failed" })).toBe(false);
     // Failures with NO external outcome (max attempts, not implemented) are
     // never conflated with uncertainty: nothing left the transaction.
-    expect(isUncertainJobFailure({ state: "failed" })).toBe(false);
+    expect(isUncertainJobFailure({ state: "failed", externalOutcome: undefined })).toBe(false);
     expect(isUncertainJobFailure({ state: "failed", externalOutcome: "succeeded" })).toBe(false);
     // Non-failed states never count.
     expect(isUncertainJobFailure({ state: "succeeded", externalOutcome: "timeout" })).toBe(false);

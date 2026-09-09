@@ -74,7 +74,7 @@ export interface ExistingJobRow {
    * have happened, so re-registration is forbidden until reconciliation
    * observes the external system.
    */
-  readonly externalOutcome?: ExternalOutcome;
+  readonly externalOutcome: ExternalOutcome | undefined;
 }
 
 /**

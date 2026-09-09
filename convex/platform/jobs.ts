@@ -42,7 +42,7 @@ async function executeJob(ctx: MutationCtx, jobKey: string): Promise<void> {
   if (
     isUncertainJobFailure({
       state: job.state,
-      ...(job.externalOutcome === undefined ? {} : { externalOutcome: job.externalOutcome }),
+      externalOutcome: job.externalOutcome,
     })
   ) {
     // Failed by uncertainty: only reconciliation may re-queue it. (Rows
