@@ -1,4 +1,4 @@
-// apps/export-worker/wrangler.jsonc — non-secret skeleton (issue I1 #53).
+// apps/export-worker/wrangler.jsonc: non-secret skeleton (issue I1 #53).
 //
 // EU export Container (background firm-export archives: HTML index, versioned
 // JSON, history, retained media). The TOP-LEVEL block targets LOCAL DEV names
@@ -7,24 +7,28 @@
 //
 // EU placement notes:
 // - Same container-jurisdiction caveat as media-worker: the
-//   `constraints.jurisdiction = "eu"` field needs wrangler >= 4.130.0 (A1
-//   pin); it is COMMENTED OUT until then. D5 activates and verifies it.
+//   `constraints.jurisdiction = "eu"` field needs wrangler >= 4.130.0 and
+//   stays COMMENTED OUT until that pin lands (owner A3, root manifest; see
+//   the PENDING table in docs/evidence/environment/preflight-2026-09.md).
+//   D5 activates and verifies it.
 // - Exports read the eu-jurisdiction media R2 bucket via S3 credentials
 //   (infra/bindings/media-export-workers.md) and hold NO backup-bucket
 //   credentials.
 // - No account_id committed; the account comes from `wrangler whoami`.
 //
 // NOTE (wrangler schema): `containers` is NOT inherited into named
-// environments — every env block repeats it when containers deploy.
-// Verified with wrangler 4.27.0: `wrangler deploy --dry-run --env <env>`
-// parses this file and reports ONLY the (expected) missing ./Dockerfile and
-// src/index.ts until D5/A1 create them.
+// environments: every env block repeats it when containers deploy.
+// Re-verified after the A1 merge (db1d6a5) with wrangler 4.27.0:
+// `wrangler deploy --dry-run` parses this file and reports ONLY the
+// expected missing ./Dockerfile (the src/index.ts skeleton now exists).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kiero-dev-export-worker",
-  // Worker entry wrapping the container's Durable Object; created by A1/D5.
+  // Worker entry wrapping the container's Durable Object (skeleton from A1;
+  // container wiring from D5).
   "main": "src/index.ts",
-  // Confirm/raise against A1's pinned wrangler on first deploy.
+  // Raise together with the wrangler >= 4.130 pin: owner A3, root manifest;
+  // see the PENDING table in docs/evidence/environment/preflight-2026-09.md.
   "compatibility_date": "2026-09-01",
   "observability": {
     "enabled": true
@@ -34,7 +38,7 @@
       "name": "kiero-dev-export-container",
       // Dockerfile lands with D5; path relative to this config.
       "image": "./Dockerfile",
-      // Placeholder DO class; D5 aligns it with the A1 app skeleton.
+      // Placeholder DO class; D5 aligns it with the workspace app skeleton.
       "class_name": "ExportWorkerContainer",
       "instance_type": "dev"
       // Once wrangler >= 4.130.0 is pinned, set:

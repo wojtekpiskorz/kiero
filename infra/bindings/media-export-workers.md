@@ -1,6 +1,6 @@
 # Media and export worker bindings
 
-Runtime: `apps/media-worker` and `apps/export-worker` — EU-jurisdiction
+Runtime: `apps/media-worker` and `apps/export-worker`: EU-jurisdiction
 Cloudflare Containers (FFmpeg audio conversion/segmentation; background firm
 export assembly). Configuration skeletons:
 [apps/media-worker/wrangler.jsonc](../../apps/media-worker/wrangler.jsonc),
@@ -30,4 +30,5 @@ export assembly). Configuration skeletons:
   executor per the accepted architecture, even where build tooling is shared.
 - Container EU placement: `containers[].constraints.jurisdiction = "eu"` in
   `wrangler.jsonc`, available from wrangler 4.130.0 (installed 4.27.0 predates
-  it — A1 must pin the newer wrangler before these fields take effect).
+  it; the pin is owned by A3 via the PENDING table in
+  docs/evidence/environment/preflight-2026-09.md).

@@ -1,6 +1,6 @@
 # Environment: alpha production (`alpha-production`)
 
-Status: PENDING — NOT PROVISIONED. This descriptor fixes the identity,
+Status: PENDING, NOT PROVISIONED. This descriptor fixes the identity,
 naming and EU contract the future alpha must follow. Nothing here has been
 created; per the issue rules, purchases, OAuth consent screens, domains and
 production services stay explicit pending actions.
@@ -48,7 +48,8 @@ when those integrations land.
   `--jurisdiction eu --location weur`; the backup bucket's token must not
   grant access to the media bucket and vice versa.
 - Media/export and backup Containers with `constraints.jurisdiction: "eu"`
-  (wrangler >= 4.130 required — A1 pin).
+  (wrangler >= 4.130 required; pin owned by A3, see the PENDING table in
+  docs/evidence/environment/preflight-2026-09.md).
 - Alpha data (database, files, backups) stays EU-placed; AI processing outside
   the EU is accepted per the architecture decision; Worker routing is global
   and is not claimed as EU-only compute.

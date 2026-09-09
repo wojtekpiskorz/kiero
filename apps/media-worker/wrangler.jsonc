@@ -1,4 +1,4 @@
-// apps/media-worker/wrangler.jsonc — non-secret skeleton (issue I1 #53).
+// apps/media-worker/wrangler.jsonc: non-secret skeleton (issue I1 #53).
 //
 // EU media Container (FFmpeg audio conversion/segmentation). The TOP-LEVEL
 // block targets LOCAL DEV names only; staging/alpha are named environments
@@ -8,24 +8,28 @@
 // EU placement notes:
 // - Container EU jurisdiction requires wrangler >= 4.130.0
 //   (`containers[].constraints.jurisdiction = "eu"`); installed 4.27.0
-//   predates that schema field, so it is intentionally COMMENTED OUT here —
-//   A1 pins the wrangler version, then D6 uncomment+verify on first deploy.
+//   predates that schema field, so it is intentionally COMMENTED OUT here.
+//   The pin is a root-manifest change owned by A3; D6 uncomments and
+//   verifies on first deploy. Single ownership source: the PENDING table in
+//   docs/evidence/environment/preflight-2026-09.md.
 // - Media bytes live in the eu-jurisdiction R2 bucket (gateway binding);
 //   this container addresses it via S3 credentials (see
 //   infra/bindings/media-export-workers.md), not via a Worker binding.
 // - No account_id committed; the account comes from `wrangler whoami`.
 //
 // NOTE (wrangler schema): `containers` is NOT inherited into named
-// environments — every env block repeats it when containers deploy.
-// Verified with wrangler 4.27.0: `wrangler deploy --dry-run --env <env>`
-// parses this file and reports ONLY the (expected) missing ./Dockerfile and
-// src/index.ts until D6/A1 create them.
+// environments: every env block repeats it when containers deploy.
+// Re-verified after the A1 merge (db1d6a5) with wrangler 4.27.0:
+// `wrangler deploy --dry-run` parses this file and reports ONLY the
+// expected missing ./Dockerfile (the src/index.ts skeleton now exists).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kiero-dev-media-worker",
-  // Worker entry wrapping the container's Durable Object; created by A1/D6.
+  // Worker entry wrapping the container's Durable Object (skeleton from A1;
+  // container wiring from D6).
   "main": "src/index.ts",
-  // Confirm/raise against A1's pinned wrangler on first deploy.
+  // Raise together with the wrangler >= 4.130 pin: owner A3, root manifest;
+  // see the PENDING table in docs/evidence/environment/preflight-2026-09.md.
   "compatibility_date": "2026-09-01",
   "observability": {
     "enabled": true
@@ -35,7 +39,7 @@
       "name": "kiero-dev-media-container",
       // Dockerfile lands with D6; path relative to this config.
       "image": "./Dockerfile",
-      // Placeholder DO class; D6 aligns it with the A1 app skeleton.
+      // Placeholder DO class; D6 aligns it with the workspace app skeleton.
       "class_name": "MediaWorkerContainer",
       "instance_type": "dev"
       // Once wrangler >= 4.130.0 is pinned, set:

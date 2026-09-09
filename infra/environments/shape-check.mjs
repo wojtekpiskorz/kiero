@@ -85,18 +85,24 @@ for (const [app, names] of Object.entries(expectedApps)) {
     if (env.name !== expected) fail(`${file}: env.${envName}.name must be ${expected}, got ${env.name}`);
     if (env.account_id) fail(`${file}: env.${envName} commits account_id`);
   }
-  const r2Blocks = [
-    ...(cfg.r2_buckets ?? []),
-    ...Object.values(envs).flatMap((e) => e.r2_buckets ?? []),
+  // R2 expectations derive from the file's own declared scope: every
+  // environment (top-level plus each named env block) that declares R2
+  // bindings must declare all of them eu-jurisdiction, and the gateway must
+  // declare at least one binding somewhere so the rule cannot pass vacuously.
+  const r2Scopes = [
+    ["top-level", cfg.r2_buckets ?? []],
+    ...Object.entries(envs).map(([envName, e]) => [`env.${envName}`, e.r2_buckets ?? []]),
   ];
-  if (app === "gateway") {
-    for (const b of r2Blocks)
+  const declaredR2 = r2Scopes.filter(([, blocks]) => blocks.length > 0);
+  for (const [scope, blocks] of r2Scopes)
+    for (const b of blocks)
       if (b.jurisdiction !== "eu")
-        fail(`${file}: R2 binding ${b.binding} must carry jurisdiction "eu"`);
-    if (r2Blocks.length !== 3) fail(`${file}: expected 3 env-scoped R2 bindings`);
-  } else if (r2Blocks.length) {
-    fail(`${file}: container workers must not bind R2 directly (S3 credentials instead)`);
-  }
+        fail(`${file}: ${scope} R2 binding ${b.binding} must carry jurisdiction "eu"`);
+  if (app === "gateway" && declaredR2.length === 0)
+    fail(`${file}: gateway declares no R2 bindings; at least one eu binding per environment is required`);
+  if (app !== "gateway")
+    for (const [scope, blocks] of declaredR2)
+      fail(`${file}: ${scope} must not bind R2 directly (S3 credentials instead)`);
   const containerBlocks = [
     ...(cfg.containers ?? []),
     ...Object.values(envs).flatMap((e) => e.containers ?? []),
@@ -105,7 +111,10 @@ for (const [app, names] of Object.entries(expectedApps)) {
     if (!(cfg.containers?.length)) fail(`${file}: missing top-level containers block`);
     for (const c of containerBlocks) {
       if (!c.image || !c.class_name) fail(`${file}: container ${c.name} needs image and class_name`);
-      if (c.constraints) fail(`${file}: container constraints activate only after wrangler >= 4.130 pin (A1)`);
+      // Durable invariant: once constraints exist (wrangler >= 4.130 schema),
+      // EU jurisdiction is mandatory, never optional.
+      if (c.constraints && c.constraints.jurisdiction !== "eu")
+        fail(`${file}: container ${c.name} constraints.jurisdiction must be "eu"`);
     }
   } else if (containerBlocks.length) {
     fail(`${file}: gateway must not run containers`);

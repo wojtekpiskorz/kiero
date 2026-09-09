@@ -1,4 +1,4 @@
-// apps/gateway/wrangler.jsonc — non-secret skeleton (issue I1 #53).
+// apps/gateway/wrangler.jsonc: non-secret skeleton (issue I1 #53).
 //
 // The TOP-LEVEL block is the default environment and targets LOCAL DEV names
 // only (kiero-dev-*). Staging and alpha production exist solely as named
@@ -16,13 +16,15 @@
 // in infra/environments/preflight.mjs.
 //
 // Secrets are injected out-of-band (never here): AXIOM_API_TOKEN via
-// `wrangler secret put` — see infra/bindings/gateway-worker.md.
+// `wrangler secret put`; see infra/bindings/gateway-worker.md.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kiero-dev-gateway",
-  // Created by A1's app skeleton; deploys intentionally fail until it exists.
+  // Entry point provided by the workspace app skeleton (A1, merged db1d6a5);
+  // `wrangler deploy --dry-run` bundles it.
   "main": "src/index.ts",
-  // Confirm/raise against A1's pinned wrangler on first deploy.
+  // Raise together with the wrangler >= 4.130 pin: owner A3, root manifest;
+  // see the PENDING table in docs/evidence/environment/preflight-2026-09.md.
   "compatibility_date": "2026-09-01",
   "observability": {
     "enabled": true

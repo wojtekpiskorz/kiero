@@ -1,6 +1,6 @@
 # Backup worker bindings
 
-Runtime: `apps/backup-worker` — the separate EU-jurisdiction Container run by
+Runtime: `apps/backup-worker`: the separate EU-jurisdiction Container run by
 the scheduled backup job (every 15 minutes per the accepted architecture).
 Configuration skeleton: [apps/backup-worker/wrangler.jsonc](../../apps/backup-worker/wrangler.jsonc).
 
@@ -9,7 +9,7 @@ Configuration skeleton: [apps/backup-worker/wrangler.jsonc](../../apps/backup-wo
 | Name | Purpose |
 | --- | --- |
 | `ENVIRONMENT` | Literal environment name for telemetry tagging |
-| `R2_BACKUP_BUCKET` | Backup bucket name (`kiero-<env>-backup`) — a DIFFERENT bucket from media, with its own credentials |
+| `R2_BACKUP_BUCKET` | Backup bucket name (`kiero-<env>-backup`): a DIFFERENT bucket from media, with its own credentials |
 | `R2_BACKUP_ENDPOINT` | S3-compatibility endpoint used for backup writes |
 | `CONVEX_SITE_URL` | Convex HTTP actions URL for recovery manifests / job state |
 

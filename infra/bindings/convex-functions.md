@@ -23,7 +23,7 @@ the current deployment; see
 ## Notes
 
 - Convex environment variables are per-deployment: setting `OPENROUTER_API_KEY`
-  on the dev deployment does not affect staging/alpha — each deployment gets
+  on the dev deployment does not affect staging/alpha: each deployment gets
   its own injection.
 - Verification without values: `npx --yes convex@1.45.0 env list --names-only
   --deployment <team>:<project>:dev` (VERIFIED pattern).

@@ -75,6 +75,18 @@ function run(cmd, cmdArgs, opts = {}) {
   };
 }
 
+// One retry for read-only Cloudflare API calls so a transient network/API
+// hiccup does not masquerade as a missing capability. The reported evidence is
+// the LAST attempt; a persistent failure still lands on UNAVAILABLE.
+function runReadOnlyWithRetry(cmd, cmdArgs, opts = {}) {
+  const first = run(cmd, cmdArgs, opts);
+  if (first.ok) return first;
+  const transient =
+    first.status === null || /fetch|network|ETIMEDOUT|ECONNRESET|5\d{2}\b/i.test(first.output);
+  if (!transient) return first;
+  return run(cmd, cmdArgs, opts);
+}
+
 const results = [];
 function report(name, status, evidence, action) {
   results.push({ name, status, evidence, action });
@@ -85,7 +97,7 @@ function report(name, status, evidence, action) {
 }
 
 // ---------------------------------------------------------------------------
-// Probe 4 first so its versions head the report: reproducibility baseline.
+// Node/npm: reproducibility baseline.
 // ---------------------------------------------------------------------------
 function probeNodeNpm() {
   const node = run(process.execPath, ["--version"]);
@@ -162,7 +174,7 @@ function probeWrangler() {
       (containersScope ? ", token scope includes containers (write)" : ", containers scope NOT in token")
   );
 
-  const buckets = run(wr.cmd, ["r2", "bucket", "list"]);
+  const buckets = runReadOnlyWithRetry(wr.cmd, ["r2", "bucket", "list"]);
   const bucketNames = [...buckets.output.matchAll(/^name:\s+(\S+)$/gm)].map((m) => m[1]);
   if (buckets.ok) {
     report(
@@ -181,7 +193,7 @@ function probeWrangler() {
     );
   }
 
-  const euBuckets = run(wr.cmd, ["r2", "bucket", "list", "--jurisdiction", "eu"]);
+  const euBuckets = runReadOnlyWithRetry(wr.cmd, ["r2", "bucket", "list", "--jurisdiction", "eu"]);
   const euNames = [...euBuckets.output.matchAll(/^name:\s+(\S+)$/gm)].map((m) => m[1]);
   if (euBuckets.ok) {
     report(
@@ -200,7 +212,7 @@ function probeWrangler() {
     );
   }
 
-  const containers = run(wr.cmd, ["containers", "list"]);
+  const containers = runReadOnlyWithRetry(wr.cmd, ["containers", "list"]);
   if (containers.ok) {
     report(
       "cloudflare-containers",
@@ -231,7 +243,7 @@ function probeWrangler() {
       : `installed wrangler ${major}.${minor} predates containers.constraints.jurisdiction (added by 4.130.0)`,
     supportsContainerJurisdiction
       ? undefined
-      : "Pin wrangler >= 4.130.0 in the workspace (A1 bootstrap) before relying on container jurisdiction fields."
+      : "Pin wrangler >= 4.130.0 (root manifest; owner A3, see the PENDING table in docs/evidence/environment/preflight-2026-09.md) before relying on container jurisdiction fields."
   );
 }
 

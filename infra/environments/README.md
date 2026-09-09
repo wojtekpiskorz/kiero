@@ -17,12 +17,18 @@ verified against the live accounts on 2026-09-08/09.
 node infra/environments/preflight.mjs [--no-secret-checks] [--env-file-path <path>]
 ```
 
+Validate the checked-in descriptors locally with the non-secret shape check:
+
+```
+node infra/environments/shape-check.mjs
+```
+
 Bindings (which runtime consumes which variable/secret NAME, and the injection
 method for each) live in [infra/bindings/](../../infra/bindings/README.md).
 
 ## Note on `convex.json` (root)
 
-`convex.json` is strict JSON — JSONC comments are not allowed there — so this
+`convex.json` is strict JSON (JSONC comments are not allowed there), so this
 is the sibling note the file itself points to through its fields:
 
 - `team` / `project` pin the LOCAL DEVELOPMENT project (`kiero-dev-core`).

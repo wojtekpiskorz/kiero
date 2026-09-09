@@ -49,7 +49,7 @@ created by their owning tickets on first need. Evidence:
 
 ## EU requirements
 
-- Convex dev deployment in region `eu` — VERIFIED (steady-basilisk-613,
+- Convex dev deployment in region `eu`: VERIFIED (steady-basilisk-613,
   eu-west-1). All future `kiero-dev-core` deployments are created with
   `--region eu`.
 - R2 buckets created with `--jurisdiction eu` and `--location weur`.
@@ -62,16 +62,16 @@ created by their owning tickets on first need. Evidence:
 
 Default commands in this repository target `dev` ONLY:
 
-- `npx convex dev` — uses root `convex.json` (`kiero-dev-core`); can never
+- `npx convex dev` uses root `convex.json` (`kiero-dev-core`); can never
   touch staging/alpha because they are different projects.
-- `wrangler deploy` inside `apps/*` — uses the top-level env block of each
+- `wrangler deploy` inside `apps/*` uses the top-level env block of each
   `wrangler.jsonc`, whose names all start with `kiero-dev-`.
 - Any staging/alpha operation must spell the environment:
   `--env staging` / `--env alpha-production` for wrangler, and explicit
   `team:project:ref` (`wojtek-piskorz-jr:kiero-staging-core:...`) for Convex.
   There is no shared default that resolves to production.
 
-When A1 adds package scripts, they must preserve this shape (for example
+Repository and CI command aliases must preserve this shape (for example
 `dev:*`, `deploy:staging:*`, `deploy:alpha:*` with no un-suffixed deploy
 alias).
 

@@ -1,4 +1,4 @@
-// apps/backup-worker/wrangler.jsonc — non-secret skeleton (issue I1 #53).
+// apps/backup-worker/wrangler.jsonc: non-secret skeleton (issue I1 #53).
 //
 // Separate EU backup Container (every-15-minute scheduled backup job; complete
 // snapshot + referenced retained media into a private eu-jurisdiction backup
@@ -7,26 +7,30 @@
 // (`--env staging` / `--env alpha-production`).
 //
 // EU placement notes:
-// - Container EU jurisdiction needs wrangler >= 4.130.0 (A1 pin); the
-//   `constraints.jurisdiction = "eu"` field is COMMENTED OUT until then. I5
-//   activates and verifies it.
+// - Container EU jurisdiction needs wrangler >= 4.130.0; the
+//   `constraints.jurisdiction = "eu"` field stays COMMENTED OUT until that
+//   pin lands (owner A3, root manifest; see the PENDING table in
+//   docs/evidence/environment/preflight-2026-09.md). I5 activates and
+//   verifies it.
 // - The backup bucket (kiero-<env>-backup) is created with
 //   `wrangler r2 bucket create kiero-<env>-backup --jurisdiction eu --location weur`
 //   and is accessed ONLY through its own per-bucket R2 API token
-//   (infra/bindings/backup-worker.md) — never through the media credentials.
+//   (infra/bindings/backup-worker.md), never through the media credentials.
 // - No account_id committed; the account comes from `wrangler whoami`.
 //
 // NOTE (wrangler schema): `containers` is NOT inherited into named
-// environments — every env block repeats it when containers deploy.
-// Verified with wrangler 4.27.0: `wrangler deploy --dry-run --env <env>`
-// parses this file and reports ONLY the (expected) missing ./Dockerfile and
-// src/index.ts until I5/A1 create them.
+// environments: every env block repeats it when containers deploy.
+// Re-verified after the A1 merge (db1d6a5) with wrangler 4.27.0:
+// `wrangler deploy --dry-run` parses this file and reports ONLY the
+// expected missing ./Dockerfile (the src/index.ts skeleton now exists).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kiero-dev-backup-worker",
-  // Worker entry wrapping the container's Durable Object; created by A1/I5.
+  // Worker entry wrapping the container's Durable Object (skeleton from A1;
+  // container wiring from I5).
   "main": "src/index.ts",
-  // Confirm/raise against A1's pinned wrangler on first deploy.
+  // Raise together with the wrangler >= 4.130 pin: owner A3, root manifest;
+  // see the PENDING table in docs/evidence/environment/preflight-2026-09.md.
   "compatibility_date": "2026-09-01",
   "observability": {
     "enabled": true
@@ -41,7 +45,7 @@
       "name": "kiero-dev-backup-container",
       // Dockerfile lands with I5; path relative to this config.
       "image": "./Dockerfile",
-      // Placeholder DO class; I5 aligns it with the A1 app skeleton.
+      // Placeholder DO class; I5 aligns it with the workspace app skeleton.
       "class_name": "BackupWorkerContainer",
       "instance_type": "dev"
       // Once wrangler >= 4.130.0 is pinned, set:

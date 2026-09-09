@@ -46,18 +46,18 @@ Convex project `kiero-staging-core`.
 
 ## EU requirements
 
-- Convex deployment created with `--region eu` (Europe, Ireland) — the only
+- Convex deployment created with `--region eu` (Europe, Ireland): the only
   allowed region for any Kiero deployment.
 - R2 buckets with `--jurisdiction eu --location weur`.
 - Containers with `constraints.jurisdiction: "eu"` (requires wrangler >= 4.130
-  pinned by A1).
+  pending; owner A3, see docs/evidence/environment/preflight-2026-09.md).
 
 ## Command aliases (wrong-environment guardrail)
 
 - Staging deploys are explicit: `wrangler deploy --env staging` inside `apps/*`
   (the `staging` env blocks point only at `kiero-staging-*` names) and
   `npx --yes convex@1.45.0 deploy --env-file <staging-env-file>` where that
-  gitignored file sets `CONVEX_DEPLOYMENT` to the staging deployment name —
+  gitignored file sets `CONVEX_DEPLOYMENT` to the staging deployment name;
   never a bare `convex deploy` from the repo root, which is dev-only by
   `convex.json`. (Verified flag surface: `convex deploy` selects its target
   via `CONVEX_DEPLOYMENT`/`--env-file`, not via team/project flags.)
@@ -73,6 +73,6 @@ wrangler r2 bucket create kiero-staging-media  --jurisdiction eu --location weur
 wrangler r2 bucket create kiero-staging-backup --jurisdiction eu --location weur
 ```
 
-Owner: the CI/deploy ticket that first wires GitHub Actions (A1 workflow +
+Owner: the CI/deploy ticket that first wires deploys (checks.yml workflow +
 first staging deploy), in coordination with I1-recorded facts. These stay
 PENDING until that ticket runs them.

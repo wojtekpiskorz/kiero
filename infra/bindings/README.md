@@ -26,10 +26,14 @@ values. Environment-specific value sources are defined in
 ## Rules
 
 1. A pull request that introduces a new runtime variable or secret must update
-   the matching binding file here and the environment descriptors — a name
+   the matching binding file here and the environment descriptors; a name
    that appears in code but not here is a defect.
 2. Values move only through the methods above. They are never committed,
    logged, echoed into evidence, or pasted into issues.
 3. Per-environment VALUE isolation (dev/staging/alpha) is mandatory; NAME reuse
    across environments is intentional and this inventory is the single
    namespace authority.
+4. `infra/environments/preflight.mjs` hard-codes the two secret names that
+   exist today (`OPENROUTER_API_KEY`, `ZAI_API_KEY`); when this inventory
+   grows, the preflight must derive its name lists from this README instead of
+   extending the hard-coded set.
