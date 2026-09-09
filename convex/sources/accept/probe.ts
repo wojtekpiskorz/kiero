@@ -44,9 +44,9 @@ import {
   bridgeContextForEmail,
   probeDisabled,
   probeGuardEnabled,
+  resolveProbeSession,
   serviceIdentityUnavailable,
-  serviceSessionId,
-} from "./probe_shared";
+} from "../probe_shared";
 
 // --- acceptance probes ---------------------------------------------------------
 
@@ -57,7 +57,7 @@ export const probeAcceptSource = action({
     if (!probeGuardEnabled()) {
       return probeDisabled();
     }
-    const sessionId = args.sessionId ?? (await serviceSessionId(ctx));
+    const sessionId = await resolveProbeSession(ctx, args.sessionId);
     if (sessionId === null) {
       return serviceIdentityUnavailable();
     }
@@ -105,7 +105,7 @@ export const probeCrashAcceptance = action({
     if (!probeGuardEnabled()) {
       return probeDisabled();
     }
-    const sessionId = args.sessionId ?? (await serviceSessionId(ctx));
+    const sessionId = await resolveProbeSession(ctx, args.sessionId);
     if (sessionId === null) {
       return serviceIdentityUnavailable();
     }
@@ -382,7 +382,7 @@ export const probeAcceptanceState = action({
     if (!probeGuardEnabled()) {
       return probeDisabled();
     }
-    const sessionId = args.sessionId ?? (await serviceSessionId(ctx));
+    const sessionId = await resolveProbeSession(ctx, args.sessionId);
     if (sessionId === null) {
       return serviceIdentityUnavailable();
     }

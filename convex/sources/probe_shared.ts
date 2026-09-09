@@ -14,9 +14,9 @@
 
 import { errorResult, type ResultEnvelope } from "@kiero/contracts";
 import { forbiddenError, unsupportedError, type RequestContext } from "@kiero/runtime";
-import { api } from "../../_generated/api";
-import type { ActionCtx } from "../../_generated/server";
-import { bridgeIdentity, resolveRequestContext, type ResolutionDb } from "../../platform/context";
+import { api } from "../_generated/api";
+import type { ActionCtx } from "../_generated/server";
+import { bridgeIdentity, resolveRequestContext, type ResolutionDb } from "../platform/context";
 
 /** The A3 platform proof service account (seeded by platform/probe:probeSeed). */
 export const SERVICE_EMAIL = "platform-service@kiero.invalid";
