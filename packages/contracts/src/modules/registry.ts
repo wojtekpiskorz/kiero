@@ -1,0 +1,323 @@
+/**
+ * Composed operation/event registry and the initial producer/consumer
+ * registration entries.
+ *
+ * This is the single composition point of the candidate contracts: every
+ * module's operations and events are gathered here, and the load-bearing
+ * durable consumer edges named in the architecture are registered once:
+ * access-revocation cleanup, reanalysis, deletion purge and Calendar outcome
+ * reconciliation. Constructing the registry checks that every registered
+ * operation/event name exists in exactly one module surface and that no
+ * executor claims a job kind twice: a typo'd edge fails here, not silently
+ * in production.
+ *
+ * Registrations are candidates: they declare seams, not implementations.
+ * Dispatching any unimplemented entry fails closed with `unsupported`.
+ */
+
+import { Schema } from "effect";
+import { tableIdSchema } from "../tableIds";
+import {
+  FeatureId,
+  eventConsumerEntry,
+  executorEntry,
+  featureEntry,
+  type AnyEventEntry,
+  type AnyOperationEntry,
+  type EventConsumerEntry,
+  type ExecutorEntry,
+  type FeatureEntry,
+} from "./registration";
+import { accessOperations, accessEvents } from "./access";
+import { sourcesOperations, sourcesEvents } from "./sources";
+import { memoryOperations, memoryEvents } from "./memory";
+import { projectsOperations, projectsEvents } from "./projects";
+import { workOperations, workEvents } from "./work";
+import { attentionOperations, attentionEvents } from "./attention";
+import { calendarOperations, calendarEvents, CalendarRemoteOutcome } from "./calendar";
+import { operationsOperations, operationsEvents } from "./operations";
+import { searchOperations, searchEvents } from "./search";
+import { integrationsOperations, integrationsEvents } from "./integrations";
+
+interface Nameable {
+  readonly name: string;
+}
+
+function collect<E extends Nameable>(
+  ...groups: Readonly<Record<string, E>>[]
+): Record<string, E> {
+  const out: Record<string, E> = {};
+  for (const group of groups) {
+    for (const key of Object.keys(group)) {
+      const entry = group[key];
+      if (entry === undefined || entry.name in out || entry.name !== key) {
+        throw new Error(`Contract registry: duplicate or mis-keyed entry: ${key}`);
+      }
+      out[entry.name] = entry;
+    }
+  }
+  return out;
+}
+
+/** All declared operations, keyed by operation name. */
+export const operations: Record<string, AnyOperationEntry> = collect<AnyOperationEntry>(
+  accessOperations,
+  sourcesOperations,
+  memoryOperations,
+  projectsOperations,
+  workOperations,
+  attentionOperations,
+  calendarOperations,
+  operationsOperations,
+  searchOperations,
+  integrationsOperations,
+);
+
+/** All declared events, keyed by event name. */
+export const events: Record<string, AnyEventEntry> = collect<AnyEventEntry>(
+  accessEvents,
+  sourcesEvents,
+  memoryEvents,
+  projectsEvents,
+  workEvents,
+  attentionEvents,
+  calendarEvents,
+  operationsEvents,
+  searchEvents,
+  integrationsEvents,
+);
+
+// Executor input schemas (decode authority per job kind).
+
+const revokedAccessCleanupInput = Schema.Struct({
+  kind: Schema.Literals(["membership", "session"]),
+  membershipId: Schema.NullOr(tableIdSchema("memberships")),
+  sessionId: Schema.NullOr(tableIdSchema("sessions")),
+  revokedAtMs: Schema.Number,
+});
+
+const recomputeDependentsInput = Schema.Struct({
+  rootFindingId: Schema.NullOr(tableIdSchema("findings")),
+  sourceId: Schema.NullOr(tableIdSchema("sources")),
+  cause: Schema.Literals(["source_withdrawn", "dependent_stale", "reanalysis"]),
+});
+
+const purgeSourceInput = Schema.Struct({
+  sourceId: tableIdSchema("sources"),
+  deletionRecordId: tableIdSchema("deletionRecords"),
+});
+
+const reconcileOutcomeInput = Schema.Struct({
+  copyId: tableIdSchema("calendarCopies"),
+  lastKnownOutcome: CalendarRemoteOutcome,
+});
+
+const extractFragmentsInput = Schema.Struct({
+  sourceId: tableIdSchema("sources"),
+  extractionId: tableIdSchema("extractions"),
+});
+
+const analyzeChangePlanInput = Schema.Struct({
+  sourceId: tableIdSchema("sources"),
+  processingRunId: tableIdSchema("processingRuns"),
+  reanalysisOfRunId: Schema.NullOr(tableIdSchema("processingRuns")),
+});
+
+function decodeFeatureId(value: string): Schema.Schema.Type<typeof FeatureId> {
+  return Schema.decodeUnknownSync(FeatureId)(value);
+}
+
+/**
+ * Durable executors declared so far. Each later lane registers its own
+ * executors in its fragment; this initial set names the seams the
+ * architecture requires to exist before consumers begin.
+ */
+export const executors: readonly ExecutorEntry[] = [
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("access.cleanup"),
+    jobKind: "access.cleanup_revocation",
+    input: revokedAccessCleanupInput,
+  }),
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("memory.recompute"),
+    jobKind: "memory.recompute_dependents",
+    input: recomputeDependentsInput,
+  }),
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("deletion.purge"),
+    jobKind: "deletion.purge_source",
+    input: purgeSourceInput,
+  }),
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("calendar.reconcile"),
+    jobKind: "calendar.reconcile_outcome",
+    input: reconcileOutcomeInput,
+  }),
+  // The durable publication pipeline seams (E3 and later lanes implement).
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("processing.extract"),
+    jobKind: "processing.extract_fragments",
+    input: extractFragmentsInput,
+  }),
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("processing.analyze"),
+    jobKind: "processing.analyze_change_plan",
+    input: analyzeChangePlanInput,
+  }),
+];
+
+function consumer(eventName: string, jobKind: EventConsumerEntry["jobKind"]): EventConsumerEntry {
+  return eventConsumerEntry({ kind: "event_consumer", eventName, jobKind });
+}
+
+/**
+ * Durable event consumers declared so far: the four cross-module outcomes the
+ * architecture names explicitly (access-revocation cleanup, reanalysis,
+ * deletion, Calendar outcomes) plus the publication pipeline seams. Each
+ * edge belongs to whichever executor owns its job kind; the feature
+ * attribution below is derived from that, never hand-written.
+ */
+export const eventConsumers: readonly EventConsumerEntry[] = [
+  // Access revocation must invalidate derived access and media checks.
+  consumer("access.membershipRevoked", "access.cleanup_revocation"),
+  consumer("access.sessionRevoked", "access.cleanup_revocation"),
+  // Withdrawal/purge re-evaluates dependent findings; history retained.
+  consumer("sources.sourceWithdrawn", "memory.recompute_dependents"),
+  consumer("memory.dependentsMarkedStale", "memory.recompute_dependents"),
+  // Permanent deletion purges derivatives within the accepted window.
+  consumer("sources.sourcePurged", "deletion.purge_source"),
+  // Unknown Calendar outcomes always reconcile before another POST.
+  consumer("calendar.copyOutcomeRecorded", "calendar.reconcile_outcome"),
+  // Accepted sources register durable extraction atomically; the extract
+  // executor owns `processing.extract_fragments`, so this edge belongs to
+  // the processing.extract feature (the earlier hand-written attribution to
+  // processing.analyze was the inconsistency; the executor table is the
+  // authority and its input shape is extraction, not change-plan analysis).
+  consumer("sources.sourceAccepted", "processing.extract_fragments"),
+  // Requested reanalysis runs as a linked new analysis run.
+  consumer("operations.reanalysisRequested", "processing.analyze_change_plan"),
+];
+
+/**
+ * The initial feature registrations, DERIVED from the executor table: one
+ * feature per executor, keyed by its id. `consumesEvents` groups the
+ * registered consumer edges on job kind (an edge belongs to the executor
+ * owning its job kind) and `executesJobs` is exactly that job kind, so the
+ * three encodings cannot disagree. Only `providesOperations` and
+ * `publishesEvents` are hand-written; they stay empty until the owning
+ * lanes declare their surface.
+ */
+export const features: readonly FeatureEntry[] = executors.map((executor) =>
+  featureEntry({
+    kind: "feature",
+    featureId: executor.executorId,
+    providesOperations: [],
+    publishesEvents: [],
+    consumesEvents: eventConsumers
+      .filter((edge) => edge.jobKind === executor.jobKind)
+      .map((edge) => edge.eventName),
+    executesJobs: [executor.jobKind],
+  }),
+);
+
+// Fail fast on impossible registrations (module surface name drift).
+
+/**
+ * Throws if two executors claim the same job kind. Exported so the
+ * construction-time guarantee itself is under test: a silent Set collapse
+ * here would let two lanes believe they own one job kind.
+ */
+export function assertNoDuplicateExecutors(list: readonly ExecutorEntry[]): Set<string> {
+  const seen = new Set<string>();
+  for (const executor of list) {
+    if (seen.has(executor.jobKind)) {
+      throw new Error(
+        `Contract registry: duplicate executor for job kind ${executor.jobKind}`,
+      );
+    }
+    seen.add(executor.jobKind);
+  }
+  return seen;
+}
+
+/**
+ * Throws if a hand-written part of a feature registration (provided
+ * operations, published events) references a name no module surface
+ * declared. Exported so the construction-time guarantee itself is under
+ * test. The derived parts (consumed events, executed job kinds) are checked
+ * by {@link assertFeaturesCoverRegistrations} instead.
+ */
+export function assertFeaturesCoherent(
+  list: readonly FeatureEntry[],
+  knownOperations: Readonly<Record<string, unknown>>,
+  knownEvents: Readonly<Record<string, unknown>>,
+): void {
+  for (const feature of list) {
+    for (const name of feature.providesOperations) {
+      if (!(name in knownOperations)) {
+        throw new Error(`Contract registry: feature ${feature.featureId} provides unknown operation ${name}`);
+      }
+    }
+    for (const name of [...feature.publishesEvents, ...feature.consumesEvents]) {
+      if (!(name in knownEvents)) {
+        throw new Error(`Contract registry: feature ${feature.featureId} references unknown event ${name}`);
+      }
+    }
+  }
+}
+
+/**
+ * Cross-check that the derived feature edges equal the declared
+ * registrations: every executor's job kind appears in exactly one feature
+ * with exactly that feature's consumed edges for the kind, and every
+ * consumer edge is covered. Throws otherwise. Exported so the
+ * construction-time guarantee itself is under test.
+ */
+export function assertFeaturesCoverRegistrations(
+  list: readonly FeatureEntry[],
+  registeredExecutors: readonly ExecutorEntry[],
+  registeredConsumers: readonly EventConsumerEntry[],
+): void {
+  for (const executor of registeredExecutors) {
+    const owning = list.filter((feature) => feature.executesJobs.includes(executor.jobKind));
+    if (owning.length !== 1) {
+      throw new Error(
+        `Contract registry: job kind ${executor.jobKind} is executed by ${owning.length} features, expected exactly 1`,
+      );
+    }
+    const feature = owning[0];
+    if (feature === undefined) {
+      throw new Error(`Contract registry: job kind ${executor.jobKind} has no feature`);
+    }
+    const derivedEdges = registeredConsumers
+      .filter((edge) => edge.jobKind === executor.jobKind)
+      .map((edge) => edge.eventName)
+      .sort();
+    const declaredEdges = [...feature.consumesEvents].sort();
+    if (derivedEdges.length !== declaredEdges.length || derivedEdges.some((name, i) => name !== declaredEdges[i])) {
+      throw new Error(
+        `Contract registry: feature ${feature.featureId} consumed edges diverge from the registered consumer edges for ${executor.jobKind}`,
+      );
+    }
+  }
+}
+
+const registeredJobKinds = assertNoDuplicateExecutors(executors);
+for (const entry of eventConsumers) {
+  if (!(entry.eventName in events)) {
+    throw new Error(`Contract registry: consumer references unknown event ${entry.eventName}`);
+  }
+  if (!registeredJobKinds.has(entry.jobKind)) {
+    throw new Error(
+      `Contract registry: consumer of ${entry.eventName} references unregistered job kind ${entry.jobKind}`,
+    );
+  }
+}
+assertFeaturesCoherent(features, operations, events);
+assertFeaturesCoverRegistrations(features, executors, eventConsumers);
