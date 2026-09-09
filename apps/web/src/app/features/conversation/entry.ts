@@ -14,6 +14,9 @@ import { appFeatureEntry } from "../../registry";
 import { useAppServices } from "../../providers";
 import { FeatureOperationsList, featureHeadingId } from "../../feature-pending";
 
+const CONVERSATION_PENDING_NOTE =
+  "Rozmowa firmy to jedna ciągła, wspólna historia wypowiedzi szefów i agenta na poziomie firmy. Tu pojawi się po zaimplementowaniu funkcji.";
+
 function connectionLine(state: "configured" | "unconfigured" | "misconfigured"): string {
   switch (state) {
     case "configured":
@@ -33,11 +36,7 @@ function ConversationPendingScreen(): ReactNode {
     { "aria-labelledby": featureHeadingId(conversationFeatureEntry) },
     createElement("h1", { id: featureHeadingId(conversationFeatureEntry) }, "Rozmowa firmy"),
     createElement("p", { role: "status" }, "W przygotowaniu."),
-    createElement(
-      "p",
-      null,
-      "Rozmowa firmy to jedna ciągła, wspólna historia wypowiedzi szefów i agenta na poziomie firmy. Tu pojawi się po zaimplementowaniu funkcji.",
-    ),
+    createElement("p", null, CONVERSATION_PENDING_NOTE),
     createElement("h2", null, "Co jest potrzebne"),
     createElement(
       "ul",
@@ -70,7 +69,6 @@ export const conversationFeatureEntry = appFeatureEntry({
     "attention.markSourceRead",
   ],
   implementation: "pending",
-  pendingNote:
-    "Rozmowa firmy to jedna ciągła, wspólna historia wypowiedzi szefów i agenta na poziomie firmy. Tu pojawi się po zaimplementowaniu funkcji.",
+  pendingNote: CONVERSATION_PENDING_NOTE,
   pendingScreen: ConversationPendingScreen,
 });

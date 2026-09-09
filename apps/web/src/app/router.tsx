@@ -17,7 +17,7 @@ import {
 } from "@tanstack/react-router";
 import { AppShell } from "./app-shell";
 import { appFeatures } from "./app-features";
-import { createPendingScreen } from "./feature-pending";
+import { resolveFeatureScreen } from "./feature-pending";
 
 /** Plain not-found screen for drifted URLs. */
 function NotFoundScreen() {
@@ -51,12 +51,7 @@ export function createAppRouter() {
     createRoute({
       getParentRoute: () => rootRoute,
       path: feature.routePath,
-      // The one dispatch point: mounted entries bring their screen; pending
-      // entries use theirs or the shared placeholder.
-      component:
-        feature.implementation === "mounted"
-          ? feature.screen
-          : feature.pendingScreen ?? createPendingScreen(feature),
+      component: resolveFeatureScreen(feature),
     }),
   );
   return createRouter({

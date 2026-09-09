@@ -1,7 +1,7 @@
 /**
  * Application services context (A4).
  *
- * Carries the typed config seam and the connection flag to every host
+ * Carries the typed config seam to every host
  * component. Written with `createElement` (no JSX) so the composed feature
  * registry stays importable from the root node test program, which has no
  * JSX flag; JSX modules (shell, router, health) consume this context.

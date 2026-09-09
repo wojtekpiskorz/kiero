@@ -10,20 +10,16 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { createElement, type ReactNode } from "react";
+import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { appFeatures } from "../../apps/web/src/app/app-features";
+import { resolveFeatureScreen } from "../../apps/web/src/app/feature-pending";
 import { AppServicesProvider } from "../../apps/web/src/app/providers";
 import { loadAppConfig } from "../../apps/web/src/app/config";
-import { createPendingScreen } from "../../apps/web/src/app/feature-pending";
-import type { AppFeatureEntry } from "../../apps/web/src/app/registry";
 
-/** Resolves the screen the way the router does (one dispatch rule). */
-function screenFor(entry: AppFeatureEntry): () => ReactNode {
-  return entry.implementation === "mounted"
-    ? entry.screen
-    : entry.pendingScreen ?? createPendingScreen(entry);
-}
+/** The real dispatch, imported from the app: the test exercises the rule
+ * the router actually uses. */
+const screenFor = resolveFeatureScreen;
 
 function renderScreen(entryIndex: number, config = loadAppConfig({})): string {
   const entry = appFeatures[entryIndex];

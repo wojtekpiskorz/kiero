@@ -51,3 +51,12 @@ export function createPendingScreen(entry: PendingAppFeatureEntry): () => ReactN
     );
   };
 }
+
+/** The one dispatch rule: mounted entries bring their screen; pending
+ * entries use theirs or the shared placeholder. Exported so tests exercise
+ * the real dispatch instead of restating it. */
+export function resolveFeatureScreen(feature: AppFeatureEntry): () => ReactNode {
+  return feature.implementation === "mounted"
+    ? feature.screen
+    : feature.pendingScreen ?? createPendingScreen(feature);
+}
