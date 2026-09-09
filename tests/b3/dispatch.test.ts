@@ -220,6 +220,19 @@ describe("the B3 contract entries (closed error vocabulary)", () => {
     ).toThrow();
   });
 
+  it("carries the timezone as a plain string (the transaction's IANA check is the single authority)", () => {
+    // Real IANA shapes the removed regex rejected; the contract layer must
+    // pass them through and let validateTimezone decide.
+    for (const zone of ["America/Argentina/Buenos_Aires", "Etc/GMT+5", "UTC"]) {
+      const decoded = Schema.decodeUnknownSync(accessOperations["access.createCompany"].input)({
+        name: "X",
+        timezone: zone,
+        defaultCurrency: "PLN",
+      });
+      expect(decoded.timezone, zone).toBe(zone);
+    }
+  });
+
   it("carries the single-use invitation code as plain string input, role per the vocabulary", () => {
     const decoded = Schema.decodeUnknownSync(accessOperations["access.createInvitation"].input)({
       email: "szef@firma.pl",

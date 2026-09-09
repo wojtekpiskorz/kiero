@@ -341,8 +341,13 @@ describe("issuance helpers", () => {
     });
   });
 
-  it("validates real IANA zones only", () => {
+  it("validates real IANA zones only (the single timezone authority)", () => {
     expect(validateTimezone("Europe/Warsaw")).toEqual({ ok: true, value: "Europe/Warsaw" });
+    // Real shapes a short regex rejects (the reason the contract input
+    // carries a plain string and this validator is the one authority).
+    for (const zone of ["America/Argentina/Buenos_Aires", "Etc/GMT+5", "UTC"]) {
+      expect(validateTimezone(zone), zone).toEqual({ ok: true, value: zone });
+    }
     expect(validateTimezone("Mars/Olympus")).toEqual({ ok: false, code: "timezone_invalid" });
   });
 

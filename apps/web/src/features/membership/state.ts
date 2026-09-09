@@ -2,38 +2,16 @@
  * Membership feature state: Polish copy and the closed-error
  * classification for the B3 surface.
  *
- * The sign-in leg composes B1's exported state machine and copy
- * (../sign-in/state.ts) verbatim — same steps, same failure mapping — so
- * the mounted surface cannot drift from B1's product text. Membership
- * operation results arrive as `ResultEnvelope`s; every closed error maps
- * to honest Polish copy, with machine codes the tests can pin.
+ * The sign-in leg lives in B1's shared gate (../sign-in/SignInGate.ts)
+ * and walks B1's own state machine; this module carries only the
+ * membership copy. Membership operation results arrive as
+ * `ResultEnvelope`s; every closed error maps to honest Polish copy (the
+ * server message) plus hints for load-bearing machine codes.
  */
 
-import {
-  classifySignInError,
-  pendingLabel,
-  sessionDeniedView,
-  signInCopy,
-  isValidEmail,
-  type SessionDeniedView,
-  type SessionDenialReason,
-  type SignInFailure,
-  type SignInState,
-} from "../sign-in/state";
+import { signInCopy } from "../sign-in/state";
 
-export {
-  classifySignInError,
-  pendingLabel,
-  sessionDeniedView,
-  signInCopy,
-  isValidEmail,
-};
-export type {
-  SessionDeniedView,
-  SessionDenialReason,
-  SignInFailure,
-  SignInState,
-};
+export { signInCopy };
 
 /** Polish copy for the membership surface (stable product text). */
 export const membershipCopy = {

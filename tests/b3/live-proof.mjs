@@ -545,10 +545,13 @@ let szef2Invitation = null;
   const stranger = await signInFixture(OBCY);
   const created = await admit(stranger.client, "access.createCompany", {
     name: "Firma Obcych",
-    timezone: "Europe/Warsaw",
+    // A real multi-segment IANA zone the removed contract regex rejected:
+    // proves end-to-end that validateTimezone is the single authority and
+    // the access snapshot mirrors what it accepted.
+    timezone: "America/Argentina/Buenos_Aires",
     defaultCurrency: "EUR",
   });
-  check("F1 a second, fully isolated company exists (stranger is its first admin)",
+  check("F1 a second, fully isolated company exists (stranger is its first admin; multi-segment IANA zone accepted)",
     isOk(created) && created.value.companyId !== companyA,
     JSON.stringify({ companyId: created?.value?.companyId }));
   const stateA = await companyState(companyA);
@@ -580,9 +583,10 @@ let szef2Invitation = null;
   const strangerAccess = await stranger.client.query("access/identity/functions:resolveCurrentAccess", {
     sessionId: stranger.sessionId,
   });
-  check("F5 stranger resolves ONLY their own company scope",
-    strangerAccess?.companyId === created.value.companyId && strangerAccess?.companyId !== companyA,
-    JSON.stringify({ companyId: strangerAccess?.companyId, role: strangerAccess?.membershipRole }));
+  check("F5 stranger resolves ONLY their own company scope (snapshot decodes the multi-segment zone)",
+    strangerAccess?.companyId === created.value.companyId && strangerAccess?.companyId !== companyA
+      && strangerAccess?.companyTimezone === "America/Argentina/Buenos_Aires",
+    JSON.stringify({ companyId: strangerAccess?.companyId, role: strangerAccess?.membershipRole, tz: strangerAccess?.companyTimezone }));
   const strangerOverview = await stranger.client.query("access/membership/functions:membershipOverview", {});
   const leaked = JSON.stringify(strangerOverview);
   check("F6 stranger's overview leaks no other-tenant content",

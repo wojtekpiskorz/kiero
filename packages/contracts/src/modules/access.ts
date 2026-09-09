@@ -13,13 +13,21 @@ import { tableIdSchema } from "../tableIds";
 import { MembershipRole } from "../actor";
 import { operationEntry, eventEntry } from "./registration";
 
-/** What the server returns for the current authenticated actor. */
+/**
+ * What the server returns for the current authenticated actor.
+ *
+ * `companyTimezone` is a plain string on purpose: real IANA zone names
+ * ("America/Argentina/Buenos_Aires", "Etc/GMT+5", "UTC") defeat any short
+ * regex, and the SINGLE validation authority is the creating transaction's
+ * IANA check (convex/access/membership/cores.ts `validateTimezone`); the
+ * snapshot mirrors what that authority already accepted.
+ */
 export const AccessSnapshot = Schema.Struct({
   userId: tableIdSchema("users"),
   companyId: tableIdSchema("companies"),
   membershipRole: MembershipRole,
   isGm: Schema.Boolean,
-  companyTimezone: Schema.String.pipe(Schema.check(Schema.isPattern(/^[A-Za-z_]+\/[A-Za-z_]+$/))),
+  companyTimezone: Schema.String,
   defaultCurrency: Schema.String.pipe(Schema.check(Schema.isPattern(/^[A-Z]{3}$/))),
 });
 export type AccessSnapshot = Schema.Schema.Type<typeof AccessSnapshot>;
@@ -42,9 +50,12 @@ export const accessOperations = {
     name: "access.createCompany",
     input: Schema.Struct({
       name: Schema.NonEmptyString,
-      timezone: Schema.String.pipe(
-        Schema.check(Schema.isPattern(/^[A-Za-z_]+\/[A-Za-z_]+$/)),
-      ),
+      // Plain string by design: real IANA zone names ("Etc/GMT+5",
+      // "America/Argentina/Buenos_Aires", "UTC") defeat any short regex.
+      // The SINGLE validation authority is the transaction's IANA check
+      // (convex/access/membership/cores.ts `validateTimezone`), which runs
+      // before any write; the schema only carries the value.
+      timezone: Schema.String,
       defaultCurrency: Schema.String.pipe(Schema.check(Schema.isPattern(/^[A-Z]{3}$/))),
     }),
     result: Schema.Struct({

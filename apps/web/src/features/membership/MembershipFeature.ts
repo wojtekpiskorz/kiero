@@ -6,10 +6,10 @@
  * JSX-free on purpose (createElement only): the host feature registry
  * chain (app-features composed from the per-feature entry modules) is
  * imported by the root node test programs, which compile without a JSX
- * flag — the same discipline A4's own shell and B1's state module follow.
- * The sign-in leg composes B1's exported state machine and copy
- * (../sign-in/state.ts), so the mounted sign-in cannot drift from B1's
- * product; the authenticated leg is the B3 membership surface.
+ * flag. The sign-in leg is B1's own shared, JSX-free gate
+ * (../sign-in/SignInGate.ts) composed with this surface as the
+ * authenticated continuation — one sign-in implementation, no
+ * transcription; the membership surface is the B3 part.
  *
  * The unauthenticated visitor reaches sign-in here; the authenticated
  * member reaches the membership surface. No styling, semantic controls
@@ -18,14 +18,14 @@
 
 import {
   createElement,
-  useEffect,
   useMemo,
   useState,
   type ChangeEvent,
   type ReactNode,
 } from "react";
-import { ConvexAuthProvider, useAuthActions, useConvexAuth } from "@convex-dev/auth/react";
+import { ConvexAuthProvider, useAuthActions } from "@convex-dev/auth/react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import type { ResultEnvelope } from "@kiero/contracts";
 import { api } from "../../../../../convex/_generated/api";
 import type {
   CompanyInvitationView,
@@ -35,17 +35,8 @@ import type {
 } from "../../../../../convex/access/membership/functions";
 import { useAppServices } from "../../app/providers";
 import { createConvexClient } from "../sign-in/client";
-import {
-  classifySignInError,
-  failureHint,
-  isValidEmail,
-  membershipCopy,
-  pendingLabel,
-  sessionDeniedView,
-  signInCopy,
-  type SignInFailure,
-  type SignInState,
-} from "./state";
+import { AuthenticatedGate } from "../sign-in/SignInGate";
+import { failureHint, membershipCopy, signInCopy } from "./state";
 
 /** One command envelope (the checked dispatch input shape). */
 function envelopeOf(operation: string, input: unknown) {
@@ -63,18 +54,17 @@ interface Notice {
   readonly text: string;
 }
 
-function describe(result: unknown, okText: string): Notice {
-  if (
-    typeof result === "object" &&
-    result !== null &&
-    "_tag" in result &&
-    (result as { _tag: string })._tag === "error"
-  ) {
-    const error = (result as { error?: { code?: string; message?: string } }).error;
-    const hint = failureHint(error?.code);
-    return { kind: "error", text: hint ?? error?.message ?? signInCopy.failures.unknown };
+function describe(result: ResultEnvelope, okText: string): Notice {
+  switch (result._tag) {
+    case "error": {
+      // The closed error carries stable Polish copy and a machine code;
+      // the hint table only ADDS context for load-bearing codes.
+      const hint = failureHint(result.error.code);
+      return { kind: "error", text: hint ?? result.error.message };
+    }
+    case "ok":
+      return { kind: "ok", text: okText };
   }
-  return { kind: "ok", text: okText };
 }
 
 function NoticeArea({ notice }: { notice: Notice | null }): ReactNode {
@@ -112,199 +102,11 @@ function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): Rea
   });
 }
 
-/** Authentication gate: sign-in for visitors, bootstrap + surface for members. */
+/** Authentication gate: B1's shared sign-in surface; members continue here. */
 function MembershipGate(): ReactNode {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  if (isLoading) {
-    return createElement("section", null, createElement("h1", null, membershipCopy.title), createElement("p", { role: "status" }, membershipCopy.checkingSession));
-  }
-  if (!isAuthenticated) {
-    return createElement(SignInCard);
-  }
-  return createElement(SessionBootstrap);
-}
-
-// ---------------------------------------------------------------------------
-// Sign-in leg (B1's state machine and copy, JSX-free markup)
-// ---------------------------------------------------------------------------
-
-/** The sign-in card: email code first, Google when the deployment offers it. */
-function SignInCard(): ReactNode {
-  const { signIn } = useAuthActions();
-  const availability = useQuery(api.access.identity.functions.providerAvailability, {});
-  const [state, setState] = useState<SignInState>({ step: "choose" });
-  const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [failure, setFailure] = useState<SignInFailure | null>(null);
-
-  const googleAvailable = availability?.google === true;
-  const pending = pendingLabel(state);
-
-  async function requestCode(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
-    if (!isValidEmail(email)) {
-      setFailure("invalid_email");
-      return;
-    }
-    setState({ step: "submitting-email" });
-    setFailure(null);
-    try {
-      await signIn("email_code", { email });
-      setCode("");
-      setState({ step: "code-sent", email });
-    } catch (error) {
-      setFailure(classifySignInError(error));
-      setState({ step: "choose" });
-    }
-  }
-
-  async function verifyCode(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
-    if (state.step !== "code-sent") {
-      return;
-    }
-    setState({ step: "submitting-code", email: state.email });
-    setFailure(null);
-    try {
-      await signIn("email_code", { email: state.email, code });
-    } catch (error) {
-      setFailure(classifySignInError(error));
-      setState({ step: "code-sent", email: state.email });
-    }
-  }
-
-  async function resendCode(): Promise<void> {
-    if (state.step !== "code-sent" && state.step !== "submitting-code") {
-      return;
-    }
-    const resendEmail = state.email;
-    setState({ step: "submitting-email" });
-    setFailure(null);
-    try {
-      await signIn("email_code", { email: resendEmail });
-      setCode("");
-      setState({ step: "code-sent", email: resendEmail });
-    } catch (error) {
-      setFailure(classifySignInError(error));
-      setState({ step: "code-sent", email: resendEmail });
-    }
-  }
-
-  function startGoogle(): void {
-    setState({ step: "google-pending" });
-    setFailure(null);
-    void signIn("google").catch((error: unknown) => {
-      setFailure(classifySignInError(error));
-      setState({ step: "choose" });
-    });
-  }
-
-  if (state.step === "code-sent" || state.step === "submitting-code") {
-    return createElement(
-      "section",
-      null,
-      createElement("h1", null, signInCopy.title),
-      createElement("form", { onSubmit: (event) => void verifyCode(event) },
-        createElement("p", null, signInCopy.codeSentNotice(state.email)),
-        createElement("label", { htmlFor: "membership-invite-signin-code" }, signInCopy.codeLabel),
-        createElement("input", {
-          id: "membership-invite-signin-code",
-          type: "text",
-          inputMode: "numeric",
-          autoComplete: "one-time-code",
-          placeholder: signInCopy.codePlaceholder,
-          value: code,
-          onChange: (event: ChangeEvent<HTMLInputElement>) => setCode(event.target.value),
-          required: true,
-        }),
-        createElement("button", { type: "submit", disabled: pending !== null }, pending ?? signInCopy.verify),
-        createElement("button", {
-          type: "button",
-          disabled: pending !== null,
-          onClick: () => {
-            setState({ step: "choose" });
-            setCode("");
-            setFailure(null);
-          },
-        }, signInCopy.changeEmail),
-        failure === "code_wrong_or_expired"
-          ? createElement("button", { type: "button", disabled: pending !== null, onClick: () => void resendCode() }, signInCopy.resendCode)
-          : null,
-        failure !== null ? createElement("p", { role: "alert" }, signInCopy.failures[failure]) : null,
-      ),
-    );
-  }
-
-  return createElement(
-    "section",
-    null,
-    createElement("h1", null, signInCopy.title),
-    createElement("p", null, signInCopy.intro),
-    createElement("form", { onSubmit: (event) => void requestCode(event) },
-      createElement("label", { htmlFor: "membership-sign-in-email" }, signInCopy.emailLabel),
-      createElement("input", {
-        id: "membership-sign-in-email",
-        type: "email",
-        autoComplete: "email",
-        placeholder: signInCopy.emailPlaceholder,
-        value: email,
-        onChange: (event: ChangeEvent<HTMLInputElement>) => setEmail(event.target.value),
-        required: true,
-      }),
-      createElement("button", { type: "submit", disabled: pending !== null }, pending ?? signInCopy.sendCode),
-      failure !== null ? createElement("p", { role: "alert" }, signInCopy.failures[failure]) : null,
-      googleAvailable
-        ? createElement("button", { type: "button", disabled: pending !== null, onClick: startGoogle }, pending ?? signInCopy.googleButton)
-        : createElement("p", null, signInCopy.googleUnavailable),
-    ),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Session bootstrap (B1's registry provisioning, then the membership read)
-// ---------------------------------------------------------------------------
-
-function SessionBootstrap(): ReactNode {
-  const ensureSession = useMutation(api.access.identity.functions.ensureSessionRegistry);
-  const [ready, setReady] = useState(false);
-  const [deniedNotice, setDeniedNotice] = useState<string | null>(null);
-  const { signOut } = useAuthActions();
-
-  useEffect(() => {
-    let cancelled = false;
-    void ensureSession({})
-      .then((result) => {
-        if (cancelled) {
-          return;
-        }
-        if (result.state === "live") {
-          setReady(true);
-        } else {
-          setDeniedNotice(sessionDeniedView(result.reason).notice);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDeniedNotice(sessionDeniedView("no_identity").notice);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [ensureSession]);
-
-  if (deniedNotice !== null) {
-    return createElement(
-      "section",
-      null,
-      createElement("p", { role: "alert" }, deniedNotice),
-      createElement("button", { type: "button", onClick: () => void signOut() }, signInCopy.signInAgain),
-    );
-  }
-  if (!ready) {
-    return createElement("p", { role: "status" }, membershipCopy.verifyingSession);
-  }
-  return createElement(MembershipSurface);
+  return createElement(AuthenticatedGate, {
+    continuation: MembershipSurface,
+  });
 }
 
 // ---------------------------------------------------------------------------

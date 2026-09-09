@@ -54,8 +54,10 @@ export const expireInvitationInternal = internalMutation({
   args: { invitationId: v.id("invitations") },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
     const invitation = await ctx.db.get(args.invitationId);
-    if (invitation === null) {
-      return errorResult(unsupportedError("access.b3Proof", "invitation_not_found"));
+    // The proof-domain rule is uniform across every fixture: even with the
+    // dev guard on, no fixture may touch a real person's invitation.
+    if (invitation === null || !isProofFixtureEmail(invitation.email)) {
+      return errorResult(unsupportedError("access.b3Proof", "proof_domain_required"));
     }
     await ctx.db.patch(args.invitationId, { expiresAtMs: Date.now() - 1 });
     return okResult({ expired: true });

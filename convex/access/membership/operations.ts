@@ -53,7 +53,6 @@ import { normalizeEmail } from "../identity/userPolicy";
 import {
   INVITATION_TTL_MS,
   admissionErrorKind,
-  activeAdministrators,
   classifyRoleChange,
   decideAdministrationTransfer,
   decideInvitationAdmission,
@@ -64,7 +63,6 @@ import {
   validateCompanyName,
   validateInvitationEmail,
   validateTimezone,
-  type MembershipView,
   type MembershipViewWithTime,
 } from "./cores";
 
@@ -110,6 +108,27 @@ function membershipView(row: Doc<"memberships">): MembershipViewWithTime {
     state: row.state,
     createdAtMs: row.createdAtMs,
   };
+}
+
+/**
+ * The company scope every company-scoped transaction resolves first: the
+ * Convex-normalized company and actor ids from the RESOLVED request
+ * context (never client input). Unresolvable references fail closed with
+ * the shared typed validation error before any read or write.
+ */
+function companyScopeOf(
+  tx: MutationCtx,
+  context: RequestContext,
+): { readonly ok: true; readonly companyId: Id<"companies">; readonly actorUserId: Id<"users"> } | {
+  readonly ok: false;
+  readonly error: ResultEnvelope;
+} {
+  const companyId = tx.db.normalizeId("companies", context.actor.companyId);
+  const actorUserId = tx.db.normalizeId("users", context.actor.userId);
+  if (companyId === null || actorUserId === null) {
+    return { ok: false, error: errorResult(validationError("company_scope_unresolved")) };
+  }
+  return { ok: true, companyId, actorUserId };
 }
 
 /** All membership rows of one user (the multi-membership-capable read). */
@@ -200,14 +219,11 @@ export async function performCreateInvitation(
   | { readonly ok: false; readonly result: ResultEnvelope }
 > {
   const nowMs = Date.now();
-  const companyId = tx.db.normalizeId("companies", context.actor.companyId);
-  if (companyId === null) {
-    return { ok: false, result: errorResult(validationError("company_scope_unresolved")) };
+  const scope = companyScopeOf(tx, context);
+  if (!scope.ok) {
+    return { ok: false, result: scope.error };
   }
-  const actorUserId = tx.db.normalizeId("users", context.actor.userId);
-  if (actorUserId === null) {
-    return { ok: false, result: errorResult(validationError("actor_user_unresolved")) };
-  }
+  const { companyId, actorUserId } = scope;
   if (context.actor.membershipRole !== "admin") {
     // The policy already denies non-administer intents; this is the
     // handler-level recheck that never trusts a stale role.
@@ -260,10 +276,11 @@ export async function performRevokeInvitation(
   context: RequestContext,
   invitationId: Id<"invitations">,
 ): Promise<ResultEnvelope> {
-  const companyId = tx.db.normalizeId("companies", context.actor.companyId);
-  if (companyId === null) {
-    return errorResult(validationError("company_scope_unresolved"));
+  const scope = companyScopeOf(tx, context);
+  if (!scope.ok) {
+    return scope.error;
   }
+  const { companyId } = scope;
   const invitation = await tx.db.get(invitationId);
   if (invitation === null || invitation.companyId !== companyId) {
     // Cross-tenant ids are indistinguishable from missing ones.
@@ -406,10 +423,11 @@ export async function performChangeMembershipRole(
   membershipId: Id<"memberships">,
   role: "admin" | "member",
 ): Promise<ResultEnvelope> {
-  const companyId = tx.db.normalizeId("companies", context.actor.companyId);
-  if (companyId === null) {
-    return errorResult(validationError("company_scope_unresolved"));
+  const scope = companyScopeOf(tx, context);
+  if (!scope.ok) {
+    return scope.error;
   }
+  const { companyId } = scope;
   const membership = await tx.db.get(membershipId);
   if (membership === null || membership.companyId !== companyId) {
     return errorResult(notFoundError("memberships"));
@@ -452,11 +470,11 @@ export async function performRevokeMembership(
   membershipId: Id<"memberships">,
 ): Promise<ResultEnvelope> {
   const nowMs = Date.now();
-  const companyId = tx.db.normalizeId("companies", context.actor.companyId);
-  const actorUserId = tx.db.normalizeId("users", context.actor.userId);
-  if (companyId === null || actorUserId === null) {
-    return errorResult(validationError("company_scope_unresolved"));
+  const scope = companyScopeOf(tx, context);
+  if (!scope.ok) {
+    return scope.error;
   }
+  const { companyId, actorUserId } = scope;
   const membership = await tx.db.get(membershipId);
   if (membership === null || membership.companyId !== companyId) {
     return errorResult(notFoundError("memberships"));
@@ -523,11 +541,11 @@ export async function performTransferAdministration(
   context: RequestContext,
   toUserId: Id<"users">,
 ): Promise<ResultEnvelope> {
-  const companyId = tx.db.normalizeId("companies", context.actor.companyId);
-  const actorUserId = tx.db.normalizeId("users", context.actor.userId);
-  if (companyId === null || actorUserId === null) {
-    return errorResult(validationError("company_scope_unresolved"));
+  const scope = companyScopeOf(tx, context);
+  if (!scope.ok) {
+    return scope.error;
   }
+  const { companyId, actorUserId } = scope;
   const rows = await tx.db
     .query("memberships")
     .withIndex("by_company_user", (q) => q.eq("companyId", companyId))
@@ -565,7 +583,3 @@ export async function performTransferAdministration(
   );
 }
 
-/** Active administrators count (probe assertions and overview reads). */
-export function activeAdminCount(rows: readonly MembershipView[]): number {
-  return activeAdministrators(rows).length;
-}

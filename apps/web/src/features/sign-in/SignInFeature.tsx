@@ -219,7 +219,14 @@ function AuthenticatedApp(): React.ReactNode {
   return <SessionPanel sessionId={sessionId} />;
 }
 
-/** The feature root: mounted by the app entry at `/`. */
+/**
+ * The feature root. Not mounted by the host directly: the shared JSX-free
+ * gate (./SignInGate.ts) is what host features compose — the membership
+ * surface (B3) mounts it at `/firma`, where an unauthenticated visitor
+ * reaches this same sign-in walk and an authenticated member continues to
+ * the membership surface. This JSX root stays the standalone/full
+ * reference implementation of the same state machine.
+ */
 export function SignInFeature(): React.ReactNode {
   const client = useMemo(() => createConvexClient(import.meta.env.VITE_CONVEX_URL), []);
   return (
