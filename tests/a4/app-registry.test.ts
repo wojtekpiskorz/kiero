@@ -129,11 +129,12 @@ describe("the shipped host features", () => {
     }
   });
 
-  it("registers every feature as pending with a note, except the B3 membership mount; only the conversation carries its own placeholder screen", () => {
+  it("registers every feature as pending with a note, except the B3 membership and G1 calendar mounts; only the conversation carries its own placeholder screen", () => {
     // B3 (issue #22) is the first lane to mount a real screen through this
-    // registry: the sanctioned sign-in + membership host composition.
+    // registry: the sanctioned sign-in + membership host composition. G1
+    // (issue #45) mounts the Calendar connection screen the same way.
     const mounted = appFeatures.filter((entry) => entry.implementation === "mounted");
-    expect(mounted.map((entry) => entry.featureId)).toEqual(["access.membership"]);
+    expect(mounted.map((entry) => entry.featureId)).toEqual(["access.membership", "calendar.connection"]);
     for (const mountedEntry of mounted) {
       expect(mountedEntry.screen).toBeTypeOf("function");
     }

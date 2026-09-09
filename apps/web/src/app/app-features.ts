@@ -12,6 +12,7 @@ import { conversationFeatureEntry } from "./features/conversation/entry";
 import { coTerazFeatureEntry } from "./features/co-teraz/entry";
 import { projectsFeatureEntry } from "./features/projects/entry";
 import { membershipFeatureEntry } from "./features/membership/entry";
+import { calendarFeatureEntry } from "./features/calendar/entry";
 
 /** Every registered host feature, in navigation order. The first entry ("/") is the default route. */
 export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
@@ -21,4 +22,7 @@ export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
   // B3's sanctioned host mount: the first mounted feature (sign-in gate +
   // membership surface); the entry file owns the shape, this line the wiring.
   membershipFeatureEntry,
+  // G1's sanctioned host mount: the optional personal Calendar connection
+  // (sign-in gate reused; connection lifecycle only, never identity).
+  calendarFeatureEntry,
 ]);
