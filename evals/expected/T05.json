@@ -1,0 +1,67 @@
+{
+  "caseId": "T05",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "crew_arrival",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "datetime",
+            "role": "internal_plan",
+            "date": "2026-09-21",
+            "timeOfDay": "08:00",
+            "datetime": "2026-09-21T08:00:00+02:00",
+            "originalExpression": "w poniedziałek o 8:00"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "podjeżdża na Banana w poniedziałek o 8:00" }
+            }
+          ],
+          "rationale": "Friday send: 'w poniedziałek' = next Monday 2026-09-21. The hour is stated, so precision is datetime; role is an internal plan, not a client agreement."
+        },
+        {
+          "findingKey": "unloading_window",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "range",
+            "role": "internal_plan",
+            "fromDate": "2026-09-21",
+            "fromTime": "12:00",
+            "toDate": "2026-09-21",
+            "toTime": "14:00",
+            "originalExpression": "między 12:00 a 14:00"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "Rozładunek będzie między 12:00 a 14:00" }
+            }
+          ],
+          "rationale": "A same-day time range must keep its range precision; no exact hour may be chosen inside it."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Collapse the unloading window to a datetime (e.g. 12:00) or to a bare date.", "category": "date", "because": "The source gives a range, and precision must be preserved." },
+        { "mustNot": "Record the crew arrival as date-only (dropping 08:00).", "category": "date", "because": "The hour is explicitly stated." },
+        { "mustNot": "Ask a clarification about the timing.", "category": "clarification", "because": "Both facts are completely specified for their stated precision." }
+      ]
+    }
+  ]
+}

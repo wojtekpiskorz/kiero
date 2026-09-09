@@ -1,0 +1,46 @@
+{
+  "caseId": "T01",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "notes": "Monday 2026-09-14 + 'w przyszły czwartek' = 2026-09-24. Date-only; 'bez konkretnej godziny' forbids inventing an hour.",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "delivery_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "agreed",
+            "date": "2026-09-24",
+            "originalExpression": "w przyszły czwartek"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "dostawa płytek na Bananie w przyszły czwartek, bez konkretnej godziny" }
+            }
+          ],
+          "rationale": "'Ustaliliśmy z Kowalskim' marks an agreement; the relative phrase resolves against the Monday send date, giving Thursday of next week."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record 2026-09-17 (this week's Thursday) as the delivery date.", "category": "date", "because": "'przyszły' unambiguously points to next week from the Monday send date." },
+        { "mustNot": "Attach any hour or time range to the delivery date.", "category": "date", "because": "The source explicitly says 'bez konkretnej godziny'; precision is date-only." },
+        { "mustNot": "Ask a clarification about the delivery timing.", "category": "clarification", "because": "The evidence is clear and complete for a date-only agreement; asking is needless and fails this expected outcome." }
+      ]
+    }
+  ],
+  "retrievalExpectations": {
+    "expectHits": [
+      { "query": "kiedy dostawa płytek na Bananie", "mustReturnEvidenceFrom": ["S1"], "findingKeys": ["delivery_date"] }
+    ]
+  }
+}

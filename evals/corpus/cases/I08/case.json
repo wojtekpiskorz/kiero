@@ -1,0 +1,61 @@
+{
+  "caseId": "I08",
+  "modality": "image",
+  "corpusRevision": "2026.09.1",
+  "title": "Lista materiałów opisana SZACUNEK",
+  "coverage": [
+    "estimate_vs_agreed",
+    "amounts"
+  ],
+  "fixtureClock": "2026-09-25T15:40:00+02:00",
+  "notes": "Header SZACUNEK and 'razem ~ 4 200' (with tilde) make 4200.00 an approximate estimate, not an agreed or exact amount.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-MAREK",
+        "name": "Marek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [],
+    "projects": [
+      {
+        "ref": "P-BANANOWA",
+        "alias": "Bananowa",
+        "stage": "realizacja"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-25T15:40:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T15:40:04+02:00",
+      "projectPill": "P-BANANOWA",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "estimate.svg",
+          "widthPx": 800,
+          "heightPx": 600,
+          "contentDescription": "Wydruk z nagłówkiem 'SZACUNEK — MATERIAŁY'. Wiersze: klej 320 zł, grunty 140 zł, silikony 90 zł, płytki 3 650 zł. Na dole pogrubione 'razem ~ 4 200'.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 108,
+            "note": "Deterministic synthetic SVG (print style estimate).",
+            "sha256": "7c18fbfe933b9dbb541a63b20725527f14e305b97190221b4a4dc54dc98751ed"
+          }
+        }
+      ]
+    }
+  ]
+}

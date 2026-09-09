@@ -1,0 +1,40 @@
+{
+  "caseId": "T08",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "kitchen_install_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-SIKORA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "agreed",
+            "date": "2026-09-18",
+            "originalExpression": "w piątek"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "w piątek. Piątek jest pewny, umówione z montażystami" }
+            }
+          ],
+          "historyExpectation": "The discarded 'w środę' (2026-09-16) remains visible in the source and history as a superseded wording, but never as the current value.",
+          "rationale": "Tuesday send: środа = 2026-09-16 (superseded), piątek = 2026-09-18. An explicit self-correction resolves the choice; no clarification is needed."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record 2026-09-16 (Wednesday) as the current install date.", "category": "date", "because": "The speaker explicitly retracted Wednesday in the same message." },
+        { "mustNot": "Mark the finding conflicted or ask which day applies.", "category": "clarification", "because": "'nie, moment... w piątek. Piątek jest pewny' is an explicit self-correction; asking is needless." }
+      ]
+    }
+  ]
+}

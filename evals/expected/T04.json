@@ -1,0 +1,43 @@
+{
+  "caseId": "T04",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "quoted_price",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-LISCIANA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "quoted_price",
+            "precision": "exact",
+            "amount": "8200.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "8 200 zł"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "wycenę remontu łazienki na Liścianej: 8 200 zł" }
+            }
+          ],
+          "rationale": "A quote was handed over; the basis was never mentioned, so it must stay explicitly not_specified."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record the basis as net or gross (including computing any VAT-inclusive variant).", "category": "source_basis", "because": "The boss explicitly says neither was mentioned; never infer VAT." },
+        { "mustNot": "Ask the bosses whether the quote is net or gross.", "category": "clarification", "because": "The missing basis does not block recording the quote; per the accepted contract the gap stays visible as 'nie podano' without nagging." },
+        { "mustNot": "Record the quote as an agreed price.", "category": "commitment", "because": "Only a quote was handed over, not accepted." }
+      ]
+    }
+  ]
+}

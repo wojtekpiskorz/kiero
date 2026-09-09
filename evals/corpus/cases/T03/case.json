@@ -1,0 +1,34 @@
+{
+  "caseId": "T03",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Szacunek robocizny i uzgodniona cena w jednej wiadomości",
+  "coverage": ["estimate_vs_agreed", "amounts"],
+  "fixtureClock": "2026-09-16T18:30:00+02:00",
+  "notes": "Two financial findings with different business roles; a confident read of an estimate must not become an agreed price.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-ZIELINSKA", "name": "Zielińska", "kind": "person", "detail": "klientka" }],
+    "projects": [
+      { "ref": "P-MALINOWA", "alias": "Malinowa", "client": "C-ZIELINSKA", "stage": "wycena", "location": "ul. Malinowa 7, Oława" }
+    ],
+    "existingFindings": []
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-16T18:30:00+02:00",
+      "fullyAcceptedAt": "2026-09-16T18:30:04+02:00",
+      "projectPill": "P-MALINOWA",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Malinowa: robocizna — myślę, że zmieścimy się w 10 tysiącach, ale to jeszcze nie umowa. Natomiast z klientką uzgodniłem ostatecznie całość za 10 500 zł brutto, ustalone dziś."
+        }
+      ]
+    }
+  ]
+}

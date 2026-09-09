@@ -1,0 +1,70 @@
+{
+  "caseId": "I12",
+  "modality": "image",
+  "corpusRevision": "2026.09.1",
+  "title": "Przekreślona kwota z odręczną poprawką",
+  "coverage": [
+    "handwriting",
+    "self_correction",
+    "amounts"
+  ],
+  "fixtureClock": "2026-09-25T18:00:00+02:00",
+  "notes": "Handwritten note: 7 200 crossed out, 7 900 written next to it with 'była 7 2'. The corrected 7900.00 is the current value; the crossed-out 7200 stays in history only.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-WOJTEK",
+        "name": "Wojtek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "C-KOWALSKI",
+        "name": "Kowalski",
+        "kind": "person",
+        "detail": "klient"
+      }
+    ],
+    "projects": [
+      {
+        "ref": "P-BANAN",
+        "alias": "Banan",
+        "client": "C-KOWALSKI",
+        "stage": "realizacja"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-25T18:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T18:00:04+02:00",
+      "projectPill": "P-BANAN",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "corrected-invoice.svg",
+          "widthPx": 800,
+          "heightPx": 600,
+          "contentDescription": "Odręczna notatka w linii: nagłówek 'Faktura Kowalski', niżej wyszarzona kwota '7 200 zł' przekreślona czerwoną kreską, obok na prawo czerwona poprawiona kwota '7 900 zł' pogrubiona, pod spodem dopisek 'była 7 2'.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 112,
+            "note": "Deterministic synthetic SVG (handwriting style with strikethrough).",
+            "sha256": "72202f345d9830d6d21b0c4e0a630aacccf8d2400480e8d2d5679059f398123e"
+          }
+        }
+      ]
+    }
+  ]
+}

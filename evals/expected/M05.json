@@ -1,0 +1,124 @@
+{
+  "caseId": "M05",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 1.5, "to": 6.0, "expectedText": "kleju na Bananową przychodzi w czwartek rano", "risk": "'Bananową' dropped to 'Banan', flipping project attribution." }
+      ]
+    }
+  ],
+  "expectedVision": [
+    {
+      "sourceId": "S2",
+      "partId": "S2-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 40, "y": 140, "w": 250, "h": 40, "note": "Project line on the delivery note." },
+          "expectedValue": { "kind": "text", "value": "Projekt: BANAN" },
+          "risk": "Alias read as BANANOWA."
+        },
+        {
+          "region": { "kind": "image_region", "x": 40, "y": 210, "w": 260, "h": 40, "note": "Item line, format." },
+          "expectedValue": { "kind": "quantity", "value": "60", "secondValue": "60", "unit": "cm", "originalExpression": "płytki 60×60" },
+          "risk": "Format scale drift."
+        },
+        {
+          "region": { "kind": "image_region", "x": 330, "y": 210, "w": 180, "h": 40, "note": "Item line, quantity." },
+          "expectedValue": { "kind": "quantity", "value": "20", "unit": "m2", "originalExpression": "20 m²" },
+          "risk": "Quantity column swap with the format."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "voice-processed",
+      "when": "After S1 (voice) is processed, before S2 arrives.",
+      "memoryChanges": [
+        {
+          "findingKey": "glue_delivery_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "internal_plan",
+            "date": "2026-09-24",
+            "qualifier": "rano",
+            "originalExpression": "w czwartek rano"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-aud", "supportType": "support", "anchor": { "kind": "audio_interval", "from": 1.5, "to": 6.0, "transcriptQuote": "Dostawa kleju na Bananową przychodzi w czwartek rano" } }
+          ],
+          "rationale": "Monday 2026-09-21 send: czwartek = 2026-09-24 on Bananowa; 'rano' stays a qualifier. The project pill (Bananowa) agrees with the spoken alias here."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Turn 'rano' into an exact hour.", "category": "date", "because": "No hour was spoken." }
+      ]
+    },
+    {
+      "stageId": "final",
+      "when": "After S2 (image) is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "glue_delivery_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "internal_plan",
+            "date": "2026-09-24",
+            "qualifier": "rano",
+            "originalExpression": "w czwartek rano"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-aud", "supportType": "support", "anchor": { "kind": "audio_interval", "from": 1.5, "to": 6.0, "transcriptQuote": "na Bananową przychodzi w czwartek rano" } }
+          ],
+          "rationale": "Unchanged by S2: S2 concerns the other project."
+        },
+        {
+          "findingKey": "tile_delivery",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "20", "unit": "m2", "originalExpression": "płytki 60×60 — 20 m²" },
+          "evidence": [
+            { "sourceId": "S2", "partId": "S2-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 330, "y": 210, "w": 180, "h": 40, "note": "Quantity on the note marked Projekt: BANAN." } }
+          ],
+          "rationale": "The delivery note explicitly names BANAN: 20 m² of 60x60 tiles. No pill was attached; the note's own project line decides."
+        },
+        {
+          "findingKey": "tile_format",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "60", "secondValue": "60", "unit": "cm", "originalExpression": "płytki 60×60" },
+          "evidence": [
+            { "sourceId": "S2", "partId": "S2-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 40, "y": 210, "w": 260, "h": 40, "note": "Format line." } }
+          ],
+          "rationale": "Format from the same note, on Banan."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Attribute the 20 m² tile delivery to Bananowa because the voice message arrived first and concerned it.", "category": "project", "because": "The note names its own project (BANAN); recency of another project's message is not evidence." },
+        { "mustNot": "Attribute the glue delivery to Banan.", "category": "project", "because": "The spoken alias is 'Bananowa', backed by the pill." }
+      ]
+    }
+  ],
+  "retrievalExpectations": {
+    "expectHits": [
+      { "query": "dostawa płytek Banan", "mustReturnEvidenceFrom": ["S2"], "findingKeys": ["tile_delivery"] }
+    ],
+    "mustNotSurface": [
+      { "query": "dostawa płytek Banan", "forbiddenSourceOrProject": "the Bananowa glue-delivery clause", "because": "Different project and different material; similar aliases must not blur retrieval." }
+    ]
+  }
+}

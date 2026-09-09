@@ -1,0 +1,73 @@
+{
+  "caseId": "I04",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 60, "y": 100, "w": 500, "h": 60, "note": "Card headline." },
+          "expectedValue": { "kind": "text", "value": "WIŚNIEWSKI INSTALACJE" },
+          "risk": "Letter-spacing fooling OCR into splitting words."
+        },
+        {
+          "region": { "kind": "image_region", "x": 60, "y": 170, "w": 400, "h": 45, "note": "Person line." },
+          "expectedValue": { "kind": "text", "value": "Marek Wiśniewski" },
+          "risk": "Diacritic loss: 'Wisniewski'."
+        },
+        {
+          "region": { "kind": "image_region", "x": 60, "y": 230, "w": 300, "h": 40, "note": "Phone line." },
+          "expectedValue": { "kind": "text", "value": "601 202 303" },
+          "risk": "Digit transposition."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1's vision extraction is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "contact_org",
+          "operation": "set",
+          "scope": { "level": "company", "ref": "COMPANY" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "WIŚNIEWSKI INSTALACJE" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 60, "y": 100, "w": 500, "h": 60, "note": "Card headline." } }
+          ],
+          "rationale": "Company-level knowledge: a new contact organization in the firm catalog."
+        },
+        {
+          "findingKey": "contact_person",
+          "operation": "set",
+          "scope": { "level": "company", "ref": "COMPANY" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "Marek Wiśniewski" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 60, "y": 170, "w": 400, "h": 45, "note": "Person line." } }
+          ],
+          "rationale": "Contact person with diacritics preserved."
+        },
+        {
+          "findingKey": "contact_phone",
+          "operation": "set",
+          "scope": { "level": "company", "ref": "COMPANY" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "601 202 303" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 60, "y": 230, "w": 300, "h": 40, "note": "Phone line." } }
+          ],
+          "rationale": "Phone digits exact."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Store names without Polish diacritics ('Wisniewski').", "category": "other", "because": "Identity data must transfer verbatim." },
+        { "mustNot": "Attach the contact to a project as a client.", "category": "project", "because": "The card only establishes a contact; no project role was stated." }
+      ]
+    }
+  ]
+}

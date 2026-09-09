@@ -1,0 +1,66 @@
+{
+  "caseId": "M02",
+  "modality": "mixed",
+  "corpusRevision": "2026.09.1",
+  "title": "Korekta startu w trakcie przestoju analizy",
+  "coverage": ["stale_plan", "relative_dates"],
+  "fixtureClock": "2026-09-15T09:00:00+02:00",
+  "notes": "Tuesday send: S1 'w przyszły poniedziałek' = 2026-09-21 (plan). S2 (voice, 09:10) corrects to an explicit date 2026-09-23 which publishes at 09:12; S1's plan completes at 09:45 and must be reconsidered, not overwrite.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-SIKORA", "name": "Sikora", "kind": "person", "detail": "klient" }],
+    "projects": [{ "ref": "P-SIKORA", "alias": "Sikora", "client": "C-SIKORA", "stage": "uzgodnienie" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-15T09:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-15T09:00:02+02:00",
+      "projectPill": "P-SIKORA",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Remont u Sikory rusza w przyszły poniedziałek, planuję ekipę."
+        }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-15T09:10:00+02:00",
+      "fullyAcceptedAt": "2026-09-15T09:10:07+02:00",
+      "projectPill": "P-SIKORA",
+      "parts": [
+        {
+          "partId": "S2-aud",
+          "type": "voice",
+          "durationSeconds": 14.0,
+          "transcript": "Nie, przepraszam, Sikora przesunął — ruszamy dopiero dwudziestego trzeciego września. Zapisz dwudziestego trzeciego.",
+          "recordingContext": "Głosówka Wojtka z samochodu.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker A, car noise."
+          }
+        }
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "type": "run_completion",
+      "sourceId": "S2",
+      "completesAt": "2026-09-15T09:12:00+02:00",
+      "reason": "Standard processing; correction publishes first."
+    },
+    {
+      "type": "run_completion",
+      "sourceId": "S1",
+      "completesAt": "2026-09-15T09:45:00+02:00",
+      "reason": "Provider outage delayed S1; its plan carries the superseded Monday start and must be reconsidered against current state."
+    }
+  ]
+}

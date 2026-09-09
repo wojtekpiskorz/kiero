@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+<desc>Wydruk kalendarza PAŹDZIERNIK 2026; 15 października zakreślone na czerwono z dopiskiem wpłata 5 000.</desc>
+<rect width="800" height="600" fill="#ffffff"/>
+<text x="60" y="70" font-family="Arial, Helvetica, sans-serif" font-size="26" fill="#111" font-weight="bold" letter-spacing="2">PAŹDZIERNIK 2026</text>
+<text x="72" y="134" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111" font-weight="bold">Pn</text>
+<text x="168" y="134" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111" font-weight="bold">Wt</text>
+<text x="264" y="134" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111" font-weight="bold">Śr</text>
+<text x="360" y="134" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111" font-weight="bold">Cz</text>
+<text x="456" y="134" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111" font-weight="bold">Pt</text>
+<text x="552" y="134" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111" font-weight="bold">So</text>
+<text x="648" y="134" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#111" font-weight="bold">Nd</text>
+<text x="360" y="156" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">1</text>
+<text x="456" y="156" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">2</text>
+<text x="552" y="156" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">3</text>
+<text x="648" y="156" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">4</text>
+<text x="72" y="234" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">5</text>
+<text x="168" y="234" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">6</text>
+<text x="264" y="234" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">7</text>
+<text x="360" y="234" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">8</text>
+<text x="456" y="234" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">9</text>
+<text x="552" y="234" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">10</text>
+<text x="648" y="234" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">11</text>
+<text x="72" y="312" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">12</text>
+<text x="168" y="312" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">13</text>
+<text x="264" y="312" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">14</text>
+<text x="360" y="312" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#c62828" font-weight="bold">15</text>
+<ellipse cx="372" cy="306" rx="26" ry="22" fill="none" stroke="#c62828" stroke-width="3"/>
+<text x="456" y="312" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">16</text>
+<text x="552" y="312" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">17</text>
+<text x="648" y="312" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">18</text>
+<text x="72" y="390" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">19</text>
+<text x="168" y="390" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">20</text>
+<text x="264" y="390" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">21</text>
+<text x="360" y="390" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">22</text>
+<text x="456" y="390" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">23</text>
+<text x="552" y="390" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">24</text>
+<text x="648" y="390" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">25</text>
+<text x="72" y="468" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">26</text>
+<text x="168" y="468" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">27</text>
+<text x="264" y="468" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">28</text>
+<text x="360" y="468" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">29</text>
+<text x="456" y="468" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">30</text>
+<text x="552" y="468" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#111" font-weight="normal">31</text>
+<text x="60" y="560" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#c62828" font-weight="bold">wpłata 5 000</text>
+</svg>

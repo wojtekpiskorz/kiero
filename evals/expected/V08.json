@@ -1,0 +1,79 @@
+{
+  "caseId": "V08",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 1.5, "to": 5.0, "expectedText": "na Bananowej dostawa płytek w czwartek", "risk": "Alias dropped or attached to the wrong weekday." },
+        { "from": 7.0, "to": 10.5, "expectedText": "na Bananie spotkanie z klientem w piątek", "risk": "'Banie' vs 'Bananowej' confusion swapping the two projects." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "delivery_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "internal_plan",
+            "date": "2026-09-24",
+            "originalExpression": "w czwartek"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 1.5, "to": 5.0, "transcriptQuote": "na Bananowej dostawa płytek w czwartek" }
+            }
+          ],
+          "rationale": "Monday 2026-09-21 send: czwartek = 2026-09-24, on Bananowa."
+        },
+        {
+          "findingKey": "client_meeting_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "internal_plan",
+            "date": "2026-09-25",
+            "originalExpression": "w piątek"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 7.0, "to": 10.5, "transcriptQuote": "na Bananie spotkanie z klientem w piątek" }
+            }
+          ],
+          "rationale": "Same message: piątek = 2026-09-25, on Banan."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Swap the dates or aliases between the two projects.", "category": "project", "because": "The speaker names each project explicitly and adds 'Nie pomyl'." },
+        { "mustNot": "Create a single mixed finding covering both projects.", "category": "project", "because": "Two projects, two ustalenia." }
+      ]
+    }
+  ],
+  "retrievalExpectations": {
+    "expectHits": [
+      { "query": "kiedy dostawa płytek Bananowa", "mustReturnEvidenceFrom": ["S1"], "findingKeys": ["delivery_date"] }
+    ],
+    "mustNotSurface": [
+      { "query": "kiedy dostawa płytek Bananowa", "forbiddenSourceOrProject": "the Banan meeting clause returned as Bananowa's delivery", "because": "Similar-alias retrieval must not cross projects." }
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "caseId": "V03",
+  "modality": "voice",
+  "corpusRevision": "2026.09.1",
+  "title": "Samopoprawka terminu w głosówce",
+  "coverage": ["self_correction", "noisy_speech"],
+  "fixtureClock": "2026-09-18T06:50:00+02:00",
+  "notes": "Speaker corrects 13th -> 30th. Final wording wins (2026-09-30), no clarification; recording the superseded 13th as current is a date error.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [],
+    "projects": [{ "ref": "P-BANANOWA", "alias": "Bananowa", "stage": "realizacja" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-18T06:50:00+02:00",
+      "fullyAcceptedAt": "2026-09-18T06:50:07+02:00",
+      "projectPill": "P-BANANOWA",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 22.0,
+          "transcript": "Start robotów na Bananowej... zaraz... trzynastego... nie, nie, moment — trzydziestego. Trzydziestego września na pewno, ekipa potwierdziła.",
+          "recordingContext": "Głosówka w trakcie spaceru po budowie; w tle wiertarka, mówca mówi szybciej przy poprawce.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker, drill noise, hurried correction."
+          }
+        }
+      ]
+    }
+  ]
+}

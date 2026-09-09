@@ -1,0 +1,82 @@
+{
+  "caseId": "V16",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 2.0, "to": 7.5, "expectedText": "stopnie sześćdziesiąt na trzydzieści centymetrów", "risk": "Dimension pair order or values swapped (60/30)." },
+        { "from": 8.0, "to": 10.5, "expectedText": "czternaście sztuk", "risk": "Count corrupted (e.g. 'cztery')." },
+        { "from": 12.5, "to": 16.0, "expectedText": "cztery milimetry", "risk": "Unit mis-heard as centymetry, changing 4 mm into 4 cm." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "step_dimensions",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "quantity",
+            "value": "60",
+            "secondValue": "30",
+            "unit": "cm",
+            "originalExpression": "sześćdziesiąt na trzydzieści centymetrów"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 2.0, "to": 7.5, "transcriptQuote": "stopnie sześćdziesiąt na trzydzieści centymetrów" }
+            }
+          ],
+          "rationale": "Spoken dimensions keep their original unit (cm) and order (60 x 30)."
+        },
+        {
+          "findingKey": "step_count",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "14", "unit": "szt", "originalExpression": "czternaście sztuk" },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 8.0, "to": 10.5, "transcriptQuote": "czternaście sztuk" }
+            }
+          ],
+          "rationale": "Fourteen steps, counted in pieces."
+        },
+        {
+          "findingKey": "sheet_thickness",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "4", "unit": "mm", "originalExpression": "cztery milimetry" },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 12.5, "to": 16.0, "transcriptQuote": "Blacha na podstopnice cztery milimetry" }
+            }
+          ],
+          "rationale": "Sheet thickness stated in millimeters; the boss explicitly asks to keep his units."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Store 4 mm as 4 cm or convert it to 0.4 cm as the stored value.", "category": "other", "because": "Original unit preservation; silent conversion changes meaning (per the accepted extension-versioning example)." },
+        { "mustNot": "Swap step dimensions to 30x60 or alter the count.", "category": "other", "because": "Spoken values are exact." }
+      ]
+    }
+  ]
+}

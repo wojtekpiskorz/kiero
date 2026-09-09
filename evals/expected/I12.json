@@ -1,0 +1,66 @@
+{
+  "caseId": "I12",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 110, "y": 215, "w": 260, "h": 60, "note": "Greyed 7 200 with a red strikethrough." },
+          "expectedValue": { "kind": "text", "value": "7 200 zł" },
+          "risk": "Strikethrough missed, storing the dead value as current."
+        },
+        {
+          "region": { "kind": "image_region", "x": 410, "y": 210, "w": 280, "h": 70, "note": "Bold red correction to the right." },
+          "expectedValue": {
+            "kind": "financial",
+            "role": "payment",
+            "precision": "exact",
+            "amount": "7900.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "7 900 zł"
+          },
+          "risk": "Correction confused with the crossed-out original (7 200 vs 7 900)."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1's vision extraction is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "invoice_amount",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "payment",
+            "precision": "exact",
+            "amount": "7900.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "7 900 zł"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 410, "y": 210, "w": 280, "h": 70, "note": "Corrected amount, written after the strikethrough with 'była 7 2'." } }
+          ],
+          "historyExpectation": "The crossed-out 7 200 stays visible in history as the superseded value, together with the correction mark.",
+          "rationale": "A handwritten correction inside one document behaves like an explicit self-correction: the corrected 7 900 is current; 7 200 is history. No basis is written on the note."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record 7 200 as the current invoice amount.", "category": "amount", "because": "It is crossed out and replaced by 7 900 with an explicit note." },
+        { "mustNot": "Mark the finding conflicted or ask which amount applies.", "category": "clarification", "because": "The strikethrough plus 'była 7 2' resolves it within the source." },
+        { "mustNot": "Guess a tax basis.", "category": "source_basis", "because": "The note states none." }
+      ]
+    }
+  ]
+}

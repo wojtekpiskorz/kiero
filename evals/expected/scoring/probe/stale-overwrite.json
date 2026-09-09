@@ -1,0 +1,75 @@
+{
+  "caseId": "T13",
+  "corpusRevision": "2026.09.1",
+  "run": {
+    "runId": "probe-deliberate-4",
+    "attempt": 1,
+    "startedAt": "2026-09-21T08:02:00+02:00",
+    "finishedAt": "2026-09-21T08:31:20+02:00",
+    "environment": "hand-built probe report (no real run)",
+    "revision": "not-a-real-run"
+  },
+  "configuration": {
+    "chat": { "provider": "probe", "model": "probe/fictional", "route": "n/a", "promptVersion": "probe", "schemaVersion": "probe" }
+  },
+  "latencyMs": { "firstUsefulOutputMs": 900, "totalMs": 2940000 },
+  "attempts": 1,
+  "cost": { "amountUsd": "0.0000", "metered": false },
+  "stages": {
+    "stt": { "status": "skipped" },
+    "vision": { "status": "skipped" },
+    "retrieval": { "status": "complete", "evidenceReturned": ["S1", "S2"] },
+    "memoryChanges": {
+      "status": "complete",
+      "published": [
+        {
+          "stageId": "correction-published",
+          "changes": [
+            {
+              "findingKey": "agreed_price",
+              "scope": { "level": "project", "ref": "P-KACZMAREK" },
+              "operation": "supersede",
+              "knowledgeState": "known",
+              "value": {
+                "kind": "financial",
+                "role": "agreed_price",
+                "precision": "exact",
+                "amount": "12500.00",
+                "currency": "PLN",
+                "currencyOrigin": "firm_default",
+                "vatBasis": "net",
+                "originalExpression": "finalnie ustaliliśmy 12 500 zł netto"
+              },
+              "evidence": [{ "sourceId": "S2", "anchor": { "kind": "text_quote", "quote": "finalnie ustaliliśmy 12 500 zł netto. Ta kwota obowiązuje" } }]
+            }
+          ]
+        },
+        {
+          "stageId": "final",
+          "changes": [
+            {
+              "findingKey": "agreed_price",
+              "scope": { "level": "project", "ref": "P-KACZMAREK" },
+              "operation": "set",
+              "knowledgeState": "known",
+              "value": {
+                "kind": "financial",
+                "role": "agreed_price",
+                "precision": "exact",
+                "amount": "15000.00",
+                "currency": "PLN",
+                "currencyOrigin": "firm_default",
+                "vatBasis": "net",
+                "originalExpression": "Kaczmarek się zgadza na wycenę 15 000 zł netto"
+              },
+              "evidence": [{ "sourceId": "S1", "anchor": { "kind": "text_quote", "quote": "Kaczmarek się zgadza na wycenę 15 000 zł netto, zapisuję." } }]
+            }
+          ]
+        }
+      ]
+    },
+    "clarifications": { "status": "complete", "asked": [] }
+  },
+  "caseScore": 1.0,
+  "caseOutcome": "pass"
+}

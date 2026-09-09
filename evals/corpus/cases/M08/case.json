@@ -1,0 +1,48 @@
+{
+  "caseId": "M08",
+  "modality": "mixed",
+  "corpusRevision": "2026.09.1",
+  "title": "Podstawę kwoty trzeba wyjaśnić",
+  "coverage": ["unknown_tax_basis", "amounts"],
+  "fixtureClock": "2026-09-24T11:00:00+02:00",
+  "notes": "S1 records an 18 000 contract but the boss himself says 'chyba brutto, nie pamiętam': an explicit uncertainty about basis on a signed contract. Correct stage 1: record 18000 with not_specified (no guessing) AND ask; asking is a SUCCESS here. S2 resolves: netto, applied as a revision, history keeps the not_specified phase.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [
+      { "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" },
+      { "ref": "B-MAREK", "name": "Marek", "role": "szef" }
+    ],
+    "contacts": [{ "ref": "C-DOM-LID", "name": "Dom-Lid", "kind": "organization", "detail": "klient-inwestor" }],
+    "projects": [{ "ref": "P-WISLANA", "alias": "Wiślana", "client": "C-DOM-LID", "stage": "uzgodnienie" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-24T11:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-24T11:00:03+02:00",
+      "projectPill": "P-WISLANA",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Podpisaliśmy umowę z Dom-Lid na Wiślanej: 18 000 zł za całość. Chyba brutto... nie pamiętam dokładnie, sprawdźcie w umowie jutro."
+        }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-25T09:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T09:00:02+02:00",
+      "projectPill": "P-WISLANA",
+      "parts": [
+        {
+          "partId": "S2-txt",
+          "type": "text",
+          "text": "Sprawdziłem umowę z Wiślanej: 18 000 zł netto. Proszę poprawić zapis."
+        }
+      ]
+    }
+  ]
+}

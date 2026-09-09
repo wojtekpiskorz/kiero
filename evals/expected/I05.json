@@ -1,0 +1,89 @@
+{
+  "caseId": "I05",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 60, "y": 90, "w": 320, "h": 210, "note": "Left column, blue marker." },
+          "expectedValue": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "internal_plan",
+            "date": "2026-09-28",
+            "originalExpression": "start 28.09"
+          },
+          "risk": "Column swap with BANANOWA's start date."
+        },
+        {
+          "region": { "kind": "image_region", "x": 440, "y": 90, "w": 320, "h": 210, "note": "Right column, green marker." },
+          "expectedValue": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "internal_plan",
+            "date": "2026-10-05",
+            "originalExpression": "start 5.10"
+          },
+          "risk": "Day/month flip reading 5.10 as 10.05."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1's vision extraction is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "start_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "internal_plan",
+            "date": "2026-09-28",
+            "originalExpression": "start 28.09"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 60, "y": 90, "w": 320, "h": 210, "note": "Left (blue) column: BANAN." } }
+          ],
+          "rationale": "Left column is BANAN with start 28.09 = 2026-09-28 (dd.mm, Polish convention)."
+        },
+        {
+          "findingKey": "start_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "internal_plan",
+            "date": "2026-10-05",
+            "originalExpression": "start 5.10"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 440, "y": 90, "w": 320, "h": 210, "note": "Right (green) column: BANANOWA." } }
+          ],
+          "rationale": "Right column is BANANOWA with start 5.10 = 2026-10-05."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Swap the start dates between Banan and Bananowa.", "category": "project", "because": "Each date belongs to the column that names its project." },
+        { "mustNot": "Read 5.10 as May 10th (US month/day order).", "category": "date", "because": "Polish convention is day.month; the firm context fixes the year." }
+      ]
+    }
+  ],
+  "retrievalExpectations": {
+    "expectHits": [
+      { "query": "start prac Banan", "mustReturnEvidenceFrom": ["S1"], "findingKeys": ["start_date"] }
+    ],
+    "mustNotSurface": [
+      { "query": "start prac Banan", "forbiddenSourceOrProject": "Bananowa's 5.10 date returned as Banan's start", "because": "Similar-alias projects must stay separable in retrieval." }
+    ]
+  }
+}

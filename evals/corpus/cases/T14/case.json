@@ -1,0 +1,46 @@
+{
+  "caseId": "T14",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Wycofanie wiadomości źródłowej",
+  "coverage": ["withdrawal_deletion", "amounts"],
+  "fixtureClock": "2026-09-22T09:00:00+02:00",
+  "notes": "Boss explicitly withdraws S1 (wrong client). The solely-supported deposit finding must be re-evaluated to unknown; history keeps the reason and author; no fabricated replacement value.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [
+      { "ref": "C-WROBEL", "name": "Wróbel", "kind": "person", "detail": "klient" },
+      { "ref": "C-WRONA", "name": "Wrona", "kind": "person", "detail": "klient" }
+    ],
+    "projects": [
+      { "ref": "P-WROBEL", "alias": "Wróbel", "client": "C-WROBEL", "stage": "uzgodnienie" }
+    ],
+    "existingFindings": []
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-22T09:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-22T09:00:02+02:00",
+      "projectPill": "P-WROBEL",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Wróbel dał zaliczkę 3 000 zł gotówką, odnotuj."
+        }
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "type": "source_withdrawn",
+      "sourceId": "S1",
+      "at": "2026-09-22T09:20:00+02:00",
+      "by": "B-WOJTEK",
+      "reason": "Pomyłka — zaliczkę dał Wrona, nie Wróbel. Wycofuję tę wiadomość."
+    }
+  ]
+}

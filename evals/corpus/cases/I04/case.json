@@ -1,0 +1,59 @@
+{
+  "caseId": "I04",
+  "modality": "image",
+  "corpusRevision": "2026.09.1",
+  "title": "Wizytówka instalatora",
+  "coverage": [
+    "names"
+  ],
+  "fixtureClock": "2026-09-25T12:30:00+02:00",
+  "notes": "Business card: org 'WIŚNIEWSKI INSTALACJE', person 'Marek Wiśniewski', phone '601 202 303'. Diacritics and the phone digits must transfer exactly.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-MAREK",
+        "name": "Marek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [],
+    "projects": [
+      {
+        "ref": "P-BANAN",
+        "alias": "Banan",
+        "stage": "realizacja"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-25T12:30:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T12:30:04+02:00",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "business-card.svg",
+          "widthPx": 800,
+          "heightPx": 500,
+          "contentDescription": "Wizytówka na jasnym tle z granatową obwódką: nagłówek 'WIŚNIEWSKI INSTALACJE', poniżej 'Marek Wiśniewski', dalej 'tel. 601 202 303' i adres e-mail kontakt@wisniewski-instalacje.example.pl.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 104,
+            "note": "Deterministic synthetic SVG (print style business card).",
+            "sha256": "7cadcea33da159a80d15186e363524d69ac1bb507e5526af521b92445623775a"
+          }
+        }
+      ]
+    }
+  ]
+}

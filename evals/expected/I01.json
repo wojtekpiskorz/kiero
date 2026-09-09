@@ -1,0 +1,75 @@
+{
+  "caseId": "I01",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 180, "y": 130, "w": 400, "h": 70, "note": "Client name at the top of the note." },
+          "expectedValue": { "kind": "text", "value": "KACZMAREK" },
+          "risk": "Handwritten caps misread."
+        },
+        {
+          "region": { "kind": "image_region", "x": 220, "y": 230, "w": 340, "h": 80, "note": "Underlined amount, twice." },
+          "expectedValue": {
+            "kind": "financial",
+            "role": "agreed_price",
+            "precision": "exact",
+            "amount": "9800.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "9 800 zł"
+          },
+          "risk": "Digit pair swap (9 800 vs 8 900) or extra zero."
+        },
+        {
+          "region": { "kind": "image_region", "x": 190, "y": 380, "w": 200, "h": 70, "note": "The word UMOWA." },
+          "expectedValue": { "kind": "text", "value": "UMOWA" },
+          "risk": "Role marker missed, downgrading an agreement to a quote."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1's vision extraction is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "agreed_price",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-KACZMAREK" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "agreed_price",
+            "precision": "exact",
+            "amount": "9800.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "9 800 zł"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-img",
+              "supportType": "support",
+              "anchor": { "kind": "image_region", "x": 220, "y": 230, "w": 340, "h": 80, "note": "Handwritten underlined amount next to UMOWA." }
+            }
+          ],
+          "rationale": "Handwriting reading: KACZMAREK + 9 800 zł + UMOWA establishes an agreed price; the note contains no net/gross wording whatsoever."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Guess net or gross for the 9 800 price.", "category": "source_basis", "because": "The note states no basis; never infer VAT from an image." },
+        { "mustNot": "Record 8 900 or 98 000 through handwriting digit misreads.", "category": "amount", "because": "The amount is 9 800, underlined for emphasis." },
+        { "mustNot": "Ask about the tax basis.", "category": "clarification", "because": "Recording proceeds with not_specified; the gap alone does not require a question." }
+      ]
+    }
+  ]
+}

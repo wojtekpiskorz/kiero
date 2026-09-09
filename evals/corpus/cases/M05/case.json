@@ -1,0 +1,86 @@
+{
+  "caseId": "M05",
+  "modality": "mixed",
+  "corpusRevision": "2026.09.1",
+  "title": "Głosówka o Bananowej i dostawa na Banan",
+  "coverage": [
+    "similar_aliases",
+    "mixed_projects"
+  ],
+  "fixtureClock": "2026-09-21T07:50:00+02:00",
+  "notes": "Monday send: 'w czwartek' = 2026-09-24 for Bananowa (voice). Same morning an image delivery note arrives for BANAN (print). Similar aliases across modalities; attribution must not cross.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-WOJTEK",
+        "name": "Wojtek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [],
+    "projects": [
+      {
+        "ref": "P-BANAN",
+        "alias": "Banan",
+        "stage": "realizacja"
+      },
+      {
+        "ref": "P-BANANOWA",
+        "alias": "Bananowa",
+        "stage": "realizacja"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-21T07:50:00+02:00",
+      "fullyAcceptedAt": "2026-09-21T07:50:07+02:00",
+      "projectPill": "P-BANANOWA",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 11,
+          "transcript": "Dostawa kleju na Bananową przychodzi w czwartek rano, przypilnuj rozładunku.",
+          "recordingContext": "Poranna głosówka.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker A."
+          }
+        }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-21T11:20:00+02:00",
+      "fullyAcceptedAt": "2026-09-21T11:20:05+02:00",
+      "parts": [
+        {
+          "partId": "S2-img",
+          "type": "image",
+          "asset": "delivery-note.svg",
+          "widthPx": 600,
+          "heightPx": 800,
+          "contentDescription": "Wydruk 'FV 12/2026' z dopiskiem 'Projekt: BANAN', pozycja 'płytki 60×60', ilość '20 m²'.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 205,
+            "note": "Deterministic synthetic SVG (print style delivery note).",
+            "sha256": "9b0895e4ab3793a40b336cfa067d630befcc933707ff871b85190404f9b5df36"
+          }
+        }
+      ]
+    }
+  ]
+}

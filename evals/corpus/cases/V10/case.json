@@ -1,0 +1,38 @@
+{
+  "caseId": "V10",
+  "modality": "voice",
+  "corpusRevision": "2026.09.1",
+  "title": "Niezrozumiały fragment — tydzień zamiast dnia",
+  "coverage": ["incomplete_evidence", "noisy_speech", "relative_dates"],
+  "fixtureClock": "2026-09-14T13:20:00+02:00",
+  "notes": "Monday send; 'w przyszłym tygodniu' = Mon 2026-09-21 .. Sun 2026-09-27. The unintelligible segment (which would name the day) must remain explicitly incomplete; guessing a day is prohibited.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [],
+    "projects": [{ "ref": "P-BANAN", "alias": "Banan", "stage": "realizacja" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-14T13:20:00+02:00",
+      "fullyAcceptedAt": "2026-09-14T13:20:09+02:00",
+      "projectPill": "P-BANAN",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 24.0,
+          "transcript": "Dostawa na Banana... (niezrozumiałe, dzień nie do odsłuchania) ... w każdym razie w przyszłym tygodniu na pewno. Resztę potwierdzę później.",
+          "recordingContext": "Bardzo złe warunki: wiatr, mówca z daleka od telefonu, fragment dnia całkowicie zagłuszony.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker, wind gusts deliberately covering one segment."
+          }
+        }
+      ]
+    }
+  ]
+}

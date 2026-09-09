@@ -1,0 +1,64 @@
+{
+  "caseId": "I08",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 380, "y": 345, "w": 360, "h": 50, "note": "Bold approximate total with tilde." },
+          "expectedValue": {
+            "kind": "financial",
+            "role": "estimated_price",
+            "precision": "approximate",
+            "amount": "4200.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "razem ~ 4 200"
+          },
+          "risk": "Tilde missed, storing an exact amount."
+        },
+        {
+          "region": { "kind": "image_region", "x": 60, "y": 55, "w": 400, "h": 45, "note": "SZACUNEK header." },
+          "expectedValue": { "kind": "text", "value": "SZACUNEK — MATERIAŁY" },
+          "risk": "Header ignored although it sets the document's business role."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1's vision extraction is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "material_estimate",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "estimated_price",
+            "precision": "approximate",
+            "amount": "4200.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "razem ~ 4 200"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 380, "y": 345, "w": 360, "h": 50, "note": "Approximate total." } }
+          ],
+          "rationale": "The header says SZACUNEK and the total carries a tilde: an approximate estimate, no commitment, no stated basis."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record 4 200 as an exact or agreed materials price.", "category": "commitment", "because": "Both the header and the tilde mark it as an estimate." },
+        { "mustNot": "Guess a VAT basis.", "category": "source_basis", "because": "No basis is printed anywhere on the list." }
+      ]
+    }
+  ]
+}

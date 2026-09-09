@@ -1,0 +1,69 @@
+{
+  "caseId": "I10",
+  "modality": "image",
+  "corpusRevision": "2026.09.1",
+  "title": "Kalendarz z zaznaczoną wpłatą 5 000",
+  "coverage": [
+    "date_precision",
+    "amounts"
+  ],
+  "fixtureClock": "2026-09-25T17:00:00+02:00",
+  "notes": "October 2026 calendar page, 15th circled in red with note 'wpłata 5 000'. Deposit 5000.00 with deadline 2026-10-15, date-only.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-WOJTEK",
+        "name": "Wojtek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "C-KOWALSKI",
+        "name": "Kowalski",
+        "kind": "person",
+        "detail": "klient"
+      }
+    ],
+    "projects": [
+      {
+        "ref": "P-BANAN",
+        "alias": "Banan",
+        "client": "C-KOWALSKI",
+        "stage": "uzgodnienie"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-25T17:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T17:00:04+02:00",
+      "projectPill": "P-BANAN",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "calendar.svg",
+          "widthPx": 800,
+          "heightPx": 600,
+          "contentDescription": "Wydruk kalendarza 'PAŹDZIERNIK 2026'. Liczba 15 (czwartek) jest zakreślona czerwoną elipsą, pod kalendarzem czerwony dopisek 'wpłata 5 000'.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 110,
+            "note": "Deterministic synthetic SVG (print style calendar, computed October 2026 grid).",
+            "sha256": "8c9feb6825a69b94d2fedd2711a2d8a83e5724be0776877a10c9cdc0bc7f60e0"
+          }
+        }
+      ]
+    }
+  ]
+}

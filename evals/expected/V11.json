@@ -1,0 +1,49 @@
+{
+  "caseId": "V11",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 2.0, "to": 8.0, "expectedText": "między dwudziestym a dwudziestym drugim października", "risk": "Bound confusion ('dwudziestym' vs 'dwudziestym drugim') collapsing the range to one day." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "window_install_range",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-SOSNOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "range",
+            "role": "agreed",
+            "fromDate": "2026-10-20",
+            "toDate": "2026-10-22",
+            "originalExpression": "między dwudziestym a dwudziestym drugim października"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 2.0, "to": 8.0, "transcriptQuote": "między dwudziestym a dwudziestym drugim października" }
+            }
+          ],
+          "rationale": "The boss explicitly says 'zapisz jako zakres'; both bounds are justified and neither day may be chosen alone."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Collapse the range to 2026-10-20, 2026-10-21 or 2026-10-22 as a single date.", "category": "date", "because": "A range must stay a range; picking a bound invents precision." },
+        { "mustNot": "Add an hour to either bound.", "category": "date", "because": "No time of day was stated." }
+      ]
+    }
+  ]
+}

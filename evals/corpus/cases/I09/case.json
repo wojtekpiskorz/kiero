@@ -1,0 +1,65 @@
+{
+  "caseId": "I09",
+  "modality": "image",
+  "corpusRevision": "2026.09.1",
+  "title": "Tablica na budowie: GRIS czy BIAŁE",
+  "coverage": [
+    "similar_aliases",
+    "handwriting"
+  ],
+  "fixtureClock": "2026-09-25T16:10:00+02:00",
+  "notes": "Two lines of handwriting: 'BANAN — płytki GRIS' (blue) and 'BANANOWA — płytki BIAŁE' (red). Swapping colors between projects is a critical project error.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-WOJTEK",
+        "name": "Wojtek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [],
+    "projects": [
+      {
+        "ref": "P-BANAN",
+        "alias": "Banan",
+        "stage": "realizacja"
+      },
+      {
+        "ref": "P-BANANOWA",
+        "alias": "Bananowa",
+        "stage": "realizacja"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-25T16:10:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T16:10:04+02:00",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "site-board.svg",
+          "widthPx": 800,
+          "heightPx": 600,
+          "contentDescription": "Zdjęcie tablicy na budowie, dwa odręczne wiersze: górny niebieski 'BANAN — płytki GRIS', dolny czerwony 'BANANOWA — płytki BIAŁE'.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 109,
+            "note": "Deterministic synthetic SVG (handwriting style site board).",
+            "sha256": "22065acabfe4326461b000fb2077b10caf7b3926e19da477ae226fc07b901fdc"
+          }
+        }
+      ]
+    }
+  ]
+}

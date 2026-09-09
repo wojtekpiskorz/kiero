@@ -1,0 +1,105 @@
+{
+  "caseId": "M07",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S2",
+      "partId": "S2-aud",
+      "fidelityPoints": [
+        { "from": 2.5, "to": 7.0, "expectedText": "szóstego października o dziewiątej rano", "risk": "Day read as piątego (the proposal day) or hour lost." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "proposal",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "installation_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-JURCZAK" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "proposal",
+            "date": "2026-10-05",
+            "originalExpression": "Zaproponowałem montaż na 5 października"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-txt", "supportType": "support", "anchor": { "kind": "text_quote", "quote": "Zaproponowałem Jurczakowi montaż na 5 października" } }
+          ],
+          "rationale": "A proposal awaiting the client's answer; role 'proposal', date-only."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record 2026-10-05 as agreed.", "category": "commitment", "because": "'Zaproponowałem... czekam na jego odpowiedź': nothing was accepted yet." }
+      ]
+    },
+    {
+      "stageId": "agreed",
+      "when": "After S2 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "installation_date",
+          "operation": "supersede",
+          "scope": { "level": "project", "ref": "P-JURCZAK" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "datetime",
+            "role": "agreed",
+            "date": "2026-10-06",
+            "timeOfDay": "09:00",
+            "datetime": "2026-10-06T09:00:00+02:00",
+            "originalExpression": "szóstego października o dziewiątej rano"
+          },
+          "evidence": [
+            { "sourceId": "S2", "partId": "S2-aud", "supportType": "supersession", "anchor": { "kind": "audio_interval", "from": 2.5, "to": 7.0, "transcriptQuote": "Jurczak przyjął termin: montaż szóstego października o dziewiątej rano" } }
+          ],
+          "historyExpectation": "The 2026-10-05 proposal remains in history with its original role; a new agreed date replaces the current value of the same finding.",
+          "rationale": "Client accepted a different day with an hour: agreed datetime supersedes the proposal."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Overwrite or discard the proposal's history entry.", "category": "other", "because": "Revisions are immutable; the proposal stays interpretable." },
+        { "mustNot": "Record the agreed date as 2026-10-05.", "category": "date", "because": "The client moved it to the 6th." }
+      ]
+    },
+    {
+      "stageId": "final",
+      "when": "After S3 is processed (sent 2026-10-07, 'wczoraj' = 2026-10-06).",
+      "memoryChanges": [
+        {
+          "findingKey": "installation_date",
+          "operation": "supersede",
+          "scope": { "level": "project", "ref": "P-JURCZAK" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "actual",
+            "date": "2026-10-06",
+            "originalExpression": "Wczoraj skończyliśmy cały montaż"
+          },
+          "evidence": [
+            { "sourceId": "S3", "partId": "S3-txt", "supportType": "supersession", "anchor": { "kind": "text_quote", "quote": "Wczoraj skończyliśmy cały montaż u Jurczaka" } }
+          ],
+          "historyExpectation": "History shows all three roles in order: proposal 2026-10-05, agreed 2026-10-06 09:00, actual 2026-10-06. The current value is the actual completion.",
+          "rationale": "'Wczoraj' relative to the 2026-10-07 send = 2026-10-06; actual completion is date-only even though the agreed value had an hour."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Carry the 09:00 hour onto the actual completion date.", "category": "date", "because": "The actual event only says 'wczoraj'; no completion time is known." },
+        { "mustNot": "Erase the agreed datetime from history when recording the actual date.", "category": "other", "because": "Each role's revision is preserved." }
+      ]
+    }
+  ],
+  "retrievalExpectations": {
+    "expectHits": [
+      { "query": "kiedy montaż Jurczak", "mustReturnEvidenceFrom": ["S2", "S3"], "findingKeys": ["installation_date"] }
+    ]
+  }
+}

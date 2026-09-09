@@ -1,0 +1,82 @@
+{
+  "caseId": "M08",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "uncertain-basis",
+      "when": "After S1 is processed, before the boss checks the contract.",
+      "memoryChanges": [
+        {
+          "findingKey": "contract_price",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-WISLANA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "agreed_price",
+            "precision": "exact",
+            "amount": "18000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "18 000 zł za całość. Chyba brutto... nie pamiętam dokładnie"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-txt", "supportType": "support", "anchor": { "kind": "text_quote", "quote": "18 000 zł za całość. Chyba brutto... nie pamiętam dokładnie" } }
+          ],
+          "rationale": "The amount is certain and recordable; only the basis is uncertain, so it must stay not_specified: 'chyba brutto' is not evidence of brutto."
+        }
+      ],
+      "clarifications": [
+        {
+          "clarificationId": "CL-1",
+          "ambiguity": "Umowa podpisana na 18 000 zł, ale szef sam mówi „Chyba brutto... nie pamiętam dokładnie” — podstawa kwoty w podpisanej umowie jest jawnie niepewna.",
+          "asksAbout": "Whether the 18 000 contract amount is net or gross.",
+          "options": ["netto", "brutto"]
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record the basis as gross on the strength of 'chyba brutto'.", "category": "source_basis", "because": "An explicitly uncertain recollection is not a source for a tax basis; never infer VAT." },
+        { "mustNot": "Record the basis as net either.", "category": "source_basis", "because": "No basis is established until the contract is checked." },
+        { "mustNot": "Withhold the amount until the basis is answered.", "category": "amount", "because": "The 18 000 amount is fully supported and must be recorded immediately." }
+      ]
+    },
+    {
+      "stageId": "final",
+      "when": "After S2 confirms the basis from the contract.",
+      "memoryChanges": [
+        {
+          "findingKey": "contract_price",
+          "operation": "supersede",
+          "scope": { "level": "project", "ref": "P-WISLANA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "agreed_price",
+            "precision": "exact",
+            "amount": "18000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "net",
+            "originalExpression": "18 000 zł netto"
+          },
+          "evidence": [
+            { "sourceId": "S2", "partId": "S2-txt", "supportType": "supersession", "anchor": { "kind": "text_quote", "quote": "Sprawdziłem umowę z Wiślanej: 18 000 zł netto" } }
+          ],
+          "historyExpectation": "The not_specified phase remains visible in history: changing the basis creates a revision rather than rewriting it.",
+          "rationale": "The contract check resolves the basis to netto; the amount never changed."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Keep the basis not_specified after the explicit answer.", "category": "source_basis", "because": "Clear evidence arrived; ignoring it leaves a wrong current state." },
+        { "mustNot": "Alter the amount while fixing the basis.", "category": "amount", "because": "Only the basis was corrected; 18 000 stands." }
+      ]
+    }
+  ],
+  "retrievalExpectations": {
+    "expectHits": [
+      { "query": "podstawą kwoty umowa Wiślana", "mustReturnEvidenceFrom": ["S2"], "findingKeys": ["contract_price"] }
+    ]
+  }
+}

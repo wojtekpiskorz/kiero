@@ -1,0 +1,873 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kiero/corpus/expected.schema.json",
+  "title": "Kiero expected outcome (independent answer key)",
+  "description": "Human-authored expected outcomes per case. NEVER derived from model output. English structure, Polish content values. One file per corpus case under evals/expected/.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "caseId",
+    "corpusRevision",
+    "answerKeyAuthoring",
+    "stages"
+  ],
+  "properties": {
+    "caseId": {
+      "type": "string",
+      "pattern": "^(T(0[1-9]|1[0-4])|V(0[1-9]|1[0-6])|I(0[1-9]|1[0-2])|M0[1-8])$",
+      "description": "Must match the corresponding case fixture."
+    },
+    "corpusRevision": {
+      "type": "string",
+      "pattern": "^\\d{4}\\.\\d{2}\\.\\d+$",
+      "description": "Must equal the case fixture and manifest revision."
+    },
+    "answerKeyAuthoring": {
+      "const": "human_independent_of_model_output",
+      "description": "Attestation that this key was authored from the source material and accepted contracts, not from any tested model's output."
+    },
+    "notes": {
+      "type": "string"
+    },
+    "expectedStt": {
+      "type": "array",
+      "description": "Voice cases: STT fidelity points. The fixture transcript is the source of truth while audio is pending.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceId",
+          "partId",
+          "fidelityPoints"
+        ],
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "pattern": "^S[1-9][0-9]?$"
+          },
+          "partId": {
+            "type": "string"
+          },
+          "fidelityPoints": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "from",
+                "to",
+                "expectedText"
+              ],
+              "properties": {
+                "from": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "to": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "expectedText": {
+                  "type": "string",
+                  "minLength": 2,
+                  "description": "Canonical transcript substring that must survive STT verbatim (load-bearing span)."
+                },
+                "risk": {
+                  "type": "string",
+                  "description": "What a typical STT error would corrupt here, e.g. 'dwanaście i pół' -> '12,5'."
+                }
+              }
+            }
+          },
+          "incompleteSegments": {
+            "type": "array",
+            "description": "Segments that must be reported as pending/unintelligible, never filled with a guess.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "from",
+                "to",
+                "status"
+              ],
+              "properties": {
+                "from": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "to": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "status": {
+                  "const": "must_remain_incomplete"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "expectedVision": {
+      "type": "array",
+      "description": "Image cases: vision extraction points, anchored to image regions. contentDescription in the fixture is ground truth.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceId",
+          "partId",
+          "extractionPoints"
+        ],
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "pattern": "^S[1-9][0-9]?$"
+          },
+          "partId": {
+            "type": "string"
+          },
+          "extractionPoints": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "region",
+                "expectedValue"
+              ],
+              "properties": {
+                "region": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "x",
+                    "y",
+                    "w",
+                    "h"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "image_region"
+                    },
+                    "x": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "w": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "h": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "note": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "expectedValue": {
+                  "$ref": "#/definitions/value"
+                },
+                "assetTextEvidence": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Override substring that must appear in the asset when the rendering splits a value across elements (e.g. calendar day cell + month header)."
+                },
+                "risk": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "retrievalExpectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "expectHits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "query",
+              "mustReturnEvidenceFrom",
+              "findingKeys"
+            ],
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "Polish retrieval query."
+              },
+              "mustReturnEvidenceFrom": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "pattern": "^S[1-9][0-9]?$"
+                }
+              },
+              "findingKeys": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                }
+              },
+              "mustRankAbove": {
+                "type": "array",
+                "description": "Sources that must not outrank the required evidence for this query.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "mustNotSurface": {
+          "type": "array",
+          "description": "Prohibited retrieval results, e.g. another project's evidence for a project-scoped query.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "query",
+              "forbiddenSourceOrProject"
+            ],
+            "properties": {
+              "query": {
+                "type": "string"
+              },
+              "forbiddenSourceOrProject": {
+                "type": "string"
+              },
+              "because": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered expectations. Single-stage cases: exactly one stage with stageId 'final'. Mixed follow-up cases: at least 2 stages, one per timeline beat; the last is the final state.",
+      "items": {
+        "$ref": "#/definitions/stage"
+      }
+    }
+  },
+  "definitions": {
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stageId",
+        "when",
+        "memoryChanges"
+      ],
+      "properties": {
+        "stageId": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]{2,32}$"
+        },
+        "when": {
+          "type": "string",
+          "minLength": 5,
+          "description": "English description of the timeline beat this stage expects (e.g. 'after S2 processed, before delayed S1 run completes')."
+        },
+        "memoryChanges": {
+          "type": "array",
+          "description": "Expected durable memory state at this stage. Empty array is valid only when the expected outcome is genuinely 'no change' (then noChangeReason is required).",
+          "items": {
+            "$ref": "#/definitions/memoryChange"
+          }
+        },
+        "noChangeReason": {
+          "type": "string"
+        },
+        "clarifications": {
+          "type": "array",
+          "description": "Required clarifications at this stage. A correct required clarification is a SUCCESS outcome. Asking must cite the exact ambiguity.",
+          "items": {
+            "$ref": "#/definitions/clarification"
+          }
+        },
+        "prohibitedWrites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/prohibitedWrite"
+          }
+        },
+        "knowledgeState": {
+          "$ref": "#/definitions/knowledgeState"
+        }
+      }
+    },
+    "memoryChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "findingKey",
+        "operation",
+        "scope",
+        "knowledgeState"
+      ],
+      "properties": {
+        "findingKey": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "minLength": 3,
+          "description": "Stable semantic key of the ustalenie, e.g. delivery_date, agreed_price, tile_color."
+        },
+        "operation": {
+          "enum": [
+            "set",
+            "supersede",
+            "mark_unknown",
+            "mark_conflicted",
+            "mark_not_applicable",
+            "create_project"
+          ],
+          "description": "set=new/updated current value; supersede=explicit correction wins with history kept; mark_*=explicit state change per value contract."
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "level",
+            "ref"
+          ],
+          "properties": {
+            "level": {
+              "enum": [
+                "project",
+                "company"
+              ]
+            },
+            "ref": {
+              "type": "string",
+              "pattern": "^(COMPANY|P-[A-Z0-9-]{2,24})$"
+            }
+          }
+        },
+        "knowledgeState": {
+          "enum": [
+            "known",
+            "unknown",
+            "conflicted",
+            "not_applicable"
+          ]
+        },
+        "trigger": {
+          "enum": [
+            "source_withdrawn",
+            "source_deleted"
+          ],
+          "description": "For re-evaluations driven by a lifecycle op rather than a new supporting source."
+        },
+        "value": {
+          "$ref": "#/definitions/value"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sourceId",
+              "supportType",
+              "anchor"
+            ],
+            "properties": {
+              "sourceId": {
+                "type": "string",
+                "pattern": "^S[1-9][0-9]?$"
+              },
+              "partId": {
+                "type": "string"
+              },
+              "supportType": {
+                "enum": [
+                  "support",
+                  "independent_corroboration",
+                  "derivation",
+                  "supersession"
+                ],
+                "description": "Two sources confirming one fact => two evidence entries, at least one typed independent_corroboration."
+              },
+              "anchor": {
+                "$ref": "#/definitions/anchor"
+              }
+            }
+          }
+        },
+        "historyExpectation": {
+          "type": "string",
+          "description": "What must remain visible in the revision history (prior values, reasons, authors)."
+        },
+        "rationale": {
+          "type": "string",
+          "description": "English rationale for the answer key (why this is the correct interpretation)."
+        }
+      }
+    },
+    "clarification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ambiguity",
+        "asksAbout"
+      ],
+      "properties": {
+        "clarificationId": {
+          "type": "string",
+          "pattern": "^CL-[0-9]+$"
+        },
+        "ambiguity": {
+          "type": "string",
+          "minLength": 10,
+          "description": "The EXACT ambiguity (quoted source wording) that makes asking necessary. Insufficient evidence + correct question = success."
+        },
+        "asksAbout": {
+          "type": "string",
+          "description": "What the question must resolve, in English terms of the finding keys/options."
+        },
+        "options": {
+          "type": "array",
+          "description": "Concrete candidate answers the bosses may give.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "prohibitedWrite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mustNot",
+        "category"
+      ],
+      "properties": {
+        "mustNot": {
+          "type": "string",
+          "minLength": 8,
+          "description": "What the system must NOT record/do, stated concretely."
+        },
+        "category": {
+          "enum": [
+            "project",
+            "amount",
+            "date",
+            "commitment",
+            "source_basis",
+            "clarification",
+            "other"
+          ],
+          "description": "Categories project/amount/date/commitment/source_basis map to critical-error classes; 'clarification' covers needless clarification on clear evidence."
+        },
+        "because": {
+          "type": "string",
+          "description": "Why this write would be wrong."
+        }
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/textAnchor"
+        },
+        {
+          "$ref": "#/definitions/audioAnchor"
+        },
+        {
+          "$ref": "#/definitions/imageAnchor"
+        },
+        {
+          "$ref": "#/definitions/wholeSourceAnchor"
+        }
+      ]
+    },
+    "textAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "quote"
+      ],
+      "properties": {
+        "kind": {
+          "const": "text_quote"
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 3,
+          "description": "Verbatim substring of the referenced text part; validator checks presence."
+        }
+      }
+    },
+    "audioAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "from",
+        "to"
+      ],
+      "properties": {
+        "kind": {
+          "const": "audio_interval"
+        },
+        "from": {
+          "type": "number",
+          "minimum": 0
+        },
+        "to": {
+          "type": "number",
+          "minimum": 0
+        },
+        "transcriptQuote": {
+          "type": "string"
+        }
+      }
+    },
+    "imageAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "x",
+        "y",
+        "w",
+        "h"
+      ],
+      "properties": {
+        "kind": {
+          "const": "image_region"
+        },
+        "x": {
+          "type": "number",
+          "minimum": 0
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0
+        },
+        "w": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "wholeSourceAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "whole_source"
+        }
+      }
+    },
+    "value": {
+      "description": "Typed value union per the architecture value contracts.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/temporalValue"
+        },
+        {
+          "$ref": "#/definitions/financialValue"
+        },
+        {
+          "$ref": "#/definitions/quantityValue"
+        },
+        {
+          "$ref": "#/definitions/textValue"
+        },
+        {
+          "$ref": "#/definitions/enumValue"
+        },
+        {
+          "$ref": "#/definitions/entityRefValue"
+        }
+      ]
+    },
+    "temporalValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "precision",
+        "role"
+      ],
+      "properties": {
+        "kind": {
+          "const": "temporal"
+        },
+        "precision": {
+          "enum": [
+            "date",
+            "datetime",
+            "range",
+            "week"
+          ]
+        },
+        "role": {
+          "enum": [
+            "proposal",
+            "internal_plan",
+            "agreed",
+            "actual",
+            "deadline"
+          ],
+          "description": "Znaczenie terminu: propozycja, wewnętrzny plan, uzgodniony, faktyczny, termin krytyczny."
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "datetime": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+02:00$"
+        },
+        "timeOfDay": {
+          "type": "string",
+          "pattern": "^\\d{2}:\\d{2}$"
+        },
+        "fromDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "toDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "fromTime": {
+          "type": "string",
+          "pattern": "^\\d{2}:\\d{2}$"
+        },
+        "toTime": {
+          "type": "string",
+          "pattern": "^\\d{2}:\\d{2}$"
+        },
+        "originalExpression": {
+          "type": "string",
+          "description": "Polish expression as actually said/written; preserved verbatim."
+        },
+        "qualifier": {
+          "type": "string",
+          "description": "e.g. rano: kept as qualifier, never converted into an invented hour."
+        }
+      }
+    },
+    "financialValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "role",
+        "precision",
+        "currency",
+        "currencyOrigin",
+        "vatBasis"
+      ],
+      "properties": {
+        "kind": {
+          "const": "financial"
+        },
+        "role": {
+          "enum": [
+            "agreed_price",
+            "quoted_price",
+            "estimated_price",
+            "proposal_price",
+            "material_cost",
+            "labor_cost",
+            "deposit",
+            "payment"
+          ]
+        },
+        "amount": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d{2}$",
+          "description": "Exact decimal string, e.g. 12500.00. Decimal-safe; never a float."
+        },
+        "minAmount": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d{2}$"
+        },
+        "maxAmount": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d{2}$"
+        },
+        "precision": {
+          "enum": [
+            "exact",
+            "approximate",
+            "range"
+          ]
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$"
+        },
+        "currencyOrigin": {
+          "enum": [
+            "stated",
+            "firm_default"
+          ]
+        },
+        "vatBasis": {
+          "enum": [
+            "net",
+            "gross",
+            "not_specified"
+          ],
+          "description": "never-infer-VAT: an unstated basis stays not_specified forever until a source states it."
+        },
+        "originalExpression": {
+          "type": "string"
+        }
+      }
+    },
+    "quantityValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value",
+        "unit"
+      ],
+      "properties": {
+        "kind": {
+          "const": "quantity"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^\\d+([.,]\\d+)?$"
+        },
+        "unit": {
+          "enum": [
+            "mm",
+            "cm",
+            "m",
+            "m2",
+            "szt",
+            "paleta",
+            "kursy"
+          ],
+          "description": "Original unit preserved; never silently converted."
+        },
+        "secondValue": {
+          "type": "string",
+          "pattern": "^\\d+([.,]\\d+)?$",
+          "description": "For LxW pairs, e.g. 60x30 cm."
+        },
+        "originalExpression": {
+          "type": "string"
+        }
+      }
+    },
+    "textValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "const": "text"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact Polish text, diacritics preserved."
+        }
+      }
+    },
+    "enumValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "const": "enum"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "entityRefValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "entity",
+        "ref",
+        "display"
+      ],
+      "properties": {
+        "kind": {
+          "const": "entity_ref"
+        },
+        "entity": {
+          "enum": [
+            "contact",
+            "project",
+            "boss"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "pattern": "^(B|C|P)-[A-Z0-9-]{2,24}$"
+        },
+        "display": {
+          "type": "string"
+        }
+      }
+    },
+    "knowledgeState": {
+      "enum": [
+        "known",
+        "unknown",
+        "conflicted",
+        "not_applicable"
+      ]
+    }
+  }
+}

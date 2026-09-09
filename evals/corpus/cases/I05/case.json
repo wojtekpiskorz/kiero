@@ -1,0 +1,65 @@
+{
+  "caseId": "I05",
+  "modality": "image",
+  "corpusRevision": "2026.09.1",
+  "title": "Tablica z planem startu dwóch projektów",
+  "coverage": [
+    "mixed_projects",
+    "similar_aliases"
+  ],
+  "fixtureClock": "2026-09-25T13:45:00+02:00",
+  "notes": "Left half = BANAN start 28.09 (2026-09-28), right half = BANANOWA start 5.10 (2026-10-05). Region-based attribution; swapping the columns is a critical project error.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-WOJTEK",
+        "name": "Wojtek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [],
+    "projects": [
+      {
+        "ref": "P-BANAN",
+        "alias": "Banan",
+        "stage": "realizacja"
+      },
+      {
+        "ref": "P-BANANOWA",
+        "alias": "Bananowa",
+        "stage": "wycena"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-25T13:45:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T13:45:05+02:00",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "whiteboard.svg",
+          "widthPx": 800,
+          "heightPx": 600,
+          "contentDescription": "Zdjęcie białej tablicy podzielonej kredką na dwie kolumny. Lewa kolumna niebieskim markerem: 'BANAN' i pod spodem 'start 28.09'. Prawa kolumna zielonym markerem: 'BANANOWA' i pod spodem 'start 5.10'.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 105,
+            "note": "Deterministic synthetic SVG (marker handwriting style).",
+            "sha256": "a1bc6e6a9b5e41d76a3a8b3af2053b4776cdf648f40db995e8e17956df0c1aaa"
+          }
+        }
+      ]
+    }
+  ]
+}

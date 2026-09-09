@@ -1,0 +1,38 @@
+{
+  "caseId": "T06",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Dwa podobne aliasy w jednej wiadomości",
+  "coverage": ["similar_aliases", "mixed_projects"],
+  "fixtureClock": "2026-09-21T08:00:00+02:00",
+  "notes": "Similar aliases Banan / Bananowa. Each clause must land on the correct project; the project pill names one project but must not force every clause into it.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [
+      { "ref": "C-KOWALSKI", "name": "Kowalski", "kind": "person" },
+      { "ref": "C-BANASIK", "name": "Banasik", "kind": "person" }
+    ],
+    "projects": [
+      { "ref": "P-BANAN", "alias": "Banan", "client": "C-KOWALSKI", "stage": "realizacja" },
+      { "ref": "P-BANANOWA", "alias": "Bananowa", "client": "C-BANASIK", "stage": "wycena" }
+    ],
+    "existingFindings": []
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-21T08:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-21T08:00:02+02:00",
+      "projectPill": "P-BANAN",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Raport: Banan — płytki przyjęte na magazyn, faktura od dostawcy 3 400 zł netto. Bananowa — klientka Banasik zmienia płytki na białe, proszę zapisać."
+        }
+      ]
+    }
+  ]
+}

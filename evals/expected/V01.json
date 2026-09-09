@@ -1,0 +1,77 @@
+{
+  "caseId": "V01",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 2.0, "to": 6.5, "expectedText": "płytki na Banana przychodzą", "risk": "Project alias mis-heard as 'Bananowa'." },
+        { "from": 7.5, "to": 9.5, "expectedText": "we wtorek", "risk": "Weekday lost among fills." },
+        { "from": 13.0, "to": 17.5, "expectedText": "dwanaście i pół tysiąca", "risk": "Verbal number corrupted to '12,5 zł' or '12 tysięcy'." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "delivery_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "internal_plan",
+            "date": "2026-09-15",
+            "qualifier": "rano (chyba)",
+            "originalExpression": "we wtorek, rano chyba"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 7.5, "to": 12.0, "transcriptQuote": "we wtorek, rano chyba" }
+            }
+          ],
+          "rationale": "Monday send: 'we wtorek' = tomorrow 2026-09-15. 'Rano chyba' stays an uncertain qualifier; no hour is invented."
+        },
+        {
+          "findingKey": "material_cost",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "material_cost",
+            "precision": "exact",
+            "amount": "12500.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "dwanaście i pół tysiąca"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 13.0, "to": 17.5, "transcriptQuote": "Za paletę płacimy... dwanaście i pół tysiąca" }
+            }
+          ],
+          "rationale": "'Dwanaście i pół tysiąca' = 12500.00; a pallet cost with no stated basis."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record the pallet cost as 12.50 or 12 000.", "category": "amount", "because": "Verbal number words must resolve to 12500.00." },
+        { "mustNot": "Attach a specific hour to the delivery.", "category": "date", "because": "Only an uncertain 'rano' was said; precision stays date with qualifier." },
+        { "mustNot": "Guess a VAT basis for the pallet.", "category": "source_basis", "because": "None stated." }
+      ]
+    }
+  ]
+}

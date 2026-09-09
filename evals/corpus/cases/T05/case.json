@@ -1,0 +1,34 @@
+{
+  "caseId": "T05",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Termin z godziną i okno rozładunku",
+  "coverage": ["date_precision"],
+  "fixtureClock": "2026-09-18T16:05:00+02:00",
+  "notes": "Timed arrival (datetime with hour) plus a same-day time range. Precision must be preserved: no invented minutes for the range, no date-only collapse for the arrival.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-MAREK", "name": "Marek", "role": "administrator firmy" }],
+    "contacts": [],
+    "projects": [
+      { "ref": "P-BANAN", "alias": "Banan", "stage": "realizacja", "location": "ul. Wiśniowa 12, Wrocław" }
+    ],
+    "existingFindings": []
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-18T16:05:00+02:00",
+      "fullyAcceptedAt": "2026-09-18T16:05:03+02:00",
+      "projectPill": "P-BANAN",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Ekipa z płytkami podjeżdża na Banana w poniedziałek o 8:00. Rozładunek będzie między 12:00 a 14:00, zależy od ruchu na obwodnicy."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+<desc>Tablica na budowie, odręcznie: BANAN — płytki GRIS, BANANOWA — płytki BIAŁE.</desc>
+<rect width="800" height="600" fill="#efe9da"/>
+<rect x="60" y="60" width="680" height="480" fill="#f7f3e8" stroke="#8a7f6b" stroke-width="4"/>
+<text x="100" y="171.26" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="44" fill="#16324f" font-weight="bold" transform="rotate(1.72 100 170)">BANAN — płytki GRIS</text>
+<text x="100" y="328.61" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="44" fill="#7a1f1f" font-weight="bold" transform="rotate(0.42 100 330)">BANANOWA — płytki BIAŁE</text>
+</svg>

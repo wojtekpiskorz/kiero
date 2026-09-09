@@ -1,0 +1,104 @@
+{
+  "caseId": "M03",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 190, "y": 175, "w": 260, "h": 60, "note": "Handwritten header word." },
+          "expectedValue": { "kind": "text", "value": "ŁAZIENKA" },
+          "risk": "Read as a project alias; it is a room type with no client identified."
+        },
+        {
+          "region": { "kind": "image_region", "x": 200, "y": 285, "w": 300, "h": 70, "note": "Handwritten amount." },
+          "expectedValue": {
+            "kind": "financial",
+            "role": "quoted_price",
+            "precision": "exact",
+            "amount": "6500.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "6 500 zł"
+          },
+          "risk": "Digit pair swap (5 600)."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "ambiguous-image",
+      "when": "After S1's vision extraction is processed, before the boss answers.",
+      "memoryChanges": [
+        {
+          "findingKey": "quoted_price",
+          "operation": "set",
+          "scope": { "level": "company", "ref": "COMPANY" },
+          "knowledgeState": "unknown",
+          "value": {
+            "kind": "financial",
+            "role": "quoted_price",
+            "precision": "exact",
+            "amount": "6500.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "6 500 zł"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 200, "y": 285, "w": 300, "h": 70, "note": "Amount on the unattributed note." } }
+          ],
+          "rationale": "The amount itself is readable and safe to hold unattributed (or unpersisted pending the answer); the note names no client or project, and the firm has two bathroom projects (Kaczmarek, Zielińska), so project attribution is genuinely underdetermined."
+        }
+      ],
+      "clarifications": [
+        {
+          "clarificationId": "CL-1",
+          "ambiguity": "Kartka mówi wyłącznie „ŁAZIENKA — 6 500 zł”; w firmie trwają dwa projekty łazienek: Kaczmarek i Zielińska, a żadne wskazanie na zdjęciu ani w wiadomości nie rozstrzyga, o którą chodzi.",
+          "asksAbout": "Project attribution of the 6 500 zł quoted price (Kaczmarek vs Zielińska).",
+          "options": ["Kaczmarek", "Zielińska"]
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Attribute the 6 500 price to either bathroom project before the answer.", "category": "project", "because": "Two active candidates exist with zero discriminating evidence; guessing is a critical project error." },
+        { "mustNot": "Create a new project from the word ŁAZIENKA.", "category": "project", "because": "Both bathroom projects already exist; a third would be a near-duplicate." },
+        { "mustNot": "Stay silent and drop the price entirely.", "category": "other", "because": "The fact exists and blocks nothing, but the attribution gap must become a visible shared question." }
+      ]
+    },
+    {
+      "stageId": "final",
+      "when": "After S2 answers the clarification.",
+      "memoryChanges": [
+        {
+          "findingKey": "quoted_price",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-ZIELINSKA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "quoted_price",
+            "precision": "exact",
+            "amount": "6500.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "6 500 zł"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 200, "y": 285, "w": 300, "h": 70, "note": "Amount on the note." } },
+            { "sourceId": "S2", "partId": "S2-txt", "supportType": "support", "anchor": { "kind": "text_quote", "quote": "to łazienka Zielińskiej, cena 6 500 zł" } }
+          ],
+          "historyExpectation": "The clarification with its author and answer stays linked; the resolution time is visible.",
+          "rationale": "The answer resolves attribution: Zielińska. The note supplies the amount; the answer supplies the scope."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record the basis as net or gross: neither the note nor the answer states it.", "category": "source_basis", "because": "Never infer VAT." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "caseId": "V09",
+  "modality": "voice",
+  "corpusRevision": "2026.09.1",
+  "title": "Dwa projekty, dwa formaty płytek",
+  "coverage": ["mixed_projects", "technical_dimensions"],
+  "fixtureClock": "2026-09-22T09:00:00+02:00",
+  "notes": "60x60 cm for Krucza, 100x100 cm for Dębowa: spoken dimension words must not be scrambled between projects or units.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-MAREK", "name": "Marek", "role": "administrator firmy" }],
+    "contacts": [],
+    "projects": [
+      { "ref": "P-KRUCZA", "alias": "Krucza", "stage": "realizacja" },
+      { "ref": "P-DEBOWA", "alias": "Dębowa", "stage": "realizacja" }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-22T09:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-22T09:00:07+02:00",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 18.0,
+          "transcript": "Krucza bierze gres sześćdziesiąt na sześćdziesiąt centymetrów. Dębowa — metr na metr, klientka się uparła na duże płyty. Zapisz oba oddzielnie.",
+          "recordingContext": "Nagranie z magazynu płytek, echo hali.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker, warehouse echo."
+          }
+        }
+      ]
+    }
+  ]
+}

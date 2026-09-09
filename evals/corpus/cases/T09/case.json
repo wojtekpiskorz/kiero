@@ -1,0 +1,33 @@
+{
+  "caseId": "T09",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Nowy dostawca z polskimi znakami w nazwie",
+  "coverage": ["names"],
+  "fixtureClock": "2026-09-16T10:20:00+02:00",
+  "notes": "Names with Polish diacritics must be stored verbatim; normalization that drops diacritics is a prohibited write.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [],
+    "projects": [
+      { "ref": "P-BANAN", "alias": "Banan", "stage": "realizacja" }
+    ],
+    "existingFindings": []
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-16T10:20:00+02:00",
+      "fullyAcceptedAt": "2026-09-16T10:20:03+02:00",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Nowy dostawca na Banana: firma Żelbet-Pro z Legnicy, handlowczyni pani Bączkowska, tel. 721 664 019. Zapiszcie dokładnie z polskimi znakami."
+        }
+      ]
+    }
+  ]
+}

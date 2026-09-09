@@ -1,0 +1,73 @@
+{
+  "caseId": "V13",
+  "modality": "voice",
+  "corpusRevision": "2026.09.1",
+  "title": "Korekta ceny, zanim skończyła się pierwsza analiza",
+  "coverage": ["stale_plan", "amounts"],
+  "fixtureClock": "2026-09-24T07:55:00+02:00",
+  "notes": "S1 run completes at 08:40, after S2's correction published at 08:04. Final value 700.00; the delayed S1 plan must not overwrite it.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [],
+    "projects": [{ "ref": "P-CISOWA", "alias": "Cisowa", "stage": "realizacja" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-24T07:55:00+02:00",
+      "fullyAcceptedAt": "2026-09-24T07:55:06+02:00",
+      "projectPill": "P-CISOWA",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 11.0,
+          "transcript": "Zamówiłem silikony na Cisową, pięćset złotych, koniec tematu.",
+          "recordingContext": "Krótka głosówka z klatki schodowej.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker, stairwell reverb."
+          }
+        }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-24T08:02:00+02:00",
+      "fullyAcceptedAt": "2026-09-24T08:02:05+02:00",
+      "projectPill": "P-CISOWA",
+      "parts": [
+        {
+          "partId": "S2-aud",
+          "type": "voice",
+          "durationSeconds": 10.0,
+          "transcript": "Poprawka do silikonów na Cisową: będzie siedemset, podnieśli ceny. Zapisz siedemset.",
+          "recordingContext": "Krótka głosówka z klatki schodowej.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker, stairwell reverb."
+          }
+        }
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "type": "run_completion",
+      "sourceId": "S2",
+      "completesAt": "2026-09-24T08:04:00+02:00",
+      "reason": "Standard processing."
+    },
+    {
+      "type": "run_completion",
+      "sourceId": "S1",
+      "completesAt": "2026-09-24T08:40:00+02:00",
+      "reason": "Queue backlog delayed S1 analysis past S2's correction; its plan is stale."
+    }
+  ]
+}

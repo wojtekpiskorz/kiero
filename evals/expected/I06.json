@@ -1,0 +1,57 @@
+{
+  "caseId": "I06",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 130, "y": 60, "w": 250, "h": 55, "note": "Area written above the tiled rectangle." },
+          "expectedValue": { "kind": "quantity", "value": "14.4", "unit": "m2", "originalExpression": "14,4 m²" },
+          "risk": "Decimal comma lost (144) or rounded to 14."
+        },
+        {
+          "region": { "kind": "image_region", "x": 170, "y": 505, "w": 220, "h": 50, "note": "Reserve note under the sketch." },
+          "expectedValue": { "kind": "text", "value": "zapas 10%" },
+          "risk": "Percent dropped."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1's vision extraction is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "tile_area",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "14.4", "unit": "m2", "originalExpression": "14,4 m²" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 130, "y": 60, "w": 250, "h": 55, "note": "Handwritten area." } }
+          ],
+          "rationale": "Handwritten area with Polish decimal comma: 14.4 m², kept exact."
+        },
+        {
+          "findingKey": "tile_reserve",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "zapas 10%" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 170, "y": 505, "w": 220, "h": 50, "note": "Reserve note." } }
+          ],
+          "rationale": "The 10% reserve is a separate fact from the area; both live on the same finding family but with distinct values."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Store the area as 144 m² or 14 m².", "category": "other", "because": "Decimal-comma loss and rounding both corrupt a technical dimension." },
+        { "mustNot": "Fold the 10% reserve into the area as 15.84 m² as the stored tile_area value.", "category": "other", "because": "That would be an agent derivation, not the source's stated value; derivations must be marked separately if ever computed." }
+      ]
+    }
+  ]
+}

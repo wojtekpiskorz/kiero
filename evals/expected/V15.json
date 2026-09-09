@@ -1,0 +1,67 @@
+{
+  "caseId": "V15",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 2.0, "to": 6.0, "expectedText": "dostawa okien dwudziestego ósmego września", "risk": "Date corrupted in the first witness's wording." }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "partId": "S2-aud",
+      "fidelityPoints": [
+        { "from": 6.0, "to": 9.5, "expectedText": "okna przychodzą dwudziestego ósmego września", "risk": "Second witness's date differing from the first would signal STT drift." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After both S1 and S2 are processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "delivery_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-SOSNOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "internal_plan",
+            "date": "2026-09-28",
+            "originalExpression": "dwudziestego ósmego września"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 2.0, "to": 6.0, "transcriptQuote": "dostawa okien dwudziestego ósmego września" }
+            },
+            {
+              "sourceId": "S2",
+              "partId": "S2-aud",
+              "supportType": "independent_corroboration",
+              "anchor": { "kind": "audio_interval", "from": 6.0, "to": 9.5, "transcriptQuote": "okna przychodzą dwudziestego ósmego września" }
+            }
+          ],
+          "rationale": "Two bosses, two independent phone calls, identical date: one ustalenie with two sources, the second typed as independent corroboration."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Create two separate delivery-date findings for the same project.", "category": "other", "because": "One ustalenie may have several sources; duplication splits identity." },
+        { "mustNot": "Mark the finding conflicted.", "category": "other", "because": "The sources agree; corroboration is not conflict." },
+        { "mustNot": "Treat the agent's own inference as a third confirming witness.", "category": "source_basis", "because": "Inference is not another witness per the accepted contract." }
+      ]
+    }
+  ],
+  "retrievalExpectations": {
+    "expectHits": [
+      { "query": "kiedy dostawa okien Sosnowa", "mustReturnEvidenceFrom": ["S1", "S2"], "findingKeys": ["delivery_date"] }
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "caseId": "T13",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Korekta przychodzi, zanim dokończyła się pierwsza analiza",
+  "coverage": ["stale_plan"],
+  "fixtureClock": "2026-09-21T08:02:00+02:00",
+  "notes": "S1 processing is delayed (provider backlog) and completes AFTER S2's correction was published. The stale S1 plan must be reconsidered against current state; the explicit correction wins.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-KACZMAREK", "name": "Kaczmarek", "kind": "person", "detail": "klient" }],
+    "projects": [
+      { "ref": "P-KACZMAREK", "alias": "Kaczmarek", "client": "C-KACZMAREK", "stage": "uzgodnienie" }
+    ],
+    "existingFindings": []
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-21T08:02:00+02:00",
+      "fullyAcceptedAt": "2026-09-21T08:02:02+02:00",
+      "projectPill": "P-KACZMAREK",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Kaczmarek się zgadza na wycenę 15 000 zł netto, zapisuję."
+        }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-21T08:07:00+02:00",
+      "fullyAcceptedAt": "2026-09-21T08:07:02+02:00",
+      "projectPill": "P-KACZMAREK",
+      "parts": [
+        {
+          "partId": "S2-txt",
+          "type": "text",
+          "text": "Poprawka do poprzedniej: udało się zejść, finalnie ustaliliśmy 12 500 zł netto. Ta kwota obowiązuje."
+        }
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "type": "run_completion",
+      "sourceId": "S2",
+      "completesAt": "2026-09-21T08:08:00+02:00",
+      "reason": "Standard processing."
+    },
+    {
+      "type": "run_completion",
+      "sourceId": "S1",
+      "completesAt": "2026-09-21T08:31:00+02:00",
+      "reason": "Provider backlog delayed the first analysis; its plan is stale when it completes."
+    }
+  ]
+}

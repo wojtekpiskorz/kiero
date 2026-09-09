@@ -1,0 +1,50 @@
+{
+  "caseId": "V14",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 2.0, "to": 6.0, "expectedText": "drugi etap na Bananie w październiku", "risk": "Month lost; the retracted plan must stay auditable." }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "partId": "S2-aud",
+      "fidelityPoints": [
+        { "from": 3.0, "to": 8.0, "expectedText": "wycofuję to, co mówiłem rano o drugim etapie", "risk": "Retraction wording weakened into a mere postponement." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S2 is processed (S1 was processed earlier).",
+      "memoryChanges": [
+        {
+          "findingKey": "second_stage_start",
+          "operation": "mark_unknown",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "unknown",
+          "evidence": [
+            {
+              "sourceId": "S2",
+              "partId": "S2-aud",
+              "supportType": "supersession",
+              "anchor": { "kind": "audio_interval", "from": 3.0, "to": 10.5, "transcriptQuote": "wycofuję to, co mówiłem rano o drugim etapie u Kowalskiego. Klient się zawahał, na razie nic z tego nie ma" }
+            }
+          ],
+          "historyExpectation": "The October intention (from S1) stays in history as a superseded client wish; S1's own text and authorship are untouched.",
+          "rationale": "A correction by new message retracts the earlier statement: no current second-stage plan exists, so the finding returns to unknown rather than keeping October."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Keep October as the current second-stage start.", "category": "commitment", "because": "The boss explicitly withdrew his own morning statement." },
+        { "mustNot": "Edit or annotate S1's transcript: correction happens by new message only.", "category": "other", "because": "Source immutability per the accepted contract." },
+        { "mustNot": "Record a new replacement date.", "category": "date", "because": "None was given; 'na razie nic z tego nie ma'." }
+      ]
+    }
+  ]
+}

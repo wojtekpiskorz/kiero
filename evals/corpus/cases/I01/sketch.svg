@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+<desc>Żółta kartka samoprzylepna, odręczne napisy: KACZMAREK — UMOWA, 9 800 zł, podkreślone dwa razy.</desc>
+<rect width="800" height="600" fill="#8a7f6b"/>
+<rect x="120" y="80" width="560" height="460" fill="#f6e58d" stroke="#e0c96a" stroke-width="2"/>
+<text x="200" y="181.06" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="54" fill="#1c2f6e" font-weight="bold" transform="rotate(-1.46 200 180)">KACZMAREK</text>
+<text x="240" y="280.57" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="60" fill="#16324f" font-weight="bold" transform="rotate(0.16 240 280)">9 800 zł</text>
+<line x1="230" y1="300" x2="530" y2="296" stroke="#16324f" stroke-width="3"/>
+<line x1="228" y1="312" x2="535" y2="308" stroke="#16324f" stroke-width="2"/>
+<text x="210" y="420.77" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="44" fill="#7a1f1f" font-weight="bold" transform="rotate(-0.46 210 420)">UMOWA</text>
+</svg>
