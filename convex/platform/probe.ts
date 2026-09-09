@@ -41,9 +41,8 @@ import { errorResult, newDurableJobKey, okResult, type ResultEnvelope } from "@k
 import { notFoundError, unsupportedError } from "@kiero/runtime";
 import { dispatchMutationCommand } from "./dispatch";
 import { publishEvent, registerDurableJob } from "./publish";
-import { restartProofPipeline, startProofPipeline } from "./pipeline";
+import { restartProofPipeline, startProofPipeline, workflow } from "./pipeline";
 import { vWorkflowId } from "@convex-dev/workflow";
-import { workflow } from "./pipeline";
 import { drainBatch } from "./outbox";
 
 const SERVICE_EMAIL = "platform-service@kiero.invalid";
