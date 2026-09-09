@@ -23,6 +23,26 @@ Axiom account is a PENDING owner action (see
 | Deployment vars (names only) | `KIERO_PROBE_ENABLED`, `KIERO_SERVICE_TOKEN`, `KIERO_DEPLOYMENT_LABEL=dev/i2`, `KIERO_ENVIRONMENT=dev` |
 | Crons registered | `outbox-drain-safety-net` (`*/5 * * * *` -> `platform/outbox:drainOutbox`), `telemetry-tick` (every minute -> `operations/telemetry/cron:cronTick`) - confirmed in the verbose push output |
 
+## Round-1 repairs (PR #76 review, re-run 2026-09-09)
+
+`node docs/evidence/telemetry/scripts/proof-round1.mjs` on the same
+deployment. All rows PASS:
+
+| Row | Result | Evidence line |
+| --- | --- | --- |
+| One heartbeat POST -> exactly ONE ops.health.heartbeat event (single emission point: `recordHeartbeat`; the gateway client only records the row) | PASS | heartbeat events in recent window `3 -> 4` for one POST |
+| Silence loop closed: stale heartbeat -> tick emits `ops.health.silence_detected`; episode dedup holds on sequential ticks; composed health shows the service `silent` | PASS | tick 1 `{"silent":1}`, events `1 -> 2 -> 2` (no re-emission on tick 2), `backup.job: silent`, cleanup `{"removed":1}` |
+| Indexed outbox scan still diagnoses standing failed rows once each | PASS | `incidents: 2`, delivery_failed events in window: 2 (no re-emission) |
+| Gateway telemetry off the critical path; one Axiom client; shared credential check; unified rejection rule | PASS | unit rows in tests/i2 (gated-fetch response-while-pending, single-POST heartbeat, service-token digest tests); 147/147 |
+
+Honest note: the FIRST emission of a silence episode raced with the
+every-minute cron tick (both observed the fresh episode before either
+committed), producing one duplicate event at episode start. Sequential
+ticks dedup correctly (proven). Diagnostic delivery is best effort and
+duplicate-tolerant by contract (architecture: "events may be dropped or
+duplicated"); no unique-constraint machinery exists on Convex, and the
+narrow race is documented instead of papered over.
+
 ## How to reproduce
 
 ```

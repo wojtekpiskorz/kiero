@@ -92,6 +92,37 @@ export const probeSeedCost = action({
   },
 });
 
+/** Seeds one stale heartbeat row (guarded; silence-loop proofs). */
+export const probeSeedStaleHeartbeat = action({
+  args: { serviceName: v.string(), ageMinutes: v.float64() },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    if (!probeGuardEnabled()) {
+      return probeDisabled();
+    }
+    return okResult(
+      await ctx.runMutation(internal.operations.telemetry.functions.seedStaleHeartbeat, {
+        serviceName: args.serviceName,
+        ageMinutes: args.ageMinutes,
+      }),
+    );
+  },
+});
+
+/** Clears all heartbeat rows of one service (guarded; cleanup). */
+export const probeClearHeartbeats = action({
+  args: { serviceName: v.string() },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    if (!probeGuardEnabled()) {
+      return probeDisabled();
+    }
+    return okResult(
+      await ctx.runMutation(internal.operations.telemetry.functions.clearHeartbeats, {
+        serviceName: args.serviceName,
+      }),
+    );
+  },
+});
+
 /** Removes labeled synthetic cost entries and the period's alert states (guarded). */
 export const probeClearCosts = action({
   args: { label: v.string() },

@@ -27,7 +27,9 @@ import { Schema } from "effect";
 export const TABLE_ID_NAMES = [
   // access/identity
   "users",
-  "sessions",  // access/membership
+  "sessions",
+
+  // access/membership
   "companies",
   "memberships",
   "invitations",

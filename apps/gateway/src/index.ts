@@ -24,9 +24,10 @@ import type { TelemetryEnv } from "./telemetry/emit";
 export type Env = BridgeEnv & TelemetryEnv;
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    return withGatewayTelemetry(env, url.pathname, async () => {
+    // Telemetry is scheduled through ctx.waitUntil: never on the critical path.
+    return withGatewayTelemetry(env, ctx, url.pathname, async () => {
       if (url.pathname.startsWith("/platform/")) {
         const route = matchRoute(request.method, url.pathname);
         if (route === undefined) {

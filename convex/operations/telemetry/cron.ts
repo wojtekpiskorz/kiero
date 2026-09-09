@@ -21,6 +21,7 @@ import { FORWARD_WINDOW_MS } from "./retention";
 /** Summary of one telemetry tick. */
 export interface CronTickSummary {
   readonly incidents: number;
+  readonly silence: { readonly silent: number };
   readonly costs: { readonly period: string; readonly totalMinor: number };
   readonly pruned: {
     readonly prunedDiagnostics: number;
@@ -85,6 +86,10 @@ export const cronTick = internalAction({
       internal.operations.telemetry.functions.scanIncidents,
       {},
     );
+    const silence = await ctx.runMutation(
+      internal.operations.telemetry.functions.detectSilence,
+      {},
+    );
     const costs = await ctx.runMutation(
       internal.operations.telemetry.functions.evaluateCostAlerts,
       {},
@@ -93,6 +98,7 @@ export const cronTick = internalAction({
     const forwarded = await forwardRecentToSink(ctx);
     return {
       incidents: incidents.incidents,
+      silence: { silent: silence.silent },
       costs: { period: costs.period, totalMinor: costs.totalMinor },
       pruned,
       forwarded,

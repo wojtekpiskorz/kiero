@@ -7,41 +7,35 @@
  * minutes. Two independent detection layers result:
  *
  * - Convex-side: heartbeats land in `healthHeartbeats`; the telemetry state
- *   read computes staleness per service.
- * - Sink-side: the gateway ALSO emits `ops.health.heartbeat` events (Axiom
- *   direct when configured): when they stop arriving at the monitor, the
- *   backend is totally silent - a condition Convex can never report itself.
+ *   read computes staleness per service, and the cron tick emits
+ *   `ops.health.silence_detected` for services whose latest heartbeat is
+ *   beyond the silence threshold.
+ * - Sink-side: the monitor alerts when heartbeat EVENTS stop arriving at
+ *   the observability sink - a condition Convex can never report itself.
  *
+ * ONE emission point per signal (round-1 repair): the heartbeat endpoint's
+ * `recordHeartbeat` emits the single `ops.health.heartbeat` event (it is
+ * the only sink path for non-gateway probers too); the gateway client only
+ * records the ledger row and never emits a second event for the same ping.
  * A heartbeat failure is logged-and-continued; it never throws.
  */
 
-import { emitGatewayEvents, type ConvexIngestEnv, type TelemetryEnv } from "./emit";
+import type { ConvexIngestEnv, TelemetryEnv } from "./emit";
 
 export interface HeartbeatResult {
   readonly recorded: boolean;
-  readonly eventEmitted: boolean;
   readonly reason?: string;
 }
 
-/** Sends one gateway heartbeat: sink event + Convex ledger row, best effort. */
+/** Records one gateway heartbeat row (the endpoint emits the single event). */
 export async function sendGatewayHeartbeat(
   env: TelemetryEnv & ConvexIngestEnv,
   status: "ok" | "degraded" = "ok",
 ): Promise<HeartbeatResult> {
-  const delivery = await emitGatewayEvents(env, [
-    {
-      kind: "ops.health.heartbeat",
-      metadata: [
-        { key: "serviceName", value: "gateway.worker" },
-        { key: "status", value: status },
-      ],
-    },
-  ]).catch(() => undefined);
-
   const site = env.CONVEX_SITE_URL;
   const token = env.KIERO_SERVICE_TOKEN;
   if (site === undefined || site === "" || token === undefined || token === "") {
-    return { recorded: false, eventEmitted: delivery?.delivered === true, reason: "convex_ingest_not_configured" };
+    return { recorded: false, reason: "convex_ingest_not_configured" };
   }
   try {
     const response = await fetch(`${site.replace(/\/$/, "")}/platform/telemetry/heartbeat`, {
@@ -53,10 +47,10 @@ export async function sendGatewayHeartbeat(
       body: JSON.stringify({ serviceName: "gateway.worker", status }),
     });
     if (!response.ok) {
-      return { recorded: false, eventEmitted: delivery?.delivered === true, reason: `convex_status_${response.status}` };
+      return { recorded: false, reason: `convex_status_${response.status}` };
     }
-    return { recorded: true, eventEmitted: delivery?.delivered === true };
+    return { recorded: true };
   } catch {
-    return { recorded: false, eventEmitted: delivery?.delivered === true, reason: "convex_unreachable" };
+    return { recorded: false, reason: "convex_unreachable" };
   }
 }

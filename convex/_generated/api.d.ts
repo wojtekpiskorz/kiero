@@ -21,6 +21,7 @@ import type * as operations_telemetry_observability from "../operations/telemetr
 import type * as operations_telemetry_proof from "../operations/telemetry/proof.js";
 import type * as operations_telemetry_redact from "../operations/telemetry/redact.js";
 import type * as operations_telemetry_retention from "../operations/telemetry/retention.js";
+import type * as operations_telemetry_serviceToken from "../operations/telemetry/serviceToken.js";
 import type * as operations_telemetry_sink from "../operations/telemetry/sink.js";
 import type * as platform_context from "../platform/context.js";
 import type * as platform_dispatch from "../platform/dispatch.js";
@@ -55,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   "operations/telemetry/proof": typeof operations_telemetry_proof;
   "operations/telemetry/redact": typeof operations_telemetry_redact;
   "operations/telemetry/retention": typeof operations_telemetry_retention;
+  "operations/telemetry/serviceToken": typeof operations_telemetry_serviceToken;
   "operations/telemetry/sink": typeof operations_telemetry_sink;
   "platform/context": typeof platform_context;
   "platform/dispatch": typeof platform_dispatch;

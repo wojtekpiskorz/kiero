@@ -2,21 +2,25 @@
  * The gateway telemetry surface (I2): request-scoped redacted events for the
  * architecture's GW -> OBS flow.
  *
- * Delivery is two-path and best effort:
+ * Round-1 repairs:
+ * - Delivery is scheduled through `ctx.waitUntil` when the Worker runtime
+ *   provides an ExecutionContext: best-effort telemetry is NEVER on the
+ *   request critical path (the response is already on its way when the
+ *   emit POST runs). Without a context (tests) the emit is fire-and-forget.
+ * - The Axiom client is the ONE shipped sink (`convex/operations/telemetry/
+ *   sink.ts`: ingest POST, metadata flattening, redactionsApplied injection,
+ *   injectable fetch) - this module no longer reimplements any of it.
  *
- * 1. AXIOM DIRECT: when the Worker holds `AXIOM_API_TOKEN` +
- *    `AXIOM_DATASET`, events go straight to the sink (the architecture's
- *    primary flow; the token is a Worker secret binding, never a value).
- * 2. CONVEX INGEST fallback: otherwise events are posted to the verified
- *    Convex ingest endpoint, where they pass the SAME single sanitizer
- *    (imported from the Convex tree - one definition, no drifting copy) and
- *    become readable through the query surface. This keeps the dev/alpha
- *    (pre-Axiom) window honest without pretending delivery happened.
- * 3. Neither configured: events are dropped and counted as such.
- *
- * Nothing here ever throws into request handling.
+ * Delivery remains two-path and best effort: Axiom direct when the Worker
+ * holds `AXIOM_API_TOKEN` + `AXIOM_DATASET`, otherwise the verified Convex
+ * ingest endpoint (where the SAME single sanitizer applies), otherwise an
+ * honest drop. Nothing here ever throws into request handling.
  */
 
+import {
+  axiomHttpSink,
+  toSinkEvent,
+} from "../../../../convex/operations/telemetry/sink";
 import {
   sanitizeDiagnosticEvent,
   type SanitizedDiagnosticEvent,
@@ -27,6 +31,17 @@ export interface TelemetryEnv {
   readonly AXIOM_API_TOKEN?: string;
   readonly AXIOM_DATASET?: string;
   readonly ENVIRONMENT?: string;
+}
+
+/** The Convex HTTP endpoint base + service token (bridge bindings). */
+export interface ConvexIngestEnv {
+  readonly CONVEX_SITE_URL?: string;
+  readonly KIERO_SERVICE_TOKEN?: string;
+}
+
+/** The scheduling seam: Workers pass ExecutionContext; tests pass a collector. */
+export interface TelemetryScheduler {
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 /** One raw gateway event before redaction (trusted only after sanitizing). */
@@ -52,6 +67,7 @@ export function sanitizeGatewayEvents(
 ): SanitizedDiagnosticEvent[] {
   const sanitized: SanitizedDiagnosticEvent[] = [];
   for (const event of events) {
+    // The single sanitizer definition, imported across the tree.
     const result = sanitizeDiagnosticEvent({
       kind: event.kind,
       metadata: event.metadata,
@@ -73,40 +89,14 @@ async function postAxiom(
   if (dataset === undefined || dataset === "") {
     return { delivered: false, via: "dropped", reason: "axiom_dataset_missing" };
   }
-  const payload = events.map((event) => ({
-    _time: new Date().toISOString(),
-    service: "gateway.worker",
-    environment: environmentTag(env),
-    kind: event.kind,
-    metadata: Object.fromEntries([
-      ...event.metadata.map((entry) => [entry.key, entry.value] as const),
-      ...(event.redactionsApplied > 0
-        ? ([["redactionsApplied", String(event.redactionsApplied)]] as const)
-        : []),
-    ]),
-  }));
-  try {
-    const response = await fetch(`https://api.axiom.co/v1/datasets/${dataset}/ingest`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${env.AXIOM_API_TOKEN}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      return { delivered: false, via: "dropped", reason: `axiom_status_${response.status}` };
-    }
-    return { delivered: true, via: "axiom", accepted: events.length };
-  } catch {
-    return { delivered: false, via: "dropped", reason: "axiom_unreachable" };
-  }
-}
-
-/** The Convex HTTP endpoint base + service token (bridge bindings). */
-export interface ConvexIngestEnv {
-  readonly CONVEX_SITE_URL?: string;
-  readonly KIERO_SERVICE_TOKEN?: string;
+  const sink = axiomHttpSink({ apiToken: env.AXIOM_API_TOKEN ?? "", dataset });
+  const sinkEvents = events.map((event) =>
+    toSinkEvent(event, Date.now(), "gateway.worker", environmentTag(env)),
+  );
+  const result = await sink.ingest(sinkEvents);
+  return result.ok
+    ? { delivered: true, via: "axiom", accepted: result.ingested }
+    : { delivered: false, via: "dropped", reason: result.reason ?? "axiom_failed" };
 }
 
 async function postConvexIngest(
@@ -154,41 +144,49 @@ export async function emitGatewayEvents(
   return postConvexIngest(env, sanitized);
 }
 
-/** Wraps one request handler with request-scoped redacted telemetry. */
+/**
+ * Wraps one request handler with request-scoped redacted telemetry. The
+ * emit is scheduled through `scheduler.waitUntil` (Workers: the real
+ * ExecutionContext) so the response is never blocked on telemetry delivery;
+ * without a scheduler it degrades to fire-and-forget.
+ */
 export async function withGatewayTelemetry(
   env: TelemetryEnv & ConvexIngestEnv,
+  scheduler: TelemetryScheduler | undefined,
   pathname: string,
   handle: () => Promise<Response>,
 ): Promise<Response> {
   const startedAtMs = Date.now();
+  const requestEvent = (httpStatus: string): GatewayEventInput => ({
+    kind: "ops.gateway.request",
+    metadata: [
+      { key: "route", value: pathname.slice(0, 120) },
+      { key: "httpStatus", value: httpStatus },
+      { key: "latencyMs", value: String(Date.now() - startedAtMs) },
+      { key: "environment", value: environmentTag(env) },
+    ],
+  });
+  const emit = (httpStatus: string) =>
+    emitGatewayEvents(env, [requestEvent(httpStatus)]).catch(() => undefined);
+
   let response: Response;
   try {
     response = await handle();
   } catch (error) {
     // Best effort: the failure itself is the telemetry, never the error text.
-    await emitGatewayEvents(env, [
-      {
-        kind: "ops.gateway.request",
-        metadata: [
-          { key: "route", value: pathname.slice(0, 120) },
-          { key: "httpStatus", value: "500" },
-          { key: "latencyMs", value: String(Date.now() - startedAtMs) },
-          { key: "environment", value: environmentTag(env) },
-        ],
-      },
-    ]).catch(() => undefined);
+    const pending = emit("500");
+    if (scheduler !== undefined) {
+      scheduler.waitUntil(pending);
+    } else {
+      void pending;
+    }
     throw error;
   }
-  await emitGatewayEvents(env, [
-    {
-      kind: "ops.gateway.request",
-      metadata: [
-        { key: "route", value: pathname.slice(0, 120) },
-        { key: "httpStatus", value: String(response.status) },
-        { key: "latencyMs", value: String(Date.now() - startedAtMs) },
-        { key: "environment", value: environmentTag(env) },
-      ],
-    },
-  ]).catch(() => undefined);
+  const pending = emit(String(response.status));
+  if (scheduler !== undefined) {
+    scheduler.waitUntil(pending);
+  } else {
+    void pending;
+  }
   return response;
 }

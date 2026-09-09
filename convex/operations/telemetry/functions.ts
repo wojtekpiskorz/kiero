@@ -25,6 +25,7 @@ import { emitDiagnosticEvent, type EmitResult } from "./emit";
 import { classifyIncidents } from "./incidents";
 import {
   COST_THRESHOLDS,
+  costAlertDedupKey,
   evaluateCostThresholds,
   isValidPeriod,
   periodOf,
@@ -37,6 +38,7 @@ import {
   HEARTBEAT_SERVICES,
   HEARTBEATS_KEPT_PER_SERVICE,
   backendSilenceState,
+  silenceIncidents,
   type HeartbeatService,
 } from "./heartbeat";
 import { PRUNE_BATCH_SIZE, costPeriodCutoff, retentionCutoffMs } from "./retention";
@@ -295,7 +297,12 @@ export const scanIncidents = internalMutation({
   handler: async (ctx): Promise<IncidentScanSummary> => {
     const nowMs = Date.now();
     const jobs = await ctx.db.query("durableJobs").collect();
-    const outbox = await ctx.db.query("outboxEvents").collect();
+    // Indexed scan: only failed rows can be delivery incidents (the
+    // by_delivery index leads with deliveryState).
+    const outbox = await ctx.db
+      .query("outboxEvents")
+      .withIndex("by_delivery", (q) => q.eq("deliveryState", "failed"))
+      .collect();
     const runs = await ctx.db.query("processingRuns").collect();
     const incidents = classifyIncidents(
       {
@@ -386,9 +393,14 @@ export const evaluateCostAlerts = internalMutation({
             { key: "thresholdMinor", value: String(entry.thresholdMinor) },
             { key: "level", value: entry.level },
           ],
-          dedupKey: `cost_alert:${entry.level}:${period}:${nowMs}`,
+          dedupKey: costAlertDedupKey(
+            entry.level,
+            period,
+            existing === null ? 1 : existing.fireCount + 1,
+          ),
         });
         fired = true;
+        const fireCount = existing === null ? 1 : existing.fireCount + 1;
         if (existing === null) {
           await ctx.db.insert("costAlertStates", {
             period,
@@ -396,13 +408,13 @@ export const evaluateCostAlerts = internalMutation({
             thresholdMinor: entry.thresholdMinor,
             firstFiredAtMs: nowMs,
             lastFiredAtMs: nowMs,
-            fireCount: 1,
+            fireCount,
             lastTotalMinor: totalMinor,
           });
         } else {
           await ctx.db.patch(existing._id, {
             lastFiredAtMs: nowMs,
-            fireCount: existing.fireCount + 1,
+            fireCount,
             lastTotalMinor: totalMinor,
           });
         }
@@ -492,6 +504,73 @@ export const markForwarded = internalMutation({
       await ctx.db.patch(id, { forwardedAtMs: args.atMs });
     }
     return { marked: args.ids.length };
+  },
+});
+
+/**
+ * Monitor scan 2's emission half: reports services whose latest heartbeat
+ * is beyond the silence threshold (`ops.health.silence_detected`), deduped
+ * per silence episode (anchor = newest heartbeat atMs). Only services with
+ * heartbeat history are emitted - never-seen lanes are the sink-side
+ * absence monitor's coverage, not permanent in-app noise.
+ */
+export const detectSilence = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<{ silent: number; emitted: readonly { serviceName: string; emitted: boolean; reason?: string }[] }> => {
+    const nowMs = Date.now();
+    const latest = await latestHeartbeats(ctx);
+    const incidents = silenceIncidents(latest, nowMs);
+    const emitted: { serviceName: string; emitted: boolean; reason?: string }[] = [];
+    for (const incident of incidents) {
+      const result = await emitDiagnosticEvent(ctx, {
+        kind: incident.kind,
+        metadata: incident.metadata,
+        dedupKey: incident.dedupKey,
+      });
+      const serviceName = incident.metadata[0]?.value ?? "unknown";
+      emitted.push({
+        serviceName,
+        emitted: result.emitted,
+        ...(result.reason === undefined ? {} : { reason: result.reason }),
+      });
+    }
+    return { silent: incidents.length, emitted };
+  },
+});
+
+/** Seeds one stale heartbeat row (staging-proof fixture, guarded callers only). */
+export const seedStaleHeartbeat = internalMutation({
+  args: { serviceName: v.string(), ageMinutes: v.float64() },
+  handler: async (ctx, args): Promise<{ seeded: boolean; atMs?: number; reason?: string }> => {
+    if (!isHeartbeatService(args.serviceName)) {
+      return { seeded: false, reason: "service_unknown" };
+    }
+    if (!Number.isInteger(args.ageMinutes) || args.ageMinutes < 1 || args.ageMinutes > 60 * 24 * 30) {
+      return { seeded: false, reason: "age_invalid" };
+    }
+    const serviceName: HeartbeatService = args.serviceName;
+    const atMs = Date.now() - args.ageMinutes * 60 * 1000;
+    await ctx.db.insert("healthHeartbeats", { serviceName, status: "ok", atMs });
+    return { seeded: true, atMs };
+  },
+});
+
+/** Clears all heartbeat rows of one service (staging-proof cleanup, guarded). */
+export const clearHeartbeats = internalMutation({
+  args: { serviceName: v.string() },
+  handler: async (ctx, args): Promise<{ removed: number }> => {
+    if (!isHeartbeatService(args.serviceName)) {
+      return { removed: 0 };
+    }
+    const serviceName: HeartbeatService = args.serviceName;
+    const rows = await ctx.db
+      .query("healthHeartbeats")
+      .withIndex("by_service_time", (q) => q.eq("serviceName", serviceName))
+      .collect();
+    for (const row of rows) {
+      await ctx.db.delete(row._id);
+    }
+    return { removed: rows.length };
   },
 });
 

@@ -11,38 +11,19 @@
  * - `GET /platform/telemetry/health`: the composed state - platform health,
  *   heartbeat/silence, cost thresholds, retention and the honesty block.
  *
- * The bearer check mirrors the bridge's digest comparison (compared as
- * SHA-256 digests; the secret is never handled in the clear or logged).
+ * The bearer check is the ONE shared digest-compare helper
+ * (`./serviceToken.ts`, also used by the platform bridge).
  */
 
 import { httpAction } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import { errorResult, okResult } from "@kiero/contracts";
-import { forbiddenError, unauthenticatedError, validationError } from "@kiero/runtime";
+import { unauthenticatedError, validationError } from "@kiero/runtime";
+import { verifyServiceBearerToken } from "./serviceToken";
 
-async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/** Digest-compared bearer check; never logs or echoes either side. */
+/** The one bearer rule at this boundary: the shared digest-compare helper. */
 async function verifyServiceToken(authorizationHeader: string | null): Promise<boolean> {
-  const expected = process.env.KIERO_SERVICE_TOKEN;
-  if (expected === undefined || expected === "") {
-    return false;
-  }
-  if (authorizationHeader === null || !authorizationHeader.startsWith("Bearer ")) {
-    return false;
-  }
-  const presented = authorizationHeader.slice("Bearer ".length);
-  const [presentedHash, expectedHash] = await Promise.all([sha256Hex(presented), sha256Hex(expected)]);
-  let equal = presentedHash.length === expectedHash.length;
-  for (let index = 0; index < presentedHash.length; index += 1) {
-    equal = presentedHash[index] === expectedHash[index] && equal;
-  }
-  return equal;
+  return verifyServiceBearerToken(authorizationHeader, process.env.KIERO_SERVICE_TOKEN);
 }
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -117,8 +98,13 @@ export const heartbeatHandler = httpAction(async (ctx, request) => {
     serviceName: body.serviceName,
     status,
   });
+  // Same rule as ingest: credential problems are unauthenticated, every
+  // body/input problem is a validation error (never forbidden).
   if (!recorded.recorded) {
-    return jsonResponse(400, errorResult(forbiddenError(recorded.reason ?? "heartbeat_rejected")));
+    return jsonResponse(
+      400,
+      errorResult(validationError(recorded.reason ?? "heartbeat_rejected")),
+    );
   }
   return jsonResponse(200, okResult(recorded));
 });

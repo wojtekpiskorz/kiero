@@ -91,3 +91,51 @@ export function backendSilenceState(
     ),
   };
 }
+
+/** One silence emission the tick must produce (kind + dedup identity + metadata). */
+export interface SilenceIncidentEmit {
+  readonly kind: "ops.health.silence_detected";
+  /**
+   * Anchored to the episode: the newest heartbeat atMs defines it, so a
+   * continuing silence dedups (same anchor) while a recovery followed by a
+   * new silence starts a new episode (new anchor).
+   */
+  readonly dedupKey: string;
+  readonly metadata: readonly { key: string; value: string }[];
+}
+
+/**
+ * Decides which services the tick must report as SILENT.
+ *
+ * Only services with a heartbeat history are emitted: `never_seen` lanes
+ * have not shipped their prober yet (their coverage is the sink-side
+ * absence monitor on the heartbeat event stream), and emitting them would
+ * be permanent noise. Once a lane reports, silence beyond its threshold is
+ * a real incident and is emitted once per episode.
+ */
+export function silenceIncidents(
+  latest: Readonly<Record<string, { atMs: number; status: "ok" | "degraded" } | undefined>>,
+  nowMs: number,
+): readonly SilenceIncidentEmit[] {
+  const incidents: SilenceIncidentEmit[] = [];
+  for (const service of HEARTBEAT_SERVICES) {
+    const heartbeat = latest[service];
+    if (heartbeat === undefined) {
+      continue;
+    }
+    const state = serviceSilence(service, heartbeat, nowMs);
+    if (state.state !== "silent") {
+      continue;
+    }
+    incidents.push({
+      kind: "ops.health.silence_detected",
+      dedupKey: `silence:${service}:${heartbeat.atMs}`,
+      metadata: [
+        { key: "serviceName", value: service },
+        { key: "ageMs", value: String(state.ageMs ?? 0) },
+        { key: "count", value: "1" },
+      ],
+    });
+  }
+  return incidents;
+}

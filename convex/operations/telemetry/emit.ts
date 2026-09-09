@@ -85,14 +85,3 @@ export async function emitDiagnosticEvent(
     ...(event.redactionsApplied > 0 ? { redactionsApplied: event.redactionsApplied } : {}),
   };
 }
-
-/**
- * Typed metadata constructor: builds a format-safe entry list at compile-time
- * call sites. Producers should prefer this over hand-writing `{key, value}`
- * arrays; the sanitizer still validates (defense in depth).
- */
-export function metadata(
-  ...entries: readonly { key: string; value: string }[]
-): { key: string; value: string }[] {
-  return entries.map((entry) => ({ key: entry.key, value: entry.value }));
-}

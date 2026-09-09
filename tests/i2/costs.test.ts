@@ -8,6 +8,7 @@ import {
   COST_ALERT_COOLDOWN_MS,
   COST_THRESHOLDS,
   SPEND_PROVIDERS,
+  costAlertDedupKey,
   evaluateCostThresholds,
   isValidPeriod,
   periodOf,
@@ -77,6 +78,26 @@ describe("alert cooldown", () => {
       emit: true,
       reason: "first_fire",
     });
+  });
+});
+
+describe("alert dedup identity", () => {
+  it("is stable per level+period+fireCount and distinct across levels/fires", () => {
+    expect(costAlertDedupKey("warning_400", "2026-09", 1)).toBe(
+      "cost_alert:warning_400:2026-09:1",
+    );
+    expect(costAlertDedupKey("warning_400", "2026-09", 1)).toBe(
+      costAlertDedupKey("warning_400", "2026-09", 1),
+    );
+    expect(costAlertDedupKey("warning_400", "2026-09", 2)).not.toBe(
+      costAlertDedupKey("warning_400", "2026-09", 1),
+    );
+    expect(costAlertDedupKey("alert_500", "2026-09", 1)).not.toBe(
+      costAlertDedupKey("warning_400", "2026-09", 1),
+    );
+    expect(costAlertDedupKey("warning_400", "2026-10", 1)).not.toBe(
+      costAlertDedupKey("warning_400", "2026-09", 1),
+    );
   });
 });
 

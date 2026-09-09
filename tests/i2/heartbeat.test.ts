@@ -10,7 +10,9 @@ import {
   SILENCE_TOLERANCE,
   backendSilenceState,
   serviceSilence,
+  silenceIncidents,
 } from "../../convex/operations/telemetry/heartbeat";
+import { sanitizeDiagnosticEvent } from "../../convex/operations/telemetry/redact";
 import monitors from "../../infra/observability/monitors.json";
 
 const NOW = Date.parse("2026-09-09T12:00:00Z");
@@ -60,6 +62,61 @@ describe("per-service silence states", () => {
   });
 });
 
+describe("silence incidents (the tick's emission decisions)", () => {
+  const cadence = HEARTBEAT_CADENCE_MS["gateway.worker"];
+  const staleAtMs = NOW - cadence * (SILENCE_TOLERANCE + 2);
+
+  it("emits once per silence episode, anchored to the newest heartbeat", () => {
+    const incidents = silenceIncidents(
+      { "gateway.worker": { atMs: staleAtMs, status: "ok" } },
+      NOW,
+    );
+    expect(incidents).toHaveLength(1);
+    expect(incidents[0]).toMatchObject({
+      kind: "ops.health.silence_detected",
+      dedupKey: `silence:gateway.worker:${staleAtMs}`,
+    });
+    // A continuing silence has the same anchor -> same dedup key -> deduped.
+    expect(silenceIncidents({ "gateway.worker": { atMs: staleAtMs, status: "ok" } }, NOW + 60_000)).toHaveLength(1);
+  });
+
+  it("a recovery followed by a new silence is a NEW episode (new anchor)", () => {
+    const first = silenceIncidents({ "gateway.worker": { atMs: staleAtMs, status: "ok" } }, NOW);
+    const recovered = { "gateway.worker": { atMs: NOW - 60_000, status: "ok" as const } };
+    expect(silenceIncidents(recovered, NOW)).toHaveLength(0);
+    const nextSilenceAt = NOW + cadence * (SILENCE_TOLERANCE + 2);
+    const second = silenceIncidents(recovered, nextSilenceAt);
+    expect(second).toHaveLength(1);
+    expect(second[0]?.dedupKey).not.toBe(first[0]?.dedupKey);
+  });
+
+  it("never_seen and fresh/late services produce no in-app incident", () => {
+    expect(silenceIncidents({}, NOW)).toEqual([]);
+    const fresh = silenceIncidents({ "gateway.worker": { atMs: NOW - cadence, status: "ok" } }, NOW);
+    expect(fresh).toEqual([]);
+    const lateAt = NOW - cadence * 2.5;
+    const late = silenceIncidents({ "gateway.worker": { atMs: lateAt, status: "ok" } }, NOW);
+    expect(late).toEqual([]);
+  });
+
+  it("the metadata survives the sanitizer unchanged", () => {
+    const incidents = silenceIncidents({ "gateway.worker": { atMs: staleAtMs, status: "ok" } }, NOW);
+    const incident = incidents[0];
+    expect(incident).toBeDefined();
+    if (incident === undefined) {
+      return;
+    }
+    const sanitized = sanitizeDiagnosticEvent({
+      kind: incident.kind,
+      metadata: incident.metadata,
+    });
+    expect(sanitized.status).toBe("ok");
+    if (sanitized.status === "ok") {
+      expect(sanitized.event.redactionsApplied).toBe(0);
+    }
+  });
+});
+
 describe("the external monitor layer", () => {
   it("defines exactly the three accepted monitor groups", () => {
     const groups = monitors.monitors.map((monitor) => monitor.group).sort();
@@ -75,6 +132,9 @@ describe("the external monitor layer", () => {
     const silence = monitors.monitors.find((m) => m.id === "kiero-backend-silence");
     expect(silence).toBeDefined();
     expect(silence?.apl.includes("ops.health.heartbeat")).toBe(true);
+    // Round-1 repair: the loop is closed - the emitted silence events are
+    // part of this monitor's query.
+    expect(silence?.apl.includes("ops.health.silence_detected")).toBe(true);
     expect(silence?.trigger.threshold).toBe("15m");
   });
 

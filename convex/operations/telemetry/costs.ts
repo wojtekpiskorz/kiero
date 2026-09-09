@@ -93,6 +93,19 @@ export function sumCostEntries(
   return { perProvider, totalMinor };
 }
 
+/**
+ * Stable dedup identity of one threshold firing: level + period + fire
+ * count. A timestamp would never collide, making dedup useless; this key
+ * is stable per firing while cooldown-gated re-fires get a new count.
+ */
+export function costAlertDedupKey(
+  level: CostAlertLevel,
+  period: string,
+  fireCount: number,
+): string {
+  return `cost_alert:${level}:${period}:${fireCount}`;
+}
+
 /** The UTC calendar month ("YYYY-MM") containing a timestamp. */
 export function periodOf(nowMs: number): string {
   return new Date(nowMs).toISOString().slice(0, 7);
