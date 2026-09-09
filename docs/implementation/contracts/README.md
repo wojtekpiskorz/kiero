@@ -16,26 +16,34 @@ Defined by A2 ([issue #17](https://github.com/wojtekpiskorz/kiero/issues/17)).
 4. `durableJobs` gains `dedupKey` (+ `by_dedup` index), `by_jobKey` index, `lastErrorKind`, `externalOutcome`, `finishedAtMs`: job-key/dedup lookup inside the registration transaction and sanitized outcome recording.
 5. Job kinds renamed `notifications.*` -> `attention.*` (one concept, one name: the module surface is `attention`).
 6. `DateRange` now enforces cross-precision bound ordering by period start (the A2 deferral, resolved): `start=2026-05-10/end=2026-05` rejects, `start=2026-05/end=2026-05-10` accepts; `dateOnlyPeriodStart` is exported.
-7. `convex/schema.ts` passes the literal spread to `defineSchema` (runtime uniqueness/inventory checks unchanged) so per-table index types survive into the generated data model — `withIndex("by_dedup", ...)` typechecks against real index names.
+7. `convex/schema.ts` passes the literal spread to `defineSchema` (runtime uniqueness/inventory checks unchanged) so per-table index types survive into the generated data model: `withIndex("by_dedup", ...)` typechecks against real index names.
 8. Pinned counts in `tests/contracts/` updated (52 tables, 56/40 registry, 7 features) and the unknown-event branch of `assertFeaturesCoherent` got its fixture (the A2 round-6 residual).
 
-**Deferred A2 ruling items — disposition:**
+**Deferred A2 ruling items, disposition:**
 
 - Registration builder refactor (ruling item 2): knowingly carried. The platform surface was added with the existing entry pattern; a generic builder would churn all 10 module files with zero behavioral gain while no consumer lane has registered a feature yet. Better done when B/C/D lanes actually register; the registry's import-time checks keep the current pattern safe.
 - One-concept-one-name renames (ruling item 8): done where the scan found a real split (the `notifications.*` -> `attention.*` job kinds, amendment 5). No other one-concept-two-names pair was found across the operation/event surfaces; consumers should flag further candidates during their integration instead of churning the baseline now.
 
-**Post-certification repairs (PR #73 review round 1, 2026-09-09, before merge):**
+**Post-certification repairs (PR #73 review rounds 1-2, 2026-09-09, before merge):**
 
-9. `outboxEvents` gains `lastErrorKind` (sanitized closed error kind of a
-   delivery failure) and `platform.outboxState` events expose it: the drain's
-   loud failure for unprojected consumer edges
+9. `outboxEvents` gains `lastErrorKind` and `platform.outboxState` exposes
+   it (on events, and `externalOutcome`/`lastErrorKind` on jobs): the
+   drain's loud failure for unprojected consumer edges
    (`consumer_projection_missing`) is machine-readable on the row instead of
-   a silent in_flight stranding. The registration decision now knows a
-   failure's nature: uncertain failures (`externalOutcome` timeout/unknown)
-   refuse re-registration (`uncertain_outcome` reason) so a replayed
-   publisher can never blind-retry a possibly-delivered external effect; the
-   rule lives in @kiero/runtime (single definition), and live rows O3a/O7 in
-   `docs/evidence/platform/README.md` prove both behaviors (31/31 rows).
+   a silent in_flight stranding. Durable registration is ONE row per dedup
+   key: re-registration (allowed only for DEFINITE failures, per
+   `decideJobRegistration`) patches the existing row back to queued and keeps
+   its attempt count, so a sibling row can never hide an uncertain failure
+   behind an older definitely-failed one, and the row's maxAttempts bounds
+   total executions across every replay of the logical operation. The
+   uncertain-failure predicate (`isUncertainJobFailure`: failed +
+   externalOutcome timeout/unknown; failures without an external outcome are
+   never uncertain) is defined once in @kiero/runtime and consumed by both
+   the registration decision and the executor entry. Proved live in
+   `docs/evidence/platform/README.md`: rows O3a (uncertain replay refused),
+   O7 (unprojected edge fails loudly) and O8 (the full adversarial
+   definite-fail -> replay -> uncertain-fail -> replay sequence on one row:
+   one external effect, attempts bounded at 2 of 3); 34/34 rows PASS.
 
 **Runtime facts proved against this baseline** (details in `docs/evidence/platform/README.md`): the single Effect-Schema -> Convex-validator conversion table survives real deployment; command envelopes decode through Effect Schema at the function boundary (Convex-level args validation is deliberately delegated to the contract schemas to keep ONE conversion path); `ctx.db.normalizeId` is the runtime id well-formedness bridge between branded contract ids and Convex `Id`s; the TanStack schema converter consumes `~standard.jsonSchema` (draft-07) attached by `Schema.toStandardJSONSchemaV1`.
 

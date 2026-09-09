@@ -28,8 +28,12 @@ const env = loadEnv();
  * deployed functions, so each switch also redeploys (a few seconds).
  */
 async function setEchoBehavior(behavior) {
+  const target =
+    behavior === ""
+      ? ""
+      : `https://steady-basilisk-613.eu-west-1.convex.site/platform/echo?behavior=${behavior}`;
   execSync(
-    `npx --yes convex@1.45.0 env set KIERO_ECHO_TARGET "https://steady-basilisk-613.eu-west-1.convex.site/platform/echo?behavior=${behavior}"`,
+    `npx --yes convex@1.45.0 env set KIERO_ECHO_TARGET "${target}"`,
     { stdio: "pipe" },
   );
   execSync("npx --yes convex@1.45.0 dev --once", { stdio: "pipe" });
@@ -266,5 +270,106 @@ record(
     : "FAIL",
   `event=${stranded?.eventName ?? "none"} state=${stranded?.deliveryState ?? "none"} lastErrorKind=${stranded?.lastErrorKind ?? "none"} extractJobs=${extractJobs.length}`,
 );
+
+// --- O8: adversarial definite-fail -> replay -> uncertain-fail -> replays ------
+//
+// The round-2 hole: sibling rows under one dedup key could hide an uncertain
+// failure behind an older definitely-failed row. The one-row design removes
+// siblings: re-registration patches the existing row (attempts kept), so the
+// decision always sees the authoritative row and total attempts stay bounded.
+
+const adversarialKey = `idem_${crypto.randomUUID()}`;
+
+// Phase 1: definite terminal failure (target not configured -> non-retryable).
+await setEchoBehavior("");
+const adv1 = await bridgeCall(env, {
+  operation: "platform.probeEcho",
+  input: { message: "adversarial sequence" },
+  idempotencyKey: adversarialKey,
+});
+const advJobKey = adv1.body.value.jobKey;
+const phase1 = await pollUntil(
+  "phase 1 definite failure",
+  async () => {
+    const state = await outboxState(adv1.body.value.dedupKey);
+    const job = state.jobs.find((candidate) => candidate.jobKey === advJobKey);
+    return job && job.state === "failed" ? job : null;
+  },
+  { timeoutMs: 30_000 },
+);
+record(
+  "O8 phase 1 definite terminal failure recorded on ONE row",
+  phase1.state === "failed" &&
+    phase1.externalOutcome === "failed" &&
+    phase1.lastErrorKind === "echo_target_not_configured" &&
+    phase1.attempts === 1
+    ? "PASS"
+    : "FAIL",
+  `state=${phase1.state} externalOutcome=${phase1.externalOutcome} errorKind=${phase1.lastErrorKind} attempts=${phase1.attempts}`,
+);
+
+// Phase 2: replay under the slow target: the SAME row re-queues, then fails
+// UNCERTAIN (timeout after the external system recorded its effect).
+await setEchoBehavior("slow");
+const adv2 = await bridgeCall(env, {
+  operation: "platform.probeEcho",
+  input: { message: "adversarial sequence" },
+  idempotencyKey: adversarialKey,
+});
+const phase2 = await pollUntil(
+  "phase 2 uncertain failure",
+  async () => {
+    const state = await outboxState(adv1.body.value.dedupKey);
+    const job = state.jobs.find((candidate) => candidate.jobKey === advJobKey);
+    return job && job.state === "failed" && job.externalOutcome === "timeout" ? job : null;
+  },
+  { timeoutMs: 40_000 },
+);
+const stateAfterPhase2 = await outboxState(adv1.body.value.dedupKey);
+record(
+  "O8 phase 2 replay re-queues the SAME row which then fails uncertain",
+  adv2.body.value.jobKey === advJobKey &&
+    stateAfterPhase2.jobs.filter((candidate) => candidate.jobKey === advJobKey).length === 1 &&
+    phase2.attempts === 2 &&
+    stateAfterPhase2.externalEffects.length === 1
+    ? "PASS"
+    : "FAIL",
+  `sameJobKey=${adv2.body?.value?.jobKey === advJobKey} rows=1 attempts=${phase2.attempts} externalEffects=${stateAfterPhase2.externalEffects.length}`,
+);
+
+// Phase 3: further replays are refused (uncertain) and cannot re-execute.
+const echoJobsAfterPhase2 = stateAfterPhase2.jobs.filter(
+  (candidate) => candidate.kind === "platform.echo_delivery",
+).length;
+const adv3 = await bridgeCall(env, {
+  operation: "platform.probeEcho",
+  input: { message: "adversarial sequence" },
+  idempotencyKey: adversarialKey,
+});
+const adv4 = await bridgeCall(env, {
+  operation: "platform.probeEcho",
+  input: { message: "adversarial sequence" },
+  idempotencyKey: adversarialKey,
+});
+await new Promise((resolve) => setTimeout(resolve, 3_000));
+const finalAdversarial = await outboxState(adv1.body.value.dedupKey);
+const finalJob = finalAdversarial.jobs.find((candidate) => candidate.jobKey === advJobKey);
+record(
+  "O8 phase 3 replays of the uncertain row are refused: one effect, bounded attempts",
+  adv3.body.value.jobKey === advJobKey &&
+    adv4.body.value.jobKey === advJobKey &&
+    finalAdversarial.jobs.filter((candidate) => candidate.kind === "platform.echo_delivery")
+      .length === echoJobsAfterPhase2 &&
+    finalJob.state === "failed" &&
+    finalJob.externalOutcome === "timeout" &&
+    finalJob.attempts === 2 &&
+    finalAdversarial.externalEffects.length === 1
+    ? "PASS"
+    : "FAIL",
+  `replaysReturnedSameRow=${adv3.body?.value?.jobKey === advJobKey && adv4.body?.value?.jobKey === advJobKey} echoJobRows=${finalAdversarial.jobs.filter((c) => c.kind === "platform.echo_delivery").length} (was ${echoJobsAfterPhase2}) attempts=${finalJob?.attempts} (max 3) externalEffects=${finalAdversarial.externalEffects.length}`,
+);
+
+// Restore the fast target.
+await setEchoBehavior("ok");
 
 process.exit(summarize() ? 0 : 1);

@@ -97,6 +97,12 @@ export const platformOperations = {
           kind: Schema.String,
           state: DurableJobState,
           attempts: Schema.Number,
+          /** Outcome of the attempt that left the transaction, when one did. */
+          externalOutcome: Schema.optionalKey(
+            Schema.Literals(["succeeded", "failed", "timeout", "unknown"]),
+          ),
+          /** Sanitized closed error kind of the terminal/last failure, if any. */
+          lastErrorKind: Schema.optionalKey(Schema.String),
         }),
       ),
       externalEffects: Schema.Array(

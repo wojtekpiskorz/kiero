@@ -145,8 +145,17 @@ export interface JobRegistrationResult {
 /**
  * Registers one durable job: decodes the input against the kind's executor
  * schema from the composed registry (the executor table is the decode
- * authority), dedups on `jobKey`, writes the `durableJobs` row and schedules
- * the executor, all in the caller's transaction.
+ * authority), dedups on the dedup/job key, writes (or re-queues) the
+ * `durableJobs` row and schedules the executor, all in the caller's
+ * transaction.
+ *
+ * ONE row per dedup key (the round-2 structural invariant): when
+ * re-registration is allowed (a DEFINITE failure), the existing row is
+ * patched back to queued instead of inserting a sibling. Attempts are NOT
+ * reset, so the row's `maxAttempts` bounds total executions across ALL
+ * replays of the logical operation, and the uncertain-outcome decision is
+ * always made against the one authoritative row (a sibling could otherwise
+ * hide an uncertain failure behind an older definitely-failed row).
  */
 export async function registerDurableJob(
   tx: MutationCtx,
@@ -186,6 +195,30 @@ export async function registerDurableJob(
     return {
       jobKey:
         existing === null ? jobKey : Schema.decodeUnknownSync(DurableJobKeySchema)(existing.jobKey),
+      deduplicated: true,
+    };
+  }
+
+  if (existing !== null) {
+    // Re-registration of a definitely-failed row: ONE row per dedup key.
+    // Re-queue the existing row and keep its attempt count, so total
+    // executions stay bounded by the row's maxAttempts across replays.
+    // Patching to undefined clears the finished/outcome bookkeeping
+    // (Convex patches delete fields set to undefined).
+    await tx.db.patch(existing._id, {
+      state: "queued",
+      inputJson: JSON.stringify(input),
+      maxAttempts: registration.policy.maxAttempts,
+      externalOutcome: undefined,
+      lastErrorKind: undefined,
+      finishedAtMs: undefined,
+      updatedAtMs: Date.now(),
+    });
+    await tx.scheduler.runAfter(0, internal.platform.jobs.runDurableJob, {
+      jobKey: existing.jobKey,
+    });
+    return {
+      jobKey: Schema.decodeUnknownSync(DurableJobKeySchema)(existing.jobKey),
       deduplicated: true,
     };
   }

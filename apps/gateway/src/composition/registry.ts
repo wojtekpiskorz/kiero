@@ -9,11 +9,10 @@
  *   provider is imported below.
  * - `schedulerConsumers`: what this Worker consumes from durable execution
  *   (the Convex-side executors own the work; the gateway currently hosts
- *   none; media/export/backup executors join in later lanes).
- * - `gatewayRegistry.health`: exposed for diagnostics.
+ *   none; media/export/backup executors join in later lanes and are the
+ *   first consumers of this seam).
  */
 
-import { RUNTIME_VERSION } from "@kiero/runtime";
 import { platformRoutes, type GatewayRoute } from "../platform/routes";
 
 /** One lane's route provider. */
@@ -34,13 +33,6 @@ export const routeProviders: readonly RouteProvider[] = [
  * authority; this list only reports what runs HERE.
  */
 export const schedulerConsumers: readonly string[] = [];
-
-/** Composed registry exposed for diagnostics and later joins. */
-export const gatewayRegistry = {
-  runtimeVersion: RUNTIME_VERSION,
-  routeProviders,
-  schedulerConsumers,
-} as const;
 
 /** All registered routes, flattened in registration order. */
 export function registeredRoutes(): readonly GatewayRoute[] {

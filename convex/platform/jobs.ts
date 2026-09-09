@@ -22,7 +22,7 @@ import { internalMutation } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { MutationCtx } from "../_generated/server";
 import { executors } from "@kiero/contracts";
-import { backoffDelayMs } from "@kiero/runtime";
+import { backoffDelayMs, isUncertainJobFailure } from "@kiero/runtime";
 import { jobExecutors, type JobOutcome } from "./executors";
 
 const RETRY_BACKOFF_BASE_MS = 2_000;
@@ -39,8 +39,15 @@ async function executeJob(ctx: MutationCtx, jobKey: string): Promise<void> {
   if (job.state === "succeeded" || job.state === "cancelled") {
     return; // idempotent replay
   }
-  if (job.state === "failed" && job.externalOutcome !== "failed") {
-    // failed-by-uncertainty: only reconciliation may re-queue it.
+  if (
+    isUncertainJobFailure({
+      state: job.state,
+      ...(job.externalOutcome === undefined ? {} : { externalOutcome: job.externalOutcome }),
+    })
+  ) {
+    // Failed by uncertainty: only reconciliation may re-queue it. (Rows
+    // failed WITHOUT an external outcome are not uncertain; they fall
+    // through and are bounded by maxAttempts below.)
     return;
   }
   if (job.attempts >= job.maxAttempts) {

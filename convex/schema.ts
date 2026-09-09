@@ -15,7 +15,7 @@
  *
  * A3 certification amendment: `defineSchema` now receives the literal
  * spread (not the checked `Record`) so per-table INDEX types survive into
- * the generated data model — `withIndex("by_dedup", ...)` and friends
+ * the generated data model: `withIndex("by_dedup", ...)` and friends
  * typecheck against real index names instead of only system indexes. The
  * runtime uniqueness/inventory checks are unchanged and still run first.
  */

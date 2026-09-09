@@ -8,6 +8,7 @@ import {
   backoffDelayMs,
   decideEventPublication,
   decideJobRegistration,
+  isUncertainJobFailure,
   nextDeliveryState,
   reconcileMayRetry,
 } from "@kiero/runtime";
@@ -152,5 +153,21 @@ describe("drain event projection (three-way)", () => {
       jobKind: "processing.extract_fragments",
     });
     expect(CONSUMER_PROJECTION_MISSING).toBe("consumer_projection_missing");
+  });
+});
+
+describe("the one uncertain-failure predicate (single definition)", () => {
+  it("is uncertain only for failed rows with timeout/unknown external outcomes", () => {
+    expect(isUncertainJobFailure({ state: "failed", externalOutcome: "timeout" })).toBe(true);
+    expect(isUncertainJobFailure({ state: "failed", externalOutcome: "unknown" })).toBe(true);
+    // Definite external failure is not uncertainty.
+    expect(isUncertainJobFailure({ state: "failed", externalOutcome: "failed" })).toBe(false);
+    // Failures with NO external outcome (max attempts, not implemented) are
+    // never conflated with uncertainty: nothing left the transaction.
+    expect(isUncertainJobFailure({ state: "failed" })).toBe(false);
+    expect(isUncertainJobFailure({ state: "failed", externalOutcome: "succeeded" })).toBe(false);
+    // Non-failed states never count.
+    expect(isUncertainJobFailure({ state: "succeeded", externalOutcome: "timeout" })).toBe(false);
+    expect(isUncertainJobFailure({ state: "queued", externalOutcome: "timeout" })).toBe(false);
   });
 });

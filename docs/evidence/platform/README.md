@@ -45,7 +45,7 @@ gitignored `.env.local` (proof2 also flips `KIERO_ECHO_TARGET` between
 `behavior=ok|slow` and redeploys, because Convex snapshots env vars into
 functions at deploy time).
 
-## Proof matrix (31 rows, all PASS)
+## Proof matrix (34 rows, all PASS)
 
 ### proof0: TanStack tool/schema adapter conversion (offline, P01)
 
@@ -95,6 +95,9 @@ recorded here because A4's web app gets this path for free in the browser.
 | O5 no duplicate external effect across replay+uncertainty+reconcile | PASS | `externalEffects = 1` |
 | O6 event consumer edge registers the durable analyze job (drain path) | PASS | `kind=processing.analyze_change_plan state=succeeded` |
 | O7 unprojected consumer edge fails loudly (row failed, no job) | PASS | `state=failed lastErrorKind=consumer_projection_missing extractJobs=0` |
+| O8 phase 1 definite terminal failure recorded on ONE row | PASS | `externalOutcome=failed errorKind=echo_target_not_configured attempts=1` |
+| O8 phase 2 replay re-queues the SAME row which then fails uncertain | PASS | `sameJobKey=true rows=1 attempts=2 externalEffects=1` |
+| O8 phase 3 replays of the uncertain row are refused: one effect, bounded attempts | PASS | `replaysReturnedSameRow=true echoJobRows unchanged attempts=2 (max 3) externalEffects=1` |
 
 O3a (review repair 1): the uncertain job (failed + `externalOutcome: timeout`)
 sits unreconciled while the publisher is replayed with the SAME idempotency
@@ -106,6 +109,17 @@ is marked failed on the row with the machine-readable
 `consumer_projection_missing` error kind; the drain logs it and keeps
 processing, and no durable job is registered. Previously such rows were
 silently stranded in_flight.
+O8 (round-2 repair, adversarial): the full sibling-hiding sequence from the
+review. ONE durable row exists per dedup key by construction: when
+re-registration is allowed (definite failure only), `registerDurableJob`
+patches the existing row back to queued and KEEPS its attempt count, so the
+uncertain-outcome decision is always made against the authoritative row, and
+the row's maxAttempts bounds total executions across every replay. Observed
+live: definite terminal failure (attempts 1), replay re-queues the same row
+which then times out after the external system recorded its effect
+(attempts 2, exactly one external effect), and two further replays are both
+refused (same jobKey returned, no new row, attempts stay at 2 of 3, external
+effects stay at one).
 
 The external stand-in is the deployed echo endpoint: it records one
 `externalEffects` row per HTTP request BEFORE answering, then (per
@@ -160,8 +174,14 @@ recorded for D6/E2/E3 who own real pipelines).
 - Review repairs (PR #73 round 1, 2026-09-09): uncertain-outcome enforcement
   moved into the pure registration decision (O3a), the drain's projection
   became a three-way result with loud failure for unprojected edges (O7),
-  and the boundary errors now reuse @kiero/runtime's constructors. All five
-  proofs were re-run green after the repairs (31/31).
+  and the boundary errors now reuse @kiero/runtime's constructors.
+- Round-2 repairs (PR #73, 2026-09-09): registration is now one row per
+  dedup key (re-registration re-queues the existing row with attempts kept,
+  so maxAttempts bounds total executions across replays), the
+  uncertain-failure predicate lives once in @kiero/runtime
+  (`isUncertainJobFailure`; failures without an external outcome are never
+  conflated with uncertainty), and O8 proves the full adversarial sequence.
+  All five proofs were re-run green after the round-2 repairs (34/34).
 - Seeded fixtures (dev deployment only): one company/user/membership/
   service session/source row created by `platform/probe:probeSeed`, real
   rows in B-lane tables, used by context resolution; no business work.

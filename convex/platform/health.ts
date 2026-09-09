@@ -102,6 +102,10 @@ export const outboxStateFor = internalQuery({
           kind: job.kind,
           state: job.state,
           attempts: job.attempts,
+          ...(job.externalOutcome === undefined
+            ? {}
+            : { externalOutcome: job.externalOutcome }),
+          ...(job.lastErrorKind === undefined ? {} : { lastErrorKind: job.lastErrorKind }),
         }))
         .sort((a, b) => a.jobKey.localeCompare(b.jobKey)),
       externalEffects: externalEffects.map((effect) => ({

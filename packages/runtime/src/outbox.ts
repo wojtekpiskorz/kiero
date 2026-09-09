@@ -98,15 +98,25 @@ export function decideJobRegistration(
   if (existing.state === "queued" || existing.state === "running") {
     return { decision: "skip", reason: "active_attempt" };
   }
-  if (existing.state === "failed" && isUncertain(existing)) {
+  if (isUncertainJobFailure(existing)) {
     return { decision: "skip", reason: "uncertain_outcome" };
   }
   // definite failure: register again (bounded by maxAttempts at execution time).
   return { decision: "register" };
 }
 
-function isUncertain(existing: ExistingJobRow): boolean {
-  return existing.externalOutcome === "timeout" || existing.externalOutcome === "unknown";
+/**
+ * The ONE definition of an uncertain failure (timeout/unknown after an
+ * attempt that left the transaction). A row failed without an external
+ * outcome (max attempts exhausted, not implemented, bad input) is NOT
+ * uncertain: nothing left the transaction, so a retry cannot duplicate an
+ * external effect.
+ */
+export function isUncertainJobFailure(row: ExistingJobRow): boolean {
+  return (
+    row.state === "failed" &&
+    (row.externalOutcome === "timeout" || row.externalOutcome === "unknown")
+  );
 }
 
 /** Bounded exponential backoff for delivery/job retries (capped at 1 minute). */
