@@ -88,7 +88,8 @@ for (const [app, names] of Object.entries(expectedApps)) {
   // R2 expectations derive from the file's own declared scope: every
   // environment (top-level plus each named env block) that declares R2
   // bindings must declare all of them eu-jurisdiction, and the gateway must
-  // declare at least one binding somewhere so the rule cannot pass vacuously.
+  // re-declare its eu media binding in every scope, so no environment can
+  // silently inherit the dev binding or deploy without one.
   const r2Scopes = [
     ["top-level", cfg.r2_buckets ?? []],
     ...Object.entries(envs).map(([envName, e]) => [`env.${envName}`, e.r2_buckets ?? []]),
@@ -98,8 +99,10 @@ for (const [app, names] of Object.entries(expectedApps)) {
     for (const b of blocks)
       if (b.jurisdiction !== "eu")
         fail(`${file}: ${scope} R2 binding ${b.binding} must carry jurisdiction "eu"`);
-  if (app === "gateway" && declaredR2.length === 0)
-    fail(`${file}: gateway declares no R2 bindings; at least one eu binding per environment is required`);
+  if (app === "gateway")
+    for (const [scope, blocks] of r2Scopes)
+      if (blocks.length === 0)
+        fail(`${file}: ${scope} declares no R2 bindings; each gateway environment must re-declare its eu media binding`);
   if (app !== "gateway")
     for (const [scope, blocks] of declaredR2)
       fail(`${file}: ${scope} must not bind R2 directly (S3 credentials instead)`);
