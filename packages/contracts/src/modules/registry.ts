@@ -32,7 +32,7 @@ import { memoryOperations, memoryEvents } from "./memory";
 import { projectsOperations, projectsEvents } from "./projects";
 import { workOperations, workEvents } from "./work";
 import { attentionOperations, attentionEvents } from "./attention";
-import { calendarOperations, calendarEvents } from "./calendar";
+import { calendarOperations, calendarEvents, CalendarRemoteOutcome } from "./calendar";
 import { operationsOperations, operationsEvents } from "./operations";
 import { searchOperations, searchEvents } from "./search";
 import { integrationsOperations, integrationsEvents } from "./integrations";
@@ -107,7 +107,7 @@ const purgeSourceInput = Schema.Struct({
 
 const reconcileOutcomeInput = Schema.Struct({
   copyId: tableIdSchema("calendarCopies"),
-  lastKnownOutcome: Schema.Literals(["confirmed", "absent", "unknown"]),
+  lastKnownOutcome: CalendarRemoteOutcome,
 });
 
 const extractFragmentsInput = Schema.Struct({
