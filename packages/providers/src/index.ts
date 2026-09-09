@@ -5,14 +5,15 @@
  * Small public interface, deep internals (execution charter: "OpenRouter
  * chat/STT/vision/embedding adapters and server-owned routing"):
  *
- * - `PROVIDER_ROUTING` / `ROUTING_CONFIG_VERSION` (+ the per-role `*Route()`
- *   accessors): the frozen accepted model order per role. There is no
- *   user- or GM-facing model selector; the ordered-attempt runners are
- *   parameterized only for server-side verification probes.
+ * - `PROVIDER_ROUTING` / `ROUTING_CONFIG_VERSION`: the frozen accepted model
+ *   order per role. There is no user- or GM-facing model selector; the one
+ *   ordered-route runner is parameterized only for server-side verification
+ *   probes.
  * - `runChatTurn` / `chatWithRoute`: chat completions through the pinned
  *   `@tanstack/ai-openrouter` adapter with tools (decoded against the
  *   caller's Effect Schema) and strict structured output through the A3
- *   conversion (`toolJsonSchema` / `toolJsonSchemaForStructuredOutput`).
+ *   conversion (`toolJsonSchema` / `toolJsonSchemaForStructuredOutput`);
+ *   the result value's type follows the request's output codec.
  * - `runOrderedRoute`: the ONE ordered-route runner every role adapter uses
  *   (the bounded fallback loop, per-attempt records, eligibility
  *   short-circuit, record seal); a new role supplies only its attempt.

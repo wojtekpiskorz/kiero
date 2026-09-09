@@ -26,8 +26,7 @@ import {
   type ModelRoute,
 } from "./routing";
 import { classifySdkFailure, providerFailure, type ProviderFailure } from "./failures";
-import { runOrderedRoute } from "./runner";
-import type { ProviderCallRecord } from "./callRecord";
+import { runOrderedRoute, type RouteCallResult } from "./runner";
 import type { OpenRouterCredentials } from "./chat";
 
 /** Which side of retrieval the text belongs to (provider task hint). */
@@ -52,13 +51,8 @@ export interface EmbeddingResult {
   };
 }
 
-/** What one embedding call returns: typed output plus the route record. */
-export interface EmbeddingCallResult {
-  readonly outcome:
-    | { readonly outcome: "succeeded"; readonly value: EmbeddingResult }
-    | { readonly outcome: "failed"; readonly failure: ProviderFailure };
-  readonly record: ProviderCallRecord;
-}
+/** What one embedding call returns: the shared call result over the vector type. */
+export type EmbeddingCallResult = RouteCallResult<EmbeddingResult>;
 
 const finiteFloat = Schema.Number.pipe(
   Schema.check(Schema.isFinite()),

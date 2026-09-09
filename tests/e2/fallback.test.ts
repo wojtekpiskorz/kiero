@@ -16,6 +16,7 @@ import {
   CHAT_MODEL_ORDER,
   STT_MODEL_ORDER,
   chatWithRoute,
+  structuredChatWithRoute,
   providerFailure,
   transcriptionWithRoute,
   type OpenRouterCredentials,
@@ -201,7 +202,7 @@ describe("bounded ordered fallback (chat)", () => {
       [first]: failed("provider_unavailable"),
       [second]: succeeded({ text: "not json at all {" }),
     });
-    const result = await chatWithRoute(
+    const result = await structuredChatWithRoute(
       credentials,
       "chat_analysis",
       { order: CHAT_MODEL_ORDER },

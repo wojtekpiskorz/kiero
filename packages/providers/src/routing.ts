@@ -69,9 +69,14 @@ export const STT_ATTEMPT_DEADLINE_MS = 55_000;
 /** Bounded per-attempt deadline for embedding requests. */
 export const EMBEDDING_ATTEMPT_DEADLINE_MS = 30_000;
 
-/** One immutable route definition: an ordered, non-empty model list. */
+/**
+ * One immutable route definition: an ordered model list. The tuple type
+ * encodes non-emptiness, so the ordered-route runner's loop provably runs at
+ * least one attempt and an empty route is a compile-time error here rather
+ * than a silent runtime corner.
+ */
 export interface ModelRoute {
-  readonly order: readonly string[];
+  readonly order: readonly [string, ...string[]];
 }
 
 /** The frozen routing table keyed by the A2 contract route ids. */

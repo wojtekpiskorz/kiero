@@ -47,8 +47,12 @@ import {
   providerFailure,
   type ProviderFailure,
 } from "./failures";
-import { runOrderedRoute } from "./runner";
-import type { ProviderCallRecord } from "./callRecord";
+import {
+  runOrderedRoute,
+  type AttemptObservation,
+  type RouteCallResult,
+} from "./runner";
+import type { UsageObservation } from "./callRecord";
 
 /** Server-side OpenRouter credentials; never constructed from client input. */
 export interface OpenRouterCredentials {
@@ -93,17 +97,37 @@ export interface ChatToolSpec<I = unknown> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyChatToolSpec = ChatToolSpec<any>;
 
-/** The typed chat request (no model field: the route is server-owned). */
+/**
+ * The internal attempt-level request: either public request shape with the
+ * output codec widened, so `chatAttempt` (and verification fakes replacing
+ * it) accept plain and structured requests alike.
+ */
+export type ChatAttemptRequest = ChatRequest & {
+  readonly outputSchema?: Schema.Codec<unknown, unknown, never, never>;
+};
+
+/**
+ * The typed chat request for a plain or tool-calling turn (no model field:
+ * the route is server-owned; no output codec: that is the structured variant
+ * below, kept separate so the result value's type is real instead of
+ * collapsing to `unknown`).
+ */
 export interface ChatRequest {
   readonly messages: readonly ChatMessagePart[];
   /** Declared tools; the model's calls are returned decoded, never executed. */
   readonly tools?: readonly AnyChatToolSpec[];
-  /**
-   * Structured output contract. When present the request pins strict
-   * `json_schema` and the completion text must decode through this schema.
-   */
-  readonly outputSchema?: Schema.Codec<unknown, unknown, never, never>;
   readonly systemPrompt?: string;
+}
+
+/**
+ * The structured chat request: the same turn plus a REQUIRED output codec,
+ * in the style of `ChatToolSpec<I>`. The request pins strict `json_schema`
+ * converted from this codec (A3 `toolJsonSchemaForStructuredOutput`) and the
+ * completion text must decode through it. With tools declared, the model may
+ * still answer with tool calls, so the value type is `Output | ChatTurnResult`.
+ */
+export interface StructuredChatRequest<Output = unknown> extends ChatRequest {
+  readonly outputSchema: Schema.Codec<Output, unknown, never, never>;
 }
 
 /** One decoded tool call: arguments decoded through the declared schema. */
@@ -120,16 +144,12 @@ export interface ChatTurnResult {
   readonly finishReason: "stop" | "tool_calls";
 }
 
-/** The union every chat call resolves to. */
-export type ChatCallOutcome =
-  | { readonly outcome: "succeeded"; readonly value: ChatTurnResult | unknown }
-  | { readonly outcome: "failed"; readonly failure: ProviderFailure };
+/** What one plain chat call returns: the turn result plus the route record. */
+export type ChatCallResult = RouteCallResult<ChatTurnResult>;
 
-/** What one chat call returns: typed output plus the route record. */
-export interface ChatCallResult {
-  readonly outcome: ChatCallOutcome;
-  readonly record: ProviderCallRecord;
-}
+/** What one structured chat call returns: decoded output or a tool turn. */
+export type StructuredChatCallResult<Output = unknown> =
+  RouteCallResult<ChatTurnResult | Output>;
 
 /**
  * The observed model/usage harvested from the adapter's event stream.
@@ -294,7 +314,7 @@ function parseCompletionJson(text: string): { ok: true; value: unknown } | { ok:
 export async function chatAttempt(
   credentials: OpenRouterCredentials,
   model: string,
-  request: ChatRequest,
+  request: ChatAttemptRequest,
 ): Promise<
   | { ok: true; observation: StreamObservation }
   | { ok: false; failure: ProviderFailure }
@@ -376,14 +396,15 @@ export async function chatAttempt(
 }
 
 /**
- * Decodes a successful stream observation into the typed turn result.
- * Incompatible output fails closed (`output_rejected` / `unknown_tool`);
- * these are never eligible for fallback.
+ * Decodes tool calls from a successful stream observation into the typed
+ * turn result. Malformed JSON, schema mismatches and undeclared tool names
+ * fail closed (`output_rejected` / `unknown_tool`); these are never eligible
+ * for fallback.
  */
-function decodeObservation(
+function decodeToolTurn(
   request: ChatRequest,
   observation: StreamObservation,
-): { ok: true; value: ChatTurnResult | unknown } | { ok: false; failure: ProviderFailure } {
+): { ok: true; value: ChatTurnResult } | { ok: false; failure: ProviderFailure } {
   const toolSchemas = new Map<string, Schema.Codec<unknown, unknown, never, never>>();
   for (const tool of request.tools ?? []) {
     toolSchemas.set(tool.name, tool.input as Schema.Codec<unknown, unknown, never, never>);
@@ -410,17 +431,6 @@ function decodeObservation(
       } satisfies ChatTurnResult,
     };
   }
-  if (request.outputSchema !== undefined) {
-    const parsed = parseCompletionJson(observation.text);
-    if (!parsed.ok) {
-      return { ok: false, failure: providerFailure("output_rejected") };
-    }
-    const decoded = Schema.decodeUnknownOption(request.outputSchema)(parsed.value);
-    if (decoded._tag === "None") {
-      return { ok: false, failure: providerFailure("output_rejected") };
-    }
-    return { ok: true, value: decoded.value };
-  }
   return {
     ok: true,
     value: {
@@ -429,6 +439,52 @@ function decodeObservation(
       finishReason: "stop",
     } satisfies ChatTurnResult,
   };
+}
+
+/**
+ * Decodes a structured turn: with tools declared the model may answer with
+ * tool calls (the typed turn result) or the structured final answer, so the
+ * honest value type is `Output | ChatTurnResult`. Malformed JSON and schema
+ * mismatches fail closed (`output_rejected`), never eligible for fallback.
+ */
+function decodeStructuredTurn<Output>(
+  request: StructuredChatRequest<Output>,
+  observation: StreamObservation,
+): { ok: true; value: ChatTurnResult | Output } | { ok: false; failure: ProviderFailure } {
+  if (observation.toolCalls.length > 0) {
+    return decodeToolTurn(request, observation);
+  }
+  const parsed = parseCompletionJson(observation.text);
+  if (!parsed.ok) {
+    return { ok: false, failure: providerFailure("output_rejected") };
+  }
+  const decoded = Schema.decodeUnknownOption(request.outputSchema)(parsed.value);
+  if (decoded._tag === "None") {
+    return { ok: false, failure: providerFailure("output_rejected") };
+  }
+  return { ok: true, value: decoded.value };
+}
+
+/** Attaches an observation's routing metadata to an attempt outcome. */
+function withObservation<T extends object>(
+  outcome: T,
+  observation: StreamObservation,
+): T & AttemptObservation {
+  const enriched: T & {
+    observedModel?: string;
+    usage?: UsageObservation;
+    firstOutputAtMs?: number;
+  } = { ...outcome };
+  if (observation.observedModel !== undefined) {
+    enriched.observedModel = observation.observedModel;
+  }
+  if (observation.firstOutputAtMs !== undefined) {
+    enriched.firstOutputAtMs = observation.firstOutputAtMs;
+  }
+  if (observation.usage !== undefined) {
+    enriched.usage = observation.usage;
+  }
+  return enriched;
 }
 
 /**
@@ -456,31 +512,41 @@ export async function chatWithRoute(
     if (!attempt.ok) {
       return { ok: false as const, failure: attempt.failure };
     }
-    const observation = attempt.observation;
-    const decoded = decodeObservation(request, observation);
-    if (!decoded.ok) {
-      return {
-        ok: false as const,
-        failure: decoded.failure,
-        ...(observation.observedModel === undefined ? {} : { observedModel: observation.observedModel }),
-        ...(observation.firstOutputAtMs === undefined ? {} : { firstOutputAtMs: observation.firstOutputAtMs }),
-        ...(observation.usage === undefined ? {} : { usage: observation.usage }),
-      };
-    }
-    return {
-      ok: true as const,
-      value: decoded.value,
-      ...(observation.observedModel === undefined ? {} : { observedModel: observation.observedModel }),
-      ...(observation.firstOutputAtMs === undefined ? {} : { firstOutputAtMs: observation.firstOutputAtMs }),
-      ...(observation.usage === undefined ? {} : { usage: observation.usage }),
-    };
+    const decoded = decodeToolTurn(request, attempt.observation);
+    return withObservation(decoded, attempt.observation);
   });
 }
 
-/** The public chat entry point: the frozen accepted chat route. */
+/** The structured variant over the same runner and attempt protocol. */
+export async function structuredChatWithRoute<Output>(
+  credentials: OpenRouterCredentials,
+  recordRouteId: "chat_analysis" | "vision_extraction",
+  route: ModelRoute,
+  request: StructuredChatRequest<Output>,
+  attemptFunction: typeof chatAttempt = chatAttempt,
+): Promise<StructuredChatCallResult<Output>> {
+  return runOrderedRoute(recordRouteId, route, async (model) => {
+    const attempt = await attemptFunction(credentials, model, request);
+    if (!attempt.ok) {
+      return { ok: false as const, failure: attempt.failure };
+    }
+    const decoded = decodeStructuredTurn(request, attempt.observation);
+    return withObservation(decoded, attempt.observation);
+  });
+}
+
+/** The public plain chat entry point: the frozen accepted chat route. */
 export async function runChatTurn(
   credentials: OpenRouterCredentials,
   request: ChatRequest,
 ): Promise<ChatCallResult> {
   return chatWithRoute(credentials, "chat_analysis", PROVIDER_ROUTING.chat_analysis, request);
+}
+
+/** The public structured chat entry point: the frozen accepted chat route. */
+export async function runStructuredChat<Output>(
+  credentials: OpenRouterCredentials,
+  request: StructuredChatRequest<Output>,
+): Promise<StructuredChatCallResult<Output>> {
+  return structuredChatWithRoute(credentials, "chat_analysis", PROVIDER_ROUTING.chat_analysis, request);
 }

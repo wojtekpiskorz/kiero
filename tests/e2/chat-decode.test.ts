@@ -23,6 +23,7 @@ import {
   chatWithRoute,
   classifyChatFailure,
   harvestStream,
+  structuredChatWithRoute,
   type ChatRequest,
   type OpenRouterCredentials,
   type ProviderFailure,
@@ -209,7 +210,8 @@ describe("chat provider output decode (harvest -> decode -> record)", () => {
     );
     expect(result.outcome.outcome).toBe("succeeded");
     if (result.outcome.outcome === "succeeded") {
-      const turn = result.outcome.value as { text: string; toolCalls: unknown[]; finishReason: string };
+      // The plain-call value type is the real ChatTurnResult: no casts.
+      const turn = result.outcome.value;
       expect(turn.text).toBe("odp");
       expect(turn.toolCalls).toEqual([]);
       expect(turn.finishReason).toBe("stop");
@@ -247,10 +249,7 @@ describe("chat provider output decode (harvest -> decode -> record)", () => {
     const result = await chatWithRoute(credentials, "chat_analysis", route, request, fake.attempt);
     expect(result.outcome.outcome).toBe("succeeded");
     if (result.outcome.outcome === "succeeded") {
-      const turn = result.outcome.value as {
-        toolCalls: { id: string; name: string; arguments: unknown }[];
-        finishReason: string;
-      };
+      const turn = result.outcome.value;
       expect(turn.finishReason).toBe("tool_calls");
       expect(turn.toolCalls[0]?.name).toBe("record_finding");
       expect(turn.toolCalls[0]?.arguments).toEqual({
@@ -340,7 +339,7 @@ describe("chat provider output decode (harvest -> decode -> record)", () => {
         runFinished(),
       ],
     });
-    const result = await chatWithRoute(
+    const result = await structuredChatWithRoute(
       credentials,
       "chat_analysis",
       route,
@@ -351,8 +350,9 @@ describe("chat provider output decode (harvest -> decode -> record)", () => {
       fake.attempt,
     );
     expect(result.outcome.outcome).toBe("succeeded");
-    if (result.outcome.outcome === "succeeded") {
-      expect(result.outcome.value).toEqual({ odp: "tak" });
+    if (result.outcome.outcome === "succeeded" && !("toolCalls" in result.outcome.value)) {
+      // Narrowed to the codec's type: the value is typed, not re-decoded.
+      expect(result.outcome.value.odp).toBe("tak");
     }
   });
 
@@ -360,7 +360,7 @@ describe("chat provider output decode (harvest -> decode -> record)", () => {
     const fake = fakeStreamAttempts({
       "model-a": [runStarted(), textDelta('{"odp": "tak'), runFinished()],
     });
-    const result = await chatWithRoute(
+    const result = await structuredChatWithRoute(
       credentials,
       "chat_analysis",
       route,
@@ -381,7 +381,7 @@ describe("chat provider output decode (harvest -> decode -> record)", () => {
     const fake = fakeStreamAttempts({
       "model-a": [runStarted(), textDelta('{"claim":"obiecal rurke"}'), runFinished()],
     });
-    const result = await chatWithRoute(
+    const result = await structuredChatWithRoute(
       credentials,
       "chat_analysis",
       route,

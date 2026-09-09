@@ -98,7 +98,7 @@ export async function runOrderedRoute<T>(
   attemptRoute: (model: string) => Promise<RouteAttempt<T>>,
 ): Promise<RouteCallResult<T>> {
   const builder = newCallRecord(routeId);
-  let lastFailure: ProviderFailure = providerFailure("provider_unavailable");
+  let lastFailure: ProviderFailure | undefined;
   for (const model of route.order) {
     const startedAtMs = Date.now();
     const attempt = await attemptRoute(model);
@@ -128,6 +128,9 @@ export async function runOrderedRoute<T>(
     };
   }
   // Every position failed with an eligible failure: the last observed one
-  // stands (recorded per attempt above).
-  return { outcome: { outcome: "failed", failure: lastFailure }, record: sealCallRecord(builder) };
+  // stands (recorded per attempt above). `ModelRoute.order` is a non-empty
+  // tuple, so the loop provably ran at least once; the fallback default is
+  // unreachable defensive typing, not a real classification.
+  const terminal = lastFailure ?? providerFailure("provider_unavailable");
+  return { outcome: { outcome: "failed", failure: terminal }, record: sealCallRecord(builder) };
 }

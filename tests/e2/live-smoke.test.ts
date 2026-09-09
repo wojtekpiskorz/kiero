@@ -16,7 +16,7 @@
  *     cannot exist (404 before any inference) is classified eligible and the
  *     accepted first-choice model serves the retry. This is an honest forced
  *     first-position failure, labeled as a probe route — the production
- *     surface has no model parameter.
+ *     entry points take no model parameter.
  *  3. ONE embedding probe: the observed vector must be the versioned
  *     4096-dimension baseline, with the observed model recorded.
  *  4. ONE transcription probe on the dedicated endpoint with a tiny
@@ -34,9 +34,9 @@ import {
   ROUTING_CONFIG_VERSION,
   chatWithRoute,
   runEmbedding,
+  runStructuredChat,
   runTranscription,
   runVisionExtraction,
-  type ChatRequest,
   type OpenRouterCredentials,
 } from "@kiero/providers";
 
@@ -148,7 +148,7 @@ describeLive("E2 live smoke (authorized spend)", () => {
       if (credentials === null) {
         throw new Error("unreachable: gated");
       }
-      const request: ChatRequest = {
+      const result = await runStructuredChat(credentials, {
         messages: [
           {
             role: "user",
@@ -156,20 +156,13 @@ describeLive("E2 live smoke (authorized spend)", () => {
           },
         ],
         outputSchema: ProbeOutput,
-      };
-      const result = await chatWithRoute(
-        credentials,
-        "chat_analysis",
-        { order: CHAT_MODEL_ORDER },
-        request,
-      );
+      });
       // eslint-disable-next-line no-console
       console.log("[e2-smoke/chat] record:", sanitized(result.record));
       expect(result.outcome.outcome).toBe("succeeded");
-      if (result.outcome.outcome === "succeeded") {
-        const decoded = Schema.decodeUnknownSync(ProbeOutput)(result.outcome.value);
-        expect(typeof decoded.odp).toBe("string");
-        expect(decoded.odp.length).toBeGreaterThan(0);
+      if (result.outcome.outcome === "succeeded" && !("toolCalls" in result.outcome.value)) {
+        // The value already carries the codec's type: no re-decode needed.
+        expect(result.outcome.value.odp.length).toBeGreaterThan(0);
       }
       const success = result.record.attempts.find((a) => a.outcome === "succeeded");
       expect(success).toBeDefined();
@@ -188,7 +181,7 @@ describeLive("E2 live smoke (authorized spend)", () => {
       }
       // Probe route ONLY (server-side verification parameter): a first
       // position no catalog can serve, then the accepted order unchanged.
-      const probeOrder = ["kiero/nonexistent-probe-model", ...CHAT_MODEL_ORDER];
+      const probeOrder = ["kiero/nonexistent-probe-model", ...CHAT_MODEL_ORDER] as const;
       const result = await chatWithRoute(
         credentials,
         "chat_analysis",
@@ -279,9 +272,9 @@ describeLive("E2 live smoke (authorized spend)", () => {
       // eslint-disable-next-line no-console
       console.log("[e2-smoke/vision] record:", sanitized(result.record));
       expect(result.outcome.outcome).toBe("succeeded");
-      if (result.outcome.outcome === "succeeded") {
-        const decoded = Schema.decodeUnknownSync(ProbeExtraction)(result.outcome.value);
-        expect(decoded.claims.length).toBeGreaterThan(0);
+      if (result.outcome.outcome === "succeeded" && !("toolCalls" in result.outcome.value)) {
+        // The value already carries the codec's type: no re-decode needed.
+        expect(result.outcome.value.claims.length).toBeGreaterThan(0);
       }
       const success = result.record.attempts.find((a) => a.outcome === "succeeded");
       expect(success).toBeDefined();

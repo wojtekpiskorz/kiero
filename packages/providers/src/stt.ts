@@ -24,8 +24,7 @@ import {
   type ModelRoute,
 } from "./routing";
 import { classifySdkFailure, providerFailure, type ProviderFailure } from "./failures";
-import { runOrderedRoute } from "./runner";
-import type { ProviderCallRecord } from "./callRecord";
+import { runOrderedRoute, type RouteCallResult } from "./runner";
 import type { OpenRouterCredentials } from "./chat";
 
 /** Audio container formats the JSON transcription body accepts. */
@@ -62,13 +61,8 @@ export const SttTranscription = Schema.Struct({
 });
 export type SttTranscription = Schema.Schema.Type<typeof SttTranscription>;
 
-/** What one STT call returns: typed output plus the route record. */
-export interface SttCallResult {
-  readonly outcome:
-    | { readonly outcome: "succeeded"; readonly value: SttTranscription }
-    | { readonly outcome: "failed"; readonly failure: ProviderFailure };
-  readonly record: ProviderCallRecord;
-}
+/** What one STT call returns: the shared call result over the transcript type. */
+export type SttCallResult = RouteCallResult<SttTranscription>;
 
 /**
  * The provider body is untrusted data: decoded through `SttTranscription`

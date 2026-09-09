@@ -4,7 +4,7 @@
  * The accepted model order per role is application configuration (issue E2
  * acceptance criteria: no user or GM model selector exists; every role
  * follows the fixed application configuration). These tests pin the frozen
- * table and the closed error surface so any change is a deliberate,
+ * table and the closed error vocabulary so any change is a deliberate,
  * version-bumping code change.
  */
 

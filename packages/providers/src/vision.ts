@@ -7,7 +7,9 @@
  * receives completed extraction TEXT only, through the ordinary chat route).
  * Extraction results are always structured: the caller's Effect Schema
  * contract (E4 owns the real extraction schema) is pinned as strict
- * `json_schema` and the completion must decode through it.
+ * `json_schema` and the completion must decode through it, so the result
+ * value's type follows that codec (tools are not declared here; a tool turn
+ * in the value type comes from the shared structured-chat contract).
  *
  * If every image-capable route fails, the caller keeps the image extraction
  * pending and processes only information whose basis is available
@@ -17,11 +19,8 @@
 
 import { Schema } from "effect";
 import { PROVIDER_ROUTING, type ModelRoute } from "./routing";
-import {
-  chatWithRoute,
-  type ChatCallResult,
-  type OpenRouterCredentials,
-} from "./chat";
+import { structuredChatWithRoute, type ChatTurnResult, type OpenRouterCredentials } from "./chat";
+import type { RouteCallResult } from "./runner";
 
 /** One inline image for extraction (bounded by the caller's media pipeline). */
 export interface VisionImage {
@@ -29,8 +28,12 @@ export interface VisionImage {
   readonly mimeType: "image/png" | "image/jpeg" | "image/webp";
 }
 
-/** The typed image-extraction request (no model field: route is owned). */
-export interface VisionExtractionRequest {
+/**
+ * The typed image-extraction request (no model field: route is owned). The
+ * output codec is required, in the style of `ChatToolSpec<I>`, so the
+ * decoded extraction value is typed.
+ */
+export interface VisionExtractionRequest<Output = unknown> {
   readonly images: readonly VisionImage[];
   /**
    * Task instruction for the extraction. Bounded plain text; extraction
@@ -38,16 +41,20 @@ export interface VisionExtractionRequest {
    */
   readonly instruction: string;
   /** The extraction result contract the completion must decode through. */
-  readonly outputSchema: Schema.Codec<unknown, unknown, never, never>;
+  readonly outputSchema: Schema.Codec<Output, unknown, never, never>;
 }
 
+/** What one image extraction returns: decoded output or a tool turn, plus the record. */
+export type VisionExtractionCallResult<Output = unknown> =
+  RouteCallResult<ChatTurnResult | Output>;
+
 /** Runs one image extraction over an ordered (server-owned) vision route. */
-export async function visionExtractionWithRoute(
+export async function visionExtractionWithRoute<Output>(
   credentials: OpenRouterCredentials,
   route: ModelRoute,
-  request: VisionExtractionRequest,
-): Promise<ChatCallResult> {
-  return chatWithRoute(credentials, "vision_extraction", route, {
+  request: VisionExtractionRequest<Output>,
+): Promise<VisionExtractionCallResult<Output>> {
+  return structuredChatWithRoute(credentials, "vision_extraction", route, {
     messages: [
       {
         role: "user",
@@ -66,9 +73,9 @@ export async function visionExtractionWithRoute(
 }
 
 /** The public vision entry point: the frozen accepted vision route. */
-export async function runVisionExtraction(
+export async function runVisionExtraction<Output>(
   credentials: OpenRouterCredentials,
-  request: VisionExtractionRequest,
-): Promise<ChatCallResult> {
+  request: VisionExtractionRequest<Output>,
+): Promise<VisionExtractionCallResult<Output>> {
   return visionExtractionWithRoute(credentials, PROVIDER_ROUTING.vision_extraction, request);
 }
