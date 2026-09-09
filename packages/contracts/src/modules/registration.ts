@@ -116,11 +116,13 @@ export function executorEntry(entry: ExecutorEntry): ExecutorEntry {
 
 /**
  * Registration of one durable event consumer: when `eventName` is published,
- * a job of `jobKind` runs (the reaction is durable, not inline).
+ * a job of `jobKind` runs (the reaction is durable, not inline). The edge
+ * carries NO owning feature id on purpose: attribution is derived from the
+ * executor that owns `jobKind` (see `./registry`), so it cannot disagree
+ * with the executor table.
  */
 export interface EventConsumerEntry {
   readonly kind: "event_consumer";
-  readonly consumerId: FeatureId;
   readonly eventName: string;
   readonly jobKind: DurableJobKind;
 }

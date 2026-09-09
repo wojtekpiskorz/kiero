@@ -86,6 +86,7 @@ export const workTables = {
     createdAtMs: shared.tsMs,
     updatedAtMs: shared.tsMs,
   })
-    .index("by_project_state", ["companyId", "projectId", "state"])
-    .index("by_company", ["companyId"]),
+    // by_company (companyId) is intentionally absent: it is a strict prefix
+    // of by_project_state.
+    .index("by_project_state", ["companyId", "projectId", "state"]),
 } as const;

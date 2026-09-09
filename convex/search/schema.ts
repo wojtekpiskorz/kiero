@@ -18,7 +18,7 @@ export const searchTables = {
   /** One indexed fragment/finding text with its optional embedding. */
   searchEntries: defineTable({
     companyId: shared.companyId,
-    generationId: v.id("searchIndexGenerations"),
+    generationId: shared.searchIndexGenerationId,
     sourceFragmentId: v.optional(shared.sourceFragmentId),
     findingId: v.optional(shared.findingId),
     /** Versioned text preparation output. */

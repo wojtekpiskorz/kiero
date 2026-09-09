@@ -58,12 +58,12 @@ Lanes that create NEW tables (B2 `convex/access/linking/**`, D6 `convex/processi
 
 ## Producer and consumer registration entries
 
-Registration shapes live in `packages/contracts/src/modules/registration.ts` (`OperationEntry`, `EventEntry`, `FeatureEntry`, `ExecutorEntry`, `EventConsumerEntry`). The composed registry (`.../modules/registry.ts`) holds the initial entries and checks at import time that every consumer edge references a declared event and a registered executor.
+Registration shapes live in `packages/contracts/src/modules/registration.ts` (`OperationEntry`, `EventEntry`, `FeatureEntry`, `ExecutorEntry`, `EventConsumerEntry`). The composed registry (`.../modules/registry.ts`) holds the initial entries and checks at import time that every consumer edge references a declared event and a registered executor. Feature registrations are DERIVED, not hand-written: one feature per executor, `consumesEvents` grouped from the consumer edges by job kind (an edge belongs to the executor owning its job kind), so attribution cannot disagree with the executor table. Consumer edges carry no feature id of their own for exactly this reason; `assertFeaturesCoherent` (hand-written parts) and `assertFeaturesCoverRegistrations` (derived edges equal declared edges) run at import.
 
 Initial registrations (candidates until implemented; dispatching any unimplemented entry fails closed with the `unsupported` closed error):
 
 - **Executors**: `access.cleanup` (access-revocation cleanup), `memory.recompute` (dependency re-evaluation), `deletion.purge` (source purge), `calendar.reconcile` (unknown Calendar outcomes), `processing.extract` / `processing.analyze` (publication pipeline).
-- **Event consumers**: access.membershipRevoked / access.sessionRevoked → access-revocation cleanup; sources.sourceWithdrawn / memory.dependentsMarkedStale → dependent recomputation; sources.sourcePurged → deletion purge; calendar.copyOutcomeRecorded → Calendar reconciliation; sources.sourceAccepted → durable extraction; operations.reanalysisRequested → linked reanalysis run.
+- **Event consumers** (edge → job kind; the owning feature is derived from the executor table): access.membershipRevoked / access.sessionRevoked → `access.cleanup_revocation`; sources.sourceWithdrawn / memory.dependentsMarkedStale → `memory.recompute_dependents`; sources.sourcePurged → `deletion.purge_source`; calendar.copyOutcomeRecorded → `calendar.reconcile_outcome`; sources.sourceAccepted → `processing.extract_fragments` (owned by the `processing.extract` feature); operations.reanalysisRequested → `processing.analyze_change_plan`.
 
 The four cross-module outcomes the architecture names explicitly are therefore wired: access-revocation cleanup, reanalysis, deletion, and Calendar outcomes. Later lanes register their own features/executors/consumers in their fragments and extend the registry import list (a named prerequisite when shared files are touched).
 

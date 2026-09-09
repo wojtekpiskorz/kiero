@@ -172,96 +172,59 @@ export const executors: readonly ExecutorEntry[] = [
   }),
 ];
 
-function consumer(
-  consumerId: string,
-  eventName: string,
-  jobKind: EventConsumerEntry["jobKind"],
-): EventConsumerEntry {
-  return eventConsumerEntry({
-    kind: "event_consumer",
-    consumerId: decodeFeatureId(consumerId),
-    eventName,
-    jobKind,
-  });
+function consumer(eventName: string, jobKind: EventConsumerEntry["jobKind"]): EventConsumerEntry {
+  return eventConsumerEntry({ kind: "event_consumer", eventName, jobKind });
 }
 
 /**
  * Durable event consumers declared so far: the four cross-module outcomes the
  * architecture names explicitly (access-revocation cleanup, reanalysis,
- * deletion, Calendar outcomes) plus the publication pipeline seams.
+ * deletion, Calendar outcomes) plus the publication pipeline seams. Each
+ * edge belongs to whichever executor owns its job kind; the feature
+ * attribution below is derived from that, never hand-written.
  */
 export const eventConsumers: readonly EventConsumerEntry[] = [
   // Access revocation must invalidate derived access and media checks.
-  consumer("access.cleanup", "access.membershipRevoked", "access.cleanup_revocation"),
-  consumer("access.cleanup", "access.sessionRevoked", "access.cleanup_revocation"),
+  consumer("access.membershipRevoked", "access.cleanup_revocation"),
+  consumer("access.sessionRevoked", "access.cleanup_revocation"),
   // Withdrawal/purge re-evaluates dependent findings; history retained.
-  consumer("memory.recompute", "sources.sourceWithdrawn", "memory.recompute_dependents"),
-  consumer("memory.recompute", "memory.dependentsMarkedStale", "memory.recompute_dependents"),
+  consumer("sources.sourceWithdrawn", "memory.recompute_dependents"),
+  consumer("memory.dependentsMarkedStale", "memory.recompute_dependents"),
   // Permanent deletion purges derivatives within the accepted window.
-  consumer("deletion.purge", "sources.sourcePurged", "deletion.purge_source"),
+  consumer("sources.sourcePurged", "deletion.purge_source"),
   // Unknown Calendar outcomes always reconcile before another POST.
-  consumer("calendar.reconcile", "calendar.copyOutcomeRecorded", "calendar.reconcile_outcome"),
-  // Accepted sources register durable processing atomically.
-  consumer("processing.analyze", "sources.sourceAccepted", "processing.extract_fragments"),
-  // Requested reanalysis runs as a linked new run.
-  consumer("processing.analyze", "operations.reanalysisRequested", "processing.analyze_change_plan"),
+  consumer("calendar.copyOutcomeRecorded", "calendar.reconcile_outcome"),
+  // Accepted sources register durable extraction atomically; the extract
+  // executor owns `processing.extract_fragments`, so this edge belongs to
+  // the processing.extract feature (the earlier hand-written attribution to
+  // processing.analyze was the inconsistency; the executor table is the
+  // authority and its input shape is extraction, not change-plan analysis).
+  consumer("sources.sourceAccepted", "processing.extract_fragments"),
+  // Requested reanalysis runs as a linked new analysis run.
+  consumer("operations.reanalysisRequested", "processing.analyze_change_plan"),
 ];
 
 /**
- * The initial feature registrations: one per declared seam, naming what the
- * feature provides, publishes, consumes and executes. Later lanes add theirs
- * here (or in their own composed registries) through `featureEntry`.
+ * The initial feature registrations, DERIVED from the executor table: one
+ * feature per executor, keyed by its id. `consumesEvents` groups the
+ * registered consumer edges on job kind (an edge belongs to the executor
+ * owning its job kind) and `executesJobs` is exactly that job kind, so the
+ * three encodings cannot disagree. Only `providesOperations` and
+ * `publishesEvents` are hand-written; they stay empty until the owning
+ * lanes declare their surface.
  */
-export const features: readonly FeatureEntry[] = [
+export const features: readonly FeatureEntry[] = executors.map((executor) =>
   featureEntry({
     kind: "feature",
-    featureId: decodeFeatureId("access.cleanup"),
+    featureId: executor.executorId,
     providesOperations: [],
     publishesEvents: [],
-    consumesEvents: ["access.membershipRevoked", "access.sessionRevoked"],
-    executesJobs: ["access.cleanup_revocation"],
+    consumesEvents: eventConsumers
+      .filter((edge) => edge.jobKind === executor.jobKind)
+      .map((edge) => edge.eventName),
+    executesJobs: [executor.jobKind],
   }),
-  featureEntry({
-    kind: "feature",
-    featureId: decodeFeatureId("memory.recompute"),
-    providesOperations: [],
-    publishesEvents: [],
-    consumesEvents: ["sources.sourceWithdrawn", "memory.dependentsMarkedStale"],
-    executesJobs: ["memory.recompute_dependents"],
-  }),
-  featureEntry({
-    kind: "feature",
-    featureId: decodeFeatureId("deletion.purge"),
-    providesOperations: [],
-    publishesEvents: [],
-    consumesEvents: ["sources.sourcePurged"],
-    executesJobs: ["deletion.purge_source"],
-  }),
-  featureEntry({
-    kind: "feature",
-    featureId: decodeFeatureId("calendar.reconcile"),
-    providesOperations: [],
-    publishesEvents: [],
-    consumesEvents: ["calendar.copyOutcomeRecorded"],
-    executesJobs: ["calendar.reconcile_outcome"],
-  }),
-  featureEntry({
-    kind: "feature",
-    featureId: decodeFeatureId("processing.extract"),
-    providesOperations: [],
-    publishesEvents: [],
-    consumesEvents: ["sources.sourceAccepted"],
-    executesJobs: ["processing.extract_fragments"],
-  }),
-  featureEntry({
-    kind: "feature",
-    featureId: decodeFeatureId("processing.analyze"),
-    providesOperations: [],
-    publishesEvents: [],
-    consumesEvents: ["operations.reanalysisRequested"],
-    executesJobs: ["processing.analyze_change_plan"],
-  }),
-];
+);
 
 // Fail fast on impossible registrations (module surface name drift).
 
@@ -284,15 +247,16 @@ export function assertNoDuplicateExecutors(list: readonly ExecutorEntry[]): Set<
 }
 
 /**
- * Throws if a feature registration references an operation, event or job
- * kind that no module surface or executor declared. Exported so the
- * construction-time guarantee itself is under test.
+ * Throws if a hand-written part of a feature registration (provided
+ * operations, published events) references a name no module surface
+ * declared. Exported so the construction-time guarantee itself is under
+ * test. The derived parts (consumed events, executed job kinds) are checked
+ * by {@link assertFeaturesCoverRegistrations} instead.
  */
 export function assertFeaturesCoherent(
   list: readonly FeatureEntry[],
   knownOperations: Readonly<Record<string, unknown>>,
   knownEvents: Readonly<Record<string, unknown>>,
-  knownJobKinds: ReadonlySet<string>,
 ): void {
   for (const feature of list) {
     for (const name of feature.providesOperations) {
@@ -305,10 +269,41 @@ export function assertFeaturesCoherent(
         throw new Error(`Contract registry: feature ${feature.featureId} references unknown event ${name}`);
       }
     }
-    for (const kind of feature.executesJobs) {
-      if (!knownJobKinds.has(kind)) {
-        throw new Error(`Contract registry: feature ${feature.featureId} executes unregistered job kind ${kind}`);
-      }
+  }
+}
+
+/**
+ * Cross-check that the derived feature edges equal the declared
+ * registrations: every executor's job kind appears in exactly one feature
+ * with exactly that feature's consumed edges for the kind, and every
+ * consumer edge is covered. Throws otherwise. Exported so the
+ * construction-time guarantee itself is under test.
+ */
+export function assertFeaturesCoverRegistrations(
+  list: readonly FeatureEntry[],
+  registeredExecutors: readonly ExecutorEntry[],
+  registeredConsumers: readonly EventConsumerEntry[],
+): void {
+  for (const executor of registeredExecutors) {
+    const owning = list.filter((feature) => feature.executesJobs.includes(executor.jobKind));
+    if (owning.length !== 1) {
+      throw new Error(
+        `Contract registry: job kind ${executor.jobKind} is executed by ${owning.length} features, expected exactly 1`,
+      );
+    }
+    const feature = owning[0];
+    if (feature === undefined) {
+      throw new Error(`Contract registry: job kind ${executor.jobKind} has no feature`);
+    }
+    const derivedEdges = registeredConsumers
+      .filter((edge) => edge.jobKind === executor.jobKind)
+      .map((edge) => edge.eventName)
+      .sort();
+    const declaredEdges = [...feature.consumesEvents].sort();
+    if (derivedEdges.length !== declaredEdges.length || derivedEdges.some((name, i) => name !== declaredEdges[i])) {
+      throw new Error(
+        `Contract registry: feature ${feature.featureId} consumed edges diverge from the registered consumer edges for ${executor.jobKind}`,
+      );
     }
   }
 }
@@ -324,4 +319,5 @@ for (const entry of eventConsumers) {
     );
   }
 }
-assertFeaturesCoherent(features, operations, events, registeredJobKinds);
+assertFeaturesCoherent(features, operations, events);
+assertFeaturesCoverRegistrations(features, executors, eventConsumers);

@@ -11,6 +11,7 @@ import { Schema } from "effect";
 import { featureEntry } from "@kiero/contracts";
 import {
   assertFeaturesCoherent,
+  assertFeaturesCoverRegistrations,
   assertNoDuplicateExecutors,
   ClosedError,
   CommandEnvelope,
@@ -22,7 +23,9 @@ import {
   executors,
   FeatureId,
   features,
+  DurableJobKeySchema,
   IdempotencyKeySchema,
+  newDurableJobKey,
   newEventId,
   newIdempotencyKey,
   notImplemented,
@@ -92,11 +95,18 @@ describe("composed registry integrity", () => {
     expect(new Set(jobKinds).size).toBe(jobKinds.length);
   });
 
-  it("registers coherent initial features and rejects incoherent ones", () => {
-    // The initial seams all declare executable job kinds and reference only
-    // declared events (checked at import time by the registry itself).
+  it("derives coherent features and rejects incoherent hand-written parts", () => {
+    // One feature per executor; consumed edges and executed job kinds are
+    // derived from the executor/consumer tables, never hand-written.
     expect(features).toHaveLength(6);
-    // Deliberately incoherent feature: unknown operation and job kind.
+    expect(features.every((feature) => feature.providesOperations.length === 0)).toBe(true);
+    // The sourceAccepted edge belongs to processing.extract (the executor of
+    // processing.extract_fragments), not processing.analyze.
+    const extract = features.find((f) => f.featureId === "processing.extract");
+    expect(extract?.consumesEvents).toEqual(["sources.sourceAccepted"]);
+    const analyze = features.find((f) => f.featureId === "processing.analyze");
+    expect(analyze?.consumesEvents).toEqual(["operations.reanalysisRequested"]);
+    // Deliberately incoherent hand-written part: unknown provided operation.
     const drifted: readonly FeatureEntry[] = [
       ...features,
       featureEntry({
@@ -104,18 +114,20 @@ describe("composed registry integrity", () => {
         featureId: Schema.decodeUnknownSync(FeatureId)("drifted.feature"),
         providesOperations: ["drifted.nonexistentOperation"],
         publishesEvents: [],
-        consumesEvents: ["drifted.nonexistentEvent"],
+        consumesEvents: [],
         executesJobs: [],
       }),
     ];
-    const registeredJobKinds = new Set(executors.map((executor) => executor.jobKind));
-    expect(() => assertFeaturesCoherent(drifted, operations, events, registeredJobKinds)).toThrowError(
+    expect(() => assertFeaturesCoherent(drifted, operations, events)).toThrowError(
       /unknown operation drifted.nonexistentOperation/,
     );
-    // Coherent against the real registry inputs.
+    expect(() => assertFeaturesCoherent(features, operations, events)).not.toThrow();
+    // Cross-check: derived edges equal declared edges; dropping one feature
+    // (and with it its executor coverage) must throw.
+    expect(() => assertFeaturesCoverRegistrations(features, executors, eventConsumers)).not.toThrow();
     expect(() =>
-      assertFeaturesCoherent(features, operations, events, registeredJobKinds),
-    ).not.toThrow();
+      assertFeaturesCoverRegistrations(features.slice(1), executors, eventConsumers),
+    ).toThrowError(/expected exactly 1|has no feature/);
   });
 
   it("fails loudly when two executors claim one job kind", () => {
@@ -165,6 +177,8 @@ describe("typed ids", () => {
     expect(Schema.is(EventIdSchema)(newEventId())).toBe(true);
     expect(Schema.is(IdempotencyKeySchema)(newIdempotencyKey())).toBe(true);
     expect(newIdempotencyKey().startsWith("idem_")).toBe(true);
+    expect(Schema.is(DurableJobKeySchema)(newDurableJobKey())).toBe(true);
+    expect(newDurableJobKey().startsWith("job_")).toBe(true);
   });
 });
 

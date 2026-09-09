@@ -14,6 +14,7 @@
  */
 
 import { Schema } from "effect";
+import { ExpectedRecordTable } from "./tableIds";
 
 /** Closed vocabulary of error kinds. */
 export const ClosedErrorKind = Schema.Literals([
@@ -48,7 +49,7 @@ export const ClosedError = Schema.TaggedUnion({
   not_found: { ...Base, entity: Schema.NonEmptyString },
   conflict: {
     ...Base,
-    recordTable: Schema.optionalKey(Schema.NonEmptyString),
+    recordTable: Schema.optionalKey(ExpectedRecordTable),
     recordId: Schema.optionalKey(Schema.String),
   },
   idempotency_conflict: { ...Base, idempotencyKey: Schema.String },

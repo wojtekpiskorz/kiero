@@ -193,7 +193,10 @@ describe("extension definition versioning immutability", () => {
 describe("source correction immutability", () => {
   const fields = objectFields(acceptTables.sources.validator, "sources");
 
-  it("the original message core is required and has no editable text twin", () => {
+  it("immutable core is required and the editable-text blocklist is absent", () => {
+    // General invariant, blocklist witness: schema validators cannot express
+    // "no field of this shape may ever exist", so the checked names are the
+    // plausible editable-text twins; the required core is the general part.
     // The boss's own words, authorship and send-time snapshot are required at
     // acceptance; a correction is a NEW source, lifecycle stays explicit.
     for (const name of ["authorUserId", "authorText", "sentAtMs", "sentAtTimezone"]) {
@@ -230,9 +233,10 @@ describe("independent parent and checklist state", () => {
     expect(memberLiterals(itemState, "checklistItems.state")).toEqual(["open", "checked"]);
   });
 
-  it("a done task with unchecked items stays representable (2 of 3 is honest)", () => {
-    // Independence is structural: the item carries no parent-state field and
-    // the task carries no computed-done field, so `done` + `open` coexist.
+  it("keeps parent and checklist state independent (vocabularies disjoint, blocklist of coupling fields absent)", () => {
+    // The general part is the disjoint state vocabularies above; the
+    // coupling check itself is a blocklist witness (derivedDone et al.),
+    // since validators cannot name "any possible coupling field".
     for (const forbidden of ["taskState", "parentState", "derivedDone"]) {
       expect(itemFields[forbidden], forbidden).toBeUndefined();
     }

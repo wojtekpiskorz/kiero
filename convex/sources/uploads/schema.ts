@@ -48,7 +48,7 @@ export const uploadsTables = {
     companyId: shared.companyId,
     userId: shared.userId,
     stage: uploadStage,
-    partCount: v.float64(),
+    partCount: shared.counter,
     createdAtMs: shared.tsMs,
     finalizedAtMs: v.optional(shared.tsMs),
     orphanReason: v.optional(v.string()),

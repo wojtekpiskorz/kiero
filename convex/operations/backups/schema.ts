@@ -25,7 +25,7 @@ export const backupsTables = {
     ),
     databaseManifestHash: v.string(),
     mediaManifestHash: v.optional(v.string()),
-    mediaObjectCount: v.optional(v.float64()),
+    mediaObjectCount: v.optional(shared.counter),
     verifiedAtMs: v.optional(shared.tsMs),
     expiresAtMs: v.optional(shared.tsMs),
     failureReason: v.optional(v.string()),

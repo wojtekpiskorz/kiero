@@ -17,7 +17,14 @@
 
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
-import { shared } from "../../schema/shared";
+import { shared, type Encoded, type ValueValidator } from "../../schema/shared";
+import { ExtractionConfidence } from "@kiero/contracts";
+
+// Pinned to the contracts-side ExtractionConfidence (a number in [0, 1], not
+// a literals union): the column's type equals the schema's encoded type, and
+// the range itself is enforced by the Effect decoder at the boundary.
+const extractionConfidence: ValueValidator<Encoded<typeof ExtractionConfidence>> =
+  v.float64();
 
 export const acceptTables = {
   /** One immutable logical message ("Wiadomość źródłowa", CONTEXT.md). */
@@ -59,6 +66,8 @@ export const acceptTables = {
     pipelineVersion: v.string(),
     model: v.string(),
     provider: v.string(),
+    /** How sure the reader was about the bytes; separate from knowledge state. */
+    confidence: v.optional(extractionConfidence),
     processingRunId: shared.processingRunId,
     createdAtMs: shared.tsMs,
   })

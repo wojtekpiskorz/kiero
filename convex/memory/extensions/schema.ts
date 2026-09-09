@@ -46,8 +46,9 @@ export const extensionsTables = {
     currentVersionId: v.optional(shared.extensionVersionId),
     createdAtMs: shared.tsMs,
   })
-    .index("by_company_key", ["companyId", "stableKey"])
-    .index("by_company", ["companyId"]),
+    // by_company (companyId) is intentionally absent: it is a strict prefix
+    // of by_company_key.
+    .index("by_company_key", ["companyId", "stableKey"]),
 
   /** Append-only version snapshots. No row here is ever rewritten. */
   extensionVersions: defineTable({

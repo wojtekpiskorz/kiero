@@ -49,8 +49,10 @@ if (parsedCompanyId === null) {
   throw new Error("fixture id failed to normalize");
 }
 const companyId: CompanyId = parsedCompanyId;
-// @ts-expect-error - a companies id is not a tasks id
-const wrongTable: TaskId = parseTableId("companies", "c1");
+// @ts-expect-error - assigning the CompanyId VALUE to TaskId must fail on
+// the brand alone (a null-returning parseTableId call would also fail on
+// null, proving nothing about brand distinctness).
+const wrongTable: TaskId = companyId;
 
 // 3. Command envelope with expected revisions and idempotency.
 const expectation: RevisionExpectation = Schema.decodeUnknownSync(RevisionExpectation)({

@@ -49,8 +49,9 @@ export const findingsTables = {
     revisionCounter: shared.counter,
     updatedAtMs: shared.tsMs,
   })
-    .index("by_company_scope_key", ["companyId", "scopeProjectId", "semanticKey"])
-    .index("by_project", ["companyId", "scopeProjectId"]),
+    // by_project (companyId, scopeProjectId) is intentionally absent: it is
+    // a strict prefix of by_company_scope_key.
+    .index("by_company_scope_key", ["companyId", "scopeProjectId", "semanticKey"]),
 
   /** Immutable snapshot of one recorded revision. Never edited, only superseded. */
   findingRevisions: defineTable({

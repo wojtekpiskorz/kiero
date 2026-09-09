@@ -17,6 +17,7 @@
  */
 
 import { Schema } from "effect";
+import { atLeastOneBound } from "./bounds";
 
 const isCalendarDay = (value: string): value is string => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -77,13 +78,17 @@ const RangeBounds = Schema.TaggedStruct("range", {
 });
 type RangeBounds = Schema.Schema.Type<typeof RangeBounds>;
 
-const hasAtLeastOneBound = (value: RangeBounds): value is RangeBounds =>
-  value.start !== null || value.end !== null;
+const hasAtLeastOneBound = atLeastOneBound<RangeBounds>((value) => [value.start, value.end]);
 
 /**
  * A range of dates; a bound of `null` is open and stays open. Tagged like
  * the other variants so `TemporalValue.shape` is uniformly discriminable on
  * `_tag` (day | month | year | date_time | range).
+ *
+ * Ordering across precisions (day vs month vs year bounds, and date-vs
+ * date_time values generally) is deliberately NOT enforced here: comparing
+ * partially-known dates is a semantic decision, deferred to A3's runtime
+ * certification of this baseline.
  */
 export const DateRange = RangeBounds.pipe(Schema.refine(hasAtLeastOneBound));
 export type DateRange = Schema.Schema.Type<typeof DateRange>;

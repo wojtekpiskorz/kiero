@@ -101,7 +101,12 @@ describe("temporal values", () => {
     if (!("_tag" in decoded.shape) || decoded.shape._tag !== "date_time") {
       throw new Error("expected a date_time shape");
     }
-    expect(String(decoded.shape.value)).toContain("Europe/Warsaw");
+    // Assert the resolved instant structure, not a substring: a degraded
+    // plain-string value has no epochMilliseconds and must fail here.
+    const zoned = decoded.shape.value;
+    expect(typeof zoned.epochMilliseconds).toBe("number");
+    expect(zoned.epochMilliseconds).toBe(Date.UTC(2026, 0, 5, 9, 30, 0));
+    expect(String(zoned)).toContain("Europe/Warsaw");
   });
 
   it("preserves justified open bounds in ranges and rejects fully open ones", () => {
@@ -229,6 +234,26 @@ describe("money values", () => {
         certainty: "estimate",
       }),
     );
+    // Bounds are exact decimals at refine time: min greater than max is rejected.
+    expectSchemaError(() =>
+      decodeMoney({
+        role: "price_proposal",
+        amount: { _tag: "range", min: "5000", max: "4000" },
+        currency: "PLN",
+        currencyOrigin: "stated",
+        taxBasis: "not_specified",
+        certainty: "estimate",
+      }),
+    );
+    const equalBounds = decodeMoney({
+      role: "price_proposal",
+      amount: { _tag: "range", min: "4000", max: "4000" },
+      currency: "PLN",
+      currencyOrigin: "stated",
+      taxBasis: "not_specified",
+      certainty: "estimate",
+    });
+    expect(equalBounds.amount._tag).toBe("range");
   });
 
   it("keeps currency origin explicit and rejects lowercase currency codes", () => {

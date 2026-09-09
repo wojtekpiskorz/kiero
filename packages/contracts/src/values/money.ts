@@ -16,7 +16,8 @@
  * Candidate contract until A3 certifies the runtime conversion.
  */
 
-import { Schema } from "effect";
+import { Schema, BigDecimal } from "effect";
+import { atLeastOneBound } from "./bounds";
 
 /** Exact decimal amount, encoded as a plain decimal string (`"1234.56"`). */
 export const ExactDecimal = Schema.BigDecimalFromString;
@@ -28,13 +29,18 @@ const MoneyRange = Schema.TaggedStruct("range", {
 });
 type MoneyRange = Schema.Schema.Type<typeof MoneyRange>;
 
-const hasAtLeastOneBound = (value: MoneyRange): value is MoneyRange =>
-  value.min !== null || value.max !== null;
+const hasAtLeastOneBound = atLeastOneBound<MoneyRange>((value) => [value.min, value.max]);
+
+const boundsInOrder = (value: MoneyRange): value is MoneyRange =>
+  value.min === null || value.max === null || BigDecimal.isLessThanOrEqualTo(value.min, value.max);
 
 /** Amount: exact value, or a range with open (`null`) bounds where justified. */
 export const MoneyAmount = Schema.Union([
   Schema.TaggedStruct("exact", { value: ExactDecimal }),
-  MoneyRange.pipe(Schema.refine(hasAtLeastOneBound)),
+  MoneyRange.pipe(
+    Schema.refine(hasAtLeastOneBound),
+    Schema.refine(boundsInOrder),
+  ),
 ]);
 export type MoneyAmount = Schema.Schema.Type<typeof MoneyAmount>;
 

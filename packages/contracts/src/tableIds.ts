@@ -102,6 +102,26 @@ export const TABLE_ID_NAMES = [
 export type TableIdName = (typeof TABLE_ID_NAMES)[number];
 
 /**
+ * The closed set of tables a revision expectation or conflict reference may
+ * name. The `satisfies` check ties every member to the live table inventory:
+ * renaming or removing one of these tables breaks compilation here instead
+ * of silently accepting dead names.
+ */
+const EXPECTED_RECORD_TABLES = [
+  "findings",
+  "tasks",
+  "checklistItems",
+  "events",
+  "projects",
+  "sources",
+  "extensionDefinitions",
+  "clarifications",
+] as const satisfies readonly TableIdName[];
+
+export const ExpectedRecordTable = Schema.Literals(EXPECTED_RECORD_TABLES);
+export type ExpectedRecordTable = Schema.Schema.Type<typeof ExpectedRecordTable>;
+
+/**
  * The branded schema for one table's document ids. Instantiated with a
  * literal table name it yields a nominally distinct string type.
  */

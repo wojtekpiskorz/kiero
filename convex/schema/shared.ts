@@ -234,6 +234,7 @@ export const shared = {
   calendarCopyId: v.id("calendarCopies"),
   exportId: v.id("exports"),
   gmAccessGrantId: v.id("gmAccessGrants"),
+  searchIndexGenerationId: v.id("searchIndexGenerations"),
 
   /**
    * Monotonic non-negative counter: revisions, versions, attempt counts and
