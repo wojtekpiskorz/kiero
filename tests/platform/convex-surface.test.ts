@@ -12,9 +12,15 @@ import { echoExecutor } from "../../convex/platform/echo";
 import { analyzeChangePlanExecutor } from "../../convex/platform/pipeline";
 
 describe("convex executor composition", () => {
-  it("registers exactly the platform-owned mechanical executors", () => {
+  it("registers exactly the platform mechanical executors plus the B3 access cleanup", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
-      ["platform.echo_delivery", "processing.analyze_change_plan"].sort(),
+      [
+        "platform.echo_delivery",
+        "processing.analyze_change_plan",
+        // B3's sanctioned append (issue #22 owns the declared consumer
+        // proof for the access-revocation edges).
+        "access.cleanup_revocation",
+      ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");
     expect(analyzeChangePlanExecutor.jobKind).toBe("processing.analyze_change_plan");

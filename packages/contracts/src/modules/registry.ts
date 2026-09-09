@@ -96,7 +96,10 @@ export const revokedAccessCleanupInput = Schema.Struct({
   kind: Schema.Literals(["membership", "session"]),
   membershipId: Schema.NullOr(tableIdSchema("memberships")),
   sessionId: Schema.NullOr(tableIdSchema("sessions")),
-  revokedAtMs: Schema.Number,
+  // B3 amendment (issue #22): the drain projects the event payload onto this
+  // input; `access.sessionRevoked` payloads carry no timestamp, so the
+  // instant is optional and the executor stamps its own completion time.
+  revokedAtMs: Schema.optionalKey(Schema.Number),
 });
 
 export const recomputeDependentsInput = Schema.Struct({

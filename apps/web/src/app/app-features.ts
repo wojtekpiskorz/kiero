@@ -11,10 +11,14 @@ import { composeAppFeatures, type AppFeatureEntry } from "./registry";
 import { conversationFeatureEntry } from "./features/conversation/entry";
 import { coTerazFeatureEntry } from "./features/co-teraz/entry";
 import { projectsFeatureEntry } from "./features/projects/entry";
+import { membershipFeatureEntry } from "./features/membership/entry";
 
 /** Every registered host feature, in navigation order. The first entry ("/") is the default route. */
 export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
   conversationFeatureEntry,
   coTerazFeatureEntry,
   projectsFeatureEntry,
+  // B3's sanctioned host mount: the first mounted feature (sign-in gate +
+  // membership surface); the entry file owns the shape, this line the wiring.
+  membershipFeatureEntry,
 ]);
