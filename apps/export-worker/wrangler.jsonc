@@ -1,0 +1,87 @@
+// apps/export-worker/wrangler.jsonc — non-secret skeleton (issue I1 #53).
+//
+// EU export Container (background firm-export archives: HTML index, versioned
+// JSON, history, retained media). The TOP-LEVEL block targets LOCAL DEV names
+// only; staging/alpha are named environments (`--env staging` /
+// `--env alpha-production`).
+//
+// EU placement notes:
+// - Same container-jurisdiction caveat as media-worker: the
+//   `constraints.jurisdiction = "eu"` field needs wrangler >= 4.130.0 (A1
+//   pin); it is COMMENTED OUT until then. D5 activates and verifies it.
+// - Exports read the eu-jurisdiction media R2 bucket via S3 credentials
+//   (infra/bindings/media-export-workers.md) and hold NO backup-bucket
+//   credentials.
+// - No account_id committed; the account comes from `wrangler whoami`.
+//
+// NOTE (wrangler schema): `containers` is NOT inherited into named
+// environments — every env block repeats it when containers deploy.
+// Verified with wrangler 4.27.0: `wrangler deploy --dry-run --env <env>`
+// parses this file and reports ONLY the (expected) missing ./Dockerfile and
+// src/index.ts until D5/A1 create them.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kiero-dev-export-worker",
+  // Worker entry wrapping the container's Durable Object; created by A1/D5.
+  "main": "src/index.ts",
+  // Confirm/raise against A1's pinned wrangler on first deploy.
+  "compatibility_date": "2026-09-01",
+  "observability": {
+    "enabled": true
+  },
+  "containers": [
+    {
+      "name": "kiero-dev-export-container",
+      // Dockerfile lands with D5; path relative to this config.
+      "image": "./Dockerfile",
+      // Placeholder DO class; D5 aligns it with the A1 app skeleton.
+      "class_name": "ExportWorkerContainer",
+      "instance_type": "dev"
+      // Once wrangler >= 4.130.0 is pinned, set:
+      // "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
+      // "scheduling_policy": "regional",
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "dev",
+    "R2_MEDIA_BUCKET": "kiero-dev-media",
+    "R2_MEDIA_ENDPOINT": "",
+    "CONVEX_SITE_URL": ""
+  },
+  "env": {
+    "staging": {
+      "name": "kiero-staging-export-worker",
+      "containers": [
+        {
+          "name": "kiero-staging-export-container",
+          "image": "./Dockerfile",
+          "class_name": "ExportWorkerContainer",
+          "instance_type": "dev"
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "R2_MEDIA_BUCKET": "kiero-staging-media",
+        "R2_MEDIA_ENDPOINT": "",
+        "CONVEX_SITE_URL": ""
+      }
+    },
+    "alpha-production": {
+      "name": "kiero-alpha-export-worker",
+      "containers": [
+        {
+          "name": "kiero-alpha-export-container",
+          "image": "./Dockerfile",
+          "class_name": "ExportWorkerContainer",
+          "instance_type": "basic"
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT": "alpha-production",
+        "R2_MEDIA_BUCKET": "kiero-alpha-media",
+        "R2_MEDIA_ENDPOINT": "",
+        "CONVEX_SITE_URL": ""
+      }
+    }
+  }
+}
