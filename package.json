@@ -6,6 +6,7 @@
     "@opentelemetry/api is the required peer of @tanstack/ai.",
     "typescript 5.9.3 = last 5.x stable line; the 6/7 native line is a later coordinated decision, not a bootstrap substitution.",
     "A3 additions: @convex-dev/workflow 0.4.6 (+ its required peers convex-helpers 0.1.124 and @convex-dev/workpool 0.4.11) is the one canonical durable engine with the native scheduler; @convex-dev/react-query 0.1.0 is the chosen Convex TanStack Query integration; wrangler 4.130.0 (devDependency) enables container EU jurisdiction fields (I1 PENDING row).",
+    "B1 additions: @convex-dev/auth 0.0.95 (the accepted Convex Auth first candidate, beta) + its pinned @auth/core 0.41.1 peer (Google provider config). Coordinated shared change recorded in the B1 evidence.",
     "Convex CLI stays invoked as `npx --yes convex@1.45.0` (matches the pinned convex package; no global binary)."
   ],
   "name": "kiero",
@@ -32,6 +33,8 @@
     "verify:corpus": "node evals/corpus/validate/validate.mjs && node evals/expected/scoring/probe/probe.mjs"
   },
   "dependencies": {
+    "@auth/core": "0.41.1",
+    "@convex-dev/auth": "0.0.95",
     "@convex-dev/react-query": "0.1.0",
     "@convex-dev/workflow": "0.4.6",
     "@convex-dev/workpool": "0.4.11",
