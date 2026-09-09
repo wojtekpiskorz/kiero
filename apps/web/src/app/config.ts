@@ -5,7 +5,7 @@
  * names ever reach the bundle, and the only one defined today is
  * `VITE_CONVEX_URL` (see the root `.env.example`). This module is the one
  * place that reads the environment, so every component downstream gets a
- * validated, honest connection state instead of probing `import.meta.env`
+ * validated connection state instead of probing `import.meta.env`
  * on its own.
  *
  * A missing or invalid URL is a legitimate state, not an error: the host

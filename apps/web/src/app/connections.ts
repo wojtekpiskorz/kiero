@@ -8,7 +8,7 @@
  * `convexQuery(...)` options through the adapter.
  *
  * Without a configured backend URL there is no Convex client at all: the
- * returned `convexQueryClient` is null and the host renders its honest
+ * returned `convexQueryClient` is null and the host renders the
  * disconnected state. In the browser the adapter's subscription path works
  * as-is (A3 note: only Node needs the documented window shim).
  */
@@ -22,11 +22,6 @@ export interface AppConnections {
   readonly queryClient: QueryClient;
   /** Null when the app runs without a backend (unconfigured/misconfigured). */
   readonly convexQueryClient: ConvexQueryClient | null;
-}
-
-/** True when the app has a live adapter wired (i.e. a configured backend). */
-export function isConnected(connections: AppConnections): boolean {
-  return connections.convexQueryClient !== null;
 }
 
 /**

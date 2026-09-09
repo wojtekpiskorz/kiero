@@ -13,8 +13,6 @@ import type { AppConfig } from "./config";
 /** What every host component can rely on. */
 export interface AppServices {
   readonly config: AppConfig;
-  /** True when the Convex React-Query adapter is wired (backend configured). */
-  readonly connected: boolean;
 }
 
 const AppServicesContext = createContext<AppServices | null>(null);

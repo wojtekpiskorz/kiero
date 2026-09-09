@@ -14,18 +14,16 @@
  *   never claim an operation no module surface declared — the same
  *   loud-drift rule the backend registry applies at construction time.
  *
- * A pending entry renders an honest "w przygotowaniu" screen. It never
- * fakes data: until its owning lane mounts a real implementation, the
- * placeholder states exactly what is missing.
+ * The entry is discriminated on `implementation`: a pending entry carries
+ * a Polish note (and may carry a richer placeholder screen) and renders
+ * "w przygotowaniu" without faking data; a mounted entry carries its real
+ * screen. The router dispatches on that tag, so a lane that flips an entry
+ * to "mounted" supplies its screen through the type, not through a
+ * render-time surprise.
  */
 
 import { Schema } from "effect";
-import {
-  FeatureId,
-  features as contractFeatures,
-  operations as contractOperations,
-  type FeatureEntry,
-} from "@kiero/contracts";
+import { FeatureId, operations as contractOperations } from "@kiero/contracts";
 import type { ReactNode } from "react";
 
 /**
@@ -35,42 +33,43 @@ import type { ReactNode } from "react";
  */
 const ROUTE_PATH_PATTERN = /^\/$|^\/[a-z0-9-]+$/;
 
-/** Input an owning lane writes; `featureId` is validated and branded here. */
-export interface AppFeatureEntryInput {
-  readonly kind: "app_feature";
+/** Fields every entry declares, whatever its implementation state. */
+export interface AppFeatureCommonInput {
   readonly featureId: string;
   readonly routePath: string;
   readonly navLabel: string;
   readonly screenHeading: string;
-  /** Honest Polish note shown while the feature is pending. */
-  readonly pendingNote: string;
   /** Contract operation names this feature consumes once implemented. */
   readonly consumedOperations: readonly string[];
-  /**
-   * "pending" mounts the honest placeholder screen; an owning lane flips
-   * this to "mounted" only together with a real screen implementation.
-   */
-  readonly implementation: AppFeatureImplementation;
-  /** The screen component mounted at `routePath` (plain zero-prop component). */
-  readonly screen: () => ReactNode;
 }
 
-/** Implementation state of a host feature entry. */
-export type AppFeatureImplementation = "pending" | "mounted";
+/**
+ * What an owning lane writes. A pending entry states what is missing; a
+ * mounted entry brings the screen that renders it.
+ */
+export type AppFeatureEntryInput =
+  | (AppFeatureCommonInput & {
+      readonly implementation: "pending";
+      /** Polish note shown while the feature is pending. */
+      readonly pendingNote: string;
+      /** Richer placeholder screen; defaults to the shared one when omitted. */
+      readonly pendingScreen?: (() => ReactNode) | undefined;
+    })
+  | (AppFeatureCommonInput & {
+      readonly implementation: "mounted";
+      readonly screen: () => ReactNode;
+    });
+
+/** Says the entry shape once: the output is the input with a branded id. */
+type WithBrandedFeatureId<T> = T extends unknown
+  ? Omit<T, "featureId"> & { readonly featureId: FeatureId }
+  : never;
 
 /** The validated entry the host composes routes and navigation from. */
-export interface AppFeatureEntry {
-  readonly kind: "app_feature";
-  readonly featureId: FeatureId;
-  readonly routePath: string;
-  readonly navLabel: string;
-  readonly screenHeading: string;
-  readonly pendingNote: string;
-  readonly consumedOperations: readonly string[];
-  readonly implementation: AppFeatureImplementation;
-  /** The screen component mounted at `routePath` (plain zero-prop component). */
-  readonly screen: () => ReactNode;
-}
+export type AppFeatureEntry = WithBrandedFeatureId<AppFeatureEntryInput>;
+
+/** The pending variant of an entry (carries the pending note/screen). */
+export type PendingAppFeatureEntry = Extract<AppFeatureEntry, { implementation: "pending" }>;
 
 /** Declares one host feature entry (validates loudly, brands the id). */
 export function appFeatureEntry(entry: AppFeatureEntryInput): AppFeatureEntry {
@@ -92,11 +91,6 @@ export function appFeatureEntry(entry: AppFeatureEntryInput): AppFeatureEntry {
       `app feature registry: feature ${entry.featureId} is missing a Polish nav label or screen heading`,
     );
   }
-  if (entry.pendingNote.trim() === "") {
-    throw new Error(
-      `app feature registry: feature ${entry.featureId} is pending and needs an honest pending note`,
-    );
-  }
   if (entry.consumedOperations.length === 0) {
     throw new Error(
       `app feature registry: feature ${entry.featureId} declares no consumed operations; a UI feature must name the contract operations it will use`,
@@ -109,15 +103,30 @@ export function appFeatureEntry(entry: AppFeatureEntryInput): AppFeatureEntry {
       );
     }
   }
+  if (entry.implementation === "pending") {
+    if (entry.pendingNote.trim() === "") {
+      throw new Error(
+        `app feature registry: feature ${entry.featureId} is pending and needs a pending note`,
+      );
+    }
+    return {
+      featureId,
+      routePath: entry.routePath,
+      navLabel: entry.navLabel,
+      screenHeading: entry.screenHeading,
+      consumedOperations: entry.consumedOperations,
+      implementation: "pending",
+      pendingNote: entry.pendingNote,
+      ...(entry.pendingScreen === undefined ? {} : { pendingScreen: entry.pendingScreen }),
+    };
+  }
   return {
-    kind: "app_feature",
     featureId,
     routePath: entry.routePath,
     navLabel: entry.navLabel,
     screenHeading: entry.screenHeading,
-    pendingNote: entry.pendingNote,
     consumedOperations: entry.consumedOperations,
-    implementation: entry.implementation,
+    implementation: "mounted",
     screen: entry.screen,
   };
 }
@@ -156,14 +165,4 @@ export function composeAppFeatures(entries: readonly AppFeatureEntry[]): readonl
     );
   }
   return entries;
-}
-
-/**
- * The backend registration for the same feature id, when one exists in the
- * contracts registry. Null is honest: no executor/event registration claims
- * this feature yet. Kept as the typed alignment seam for lanes that need
- * both halves (e.g. to show which durable jobs their feature executes).
- */
-export function contractFeatureRegistration(featureId: FeatureId): FeatureEntry | null {
-  return contractFeatures.find((feature) => feature.featureId === featureId) ?? null;
 }

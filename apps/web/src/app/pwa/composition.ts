@@ -10,7 +10,8 @@
  *   ad-hoc from a feature;
  * - no service-worker cache may serve protected data in a way that
  *   bypasses current access checks (execution charter / issue 19 AC):
- *   protected reads stay behind live authorized queries.
+ *   protected reads stay behind live authorized queries. Stated here for
+ *   F3/I7; nothing in this module enforces it.
  *
  * The module deliberately avoids DOM global types (structural handle,
  * globalThis probing) so the node-side test program can import it without
@@ -50,9 +51,9 @@ export interface PwaComposition {
 }
 
 /**
- * Composes the PWA entries. Today everything is an honest null: no worker
- * exists, so nothing is registered and no cache can exist. F3/I7 attach
- * their modules together with the worker script that owns them.
+ * Composes the PWA entries. Today every slot is null: no worker exists,
+ * so nothing is registered and no cache can exist. F3/I7 attach their
+ * modules together with the worker script that owns them.
  */
 export function composePwaEntries(input: {
   readonly manifestPath?: string | null;

@@ -10,7 +10,7 @@
  */
 
 import { createElement, type ReactNode } from "react";
-import { appFeatureEntry, type AppFeatureEntry } from "../../registry";
+import { appFeatureEntry } from "../../registry";
 import { useAppServices } from "../../providers";
 import { FeatureOperationsList, featureHeadingId } from "../../feature-pending";
 
@@ -25,6 +25,7 @@ function connectionLine(state: "configured" | "unconfigured" | "misconfigured"):
   }
 }
 
+/** Richer placeholder: spells out what this default surface is waiting for. */
 function ConversationPendingScreen(): ReactNode {
   const { config } = useAppServices();
   return createElement(
@@ -49,7 +50,7 @@ function ConversationPendingScreen(): ReactNode {
       createElement("li", { key: "backend" }, connectionLine(config.connection.state)),
       createElement(
         "li",
-        { key: "honesty" },
+        { key: "no-examples" },
         "Nie pokazujemy przykładowych wpisów: historia rozmowy pojawi się, gdy funkcja będzie gotowa.",
       ),
     ),
@@ -58,19 +59,18 @@ function ConversationPendingScreen(): ReactNode {
 }
 
 /** The registered host entry for the default company conversation surface. */
-export const conversationFeatureEntry: AppFeatureEntry = appFeatureEntry({
-  kind: "app_feature",
+export const conversationFeatureEntry = appFeatureEntry({
   featureId: "conversation.company",
   routePath: "/",
   navLabel: "Rozmowa firmy",
   screenHeading: "Rozmowa firmy",
-  pendingNote:
-    "Rozmowa firmy to jedna ciągła, wspólna historia wypowiedzi szefów i agenta na poziomie firmy. Tu pojawi się po zaimplementowaniu funkcji.",
   consumedOperations: [
     "sources.acceptSource",
     "sources.withdrawSource",
     "attention.markSourceRead",
   ],
   implementation: "pending",
-  screen: ConversationPendingScreen,
+  pendingNote:
+    "Rozmowa firmy to jedna ciągła, wspólna historia wypowiedzi szefów i agenta na poziomie firmy. Tu pojawi się po zaimplementowaniu funkcji.",
+  pendingScreen: ConversationPendingScreen,
 });

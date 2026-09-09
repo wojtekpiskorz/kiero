@@ -6,17 +6,10 @@
  * project memory and context without a mandatory dashboard before capture.
  */
 
-import type { ReactNode } from "react";
-import { appFeatureEntry, type AppFeatureEntry } from "../../registry";
-import { FeaturePendingScreen } from "../../feature-pending";
-
-function ProjectsPendingScreen(): ReactNode {
-  return FeaturePendingScreen({ entry: projectsFeatureEntry });
-}
+import { appFeatureEntry } from "../../registry";
 
 /** The registered host entry for the projects context surface. */
-export const projectsFeatureEntry: AppFeatureEntry = appFeatureEntry({
-  kind: "app_feature",
+export const projectsFeatureEntry = appFeatureEntry({
   featureId: "projects.context",
   routePath: "/projekty",
   navLabel: "Projekty",
@@ -30,5 +23,4 @@ export const projectsFeatureEntry: AppFeatureEntry = appFeatureEntry({
     "projects.setPause",
   ],
   implementation: "pending",
-  screen: ProjectsPendingScreen,
 });

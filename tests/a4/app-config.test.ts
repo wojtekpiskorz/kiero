@@ -2,7 +2,7 @@
  * Client config seam and PWA entry composition tests (A4).
  *
  * The config seam is the only reader of VITE_* values; these tests pin
- * its honest three-state behavior (configured / unconfigured /
+ * its three-state behavior (configured / unconfigured /
  * misconfigured). The PWA composition tests pin that nothing registers
  * while no service worker is shipped, and that push/update modules cannot
  * attach without their owning worker script.
@@ -54,7 +54,7 @@ describe("composePwaEntries", () => {
     register: async () => {},
   };
 
-  it("composes an honest all-null plan while no service worker is shipped", () => {
+  it("composes an all-null plan while no service worker is shipped", () => {
     const composition = composePwaEntries();
     expect(composition).toEqual({
       manifestPath: null,

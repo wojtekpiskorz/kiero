@@ -6,17 +6,10 @@
  * dashboard: the current obligations of the firm (tasks, reminders).
  */
 
-import type { ReactNode } from "react";
-import { appFeatureEntry, type AppFeatureEntry } from "../../registry";
-import { FeaturePendingScreen } from "../../feature-pending";
-
-function CoTerazPendingScreen(): ReactNode {
-  return FeaturePendingScreen({ entry: coTerazFeatureEntry });
-}
+import { appFeatureEntry } from "../../registry";
 
 /** The registered host entry for the "Co teraz" surface. */
-export const coTerazFeatureEntry: AppFeatureEntry = appFeatureEntry({
-  kind: "app_feature",
+export const coTerazFeatureEntry = appFeatureEntry({
   featureId: "attention.now",
   routePath: "/co-teraz",
   navLabel: "Co teraz",
@@ -29,5 +22,4 @@ export const coTerazFeatureEntry: AppFeatureEntry = appFeatureEntry({
     "attention.evaluateDueIntents",
   ],
   implementation: "pending",
-  screen: CoTerazPendingScreen,
 });

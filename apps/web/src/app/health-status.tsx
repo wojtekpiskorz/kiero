@@ -5,8 +5,8 @@
  * (`platform/health`, the A3 live subscription target) through the Convex
  * React-Query adapter: the canonical `convexQuery` key, hashed and fetched
  * by the QueryClient defaults wired in `connections.ts`. Without a
- * configured backend nothing subscribes and the status stays the honest
- * "nie połączono". Connection failures render fixed Polish copy — never
+ * configured backend nothing subscribes and the status stays "nie
+ * połączono". Connection failures render fixed Polish copy — never
  * the raw transport error.
  */
 
@@ -34,13 +34,13 @@ function PlatformHealthStatus() {
 
 /** The plain status line for the chrome's status/error area. */
 export function ConnectionStatus() {
-  const { config, connected } = useAppServices();
+  const { config } = useAppServices();
   switch (config.connection.state) {
     case "unconfigured":
       return <p>Nie połączono z backendem — brak adresu (VITE_CONVEX_URL).</p>;
     case "misconfigured":
       return <p>Nie połączono z backendem — {config.connection.problem}.</p>;
     case "configured":
-      return connected ? <PlatformHealthStatus /> : <p>Nie połączono z backendem.</p>;
+      return <PlatformHealthStatus />;
   }
 }

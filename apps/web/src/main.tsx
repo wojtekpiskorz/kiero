@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { loadAppConfig } from "./app/config";
-import { createAppConnections, isConnected } from "./app/connections";
+import { createAppConnections } from "./app/connections";
 import { AppServicesProvider } from "./app/providers";
 import { createAppRouter } from "./app/router";
 import { composePwaEntries, registerPwa } from "./app/pwa/composition";
@@ -15,8 +15,8 @@ import { composePwaEntries, registerPwa } from "./app/pwa/composition";
  * React-Query adapter exactly as A3 proved it, reads the typed config seam
  * once, mounts the application host and prepares the PWA entry
  * composition (a no-op until F3/I7 ship their modules). Without a
- * configured backend the app still runs and renders its honest
- * disconnected state.
+ * configured backend the app still runs and renders the disconnected
+ * state without faking a connection.
  */
 
 const config = loadAppConfig(import.meta.env);
@@ -31,7 +31,7 @@ if (!(container instanceof HTMLDivElement)) {
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={connections.queryClient}>
-      <AppServicesProvider services={{ config, connected: isConnected(connections) }}>
+      <AppServicesProvider services={{ config }}>
         <RouterProvider router={router} />
       </AppServicesProvider>
     </QueryClientProvider>
