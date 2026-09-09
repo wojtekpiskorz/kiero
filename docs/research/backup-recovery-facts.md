@@ -1,0 +1,33 @@
+# Backup, deletion and recovery facts
+
+Checked on 2026-09-08 from primary documentation. The owner subsequently accepted the one-hour recovery-point target, eight-hour recovery-time target and deletion/backup-retention policy in Q189 and Q190. They are requirements, not measured guarantees. The architecture is still being grilled; Kiero has no pinned deployment or implemented recovery procedure.
+
+## Documented recovery capabilities
+
+Convex backups snapshot table data consistently and may include Convex file storage. Native periodic scheduling offers daily or weekly backups on Pro. Daily and manual copies retain for seven days, weekly copies for fourteen; the same page also contains generic seven-day wording, so verify the actual configured retention. Snapshot creation and restore may take hours. Native backups omit code, configuration, environment variables and pending scheduled functions. Restore replaces table data but does not delete existing files and may recreate files from the backup. Dedicated physical backups run every 24 hours, retain seven days and require support for restoration. [Backup and restore](https://docs.convex.dev/database/backup-restore)
+
+Convex documents replication and internal backup mechanisms. No customer-selectable point-in-time or subdaily restore contract was found in the reviewed documentation. Internal durability mechanisms are not a user-operated recovery target. [Status and guarantees](https://docs.convex.dev/production/state)
+
+The CLI can create a full export with optional Convex files; imports can be scripted but the import documentation labels the feature beta. Scheduling a CLI export more frequently is Kiero-operated automation. Pro's Data Sync endpoint exports table data continuously or by repeated polling, but documented streaming-export limitations include backup restoration, table changes and some schema changes. It is not evidence of a complete recoverable data-and-media set. [CLI export](https://docs.convex.dev/cli/reference/export), [import](https://docs.convex.dev/database/import-export/import), [Data Sync](https://docs.convex.dev/deployment-api/data-sync)
+
+The selected deployment region covers deployment infrastructure. EU West is Ireland. The public backup pages do not separately establish the location of retained logical copies, internal physical/incremental copies or support restore processing. Written confirmation covering these paths remains required for Kiero's accepted EU-backup constraint. [Regions](https://docs.convex.dev/production/regions)
+
+An R2 `eu` bucket guarantees its objects remain within that jurisdiction; a location hint is insufficient. R2 does not implement the S3 bucket-versioning operations shown in the current compatibility matrix. Bucket Lock enforces retention and can prevent deletion; it does not supply object version history. Avoid relying on lock behavior as either a backup or immediate targeted purge. [R2 location](https://developers.cloudflare.com/r2/reference/data-location/), [S3 compatibility](https://developers.cloudflare.com/r2/api/s3/api/), [bucket locks](https://developers.cloudflare.com/r2/buckets/bucket-locks/)
+
+Workflow durability handles recorded steps and retries, with idempotent steps still required. It does not prove that a restored snapshot re-registers missing scheduled work or knows whether a later external action happened. Scheduled work must separately recheck current authorization. [Workflows](https://docs.convex.dev/agents/workflows), [scheduled functions](https://docs.convex.dev/scheduling/scheduled-functions)
+
+## Proposed targets and architecture implications
+
+The accepted alpha targets are a recoverable full-set age of at most one hour and restoration within eight hours of incident detection. Native daily backups alone cannot establish the first target. More frequent, monitored full exports need a selected execution environment, measured snapshot duration and cost, plus corresponding protected media copies. A backup job starting successfully does not establish recoverability.
+
+Use immutable media keys and a backup manifest listing source references, object identities and integrity checks. A Convex snapshot and R2 copy do not share an atomic snapshot operation. Mark a recovery set complete only after every referenced retained object is verified. Maintain independent backup permissions and controlled deletion so a mistake in active storage does not simply mirror into the only backup. The scheduling margin must account for snapshot and media-copy time, not just nominal hourly start times.
+
+A monitored external record of deletions and access revocations must survive restoration of the application database. Preserve only identifiers and operation metadata, not removed content. Confirm the external record before treating a destructive operation as durably complete. Active access can be blocked earlier; a failed ledger write must not permit an unsafe restore. Exact ordering, outage behavior and replay protection need proof rather than an assumed cross-service transaction.
+
+Restore into an environment closed to users and external side effects. Apply the newest deletion and revocation records before serving data. Remove affected original and derived content, rebuild necessary projections, reconcile media, and invalidate restored sessions. Recreate only currently valid processing, reminders and Calendar synchronization intentions. Reconcile external outcomes before retrying; a restored table snapshot does not prove whether Google or a push service already accepted an operation.
+
+The accepted deletion policy makes content inaccessible immediately, completes purge from live and derived storage within 24 hours, and expires isolated backups containing it within 30 days. This explicitly permits temporary residual backup bytes and is not equivalent to immediate erasure from every backup. Show the deletion stage honestly. Expired backups must not be silently extended by copying them, and deleted content must be removed or gated before any recovery opens. Provider processing copies require a separate retention decision.
+
+## Evidence required before alpha
+
+Prove EU residency for every backup path, choose the exporter runtime and retention configuration, and measure age of the latest complete recovery set. Run a restore drill covering code and secrets, media integrity, post-snapshot deletion and member revocation, unknown external outcomes, missing scheduled jobs and representative unfinished workflows. Record actual recovery time and any lost interval. These are required future checks, not completed work.

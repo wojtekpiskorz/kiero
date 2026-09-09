@@ -1,0 +1,29 @@
+# Cloudflare and PostgreSQL execution facts
+
+Research date: 2026-09-08. These are upstream contracts and design inferences for Kiero Q158, not a selected or tested deployment. The main agent consolidated delegated research and independently checked Hyperdrive, caching, Workflows and R2 location documentation. No application manifest, deployment or compatibility test was created.
+
+## Database and connection boundary
+
+Hyperdrive connects Workers to an existing PostgreSQL database. Its documented setup requires a database connection string; selecting Hyperdrive does not provision managed PostgreSQL or choose its region and backup policy. Cloudflare lists external database providers. It supports `pg`, Postgres.js and Drizzle, and recommends `pg`. Node compatibility is required; current documentation says compatibility dates from 2026-08-04 enable it by default. The documentation contains older version tables alongside newer driver minimum examples, so those examples must not become untested project pins. [PostgreSQL connection guide](https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/)
+
+Hyperdrive does not support PostgreSQL `LISTEN`/`NOTIFY`, advisory locks, or undocumented session-state changes. SQL-level prepared-statement management is unsupported; this is not a claim that all driver protocol prepared statements are unsupported. A direct connection is the documented alternative for excluded features. Realtime, worker coordination and tenant-session strategies must account for this boundary. [Supported features](https://developers.cloudflare.com/hyperdrive/reference/supported-databases-and-features/)
+
+Query caching is enabled by default, with 60-second `max_age` and 15-second stale-while-revalidate. Writes do not invalidate matching cached reads. Cloudflare explicitly recommends cache-disabled connections for permissions, sessions and reads requiring freshness; connection pooling still works. For Kiero, the proposed safe baseline is to disable this cache for application reads, particularly membership checks and canonical memory. This is a design recommendation, not a chosen deployment setting. [Query caching](https://developers.cloudflare.com/hyperdrive/concepts/query-caching/)
+
+## Long media and durable work
+
+Workers distinguish CPU from elapsed time. Paid invocation CPU defaults to 30 seconds and can be raised to five minutes. HTTP work is tied to the connected request; `waitUntil` gives at most 30 seconds after response or disconnect. Queue consumers have a 15-minute wall-clock limit. A normal upload request therefore cannot own the entire asynchronous analysis after returning "saved". [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)
+
+R2 supports multipart uploads, with objects up to 5 TiB and multipart limits documented separately. Worker ingress limits still apply to any part routed through a Worker, and Workers have 128 MB memory. A no-product-duration-cap voice design requires chunked or multipart transfer and streamed processing or external asynchronous STT; it does not remove finite transport/storage limits. Do not buffer whole recordings in the Worker. [R2 limits](https://developers.cloudflare.com/r2/platform/limits/) [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)
+
+Cloudflare Workflows persist progress and support retries and waiting between steps. Limits distinguish active CPU per step from network waiting; there is no short overall HTTP-request lifetime imposed on a whole workflow. Large or long-lived artifacts should be stored externally with references in workflow state. Cloudflare Queues guarantee at-least-once delivery, so duplicate consumers are part of the design. [Workflows](https://developers.cloudflare.com/workflows/) [Workflow limits](https://developers.cloudflare.com/workflows/reference/limits/) [Queue delivery](https://developers.cloudflare.com/queues/reference/delivery-guarantees/)
+
+No reviewed contract establishes an atomic transaction spanning an external PostgreSQL commit and Cloudflare queue delivery or workflow creation. Inference: write an outbox record in the domain transaction, then dispatch and reconcile it durably with stable identifiers. A crash after commit must not lose work; a crash after dispatch must not publish it twice. This remains necessary even if an external AI request is retried successfully.
+
+Graphile's normal continuous Node runner cannot be assumed to live inside an HTTP Worker or use a Hyperdrive notification listener. Cloudflare Containers can run Linux processes, so saying Graphile is impossible anywhere on Cloudflare would be too broad. Container sleep/restart behavior and direct database connectivity require an explicit deployment design. Neither Graphile nor Effect Cluster nor Cloudflare Workflows has been selected. [Container lifecycle](https://developers.cloudflare.com/containers/concepts/architecture/)
+
+## EU storage and required evidence
+
+R2's `eu` jurisdiction constrains object storage and processing within that service. A `weur` or `eeur` location hint is only best effort. This does not establish EU-only execution for every Worker, Workflow, log sink or AI provider. PostgreSQL and backup residency need their own provider contract. [R2 data location](https://developers.cloudflare.com/r2/reference/data-location/)
+
+Before treating this stack as verified, test the exact Effect 4 RC, SQL driver and Workers bundle; fresh tenant reads and conditional publication; crash points across domain commit, outbox dispatch and AI completion; multipart interruption and retry; authenticated file delivery after membership revocation; realtime reconnect and missed changes; and EU backup restoration. Measure costs using an actual alpha workload. Choosing PostgreSQL does not itself prove these integration boundaries.

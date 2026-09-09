@@ -1,0 +1,39 @@
+name: Checks
+
+# Deterministic gates for the pinned workspace (A1). This mirrors the
+# documented local procedure: clean install from the lockfile, strict
+# typecheck, the bootstrap smoke test and a web build, all on one pinned
+# Node version (22.22.3, matching the engines field). The advisory AI
+# review stays in ai-review.yml and never gates a merge; no secrets are
+# used here.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: npm ci, typecheck, test, build (Node 22.22.3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.3
+          cache: npm
+      - name: Clean install from the lockfile
+        run: npm ci
+      - name: Strict typecheck (root and every workspace)
+        run: npm run typecheck
+      - name: Bootstrap smoke test (pinned versions)
+        run: npm run test
+      - name: Build the web app
+        run: npm run build
