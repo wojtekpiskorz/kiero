@@ -1,7 +1,7 @@
 /**
  * D1 conversation-view dev proofs (guarded by KIERO_PROBE_ENABLED, like the
  * A3 platform probes; shared plumbing lives in
- * convex/sources/accept/probe_shared.ts).
+ * convex/sources/probe_shared.ts).
  *
  * Each action resolves the default service session (or an explicitly seeded
  * session) and runs the SAME internal view query the Worker bridge would,
