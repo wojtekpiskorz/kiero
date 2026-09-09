@@ -12,10 +12,14 @@ import { liveSessionPolicy } from "../../convex/access/identity/policy";
 import { ActorContext } from "@kiero/contracts";
 import type { RequestContext } from "@kiero/runtime";
 import {
+  OUR_ERROR_MARKERS,
   classifySignInError,
   isValidEmail,
+  pendingLabel,
   signInCopy,
 } from "../../apps/web/src/features/sign-in/state";
+import { EMAIL_DELIVERY_FAILED_MARKER } from "../../convex/integrations/email/send";
+import { METHOD_CONFLICT_MARKER } from "../../convex/access/identity/userPolicy";
 import { googleSignInConfigured, providerAvailabilityFromEnv } from "../../convex/access/identity/providerAvailability";
 
 type IndexableTable = { " indexes"(): { indexDescriptor: string; fields: string[] }[] };
@@ -140,22 +144,49 @@ describe("sign-in UI state machine (Polish copy, no leaks)", () => {
     expect(isValidEmail("a@b")).toBe(false);
   });
 
-  it("classifies known failures and hides everything else", () => {
+  it("client and server marker literals are pinned equal (drift breaks classification)", () => {
+    expect(OUR_ERROR_MARKERS.emailDeliveryFailed).toBe(EMAIL_DELIVERY_FAILED_MARKER);
+    expect(OUR_ERROR_MARKERS.methodConflict).toBe(METHOD_CONFLICT_MARKER);
+  });
+
+  it("classifies OUR failures by machine marker, independent of the prose", () => {
+    expect(
+      classifySignInError(
+        new Error(`${EMAIL_DELIVERY_FAILED_MARKER} Kiero nie może teraz wysłać wiadomości.`),
+      ),
+    ).toBe("email_delivery_failed");
+    expect(
+      classifySignInError(
+        new Error(`${METHOD_CONFLICT_MARKER} Konto z tym adresem używa innej metody logowania.`),
+      ),
+    ).toBe("method_conflict");
+    // Reworded prose still classifies: the marker, not the words, decides.
+    expect(
+      classifySignInError(new Error(`${EMAIL_DELIVERY_FAILED_MARKER} entirely reworded copy`)),
+    ).toBe("email_delivery_failed");
+  });
+
+  it("classifies library failures by their stable messages and hides everything else", () => {
     expect(classifySignInError(new Error("Could not verify code"))).toBe("code_wrong_or_expired");
     expect(classifySignInError(new Error("Too many failed attempts to verify code"))).toBe(
       "too_many_attempts",
     );
-    expect(classifySignInError(new Error("Kiero nie może teraz wysłać wiadomości: usługa poczty nie jest skonfigurowana."))).toBe(
-      "email_delivery_failed",
-    );
+    expect(classifySignInError(new Error("Failed to fetch"))).toBe("network");
     expect(
       classifySignInError(
-        new Error("Konto z tym adresem e-mail używa innej metody logowania. Zaloguj się pierwotną metodą."),
+        new Error("Kiero nie może teraz wysłać wiadomości: usługa poczty nie jest skonfigurowana."),
       ),
-    ).toBe("method_conflict");
-    expect(classifySignInError(new Error("Failed to fetch"))).toBe("network");
+    ).toBe("unknown"); // our prose WITHOUT the marker no longer matches
     expect(classifySignInError(new Error("internal stack trace with token sk-123"))).toBe("unknown");
     expect(classifySignInError("not an error")).toBe("unknown");
+  });
+
+  it("pending labels come from the state machine copy", () => {
+    expect(pendingLabel({ step: "choose" })).toBeNull();
+    expect(pendingLabel({ step: "code-sent", email: "a@b.pl" })).toBeNull();
+    expect(pendingLabel({ step: "submitting-email" })).toBe(signInCopy.sending);
+    expect(pendingLabel({ step: "submitting-code", email: "a@b.pl" })).toBe(signInCopy.verifying);
+    expect(pendingLabel({ step: "google-pending" })).toBe(signInCopy.googlePending);
   });
 
   it("every failure cause has Polish copy", () => {

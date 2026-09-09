@@ -19,23 +19,27 @@
  * cryptographically.
  */
 
-import { Schema } from "effect";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { mutation, query } from "../../_generated/server";
-import { AccessSnapshot, type ResultEnvelope } from "@kiero/contracts";
+import type { ResultEnvelope } from "@kiero/contracts";
 import { unauthenticatedError, forbiddenError } from "@kiero/runtime";
 import { providerAvailabilityFromEnv } from "./providerAvailability";
 import {
   DEFAULT_DEVICE_LABEL,
+  authSessionDecision,
+  liveSessionDecision,
   resolveLiveSession,
   provisionOrRefreshLiveSession,
   resolveAccessContextFromConvexAuth,
   liveSessionIdentity,
-  SESSION_INACTIVITY_LIMIT_MS,
   type LiveSessionDenial,
 } from "./resolution";
-import { dispatchAccessCommand, revokeSessionCore } from "./operations";
+import {
+  buildAccessSnapshot,
+  dispatchAccessCommand,
+  revokeSessionCore,
+} from "./operations";
 import { resolveRequestContext } from "../../platform/context";
 import type { Id } from "../../_generated/dataModel";
 
@@ -106,24 +110,20 @@ export const resolveCurrentAccess = query({
       // (the contract's NullOr): sign-in never confers company access.
       return null;
     }
+    const userId = ctx.db.normalizeId("users", context.actor.userId);
     const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
-    if (companyId === null) {
+    if (userId === null || companyId === null) {
       return null;
     }
-    const company = await ctx.db.get(companyId);
-    if (company === null) {
-      return null;
-    }
-    return Schema.encodeSync(AccessSnapshot)(
-      Schema.decodeUnknownSync(AccessSnapshot)({
-        userId: context.actor.userId,
-        companyId: context.actor.companyId,
-        membershipRole: context.actor.membershipRole,
-        isGm: context.actor.isGm,
-        companyTimezone: company.timezone,
-        defaultCurrency: company.defaultCurrency,
-      }),
-    );
+    const snapshot = await buildAccessSnapshot(ctx.db, {
+      userId,
+      companyId,
+      membershipRole: context.actor.membershipRole,
+      isGm: context.actor.isGm,
+    });
+    // The single builder validated the snapshot against the contract
+    // schema; the query returns its plain wire form.
+    return snapshot === null ? null : { ...snapshot };
   },
 });
 
@@ -155,19 +155,28 @@ export const listMySessions = query({
       .collect();
     const entries: SessionRegistryEntry[] = [];
     for (const row of rows) {
-      // Service-bridge rows (no mirrored authSession) read as gone: they
-      // never authenticate through the user path this list belongs to.
-      const upstream =
+      // The canonical decision cores, per row: upstream existence/expiry
+      // first (service-bridge rows and signed-out sessions read "gone"),
+      // then the registry's own revocation/inactivity state.
+      const authRow =
         row.authSessionId === undefined ? null : await ctx.db.get(row.authSessionId);
-      let upstreamState: SessionRegistryEntry["upstreamState"] = "gone";
-      if (upstream !== null && upstream.userId === row.userId) {
+      const upstream = authSessionDecision(
+        authRow === null
+          ? null
+          : { userId: authRow.userId, expirationTime: authRow.expirationTime },
+        row.userId,
+        nowMs,
+      );
+      let upstreamState: SessionRegistryEntry["upstreamState"];
+      if (upstream.tag === "denied") {
+        upstreamState = upstream.reason === "auth_session_expired" ? "expired" : "gone";
+      } else {
+        const registry = liveSessionDecision(
+          { revokedAtMs: row.revokedAtMs ?? null, lastSeenAtMs: row.lastSeenAtMs },
+          nowMs,
+        );
         upstreamState =
-          upstream.expirationTime <= nowMs
-            ? "expired"
-            : row.revokedAtMs === undefined &&
-                nowMs - row.lastSeenAtMs > SESSION_INACTIVITY_LIMIT_MS
-              ? "inactive"
-              : "live";
+          registry.tag === "denied" && registry.reason === "inactive" ? "inactive" : "live";
       }
       entries.push({
         sessionId: row._id,
@@ -207,7 +216,10 @@ export const accessContextProbe = query({
 /**
  * Authenticated: self-service revocation of one of the actor's own
  * sessions (the current device's "Wyloguj to urządzenie", or a remote
- * device's row). Result envelope matches the typed dispatch entry.
+ * device's row). The company scope for the canonical revocation event
+ * comes from the SAME canonical chain (A3's resolveRequestContext: user
+ * -> earliest active membership -> company), not a hand-rolled lookup.
+ * Result envelope matches the typed dispatch entry.
  */
 export const revokeSession = mutation({
   args: { sessionId: v.id("sessions") },
@@ -216,17 +228,16 @@ export const revokeSession = mutation({
     if (live.tag === "denied") {
       denialError(live.reason);
     }
-    const membership = await ctx.db
-      .query("memberships")
-      .withIndex("by_user", (q) => q.eq("userId", live.session.userId))
-      .filter((q) => q.eq(q.field("state"), "active"))
-      .order("asc")
-      .first();
+    const context = await resolveRequestContext(
+      ctx.db,
+      liveSessionIdentity(live.session, Date.now()),
+    );
     const outcome = await revokeSessionCore(ctx, {
       actorUserId: live.session.userId,
       targetSessionId: args.sessionId,
       nowMs: Date.now(),
-      companyIdForEvent: membership === null ? null : membership.companyId,
+      companyIdForEvent:
+        context === null ? null : ctx.db.normalizeId("companies", context.actor.companyId),
     });
     return outcome.result;
   },

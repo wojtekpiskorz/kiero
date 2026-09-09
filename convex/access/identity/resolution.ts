@@ -80,17 +80,21 @@ export interface AuthSubjectParts {
   readonly authSessionId: string;
 }
 
-/** Strictly parses a Convex Auth subject; null for any malformed value. */
+/**
+ * Strictly parses a Convex Auth subject; null for any malformed value.
+ * The schema check guarantees exactly one `|` with non-empty parts, so the
+ * slices cannot produce empty or undefined components.
+ */
 export function parseConvexAuthSubject(subject: string): AuthSubjectParts | null {
   const decoded = Schema.decodeUnknownOption(ConvexAuthSubject)(subject);
   if (decoded._tag === "None") {
     return null;
   }
-  const [authUserId, authSessionId] = decoded.value.split("|");
-  if (authUserId === undefined || authSessionId === undefined) {
-    return null;
-  }
-  return { authUserId, authSessionId };
+  const divider = decoded.value.indexOf("|");
+  return {
+    authUserId: decoded.value.slice(0, divider),
+    authSessionId: decoded.value.slice(divider + 1),
+  };
 }
 
 /** The registry-row fields the pure decision consumes. */
@@ -165,15 +169,19 @@ async function registryRowByAuthSession(
 }
 
 /**
- * Resolves the current live session WITHOUT writes: the read path for
- * protected queries and subscriptions. A missing registry row denies
- * (`registry_missing`) — provisioning happens only in mutation contexts.
+ * The shared resolution prologue: verified identity -> strict subject
+ * parse -> well-formed authSessions id -> upstream liveness decision.
+ * Both the read path and the write path start here; only what they do
+ * with the registry row differs.
  */
-export async function resolveLiveSession(
+async function resolveVerifiedUpstreamSession(
   db: IdentityDb,
   auth: AuthReader,
   nowMs: number,
-): Promise<LiveSessionResult> {
+): Promise<
+  | { readonly authUserId: string; readonly authSessionId: Id<"authSessions"> }
+  | { readonly tag: "denied"; readonly reason: LiveSessionDenial }
+> {
   const identity = await auth.getUserIdentity();
   if (identity === null) {
     return { tag: "denied", reason: "no_identity" };
@@ -197,7 +205,24 @@ export async function resolveLiveSession(
   if (upstream.tag === "denied") {
     return upstream;
   }
-  const row = await registryRowByAuthSession(db, authSessionId);
+  return { authUserId: parts.authUserId, authSessionId };
+}
+
+/**
+ * Resolves the current live session WITHOUT writes: the read path for
+ * protected queries and subscriptions. A missing registry row denies
+ * (`registry_missing`) — provisioning happens only in mutation contexts.
+ */
+export async function resolveLiveSession(
+  db: IdentityDb,
+  auth: AuthReader,
+  nowMs: number,
+): Promise<LiveSessionResult> {
+  const prologue = await resolveVerifiedUpstreamSession(db, auth, nowMs);
+  if ("tag" in prologue) {
+    return prologue;
+  }
+  const row = await registryRowByAuthSession(db, prologue.authSessionId);
   if (row === null) {
     return { tag: "denied", reason: "registry_missing" };
   }
@@ -223,32 +248,13 @@ export async function provisionOrRefreshLiveSession(
   nowMs: number,
   deviceLabel: string,
 ): Promise<LiveSessionResult> {
-  const identity = await auth.getUserIdentity();
-  if (identity === null) {
-    return { tag: "denied", reason: "no_identity" };
+  const prologue = await resolveVerifiedUpstreamSession(tx, auth, nowMs);
+  if ("tag" in prologue) {
+    return prologue;
   }
-  const parts = parseConvexAuthSubject(identity.subject);
-  if (parts === null) {
-    return { tag: "denied", reason: "malformed_subject" };
-  }
-  const authSessionId = tx.normalizeId("authSessions", parts.authSessionId);
-  if (authSessionId === null) {
-    return { tag: "denied", reason: "malformed_subject" };
-  }
-  const authSession = await tx.get(authSessionId);
-  const upstream = authSessionDecision(
-    authSession === null
-      ? null
-      : { userId: authSession.userId, expirationTime: authSession.expirationTime },
-    parts.authUserId,
-    nowMs,
-  );
-  if (upstream.tag === "denied") {
-    return upstream;
-  }
-  const existing = await registryRowByAuthSession(tx, authSessionId);
+  const existing = await registryRowByAuthSession(tx, prologue.authSessionId);
   if (existing === null) {
-    const user = await tx.normalizeId("users", parts.authUserId);
+    const user = await tx.normalizeId("users", prologue.authUserId);
     if (user === null || (await tx.get(user)) === null) {
       // The verified token names no existing person row: fail closed
       // instead of provisioning a registry row for a ghost.
@@ -259,7 +265,7 @@ export async function provisionOrRefreshLiveSession(
       startedAtMs: nowMs,
       lastSeenAtMs: nowMs,
       deviceLabel,
-      authSessionId,
+      authSessionId: prologue.authSessionId,
     });
     const row = await tx.get(inserted);
     if (row === null) {

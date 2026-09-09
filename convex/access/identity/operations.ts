@@ -15,6 +15,11 @@
  * barebones UI path, which must work before any membership exists).
  * Revocation is authoritative on the app registry: a still-valid upstream
  * JWT stops resolving the moment the registry row is revoked.
+ *
+ * `buildAccessSnapshot` is the ONE access-snapshot builder: both the
+ * typed dispatch handler and the identity-layer query assemble the
+ * snapshot here, validated once against the contract `AccessSnapshot`
+ * schema (no local mirrors that could drift).
  */
 
 import { Schema } from "effect";
@@ -37,20 +42,12 @@ import { publishEvent } from "../../platform/publish";
 import {
   DEFAULT_DEVICE_LABEL,
   resolveAccessContextWithProvisioning,
+  type IdentityDb,
 } from "./resolution";
 import { liveSessionPolicy } from "./policy";
 
 const resolveCurrentAccessEntry = accessOperations["access.resolveCurrentAccess"];
 const revokeSessionEntry = accessOperations["access.revokeSession"];
-
-const accessSnapshotResult = Schema.Struct({
-  userId: Schema.String,
-  companyId: Schema.String,
-  membershipRole: Schema.Literals(["admin", "member"]),
-  isGm: Schema.Boolean,
-  companyTimezone: Schema.String,
-  defaultCurrency: Schema.String,
-});
 
 const revokedResult = Schema.Struct({ revokedAtMs: Schema.Number });
 
@@ -106,15 +103,22 @@ export async function revokeSessionCore(
   };
 }
 
-/** Builds the current access snapshot for a resolved actor context. */
-export async function currentAccessSnapshot(
-  db: MutationCtx["db"],
-  actor: {
-    readonly userId: Id<"users">;
-    readonly companyId: Id<"companies">;
-    readonly membershipRole: "admin" | "member";
-    readonly isGm: boolean;
-  },
+/** The resolved-actor fields the access snapshot is built from. */
+export interface SnapshotActor {
+  readonly userId: Id<"users">;
+  readonly companyId: Id<"companies">;
+  readonly membershipRole: "admin" | "member";
+  readonly isGm: boolean;
+}
+
+/**
+ * THE access-snapshot builder: reads the company row and validates the
+ * result once against the contract `AccessSnapshot` schema. Returns null
+ * when the company row is gone (the caller decides the honest failure).
+ */
+export async function buildAccessSnapshot(
+  db: IdentityDb,
+  actor: SnapshotActor,
 ): Promise<AccessSnapshot | null> {
   const company = await db.get(actor.companyId);
   if (company === null) {
@@ -148,7 +152,7 @@ function accessHandlers(): HandlerRegistry<MutationCtx> {
         if (userId === null || companyId === null) {
           return errorResult(notFoundError("users", "unresolvable_actor_reference"));
         }
-        const snapshot = await currentAccessSnapshot(tx.db, {
+        const snapshot = await buildAccessSnapshot(tx.db, {
           userId,
           companyId,
           membershipRole: context.actor.membershipRole,
@@ -157,16 +161,7 @@ function accessHandlers(): HandlerRegistry<MutationCtx> {
         if (snapshot === null) {
           return errorResult(notFoundError("companies"));
         }
-        return okResult(
-          Schema.decodeUnknownSync(accessSnapshotResult)({
-            userId: snapshot.userId,
-            companyId: snapshot.companyId,
-            membershipRole: snapshot.membershipRole,
-            isGm: snapshot.isGm,
-            companyTimezone: snapshot.companyTimezone,
-            defaultCurrency: snapshot.defaultCurrency,
-          }),
-        );
+        return okResult(snapshot);
       },
     },
     "access.revokeSession": {

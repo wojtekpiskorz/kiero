@@ -67,3 +67,10 @@ export async function deliverApplicationEmail(
 
 /** Re-exported so callers can cite the key name without importing env. */
 export { RESEND_API_KEY_NAME };
+
+/**
+ * Machine marker prefixing OUR delivery-failure messages, so client-side
+ * classification keys on it instead of Polish prose. The web feature's
+ * twin literal is pinned equal by tests/b1.
+ */
+export const EMAIL_DELIVERY_FAILED_MARKER = "[kiero:email_delivery_failed]";

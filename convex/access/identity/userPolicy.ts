@@ -60,6 +60,13 @@ export type UserPolicyDecision =
   | { readonly action: "create"; readonly input: CreateUserInput }
   | { readonly action: "reject"; readonly reason: "method_conflict" };
 
+/**
+ * Machine marker prefixing the method-conflict error the auth entry
+ * throws, so client classification keys on it instead of Polish prose.
+ * The web feature's twin literal is pinned equal by tests/b1.
+ */
+export const METHOD_CONFLICT_MARKER = "[kiero:method_conflict]";
+
 export interface CreateUserInput {
   readonly email: string;
   readonly displayName: string;

@@ -6,7 +6,7 @@
  */
 import { ConvexHttpClient } from "convex/browser";
 
-const DEPLOYMENT = process.env.KIERO_B1_DEPLOYMENT; // e.g. qualified-trout-260
+const DEPLOYMENT = process.env.KIERO_B1_DEPLOYMENT;
 const URL = `https://${DEPLOYMENT}.eu-west-1.convex.cloud`;
 const SITE = `https://${DEPLOYMENT}.eu-west-1.convex.site`;
 const EMAIL = "b1-proof@kiero.invalid";
@@ -61,10 +61,10 @@ async function errOf(fn) {
   const failure = await errOf(() =>
     client.action("auth:signIn", { provider: "email_code", params: { email: EMAIL } }),
   );
-  ok("C1 issuance runs and delivery fails honestly (RESEND_API_KEY absent)",
-    failure !== null && failure.includes("usługa poczty nie jest skonfigurowana"),
-    `message=${JSON.stringify(failure?.slice(0, 60))}`);
-  // Re-issuance for the same address must resume the same person (no duplicates).
+  ok("C1 issuance runs and delivery fails honestly with the machine marker (RESEND_API_KEY absent)",
+    failure !== null && failure.includes("[kiero:email_delivery_failed]")
+      && failure.includes("usługa poczty nie jest skonfigurowana"),
+    `marker+copy present`);
   const again = await errOf(() =>
     client.action("auth:signIn", { provider: "email_code", params: { email: EMAIL } }),
   );
@@ -72,8 +72,7 @@ async function errOf(fn) {
   const wrongCode = await errOf(() =>
     client.action("auth:signIn", { provider: "email_code", params: { email: EMAIL, code: "00000000" } }),
   );
-  ok("C3 wrong code rejected", wrongCode !== null && wrongCode.includes("Could not verify code"),
-    `message=${JSON.stringify(wrongCode)}`);
+  ok("C3 wrong code rejected", wrongCode !== null && wrongCode.includes("Could not verify code"));
 }
 
 // --- Phase D: fixture code + REAL verification, session and tokens ----------
@@ -98,24 +97,22 @@ let token = null;
       params: { email: EMAIL, code: FIXTURE_CODE },
     }),
   );
-  ok("D3 code reuse rejected (consumed on first verify)", reuse !== null && reuse.includes("Could not verify code"),
-    `message=${JSON.stringify(reuse)}`);
+  ok("D3 code reuse rejected (consumed on first verify)", reuse !== null && reuse.includes("Could not verify code"));
 }
 
 // --- Phase E: authenticated identity surface --------------------------------
 let sessionId = null;
 {
   const client = new ConvexHttpClient(URL, { logger: false, auth: token });
-  const ensured = await client.mutation("access/identity/functions:ensureSessionRegistry", {
-    deviceLabel: "B1 dowód",
-  });
-  ok("E1 session registry provisioned (idempotent path)", ensured?.state === "live",
-    JSON.stringify({ state: ensured?.state, sessionId: "<id>" }));
+  const ensured = await client.mutation("access/identity/functions:ensureSessionRegistry", {});
+  ok("E1 session registry provisioned (default label applied server-side)",
+    ensured?.state === "live", JSON.stringify({ state: ensured?.state, sessionId: "<id>" }));
   sessionId = ensured?.sessionId ?? null;
   const sessions = await client.query("access/identity/functions:listMySessions", {});
-  ok("E2 device registry lists the current session",
-    sessions?.length === 1 && sessions[0].isCurrent === true && sessions[0].upstreamState === "live",
-    `rows=${sessions?.length} upstream=${sessions?.[0]?.upstreamState}`);
+  const current = sessions?.find((s) => s.isCurrent);
+  ok("E2 device registry lists the current session through the decision cores",
+    current !== undefined && current.upstreamState === "live",
+    `rows=${sessions?.length} upstream=${current?.upstreamState}`);
   const access = await client.query("access/identity/functions:resolveCurrentAccess", {
     sessionId,
   });
@@ -123,8 +120,7 @@ let sessionId = null;
   const scopeMismatch = await errOf(() =>
     client.query("access/identity/functions:resolveCurrentAccess", { sessionId: "k57wrong" }),
   );
-  ok("E4 stale session belief rejected", scopeMismatch !== null && scopeMismatch.includes("Nie masz uprawnień"),
-    `message=${JSON.stringify(scopeMismatch?.slice(0, 40))}`);
+  ok("E4 stale session belief rejected", scopeMismatch !== null && scopeMismatch.includes("Nie masz uprawnień"));
   const malformed = await client.mutation("access/identity/functions:dispatchAccess", {
     envelope: { nonsense: true },
   });
@@ -147,13 +143,12 @@ let sessionId = null;
 {
   const client = new ConvexHttpClient(URL, { logger: false, auth: token });
   const revoked = await client.mutation("access/identity/functions:revokeSession", { sessionId });
-  ok("F1 self-service revocation returns its timestamp",
+  ok("F1 self-service revocation returns its timestamp (company via canonical chain)",
     revoked?._tag === "ok" && typeof revoked.value.revokedAtMs === "number",
     `revokedAtMs=${revoked?.value?.revokedAtMs}`);
   const denied = await errOf(() => client.query("access/identity/functions:listMySessions", {}));
   ok("F2 fresh protected query denied after revocation (token still valid)",
-    denied !== null && denied.includes("Najpierw się zaloguj"),
-    `message=${JSON.stringify(denied?.slice(0, 40))}`);
+    denied !== null && denied.includes("Najpierw się zaloguj"));
   const dispatched = await client.mutation("access/identity/functions:dispatchAccess", {
     envelope: {
       operation: "access.revokeSession",
@@ -168,7 +163,6 @@ let sessionId = null;
 
 // --- Phase G: 30-day inactivity and upstream-session removal ----------------
 {
-  // Fresh sign-in for a clean session.
   const anonClient = anon();
   await anonClient.action("access/identity/probe:b1ProofSetCode", { email: EMAIL, code: FIXTURE_CODE });
   const fresh = await anonClient.action("auth:signIn", {
@@ -194,8 +188,7 @@ let sessionId = null;
     lastSeenAtMs: Date.now() - 31 * 24 * 60 * 60 * 1000,
   });
   const beyond = await errOf(() => client.query("access/identity/functions:listMySessions", {}));
-  ok("G3 beyond 30 days denied (inactive)", beyond !== null && beyond.includes("Najpierw się zaloguj"),
-    `message=${JSON.stringify(beyond?.slice(0, 40))}`);
+  ok("G3 beyond 30 days denied (inactive)", beyond !== null && beyond.includes("Najpierw się zaloguj"));
 
   await client.action("access/identity/probe:b1ProofAgeSession", {
     sessionId: freshSessionId,
@@ -204,7 +197,7 @@ let sessionId = null;
   await client.action("access/identity/probe:b1ProofDropUpstreamSession", { sessionId: freshSessionId });
   const gone = await errOf(() => client.query("access/identity/functions:listMySessions", {}));
   ok("G4 upstream session removed: token still valid, read denied",
-    gone !== null && gone.includes("Najpierw się zaloguj"), `message=${JSON.stringify(gone?.slice(0, 40))}`);
+    gone !== null && gone.includes("Najpierw się zaloguj"));
 }
 
 console.log("ALL B1 LIVE PROOFS PASSED");

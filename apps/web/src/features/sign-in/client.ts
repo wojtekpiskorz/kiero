@@ -11,8 +11,10 @@ import { ConvexReactClient } from "convex/react";
 
 export function createConvexClient(url: string | undefined): ConvexReactClient {
   if (url === undefined || url.length === 0) {
+    // Developer-facing configuration error: English per the AGENTS.md
+    // language rule (Polish is reserved for product copy).
     throw new Error(
-      "Brak adresu backendu Kiero (VITE_CONVEX_URL). Uruchom `npx convex dev` lub ustaw zmienną.",
+      "Missing VITE_CONVEX_URL: run `npx convex dev` or set the variable before starting the web app.",
     );
   }
   return new ConvexReactClient(url);

@@ -2,12 +2,16 @@
  * The barebones sign-in feature (B1).
  *
  * Semantic controls only — forms, buttons, plain status text, no visual
- * design (the UX/UI track owns that). States are honest:
+ * design (the UX/UI track owns that). The screen WALKS the state machine
+ * from ./state.ts (`SignInState`): every step and pending label renders
+ * from `signInCopy`/`pendingLabel`, never ad-hoc strings. States are
+ * honest:
  *
  * - email-code: two steps (send code, then code + the same email), with
  *   distinct copy for wrong/expired codes, rate limiting, delivery
  *   failures and the method-conflict policy message;
- * - Google: shown only when the deployment reports it configured;
+ * - Google: shown only when the deployment reports it configured, with
+ *   the pending redirect state;
  * - after sign-in: the device-session panel (registry with trusted
  *   activity time, revocation, self-service sign-out).
  */
@@ -20,8 +24,10 @@ import { createConvexClient } from "./client";
 import {
   classifySignInError,
   isValidEmail,
+  pendingLabel,
   signInCopy,
   type SignInFailure,
+  type SignInState,
 } from "./state";
 import { SessionPanel } from "./SessionPanel";
 
@@ -29,13 +35,13 @@ import { SessionPanel } from "./SessionPanel";
 function SignInForm(): React.ReactNode {
   const { signIn } = useAuthActions();
   const availability = useQuery(api.access.identity.functions.providerAvailability, {});
+  const [state, setState] = useState<SignInState>({ step: "choose" });
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [sentTo, setSentTo] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<SignInFailure | null>(null);
 
   const googleAvailable = availability?.google === true;
+  const pending = pendingLabel(state);
 
   async function requestCode(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -43,108 +49,121 @@ function SignInForm(): React.ReactNode {
       setFailure("invalid_email");
       return;
     }
-    setPending(true);
+    setState({ step: "submitting-email" });
     setFailure(null);
     try {
       await signIn("email_code", { email });
-      setSentTo(email);
       setCode("");
+      setState({ step: "code-sent", email });
     } catch (error) {
       setFailure(classifySignInError(error));
-    } finally {
-      setPending(false);
+      setState({ step: "choose" });
     }
   }
 
   async function verifyCode(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (sentTo === null) {
+    if (state.step !== "code-sent") {
       return;
     }
-    setPending(true);
+    setState({ step: "submitting-code", email: state.email });
     setFailure(null);
     try {
-      await signIn("email_code", { email: sentTo, code });
+      await signIn("email_code", { email: state.email, code });
     } catch (error) {
       setFailure(classifySignInError(error));
-    } finally {
-      setPending(false);
+      setState({ step: "code-sent", email: state.email });
     }
   }
 
-  if (sentTo === null) {
+  async function resendCode(): Promise<void> {
+    if (state.step !== "code-sent" && state.step !== "submitting-code") {
+      return;
+    }
+    const resendEmail = state.email;
+    setState({ step: "submitting-email" });
+    setFailure(null);
+    try {
+      await signIn("email_code", { email: resendEmail });
+      setCode("");
+      setState({ step: "code-sent", email: resendEmail });
+    } catch (error) {
+      setFailure(classifySignInError(error));
+      setState({ step: "code-sent", email: resendEmail });
+    }
+  }
+
+  function startGoogle(): void {
+    setState({ step: "google-pending" });
+    setFailure(null);
+    void signIn("google").catch((error: unknown) => {
+      setFailure(classifySignInError(error));
+      setState({ step: "choose" });
+    });
+  }
+
+  if (state.step === "code-sent" || state.step === "submitting-code") {
     return (
-      <form onSubmit={(event) => void requestCode(event)}>
-        <label htmlFor="sign-in-email">{signInCopy.emailLabel}</label>
+      <form onSubmit={(event) => void verifyCode(event)}>
+        <p>{signInCopy.codeSentNotice(state.email)}</p>
+        <label htmlFor="sign-in-code">{signInCopy.codeLabel}</label>
         <input
-          id="sign-in-email"
-          type="email"
-          autoComplete="email"
-          placeholder={signInCopy.emailPlaceholder}
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          id="sign-in-code"
+          type="text"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder={signInCopy.codePlaceholder}
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
           required
         />
-        <button type="submit" disabled={pending}>
-          {pending ? signInCopy.sending : signInCopy.sendCode}
+        <button type="submit" disabled={pending !== null}>
+          {pending ?? signInCopy.verify}
         </button>
-        {failure !== null && (
-          <p role="alert">{signInCopy.failures[failure]}</p>
-        )}
-        {googleAvailable ? (
-          <button
-            type="button"
-            onClick={() => void signIn("google").catch((error: unknown) => setFailure(classifySignInError(error)))}
-          >
-            {signInCopy.googleButton}
+        <button
+          type="button"
+          disabled={pending !== null}
+          onClick={() => {
+            setState({ step: "choose" });
+            setCode("");
+            setFailure(null);
+          }}
+        >
+          {signInCopy.changeEmail}
+        </button>
+        {failure === "code_wrong_or_expired" && (
+          <button type="button" disabled={pending !== null} onClick={() => void resendCode()}>
+            {signInCopy.resendCode}
           </button>
-        ) : (
-          <p>{signInCopy.googleUnavailable}</p>
         )}
+        {failure !== null && <p role="alert">{signInCopy.failures[failure]}</p>}
       </form>
     );
   }
 
   return (
-    <form onSubmit={(event) => void verifyCode(event)}>
-      <p>{signInCopy.codeSentNotice(sentTo)}</p>
-      <label htmlFor="sign-in-code">{signInCopy.codeLabel}</label>
+    <form onSubmit={(event) => void requestCode(event)}>
+      <label htmlFor="sign-in-email">{signInCopy.emailLabel}</label>
       <input
-        id="sign-in-code"
-        type="text"
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        placeholder={signInCopy.codePlaceholder}
-        value={code}
-        onChange={(event) => setCode(event.target.value)}
+        id="sign-in-email"
+        type="email"
+        autoComplete="email"
+        placeholder={signInCopy.emailPlaceholder}
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
         required
       />
-      <button type="submit" disabled={pending}>
-        {pending ? signInCopy.verifying : signInCopy.verify}
+      <button type="submit" disabled={pending !== null}>
+        {pending ?? signInCopy.sendCode}
       </button>
-      <button
-        type="button"
-        onClick={() => {
-          setSentTo(null);
-          setCode("");
-          setFailure(null);
-        }}
-      >
-        {signInCopy.changeEmail}
-      </button>
-      {failure === "code_wrong_or_expired" && (
-        <button
-          type="button"
-          onClick={() =>
-            void signIn("email_code", { email: sentTo })
-              .then(() => setCode(""))
-              .catch((error: unknown) => setFailure(classifySignInError(error)))
-          }
-        >
-          {signInCopy.resendCode}
-        </button>
-      )}
       {failure !== null && <p role="alert">{signInCopy.failures[failure]}</p>}
+      {googleAvailable ? (
+        <button type="button" disabled={pending !== null} onClick={startGoogle}>
+          {pending ?? signInCopy.googleButton}
+        </button>
+      ) : (
+        <p>{signInCopy.googleUnavailable}</p>
+      )}
     </form>
   );
 }
@@ -157,7 +176,8 @@ function AuthenticatedApp(): React.ReactNode {
 
   useEffect(() => {
     let cancelled = false;
-    void ensureSession({ deviceLabel: "Przeglądarka" })
+    // No deviceLabel argument: the server applies its own default.
+    void ensureSession({})
       .then((result) => {
         if (cancelled) {
           return;

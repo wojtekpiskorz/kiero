@@ -8,9 +8,11 @@
  * subscriptions immediately.
  */
 
+import { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
+import { signInCopy } from "./state";
 
 const sessionPanelCopy = {
   heading: "Twoje urządzenia",
@@ -21,7 +23,6 @@ const sessionPanelCopy = {
   upstreamExpired: "Sesja wygasła",
   upstreamInactive: "Wygasła po 30 dniach nieaktywności",
   revokeThisDevice: "Wyloguj to urządzenie",
-  signOutEverywhere: "Wyloguj się",
   noCompany:
     "Jesteś zalogowany, ale nie należysz jeszcze do żadnej firmy. Członkostwo nadchodzi z zaproszenia.",
   companyContext: (company: { timezone: string; currency: string }): string =>
@@ -41,6 +42,14 @@ export function SessionPanel(props: { sessionId: string }): React.ReactNode {
   });
   const revoke = useMutation(api.access.identity.functions.revokeSession);
   const { signOut } = useAuthActions();
+  const [signingOut, setSigningOut] = useState(false);
+
+  function requestSignOut(): void {
+    setSigningOut(true);
+    void signOut().catch(() => {
+      setSigningOut(false);
+    });
+  }
 
   return (
     <section aria-label={sessionPanelCopy.heading}>
@@ -86,9 +95,10 @@ export function SessionPanel(props: { sessionId: string }): React.ReactNode {
           </li>
         ))}
       </ul>
-      <button type="button" onClick={() => void signOut()}>
-        {sessionPanelCopy.signOutEverywhere}
+      <button type="button" disabled={signingOut} onClick={requestSignOut}>
+        {signInCopy.signOutEverywhere}
       </button>
+      {signingOut && <p aria-live="polite">{signInCopy.signedOutNotice}</p>}
     </section>
   );
 }

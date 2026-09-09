@@ -31,8 +31,13 @@ import { Schema } from "effect";
 import { convexAuth, type ConvexAuthConfig } from "@convex-dev/auth/server";
 import { Email } from "@convex-dev/auth/providers/Email";
 import Google from "@auth/core/providers/google";
-import { deliverApplicationEmail, deliveryFailureCopy } from "../../integrations/email/send";
 import {
+  deliverApplicationEmail,
+  deliveryFailureCopy,
+  EMAIL_DELIVERY_FAILED_MARKER,
+} from "../../integrations/email/send";
+import {
+  METHOD_CONFLICT_MARKER,
   decideCreateOrUpdateUser,
   GoogleProfile,
   EmailCodeProfile,
@@ -87,10 +92,11 @@ const authConfig: ConvexAuthConfig = {
         });
         const copy = deliveryFailureCopy(outcome);
         if (copy !== null) {
-          // Fail the issuance loudly and sanitized: no code, key or
-          // provider payload in the message. Retrying issues a fresh code
-          // (the pending one is replaced, never duplicated).
-          throw new Error(copy);
+          // Fail the issuance loudly and sanitized: the machine marker
+          // (client classification) plus Polish copy; no code, key or
+          // provider payload anywhere. Retrying issues a fresh code (the
+          // pending one is replaced, never duplicated).
+          throw new Error(`${EMAIL_DELIVERY_FAILED_MARKER} ${copy}`);
         }
       },
     }),
@@ -170,7 +176,7 @@ const authConfig: ConvexAuthConfig = {
         // different sign-in method; no detail about that identity is
         // disclosed. Verified method linking is B2's operation.
         throw new Error(
-          "Konto z tym adresem e-mail używa innej metody logowania. Zaloguj się pierwotną metodą; łączenie metod będzie dostępne później.",
+          `${METHOD_CONFLICT_MARKER} Konto z tym adresem e-mail używa innej metody logowania. Zaloguj się pierwotną metodą; łączenie metod będzie dostępne później.`,
         );
       }
       if (decision.action === "resume") {
