@@ -1,0 +1,33 @@
+# Media delivery and recoverable uploads
+
+Checked on 2026-09-08. The owner subsequently accepted private R2 EU / Convex permissions / Worker delivery in Q187 and resumable source acceptance in Q188. These are architecture directions, not integration proof. Photo normalization is additionally required; the exact retained image representation and whether to retain audio are being revisited. No packages, resources or credentials were created.
+
+## Storage and request authorization
+
+An R2 bucket configured with the `eu` jurisdiction constrains its objects to the EU; the Worker binding must also specify this jurisdiction. A location hint such as `weur` is only best effort. The R2 setting does not establish the processing location of the Worker, its logs or a downstream AI provider. [R2 data location](https://developers.cloudflare.com/r2/reference/data-location/)
+
+The Workers R2 interface returns object bodies as `ReadableStream` and supports byte-range reads. Writes and multipart completion become visible to subsequent reads once successful. Workers can forward streams without buffering complete bodies; the isolate memory limit is 128 MB. These are suitable primitives for large media, not a promise that a single object or request has unlimited size. [R2 Workers API](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/), [Workers streams](https://developers.cloudflare.com/workers/runtime-apis/streams/), [Workers limits](https://developers.cloudflare.com/workers/platform/limits/)
+
+Presigned URLs are reusable bearer capabilities until expiry, which can range from one second to seven days. R2 temporary credentials can grant multipart access to a limited bucket/path but also remain bearer capabilities until expiry. Revoking a parent API token affects derived credentials broadly; these interfaces do not document immediate per-user revocation of an already issued credential. [Presigned URLs](https://developers.cloudflare.com/r2/api/s3/presigned-urls/), [temporary credentials](https://developers.cloudflare.com/r2/api/s3/temporary-credentials/)
+
+`ConvexHttpClient` works in JavaScript environments with `fetch` and accepts a JWT through its constructor or `setAuth`. Alternatively, a Convex HTTP action can receive bearer authentication and call an authenticated query. The HTTP action's 20 MB limit is not a media-transfer constraint if it only returns a small authorization decision. Forwarding a valid JWT establishes identity; it does not by itself prove that a revoked Kiero session is rejected. The application must check current session, firm membership and source access. [JavaScript client](https://docs.convex.dev/client/javascript/overview), [ConvexHttpClient](https://docs.convex.dev/api/classes/browser.ConvexHttpClient), [HTTP actions](https://docs.convex.dev/functions/http-actions), [authentication in functions](https://docs.convex.dev/auth/functions-auth)
+
+Design inference: keep R2 private and serve media through an authenticated Worker route. Authorize each new request, including byte ranges, against current Convex state. Resolve object keys server-side from permitted source attachments. Prevent browser, service-worker and CDN caching from becoming an alternative protected-media access path. The ordinary client receives no direct R2 download capability. This adds an authorization round trip whose latency must be measured.
+
+The request authorization decision is the concurrency boundary. Bytes already downloaded cannot be recalled; a response already authorized and streaming is not automatically stopped by a later membership change. If stronger interruption of an active response is required, specify and prove that separately. Native audio/image elements also need a tested authentication path; do not assume they attach an arbitrary bearer header or solve this by loading the whole recording into memory.
+
+## Multipart and source acceptance
+
+R2 multipart supports up to 10,000 parts, 5 MiB to 5 GiB per part, and 5 TiB per object. All parts except the final one must have equal size. Incomplete uploads expire after seven days by default. The Worker and HTTP request limits still apply to each incoming part. [Upload objects](https://developers.cloudflare.com/r2/objects/upload-objects/), [R2 limits](https://developers.cloudflare.com/r2/platform/limits/)
+
+Design inference: retain a server-owned upload session with firm, author, draft, object identity and part progress. Check authorization on create, part upload, resume and completion. Stream bounded parts rather than buffer a whole long recording. The logical source may use a manifest of immutable media segments if a technical single-object or provider limit requires it; the user still sees one source. Browser recorder chunks, storage multipart parts and independently decodable STT segments are different concepts and must not be assumed interchangeable.
+
+Complete every required attachment, verify its object identity and integrity, then invoke the checked Convex source-acceptance mutation. That mutation rechecks current access, draft state and attachment references and registers processing under the accepted workflow contract. An interrupted response retries the same acceptance key. No Convex/R2 cross-service transaction has been established: completion before acceptance can leave orphan objects, so a durable ledger and reconciliation must handle that case.
+
+Cleanup must not race with acceptance or delete accepted attachments. Finalized source objects must not remain writable through a stale upload session or retry. Missing or unverified attachments keep the whole source pending and invisible to coworkers; only complete acceptance can produce the saved confirmation. These rules preserve the already accepted product contract rather than add a product duration limit.
+
+## Required proof
+
+Pin the auth/client/Worker versions and exercise current-session forwarding from the PWA through the Worker. Revoke membership or a session while a valid token still exists, then try a fresh range read and every upload operation. Verify EU bucket configuration, cache behavior, native playback/seek on target phones, and bounded memory during multi-gigabyte transfer.
+
+Interrupt before and after multipart completion and Convex acceptance, including lost responses and duplicate parts. Prove safe resume, integrity checks, one accepted source, no later overwrite, no cleanup race and correct handling of a missing attachment. Test recorder/container reconstruction and original-time anchors separately from transport resumption. Existing capture research records the PWA's platform limits; these checks have not run.
