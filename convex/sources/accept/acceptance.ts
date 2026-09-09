@@ -27,6 +27,17 @@
  * E3 owns executing the registered extract/analyze work with real pipeline
  * versions; D1 only registers it.
  *
+ * D2 amendment (attachment-bearing sources, flagged in the issue report):
+ * the reference-check phase additionally runs the uploads lane's
+ * all-attachments-durable gate (`verifyAttachmentsForAcceptance`) — the
+ * upload must be finalized with its declaration fully materialized, every
+ * attachment durably completed in R2 and every attachment carrying a
+ * VERIFIED received representation — and the commit phase binds the
+ * verified attachments (`attachments.sourceId`) and the ledger row
+ * (`uploads.acceptedSourceId`) inside the SAME transaction, with the
+ * verified ids in the `sources.sourceAccepted` payload. Text-only uploads
+ * keep the exact D1 semantics.
+ *
  * Pure decisions (fingerprint, replay/conflict, state derivation for reads)
  * live here so tests/d1 can prove them without a deployment.
  */
@@ -51,6 +62,7 @@ import {
 import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { publishEvent, registerDurableJob } from "../../platform/publish";
+import { verifyAttachmentsForAcceptance } from "../uploads/acceptance_gate";
 
 /** The contract entry this transaction implements (decode/typed authority). */
 export const acceptSourceEntry = sourcesOperations["sources.acceptSource"];
@@ -344,16 +356,12 @@ export async function performAcceptance(
   if (upload.stage !== "draft" && upload.stage !== "finalized") {
     return errorResult(validationError("upload_stage_not_acceptable"));
   }
-  // D1 accepts text sources only: attachments (D2) must not be present yet.
-  const attachments = await tx.db
-    .query("attachments")
-    .withIndex("by_upload", (q) => q.eq("uploadId", uploadId))
-    .first();
-  if (attachments !== null) {
-    return errorResult(validationError("attachments_not_supported_yet"));
-  }
 
   // --- replay decision over the logical-source key -------------------------
+  // The replay decision precedes the attachment gate ON PURPOSE: a replay of
+  // the same key returns the ORIGINAL receipt, and that source's attachments
+  // are already bound to it (the binding of the first commit) — re-running
+  // the gate on a replay would misread them as foreign bindings.
   const payload = {
     authorText: input.authorText,
     intendedSentAtIso: input.intendedSentAtIso,
@@ -379,6 +387,19 @@ export async function performAcceptance(
       // Same logical source: the original receipt, first send intention intact.
       return okResult(receiptOf(existingRow));
     }
+  }
+
+  // --- D2: the all-attachments-durable gate (protocol step 3) --------------
+  // Text-only uploads pass through unchanged (D1 semantics). An upload WITH
+  // attachments is acceptable only when the upload is finalized, the
+  // declaration is fully materialized, EVERY attachment is durably completed
+  // (gateway-verified R2 completion) and EVERY attachment carries a VERIFIED
+  // received representation. The gate runs BEFORE the first insert, so a
+  // failing gate writes nothing (a source can never appear saved while any
+  // required attachment is missing or unverified).
+  const attachmentGate = await verifyAttachmentsForAcceptance(tx, upload);
+  if (!attachmentGate.ok) {
+    return errorResult(attachmentGate.error);
   }
 
   // --- project hint reference checks (context, never authority) ------------
@@ -448,6 +469,21 @@ export async function performAcceptance(
     processingRunId,
     createdAtMs: nowMs,
   });
+  // --- D2: bind the verified attachments and the ledger row atomically -----
+  // Only pre-validated patches of already-verified ids remain here (the gate
+  // resolved every attachment id and its durability before the first insert),
+  // so the structural no-partial-commit argument is unchanged: the source,
+  // its attachments' binding and the ledger's accepted marker commit together
+  // or not at all.
+  if (attachmentGate.binding.bindLedger) {
+    for (const attachmentId of attachmentGate.binding.attachmentIds) {
+      await tx.db.patch(attachmentId, { sourceId });
+    }
+    await tx.db.patch(uploadId, {
+      acceptedSourceId: sourceId,
+      lastActivityAtMs: nowMs,
+    });
+  }
   // One dedup identity for the event, the job and the logical acceptance:
   // publisher-side registration and any later drain edge collapse together.
   const dedupKey =
@@ -457,7 +493,7 @@ export async function performAcceptance(
   await publishEvent(tx, {
     companyId: context.actor.companyId,
     eventName: "sources.sourceAccepted",
-    payload: { sourceId, attachmentIds: [] },
+    payload: { sourceId, attachmentIds: attachmentGate.binding.attachmentIds },
     dedupKey,
   });
   await registerDurableJob(tx, {

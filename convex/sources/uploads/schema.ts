@@ -1,5 +1,6 @@
 /**
- * Upload and retained-media tables (A2 candidate, certified by A3).
+ * Upload and retained-media tables (A2 candidate, certified by A3;
+ * completed by D2 for resumable uploads and the acceptance gate).
  *
  * Owning implementers: D2 (resumable uploads and atomic acceptance),
  * D5 (photo normalization and retained representations), D3 (range reads).
@@ -10,6 +11,30 @@
  * evidence; the received file may be removed only after the retained one is
  * verified, and is kept on unsupported conversion, failure or unresolved
  * quality.
+ *
+ * D2 amendments (the owning lane completes the candidate fragment; every
+ * added column is OPTIONAL so D1's text-only seed fixtures stay valid):
+ *
+ * - `uploads.draftId/attachmentCount/declaredKinds/declaredParts`: the
+ *   client's stable draft identity and its declaration (media kinds and the
+ *   part bound), recorded at prepare so acceptance can later verify the WHOLE
+ *   declaration and begin can validate the presented session against it.
+ * - `uploads.lastActivityAtMs`: the reconciliation grace anchor. Every
+ *   protocol step (begin, part, complete, finalize, acceptance) refreshes
+ *   it, so a delayed legitimate retry is never garbage-collected.
+ * - `uploads.acceptedSourceId`: set inside the D1 acceptance transaction
+ *   (with the attachments' `sourceId`), atomically with the source. An
+ *   accepted upload is never collected by orphan reconciliation.
+ * - `uploads.orphanedAtMs`: when reconciliation marked the upload orphaned.
+ * - `attachments.r2UploadId/partsJson/completedAtMs/r2ObjectEtag`: the
+ *   Worker-owned R2 multipart identity, the durable part manifest (R2 parts,
+ *   not browser chunks and not media segments), and the durable
+ *   completion+readability record. `receivedBytes` is the manifest byte sum
+ *   once completed.
+ *
+ * Vocabulary (architecture protocol step 2): browser chunks are the client's
+ * slicing concern; R2 parts are the multipart identities this ledger
+ * records; media segments are D6's processing units over accepted audio.
  *
  * Tables: uploads, attachments, mediaRepresentations.
  */
@@ -52,7 +77,29 @@ export const uploadsTables = {
     createdAtMs: shared.tsMs,
     finalizedAtMs: v.optional(shared.tsMs),
     orphanReason: v.optional(v.string()),
-  }).index("by_company_stage", ["companyId", "stage"]),
+    /**
+     * The client's stable draft identity (protocol step 1). One draft of one
+     * company maps to one ledger row: prepare replays return the same row.
+     */
+    draftId: v.optional(v.string()),
+    /** How many attachments the prepare declaration requires (mediaKinds). */
+    attachmentCount: v.optional(shared.counter),
+    /**
+     * The declared media kinds, in declaration order (prepare writes them).
+     * Begin validates the presented session against THIS declaration, so an
+     * audio attachment can never be swapped for an image mid-upload.
+     */
+    declaredKinds: v.optional(v.array(mediaKind)),
+    /** The declared part bound of the whole upload (>= every recorded part no). */
+    declaredParts: v.optional(shared.counter),
+    /** Reconciliation grace anchor; refreshed by every protocol step. */
+    lastActivityAtMs: v.optional(shared.tsMs),
+    /** Set atomically inside acceptance; accepted uploads are never collected. */
+    acceptedSourceId: v.optional(shared.sourceId),
+    orphanedAtMs: v.optional(shared.tsMs),
+  })
+    .index("by_company_stage", ["companyId", "stage"])
+    .index("by_company_draft", ["companyId", "draftId"]),
 
   /** One logical attachment (audio or image) of a draft or accepted source. */
   attachments: defineTable({
@@ -64,9 +111,22 @@ export const uploadsTables = {
     receivedBytes: v.optional(v.float64()),
     contentHash: v.optional(v.string()),
     createdAtMs: shared.tsMs,
+    /** The Worker-created R2 multipart upload id (resume handle). */
+    r2UploadId: v.optional(v.string()),
+    /**
+     * Canonical JSON part manifest, ascending by partNumber:
+     * [{partNumber, etag, bytes, sha256Hex, receivedAtMs}]. R2 parts, not
+     * browser chunks (client slicing) and not media segments (D6).
+     */
+    partsJson: v.optional(v.string()),
+    /** Durable R2 completion + readability verification time (gateway-verified). */
+    completedAtMs: v.optional(shared.tsMs),
+    /** Etag of the completed R2 object (content-derived receipt identity). */
+    r2ObjectEtag: v.optional(v.string()),
   })
     .index("by_upload", ["uploadId"])
-    .index("by_source", ["sourceId"]),
+    .index("by_source", ["sourceId"])
+    .index("by_object_key", ["objectKey"]),
 
   /** Versioned representation of an attachment (received/retained/thumbnail). */
   mediaRepresentations: defineTable({

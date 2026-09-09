@@ -43,6 +43,13 @@ import type * as sources_probe_shared from "../sources/probe_shared.js";
 import type * as sources_read_probe from "../sources/read/probe.js";
 import type * as sources_read_rows from "../sources/read/rows.js";
 import type * as sources_read_views from "../sources/read/views.js";
+import type * as sources_uploads_acceptance_gate from "../sources/uploads/acceptance_gate.js";
+import type * as sources_uploads_commands from "../sources/uploads/commands.js";
+import type * as sources_uploads_dispatch from "../sources/uploads/dispatch.js";
+import type * as sources_uploads_http from "../sources/uploads/http.js";
+import type * as sources_uploads_ledger from "../sources/uploads/ledger.js";
+import type * as sources_uploads_probe from "../sources/uploads/probe.js";
+import type * as sources_uploads_protocol from "../sources/uploads/protocol.js";
 
 import type {
   ApiFromModules,
@@ -86,6 +93,13 @@ declare const fullApi: ApiFromModules<{
   "sources/read/probe": typeof sources_read_probe;
   "sources/read/rows": typeof sources_read_rows;
   "sources/read/views": typeof sources_read_views;
+  "sources/uploads/acceptance_gate": typeof sources_uploads_acceptance_gate;
+  "sources/uploads/commands": typeof sources_uploads_commands;
+  "sources/uploads/dispatch": typeof sources_uploads_dispatch;
+  "sources/uploads/http": typeof sources_uploads_http;
+  "sources/uploads/ledger": typeof sources_uploads_ledger;
+  "sources/uploads/probe": typeof sources_uploads_probe;
+  "sources/uploads/protocol": typeof sources_uploads_protocol;
 }>;
 
 /**
