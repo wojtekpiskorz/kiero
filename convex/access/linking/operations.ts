@@ -16,13 +16,12 @@
  *   handler reads through `linkingStore`, which has no write methods.
  *
  * - `access.recoverAccount`: the CHECKED MANUAL-RECOVERY COMMAND defined
- *   here per the issue text. Its invoker is deliberately unavailable: no
- *   public function routes to the handler until B4 supplies explicit GM
- *   authority. The pinned input/output schemas and the handler (running
- *   the same recoverAccountCore the guarded dev proof uses) are the
- *   contract B4 wires; until then dispatching the name fails closed with
- *   `unknown_operation` (it is not in the composed contracts registry — a
- *   named prerequisite recorded in the B2 report).
+ *   here per the issue text. B4 registered its contract entry and its only
+ *   alpha invoker (GM authority, convex/access/gm/operations.ts): the
+ *   handler takes the RESOLVED GM ACTOR as `performedBy`, runs the same
+ *   recoverAccountCore the guarded dev proof uses, and the GM transaction
+ *   writes its audit row alongside. The guarded dev action (./probe.ts)
+ *   keeps calling the core directly for evidence.
  */
 
 import { Schema } from "effect";
@@ -51,22 +50,31 @@ export const RecoverAccountResult = Schema.Struct({
   clearedGoogleSubject: Schema.Boolean,
 });
 
-/** The checked manual-recovery command (defined; invoker withheld for B4). */
+/**
+ * The checked manual-recovery command (defined; invoker supplied by B4).
+ * B4 amendment (issue #23): `run` takes the RESOLVED GM ACTOR as
+ * `performedBy` — the GM-authority handler (convex/access/gm/) passes the
+ * acting operator's user id so the ledger records the real person, never a
+ * placeholder.
+ */
 export const recoverAccountCommand = {
   name: "access.recoverAccount",
   input: RecoverAccountInput,
   result: RecoverAccountResult,
   /**
-   * The handler runs the recovery core; nothing registers it in a public
-   * dispatch surface until B4's GM authority exists. Exported for the
-   * guarded dev proof and for B4's registration — the only two sanctioned
-   * callers.
+   * The handler runs the recovery core; only the B4 GM dispatch (and the
+   * guarded dev proof) may call it — the performedBy argument is supplied
+   * by the resolved authority, never client input.
    */
-  run: async (ctx: MutationCtx, input: RecoverAccountInput): Promise<ResultEnvelope> => {
+  run: async (
+    ctx: MutationCtx,
+    input: RecoverAccountInput,
+    performedBy: string,
+  ): Promise<ResultEnvelope> => {
     const outcome = await recoverAccountCore(linkingTx(ctx), {
       targetUserId: input.userId,
       verificationBasis: input.verificationBasis,
-      performedBy: "gm-authority", // B4 replaces with the resolved GM actor.
+      performedBy,
       nowMs: Date.now(),
     });
     if (outcome.state === "rejected") {

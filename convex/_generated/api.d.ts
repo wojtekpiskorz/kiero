@@ -8,6 +8,14 @@
  * @module
  */
 
+import type * as access_gm_cores from "../access/gm/cores.js";
+import type * as access_gm_dispatch from "../access/gm/dispatch.js";
+import type * as access_gm_functions from "../access/gm/functions.js";
+import type * as access_gm_operations from "../access/gm/operations.js";
+import type * as access_gm_policy from "../access/gm/policy.js";
+import type * as access_gm_probe from "../access/gm/probe.js";
+import type * as access_gm_store from "../access/gm/store.js";
+import type * as access_gm_storeAdapter from "../access/gm/storeAdapter.js";
 import type * as access_identity_authEntry from "../access/identity/authEntry.js";
 import type * as access_identity_functions from "../access/identity/functions.js";
 import type * as access_identity_issuanceLimit from "../access/identity/issuanceLimit.js";
@@ -86,6 +94,14 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "access/gm/cores": typeof access_gm_cores;
+  "access/gm/dispatch": typeof access_gm_dispatch;
+  "access/gm/functions": typeof access_gm_functions;
+  "access/gm/operations": typeof access_gm_operations;
+  "access/gm/policy": typeof access_gm_policy;
+  "access/gm/probe": typeof access_gm_probe;
+  "access/gm/store": typeof access_gm_store;
+  "access/gm/storeAdapter": typeof access_gm_storeAdapter;
   "access/identity/authEntry": typeof access_identity_authEntry;
   "access/identity/functions": typeof access_identity_functions;
   "access/identity/issuanceLimit": typeof access_identity_issuanceLimit;

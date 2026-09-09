@@ -45,9 +45,12 @@ describe("composed registry integrity", () => {
     // Exact counts: an accidentally deleted surface entry fails here.
     // (60/40 are the real registry sizes since B3's coordinated amendment
     // added the four admission/issuance/transfer operations to the access
-    // surface; naive greps of `kind: "operation"` overcount by one because
+    // surface; 66 since the B4 amendment added the six audited GM operations
+    // (recoverAccount, gmInspectCompany, gmOnboardCompany, gmActivateCompany,
+    // gmRestoreAdministrator, gmEndCompanyAlpha); naive greps of
+    // `kind: "operation"` overcount by one because
     // registration.ts declares the interface field.)
-    expect(operationNames).toHaveLength(60);
+    expect(operationNames).toHaveLength(66);
     expect(eventNames).toHaveLength(40);
     for (const name of operationNames) {
       expect(operations[name]?.name).toBe(name);

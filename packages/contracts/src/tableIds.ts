@@ -42,6 +42,9 @@ export const TABLE_ID_NAMES = [
   "invitations",
   // access/gm
   "gmAccessGrants",
+  // access/gm (B4 amendment): the per-company alpha participation authority
+  // an open grant depends on (activation open = the firm is a testing firm).
+  "gmCompanyActivations",
   // access/linking (B2: verified linking ceremonies, email changes,
   // manual-recovery ledger)
   "linkingAttempts",
