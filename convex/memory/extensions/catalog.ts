@@ -61,7 +61,9 @@ export async function performSearchExtensionCatalog(
       continue; // corrupt definition without a current version: not a candidate
     }
     const assessment = assessCatalogCandidate(
-      { name: input.name, ...(input.fields === undefined ? {} : { fields: input.fields }) },
+      // `fields` rides along as-is (undefined = name-only lookup): the
+      // assessment's first check is === undefined.
+      { name: input.name, fields: input.fields },
       { name: current.name, fields: current.fields },
     );
     if (assessment.verdict === "distinct") {

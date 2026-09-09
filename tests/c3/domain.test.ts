@@ -20,6 +20,7 @@ import {
 } from "@kiero/domain";
 import {
   decideVersionSuccession,
+  collectEntityReferences,
   validateDefinitionShape,
   validateExtensionValueAgainstVersion,
   type FieldShapeView,
@@ -404,6 +405,102 @@ describe("value validation against the exact stored version", () => {
         value: { _tag: "quantity", amount: "8", unit: "mm" },
       }),
     ).toEqual({ ok: false, code: "value_shape_mismatch" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The entity-reference walk: the pure half of the tenant check. It is the
+// ONLY enumerator of references inside extension values; a walk that stopped
+// descending would return ok with no references and the tenant check would
+// pass vacuously — so every nesting level and refusal shape is pinned here
+// (the transactional consumer is proved live in live-proof.mjs C16).
+// ---------------------------------------------------------------------------
+
+describe("the entity-reference walk (collectEntityReferences)", () => {
+  const projectRef = { _tag: "entity_ref", reference: { _tag: "project", projectId: "p1" } };
+  const sourceRef = { _tag: "entity_ref", reference: { _tag: "source", sourceId: "s1" } };
+
+  it("collects a top-level reference scalar", () => {
+    expect(collectEntityReferences(projectRef)).toEqual({
+      ok: true,
+      references: [{ kind: "project", id: "p1" }],
+    });
+  });
+
+  it("descends into nested object members and collects each reference", () => {
+    expect(
+      collectEntityReferences({
+        _tag: "object",
+        fields: [
+          { fieldId: "kontakt", value: projectRef },
+          { fieldId: "zrodlo", value: sourceRef },
+          { fieldId: "uwaga", value: { _tag: "text", text: "bez referencji" } },
+        ],
+      }),
+    ).toEqual({
+      ok: true,
+      references: [
+        { kind: "project", id: "p1" },
+        { kind: "source", id: "s1" },
+      ],
+    });
+  });
+
+  it("descends into list items and collects each reference", () => {
+    expect(
+      collectEntityReferences({
+        _tag: "list",
+        items: [projectRef, { _tag: "text", text: "x" }, sourceRef],
+      }),
+    ).toEqual({
+      ok: true,
+      references: [
+        { kind: "project", id: "p1" },
+        { kind: "source", id: "s1" },
+      ],
+    });
+  });
+
+  it("refuses malformed references: missing id, unknown kind, non-object reference", () => {
+    // A reference tag the id table does not know: never silently skipped.
+    expect(
+      collectEntityReferences({
+        _tag: "entity_ref",
+        reference: { _tag: "company", companyId: "c1" },
+      }),
+    ).toEqual({ ok: false, code: "entity_reference_malformed" });
+    // The tag's id property missing.
+    expect(
+      collectEntityReferences({
+        _tag: "entity_ref",
+        reference: { _tag: "project" },
+      }),
+    ).toEqual({ ok: false, code: "entity_reference_malformed" });
+    // The reference payload not an object at all.
+    expect(
+      collectEntityReferences({ _tag: "entity_ref", reference: "p1" }),
+    ).toEqual({ ok: false, code: "entity_reference_malformed" });
+  });
+
+  it("returns no references for scalar payloads (nothing passes vacuously that shouldn't)", () => {
+    expect(collectEntityReferences({ _tag: "quantity", amount: "8", unit: "mm" })).toEqual({
+      ok: true,
+      references: [],
+    });
+    expect(collectEntityReferences(null)).toEqual({ ok: true, references: [] });
+    // A malformed reference nested DEEP still fails the whole walk — the
+    // descent cannot quietly stop at an outer level.
+    expect(
+      collectEntityReferences({
+        _tag: "object",
+        fields: [
+          {
+            fieldId: "lista",
+            value: { _tag: "list", items: [{ _tag: "entity_ref", reference: { _tag: "task" } }] },
+          },
+        ],
+      }),
+    ).toEqual({ ok: false, code: "entity_reference_malformed" });
   });
 });
 

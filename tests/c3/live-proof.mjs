@@ -623,5 +623,75 @@ record(
   `top=${mmSearch?.similarity?.verdict} usage=${mmSearch?.usageCount} candidates=${candidates.length}`,
 );
 
+// --- C16: entity references inside extension values are tenant-checked ----------
+// The walk (packages/domain collectEntityReferences) is the ONLY enumerator
+// of references; the prepare seam is its transactional consumer. An in-company
+// reference publishes; a FOREIGN row id (company B's source, referenced inside
+// a nested object member) and a missing id both refuse with the exact code.
+// The definition is multi-field, so every value is an OBJECT and the
+// references always sit in nested members — the walk must descend to see them.
+const projectSeed = await client().action("sources/accept/probe:probeSeedProject", {
+  displayName: `Banan (C3 refs ${RUN})`,
+});
+if (projectSeed._tag !== "ok") throw new Error(`project seeding failed`);
+const P_REF = projectSeed.value.projectId;
+const refDefined = await ext("memory.defineExtension", {
+  name: `Powiązany projekt r${RUN}`,
+  fields: [
+    { fieldId: "projekt", label: "Powiązany projekt", kind: "entity_ref" },
+    { fieldId: "uwaga", label: "Uwaga", kind: "text" },
+  ],
+});
+const REF_V = refDefined._tag === "ok" ? refDefined.value.versionId : "";
+const refObject = (reference, text) => ({
+  _tag: "object",
+  fields: [
+    { fieldId: "projekt", value: { _tag: "entity_ref", reference } },
+    { fieldId: "uwaga", value: { _tag: "text", text } },
+  ],
+});
+const { published: pubRefOk } = await publish(
+  extensionPlan(S1, `powiazany.projekt.${RUN}`, REF_V, refObject(
+    { _tag: "project", projectId: P_REF },
+    "własny projekt firmy",
+  )),
+);
+const foreignRefPrepare = await memory(
+  "memory.prepareChangeSet",
+  extensionPlan(S1, `obcy.ref.${RUN}`, REF_V, refObject(
+    // Company B's source, hidden inside a nested object member: the walk
+    // must descend and the tenant check must refuse it.
+    { _tag: "source", sourceId: isolation.value.sourceId },
+    "próba obcego źródła",
+  )),
+);
+const missingRefPrepare = await memory(
+  "memory.prepareChangeSet",
+  extensionPlan(S1, `nie_ma.ref.${RUN}`, REF_V, refObject(
+    { _tag: "project", projectId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f" },
+    "nieistniejący projekt",
+  )),
+);
+const st16 = await memState();
+const foreignStored = st16.value.revisions.some(
+  (r) => r.semanticKey === `obcy.ref.${RUN}` || r.semanticKey === `nie_ma.ref.${RUN}`,
+);
+const refUsage = (await extState()).value.usage.find((u) => u.definitionId === refDefined.value?.definitionId);
+const c16ok =
+  refDefined._tag === "ok" &&
+  pubRefOk._tag === "ok" &&
+  foreignRefPrepare._tag === "error" &&
+  foreignRefPrepare.error._tag === "validation" &&
+  foreignRefPrepare.error.code === "entity_reference_not_in_company" &&
+  missingRefPrepare._tag === "error" &&
+  missingRefPrepare.error.code === "entity_reference_not_in_company" &&
+  !foreignStored &&
+  refUsage?.usageCount === 1;
+record(
+  "C16 entity references inside extension values: an in-company reference publishes (usage counted); a foreign id nested in an object member and a missing id both refuse at prepare — nothing stored",
+  c16ok ? "PASS" : "FAIL",
+  `ok-publish=${pubRefOk._tag} foreign=${foreignRefPrepare.error?.code} missing=${missingRefPrepare.error?.code} stored=${foreignStored}`,
+);
+
 const ok = summarize();
 process.exit(ok ? 0 : 1);
