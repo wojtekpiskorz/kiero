@@ -43,10 +43,14 @@ describe("composed registry integrity", () => {
     const operationNames = Object.keys(operations);
     const eventNames = Object.keys(events);
     // Exact counts: an accidentally deleted surface entry fails here.
-    // (56/40 are the real registry sizes since A3's certification amendment
-    // added the platform surface; naive greps of `kind: "operation"`
-    // overcount by one because registration.ts declares the interface field.)
-    expect(operationNames).toHaveLength(56);
+    // (60/40 are the real registry sizes since B3's coordinated amendment
+    // added the four admission/issuance/transfer operations to the access
+    // surface; 66 since the B4 amendment added the six audited GM operations
+    // (recoverAccount, gmInspectCompany, gmOnboardCompany, gmActivateCompany,
+    // gmRestoreAdministrator, gmEndCompanyAlpha); naive greps of
+    // `kind: "operation"` overcount by one because
+    // registration.ts declares the interface field.)
+    expect(operationNames).toHaveLength(66);
     expect(eventNames).toHaveLength(40);
     for (const name of operationNames) {
       expect(operations[name]?.name).toBe(name);

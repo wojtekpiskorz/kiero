@@ -129,9 +129,16 @@ describe("the shipped host features", () => {
     }
   });
 
-  it("registers every feature as pending with a note; only the conversation carries its own placeholder screen", () => {
+  it("registers every feature as pending with a note, except the mounted lanes (B3 membership, B4 GM); only the conversation carries its own placeholder screen", () => {
+    // B3 (issue #22) is the first lane to mount a real screen through this
+    // registry: the sanctioned sign-in + membership host composition.
+    // B4 (issue #23) mounts the audited GM operator surface the same way.
+    const mounted = appFeatures.filter((entry) => entry.implementation === "mounted");
+    expect(mounted.map((entry) => entry.featureId)).toEqual(["access.membership", "access.gm"]);
+    for (const mountedEntry of mounted) {
+      expect(mountedEntry.screen).toBeTypeOf("function");
+    }
     for (const entry of appFeatures) {
-      expect(entry.implementation).toBe("pending");
       if (entry.implementation === "pending") {
         expect(entry.pendingNote.length).toBeGreaterThan(0);
       }

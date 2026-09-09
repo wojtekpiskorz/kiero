@@ -38,6 +38,41 @@ export const FindingScope = Schema.TaggedUnion({
 });
 export type FindingScope = Schema.Schema.Type<typeof FindingScope>;
 
+/**
+ * One evidence reference inside a planned revision: the source (whole-source
+ * evidence when `fragmentId` is null, per the fragment contract), the fragment
+ * when one is reliably identifiable, and whether this is plain support or
+ * INDEPENDENT corroboration — a second witness, not a derivation.
+ */
+export const PlannedEvidence = Schema.Struct({
+  sourceId: tableIdSchema("sources"),
+  fragmentId: Schema.NullOr(tableIdSchema("sourceFragments")),
+  supportKind: Schema.Literals(["support", "independent_corroboration"]),
+  extractionId: Schema.optionalKey(tableIdSchema("extractions")),
+});
+export type PlannedEvidence = Schema.Schema.Type<typeof PlannedEvidence>;
+
+/**
+ * One planned revision in a change set (C2 amendment: the certified A2 entry
+ * carried only findingId/semanticKey/value/knowledgeState, which cannot
+ * express scope for new findings, evidence witnesses or a derivation basis —
+ * the provenance and acyclicity criteria of issue #25 are inexpressible
+ * without them). Additive, flagged coordinated edit on the B3 precedent.
+ */
+export const PlannedRevision = Schema.Struct({
+  findingId: Schema.NullOr(tableIdSchema("findings")),
+  scope: FindingScope,
+  semanticKey: Schema.NonEmptyString,
+  value: FindingValue,
+  knowledgeState: KnowledgeState,
+  /** Present only when evidence establishes when the agreement applied. */
+  effectiveFrom: Schema.NullOr(TemporalValue),
+  evidence: Schema.Array(PlannedEvidence),
+  /** Findings this revision derives from ("Wniosek agenta" needs its basis). */
+  derivesFrom: Schema.Array(tableIdSchema("findings")),
+});
+export type PlannedRevision = Schema.Schema.Type<typeof PlannedRevision>;
+
 export const memoryOperations = {
   "memory.readCurrentFindings": operationEntry({
     kind: "operation",
@@ -59,14 +94,7 @@ export const memoryOperations = {
     name: "memory.prepareChangeSet",
     input: Schema.Struct({
       sourceId: tableIdSchema("sources"),
-      plannedRevisions: Schema.Array(
-        Schema.Struct({
-          findingId: Schema.NullOr(tableIdSchema("findings")),
-          semanticKey: Schema.NonEmptyString,
-          value: FindingValue,
-          knowledgeState: KnowledgeState,
-        }),
-      ),
+      plannedRevisions: Schema.Array(PlannedRevision),
     }),
     result: Schema.Struct({
       changeSetId: tableIdSchema("changeSets"),

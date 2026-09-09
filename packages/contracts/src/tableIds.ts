@@ -28,13 +28,28 @@ export const TABLE_ID_NAMES = [
   // access/identity
   "users",
   "sessions",
-
+  // access/identity: Convex Auth provider tables (B1 amendment; the library
+  // owns their shape, the identity fragment registers them in the schema)
+  "authSessions",
+  "authAccounts",
+  "authRefreshTokens",
+  "authVerificationCodes",
+  "authVerifiers",
+  "authRateLimits",
   // access/membership
   "companies",
   "memberships",
   "invitations",
   // access/gm
   "gmAccessGrants",
+  // access/gm (B4 amendment): the per-company alpha participation authority
+  // an open grant depends on (activation open = the firm is a testing firm).
+  "gmCompanyActivations",
+  // access/linking (B2: verified linking ceremonies, email changes,
+  // manual-recovery ledger)
+  "linkingAttempts",
+  "emailChangeRequests",
+  "accountRecoveries",
   // projects
   "contacts",
   "contactRoles",
