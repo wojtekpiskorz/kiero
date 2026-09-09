@@ -55,20 +55,12 @@ import {
   serializeManifest,
   upsertReceipt,
   validatePartNumber,
-  type PartInput as PartInputType,
   type PartReceipt,
-  type PrepareInput as PrepareInputType,
 } from "./protocol";
 
 /** The certified entries this ledger implements (decode/typed authority). */
 export const prepareUploadEntry = sourcesOperations["sources.prepareUpload"];
 export const resumeUploadEntry = sourcesOperations["sources.resumeUpload"];
-
-export type PrepareInputValue = Schema.Schema.Type<typeof PrepareInput>;
-export type BeginInputValue = Schema.Schema.Type<typeof BeginInput>;
-export type PartInputValue = Schema.Schema.Type<typeof PartInput>;
-export type CompleteInputValue = Schema.Schema.Type<typeof CompleteInput>;
-export type UploadRefInputValue = Schema.Schema.Type<typeof UploadRefInput>;
 
 /** The slim upload row shape the ledger works with. */
 export interface UploadRow {
@@ -147,7 +139,7 @@ export interface PrepareResult {
 export async function prepareUploadTransaction(
   tx: MutationCtx,
   context: RequestContext,
-  input: PrepareInputValue,
+  input: unknown,
 ): Promise<ResultEnvelope> {
   const decoded = Schema.decodeUnknownSync(PrepareInput)(input);
   const companyId = tx.db.normalizeId("companies", context.actor.companyId);
@@ -237,7 +229,7 @@ function kindsMatch(
 export async function beginUploadTransaction(
   tx: MutationCtx,
   context: RequestContext,
-  input: BeginInputValue,
+  input: unknown,
 ): Promise<ResultEnvelope> {
   const decoded = Schema.decodeUnknownSync(BeginInput)(input);
   const owned = await loadOwnedUpload(tx, context, decoded.uploadId, "uploads");
@@ -333,9 +325,9 @@ export async function beginUploadTransaction(
 export async function recordPartTransaction(
   tx: MutationCtx,
   context: RequestContext,
-  input: PartInputValue,
+  input: unknown,
 ): Promise<ResultEnvelope> {
-  const decoded: PartInputType = Schema.decodeUnknownSync(PartInput)(input);
+  const decoded = Schema.decodeUnknownSync(PartInput)(input);
   const owned = await loadOwnedUpload(tx, context, decoded.uploadId, "uploads");
   if (!owned.ok) {
     return errorResult(owned.error);
@@ -389,7 +381,9 @@ export async function recordPartTransaction(
     receivedBytes: manifestBytes(next),
   });
   await tx.db.patch(upload._id, {
-    partCount: next.length,
+    // The column's defined meaning: the upload's TOTAL recorded receipts
+    // across ALL its attachments (not any single attachment's manifest).
+    partCount: await totalRecordedParts(tx, upload._id),
     lastActivityAtMs: receipt.receivedAtMs,
   });
   return okResult({
@@ -399,6 +393,18 @@ export async function recordPartTransaction(
     idempotent: false,
     refreshed: decision.decision === "refresh",
   });
+}
+
+/** The upload's total recorded R2 part receipts across ALL its attachments. */
+async function totalRecordedParts(
+  tx: MutationCtx,
+  uploadId: Id<"uploads">,
+): Promise<number> {
+  const attachments = await tx.db
+    .query("attachments")
+    .withIndex("by_upload", (q) => q.eq("uploadId", uploadId))
+    .collect();
+  return attachments.reduce((total, attachment) => total + parseManifest(attachment.partsJson).length, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -414,7 +420,7 @@ export async function recordPartTransaction(
 export async function completeAttachmentTransaction(
   tx: MutationCtx,
   context: RequestContext,
-  input: CompleteInputValue,
+  input: unknown,
 ): Promise<ResultEnvelope> {
   const decoded = Schema.decodeUnknownSync(CompleteInput)(input);
   const owned = await loadOwnedUpload(tx, context, decoded.uploadId, "uploads");
@@ -498,7 +504,7 @@ export async function completeAttachmentTransaction(
 export async function finalizeUploadTransaction(
   tx: MutationCtx,
   context: RequestContext,
-  input: UploadRefInputValue,
+  input: unknown,
 ): Promise<ResultEnvelope> {
   const decoded = Schema.decodeUnknownSync(UploadRefInput)(input);
   const owned = await loadOwnedUpload(tx, context, decoded.uploadId, "uploads");
@@ -740,5 +746,3 @@ export async function uploadSessionState(
     attachments: sessionAttachments,
   });
 }
-
-export type { PrepareInputType };

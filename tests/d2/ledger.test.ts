@@ -352,6 +352,8 @@ describe("finalize: every declared attachment durable, then the recoverable stat
     // a2 complete but its representation unverified:
     await recordPart(uploadId, a2, 1, { bytes: 5 });
     await completeAttachment(uploadId, a2, 5);
+    // partCount carries its defined meaning: the TOTAL across attachments.
+    expect(ctx.db.rows("uploads").find((row) => row._id === uploadId)?.partCount).toBe(2);
     await ctx.db.patch("mediaRepresentations", representationIdOf(a2), { verifiedAtMs: undefined });
     expect(errorOf(await finalizeUploadTransaction(tx(), contextFor(actor), { uploadId })).code).toBe(
       "attachment_not_verified",

@@ -15,7 +15,7 @@
  */
 
 import { matchRoute } from "./composition/registry";
-import { unsupportedPlatformRoute } from "./platform/routes";
+import { unsupportedRoute } from "./platform/routes";
 import { withGatewayTelemetry } from "./telemetry/emit";
 import { telemetryScheduled } from "./telemetry/scheduled";
 import type { BridgeEnv } from "./platform/bridge";
@@ -33,7 +33,7 @@ export default {
       if (url.pathname.startsWith("/platform/") || url.pathname.startsWith("/uploads/")) {
         const route = matchRoute(request.method, url.pathname);
         if (route === undefined) {
-          return unsupportedPlatformRoute(url.pathname);
+          return unsupportedRoute(url.pathname);
         }
         return route.handle(request, env);
       }

@@ -14,6 +14,12 @@
  */
 
 import type { BridgeEnv } from "../platform/bridge";
+// The ONE uploads protocol definition (pure; see that module's shared-home
+// note). The gateway consumes it directly, like the telemetry sink.
+import {
+  objectKeyPrefix,
+  type PartReceipt,
+} from "../../../../convex/sources/uploads/protocol";
 
 /** The R2 binding this lane consumes (wrangler.jsonc `MEDIA_BUCKET`, EU). */
 export interface R2Env {
@@ -22,15 +28,6 @@ export interface R2Env {
 
 /** The env the uploads routes need overall (bridge + bucket). */
 export type UploadsEnv = BridgeEnv & R2Env;
-
-/** One recorded R2 part receipt as the session read returns it. */
-export interface RecordedPart {
-  readonly partNumber: number;
-  readonly etag: string;
-  readonly bytes: number;
-  readonly sha256Hex: string;
-  readonly receivedAtMs: number;
-}
 
 /** One attachment's session view (the resume handle). */
 export interface AttachmentSession {
@@ -41,17 +38,7 @@ export interface AttachmentSession {
   readonly completedAtMs?: number | undefined;
   readonly r2ObjectEtag?: string | undefined;
   readonly receivedBytes?: number | undefined;
-  readonly parts: RecordedPart[];
-}
-
-/**
- * The canonical object-key namespace. Mirrors
- * `objectKeyPrefix` in convex/sources/uploads/protocol.ts (the Convex side
- * is the authority and re-validates the namespace at `begin`); duplicated
- * here because the gateway bundle must not import Convex runtime code.
- */
-export function objectKeyPrefix(companyId: string): string {
-  return `companies/${companyId}/uploads/`;
+  readonly parts: PartReceipt[];
 }
 
 /** Mints one server-owned object key inside the tenant's namespace. */
@@ -124,7 +111,7 @@ export async function completeAndVerify(
   bucket: R2Bucket,
   objectKey: string,
   r2UploadId: string,
-  parts: readonly RecordedPart[],
+  parts: readonly PartReceipt[],
 ): Promise<{ ok: true; objectEtag: string; totalBytes: number } | { ok: false; reason: "no_parts" | "not_readable" }> {
   if (parts.length === 0) {
     return { ok: false, reason: "no_parts" };

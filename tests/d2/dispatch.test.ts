@@ -126,6 +126,30 @@ describe("the gateway protocol steps", () => {
     expect(errorOf(denied).code).toBe("tenant_scope_mismatch");
   });
 
+  it("checks identity BEFORE input decode (the certified order, no drift)", async () => {
+    // A revoked session with malformed input refuses on identity, not shape:
+    // the step rides dispatchCommand, whose order is envelope -> operation ->
+    // identity -> policy -> input decode.
+    await ctx.db.patch("sessions", actor.sessionId, { revokedAtMs: Date.now() });
+    const revoked = await dispatchUploadsStep(
+      asTx(ctx),
+      { step: "begin", input: { uploadId: 42 } },
+      actor.sessionId,
+    );
+    expect(revoked._tag).toBe("error");
+    expect(errorOf(revoked)._tag).toBe("unauthenticated");
+
+    // A live session with the same malformed input reaches the input decode.
+    const fresh = await seedActor(ctx, "d2dispatch-order");
+    const malformed = await dispatchUploadsStep(
+      asTx(ctx),
+      { step: "begin", input: { uploadId: 42 } },
+      fresh.sessionId,
+    );
+    expect(malformed._tag).toBe("error");
+    expect(errorOf(malformed)._tag).toBe("validation");
+  });
+
   it("sanitizes handler throws to unavailable (never a raw internal error)", async () => {
     // A corrupt manifest inside the part step throws inside the handler.
     const prepared = await dispatchUploadsStep(

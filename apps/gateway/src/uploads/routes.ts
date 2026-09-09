@@ -27,21 +27,33 @@
  * atomic transaction extended by D2's attachment gate); the saved receipt is
  * issued there, never here.
  *
- * Parameterized paths register through `../composition/registry.ts`'s
- * append pattern: `matchUploadsRoute` returns a structurally-GatewayRoute
- * object with the captured params closed over, so shared matching code is
- * unchanged. Parts travel over POST because the shared route vocabulary
- * (platform/routes.ts, A3-owned) admits GET|POST only; widening it is a
- * named cross-lane prerequisite, not an independent edit.
+ * Registration rides the composition contract: this lane supplies a
+ * `RouteProvider` whose optional `match` owns the parameterized paths (the
+ * captured groups close over structurally-GatewayRoute handlers), so the
+ * registry composes providers by imports only. Parts travel over POST
+ * because the shared route vocabulary (platform/routes.ts, A3-owned)
+ * admits GET|POST only; widening it is a named cross-lane prerequisite,
+ * not an independent edit.
  *
- * Envelope values arriving from the verified Convex channel were already
- * decoded against contract schemas on the backend; the narrow `as` views
- * below re-shape them for route logic after explicit field checks.
+ * The protocol (bounds, key namespace, the prepare input schema) and the
+ * envelope-to-HTTP-status mapping are consumed from their ONE definitions:
+ * convex/sources/uploads/protocol.ts (the shared pure module — see its
+ * shared-home note) and @kiero/runtime's `envelopeHttpStatus`. Envelope
+ * values arriving from the verified Convex channel were already decoded
+ * against schemas on the backend; the narrow `as` views below re-shape
+ * them for route logic after explicit field checks.
  */
 
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
-import { conflictError, unavailableError, validationError } from "@kiero/runtime";
+import {
+  conflictError,
+  decodeInput,
+  envelopeHttpStatus,
+  unavailableError,
+  validationError,
+} from "@kiero/runtime";
 import type { GatewayRoute } from "../platform/routes";
+import type { RouteProvider } from "../composition/registry";
 import { uploadsState, uploadsStep } from "./bridge";
 import {
   collectObjects,
@@ -51,10 +63,7 @@ import {
   type AttachmentSession,
   type UploadsEnv,
 } from "./r2";
-
-/** Mirrors convex/sources/uploads/protocol.ts bounds (Convex re-validates). */
-const MAX_PARTS = 1_000;
-const MAX_ATTACHMENTS = 8;
+import { PrepareInput } from "../../../../convex/sources/uploads/protocol";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -63,28 +72,8 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-function statusOf(result: ResultEnvelope): number {
-  if (result._tag === "ok") {
-    return 200;
-  }
-  switch (result.error._tag) {
-    case "unauthenticated":
-      return 401;
-    case "forbidden":
-      return 403;
-    case "not_found":
-      return 404;
-    case "unsupported":
-      return 501;
-    case "unavailable":
-      return 503;
-    default:
-      return 400;
-  }
-}
-
 function respond(result: ResultEnvelope): Response {
-  return jsonResponse(statusOf(result), result);
+  return jsonResponse(envelopeHttpStatus(result), result);
 }
 
 async function readJsonBody(
@@ -152,22 +141,14 @@ async function prepareRoute(request: Request, env: UploadsEnv): Promise<Response
   if (!body.ok) {
     return body.response;
   }
-  const { draftId, parts, mediaKinds } = body.body;
-  if (typeof draftId !== "string" || draftId.length === 0) {
-    return respond(errorResult(validationError("draft_id_missing")));
+  // The ONE prepare declaration (bounds, kinds) is the shared PrepareInput
+  // schema; the Convex boundary decodes the same schema again.
+  const decoded = decodeInput(PrepareInput, body.body);
+  if (!decoded.ok) {
+    return respond(decoded.error);
   }
-  if (!Number.isInteger(parts) || (parts as number) < 1 || (parts as number) > MAX_PARTS) {
-    return respond(errorResult(validationError("part_bound_invalid")));
-  }
-  if (
-    !Array.isArray(mediaKinds) ||
-    mediaKinds.length < 1 ||
-    mediaKinds.length > MAX_ATTACHMENTS ||
-    !mediaKinds.every((kind) => kind === "audio" || kind === "image")
-  ) {
-    return respond(errorResult(validationError("media_kinds_invalid")));
-  }
-  const prepared = await uploadsStep(env, { step: "prepare", input: body.body });
+  const { mediaKinds } = decoded.value;
+  const prepared = await uploadsStep(env, { step: "prepare", input: decoded.value });
   if (prepared._tag === "error") {
     return respond(prepared);
   }
@@ -379,105 +360,83 @@ async function reconcileRoute(_request: Request, env: UploadsEnv): Promise<Respo
 
 // --- registration ------------------------------------------------------------------
 
-/** Captured path parameters, accumulated during one match. */
-interface RouteParams {
-  uploadId: string;
-  attachmentId?: string | undefined;
-  partNumber?: number | undefined;
-}
-
-function partParams(
-  method: string,
-  path: string,
-  pattern: RegExp,
-  expectedMethod: "GET" | "POST",
-  withPartNumber: boolean,
-): RouteParams | undefined {
-  if (method !== expectedMethod) {
-    return undefined;
-  }
-  const match = pattern.exec(path);
-  if (match === null) {
-    return undefined;
-  }
-  const uploadId = match[1];
-  if (uploadId === undefined) {
-    return undefined;
-  }
-  const params: RouteParams = { uploadId };
-  if (pattern.source.includes("attachments")) {
-    const attachmentId = match[2];
-    if (attachmentId === undefined) {
-      return undefined;
-    }
-    params.attachmentId = attachmentId;
-  }
-  if (withPartNumber) {
-    const raw = match[3];
-    if (raw === undefined || !/^\d+$/.test(raw)) {
-      return undefined;
-    }
-    params.partNumber = Number(raw);
-  }
-  return params;
+/** One parameterized uploads route: method, path pattern, and its handler. */
+interface ParamRouteSpec {
+  readonly method: "GET" | "POST";
+  readonly pattern: RegExp;
+  readonly handle: (
+    request: Request,
+    env: UploadsEnv,
+    groups: RegExpExecArray,
+  ) => Promise<Response>;
 }
 
 /**
- * Matches one parameterized uploads route. Returns a structurally
- * `GatewayRoute` object with the captured path parameters closed over the
- * handler, so the composition registry's exact-match-first flow and the
- * shared `GatewayRoute` type stay untouched.
+ * The four parameterized routes. Every pattern's captures are non-empty by
+ * construction (`[^/]+` cannot match a slash-less empty segment and `\d+`
+ * only digits), which is what makes the non-null assertions below safe.
  */
-export function matchUploadsRoute(method: string, path: string): GatewayRoute | undefined {
-  const part = partParams(method, path, /^\/uploads\/([^/]+)\/attachments\/([^/]+)\/parts\/([^/]+)$/, "POST", true);
-  if (part !== undefined && part.attachmentId !== undefined && part.partNumber !== undefined) {
-    const { uploadId, attachmentId, partNumber } = part;
+const paramRoutes: readonly ParamRouteSpec[] = [
+  {
+    method: "POST",
+    pattern: /^\/uploads\/([^/]+)\/attachments\/([^/]+)\/parts\/(\d+)$/,
+    handle: (request, env, groups) =>
+      partRoute(request, env, groups[1]!, groups[2]!, Number(groups[3])),
+  },
+  {
+    method: "POST",
+    pattern: /^\/uploads\/([^/]+)\/attachments\/([^/]+)\/complete$/,
+    handle: (request, env, groups) => completeRoute(request, env, groups[1]!, groups[2]!),
+  },
+  {
+    method: "GET",
+    pattern: /^\/uploads\/([^/]+)\/session$/,
+    handle: (request, env, groups) => sessionRoute(request, env, groups[1]!),
+  },
+  {
+    method: "POST",
+    pattern: /^\/uploads\/([^/]+)\/finalize$/,
+    handle: (request, env, groups) => finalizeRoute(request, env, groups[1]!),
+  },
+];
+
+/**
+ * Matches one parameterized uploads route: the first table entry whose
+ * method and pattern fit, with the captured groups closed over the handler
+ * (structurally a `GatewayRoute`, so the shared route type stays untouched).
+ */
+function matchUploadsRoute(method: string, path: string): GatewayRoute | undefined {
+  for (const spec of paramRoutes) {
+    if (spec.method !== method) {
+      continue;
+    }
+    const groups = spec.pattern.exec(path);
+    if (groups === null) {
+      continue;
+    }
     return {
-      method: "POST",
+      method: spec.method,
       path,
-      handle: (request, env) => partRoute(request, env as UploadsEnv, uploadId, attachmentId, partNumber),
-    };
-  }
-  const complete = partParams(method, path, /^\/uploads\/([^/]+)\/attachments\/([^/]+)\/complete$/, "POST", false);
-  if (complete !== undefined && complete.attachmentId !== undefined) {
-    const { uploadId, attachmentId } = complete;
-    return {
-      method: "POST",
-      path,
-      handle: (request, env) => completeRoute(request, env as UploadsEnv, uploadId, attachmentId),
-    };
-  }
-  const session = partParams(method, path, /^\/uploads\/([^/]+)\/session$/, "GET", false);
-  if (session !== undefined) {
-    const { uploadId } = session;
-    return {
-      method: "GET",
-      path,
-      handle: (request, env) => sessionRoute(request, env as UploadsEnv, uploadId),
-    };
-  }
-  const finalize = partParams(method, path, /^\/uploads\/([^/]+)\/finalize$/, "POST", false);
-  if (finalize !== undefined) {
-    const { uploadId } = finalize;
-    return {
-      method: "POST",
-      path,
-      handle: (request, env) => finalizeRoute(request, env as UploadsEnv, uploadId),
+      handle: (request, env) => spec.handle(request, env as UploadsEnv, groups),
     };
   }
   return undefined;
 }
 
-/** The static (parameterless) uploads routes for the composition registry. */
-export const uploadsStaticRoutes: readonly GatewayRoute[] = [
-  {
-    method: "POST",
-    path: "/uploads/prepare",
-    handle: (request, env) => prepareRoute(request, env as UploadsEnv),
-  },
-  {
-    method: "POST",
-    path: "/uploads/reconcile",
-    handle: (request, env) => reconcileRoute(request, env as UploadsEnv),
-  },
-];
+/** The uploads lane's route provider: static routes plus param matching. */
+export const uploadsRouteProvider: RouteProvider = {
+  providerId: "uploads",
+  routes: [
+    {
+      method: "POST",
+      path: "/uploads/prepare",
+      handle: (request, env) => prepareRoute(request, env as UploadsEnv),
+    },
+    {
+      method: "POST",
+      path: "/uploads/reconcile",
+      handle: (request, env) => reconcileRoute(request, env as UploadsEnv),
+    },
+  ],
+  match: matchUploadsRoute,
+};

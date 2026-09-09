@@ -23,6 +23,19 @@
  * Everything in this module is pure so tests/d2 can prove the decisions
  * without a deployment; the live proofs run the same functions through the
  * real Worker, R2 and Convex deployment.
+ *
+ * SHARED-HOME DECISION (D2 review round 1): this file is the ONE definition
+ * of the uploads protocol on BOTH sides of the deployment boundary — the
+ * Convex functions import it directly, and the gateway Worker imports it
+ * exactly like the existing pure Convex-directory module it already ships
+ * (`convex/operations/telemetry/sink.ts`, see apps/gateway/src/telemetry/
+ * emit.ts). The gateway must not import Convex-RUNTIME code (the functions
+ * that execute inside a deployment), and this module is not that: it pulls
+ * in effect Schema and @kiero/contracts only. It deliberately does NOT
+ * move into @kiero/contracts, because the step schemas are the gateway
+ * channel's vocabulary, not the certified client surface — contracts stays
+ * certified-client-only, and mirrors of these bounds/keys/schemas anywhere
+ * else (gateway routes, R2 helpers) are hazards, not copies.
  */
 
 import { Schema } from "effect";

@@ -1,13 +1,19 @@
 /**
- * The Convex bridge client (A3): how Worker calls reach the platform.
+ * The Convex bridge client (A3; transport exported for lane bridges by D2):
+ * how Worker calls reach the backend.
  *
  * Every gateway call to the backend carries the verified service identity
  * (bearer credential from the Worker secret binding) and lands on the
- * canonical access check inside `convex/platform/http.ts`. Failures are
+ * canonical access check inside the Convex HTTP boundary. Failures are
  * sanitized on THIS side too: a missing backend URL or network failure
  * becomes the closed `unavailable` error with no URL, hostname or internal
  * message attached; an unauthenticated/forbidden backend answer passes
  * through as the closed error it already is.
+ *
+ * `postBridge` is the ONE HTTP transport for Convex-bound calls from this
+ * Worker (the mirror-is-a-hazard ruling): lane bridges (uploads, later
+ * media/export routes) pass their own path and body through it instead of
+ * copying the fetch/error-mapping plumbing.
  */
 
 import { Schema } from "effect";
@@ -29,7 +35,7 @@ export interface BridgeCommand {
   readonly idempotencyKey?: string;
 }
 
-async function postBridge(
+export async function postBridge(
   env: BridgeEnv,
   path: string,
   body: unknown,

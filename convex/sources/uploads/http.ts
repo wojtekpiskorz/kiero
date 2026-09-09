@@ -24,7 +24,12 @@
 import { httpAction, type ActionCtx } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import { errorResult, type ResultEnvelope } from "@kiero/contracts";
-import { forbiddenError, unauthenticatedError, validationError } from "@kiero/runtime";
+import {
+  envelopeHttpStatus,
+  forbiddenError,
+  unauthenticatedError,
+  validationError,
+} from "@kiero/runtime";
 import { verifyServiceBearerToken } from "../../operations/telemetry/serviceToken";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -36,26 +41,6 @@ function jsonResponse(status: number, body: unknown): Response {
     status,
     headers: { "content-type": "application/json" },
   });
-}
-
-function bridgeStatus(result: ResultEnvelope): number {
-  if (result._tag === "ok") {
-    return 200;
-  }
-  switch (result.error._tag) {
-    case "unauthenticated":
-      return 401;
-    case "forbidden":
-      return 403;
-    case "not_found":
-      return 404;
-    case "unsupported":
-      return 501;
-    case "unavailable":
-      return 503;
-    default:
-      return 400;
-  }
 }
 
 /** Resolves the service account's session id, or a sanitized refusal. */
@@ -102,7 +87,7 @@ export const uploadsBridgeHandler = httpAction(async (ctx, request) => {
       serviceSessionId: session.sessionId,
     },
   );
-  return jsonResponse(bridgeStatus(result), result);
+  return jsonResponse(envelopeHttpStatus(result), result);
 });
 
 /** The verified upload-session state read for the gateway's resume route. */
@@ -128,5 +113,5 @@ export const uploadsStateHandler = httpAction(async (ctx, request) => {
     internal.sources.uploads.commands.uploadStateFor,
     { uploadId: body.uploadId, serviceSessionId: session.sessionId },
   );
-  return jsonResponse(bridgeStatus(result), result);
+  return jsonResponse(envelopeHttpStatus(result), result);
 });

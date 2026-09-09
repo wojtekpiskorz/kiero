@@ -73,6 +73,7 @@ export const uploadsTables = {
     companyId: shared.companyId,
     userId: shared.userId,
     stage: uploadStage,
+    /** The upload's TOTAL recorded R2 part receipts across ALL attachments. */
     partCount: shared.counter,
     createdAtMs: shared.tsMs,
     finalizedAtMs: v.optional(shared.tsMs),
