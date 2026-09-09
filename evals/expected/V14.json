@@ -42,7 +42,7 @@
       ],
       "prohibitedWrites": [
         { "mustNot": "Keep October as the current second-stage start.", "category": "commitment", "because": "The boss explicitly withdrew his own morning statement." },
-        { "mustNot": "Edit or annotate S1's transcript — correction happens by new message only.", "category": "other", "because": "Source immutability per the accepted contract." },
+        { "mustNot": "Edit or annotate S1's transcript: correction happens by new message only.", "category": "other", "because": "Source immutability per the accepted contract." },
         { "mustNot": "Record a new replacement date.", "category": "date", "because": "None was given; 'na razie nic z tego nie ma'." }
       ]
     }

@@ -35,7 +35,7 @@
         }
       ],
       "prohibitedWrites": [
-        { "mustNot": "Record 2026-10-05 as agreed.", "category": "commitment", "because": "'Zaproponowałem... czekam na jego odpowiedź' — nothing was accepted yet." }
+        { "mustNot": "Record 2026-10-05 as agreed.", "category": "commitment", "because": "'Zaproponowałem... czekam na jego odpowiedź': nothing was accepted yet." }
       ]
     },
     {

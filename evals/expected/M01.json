@@ -68,7 +68,7 @@
         }
       ],
       "prohibitedWrites": [
-        { "mustNot": "Create a second agreed_price finding for the corroborating message.", "category": "other", "because": "One ustalenie, two sources — duplication breaks identity." },
+        { "mustNot": "Create a second agreed_price finding for the corroborating message.", "category": "other", "because": "One ustalenie, two sources: duplication breaks identity." },
         { "mustNot": "Mark the price conflicted because two sources mention it.", "category": "other", "because": "Agreement, not conflict." }
       ]
     }

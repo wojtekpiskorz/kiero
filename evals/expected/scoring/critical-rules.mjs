@@ -18,10 +18,13 @@
  * (evals/expected/<caseId>.json). Runner-agnostic: no model calls happen here.
  */
 
-/** Normalize decimal strings ("12000.00" -> "12000", "0.50" -> "0.5"). */
+/** Normalize decimal strings ("12000.00" -> "12000", "0.50" -> "0.5").
+ * Trailing zeros are stripped only after a decimal point: "12500" stays
+ * "12500", so a 10x digit shift can never normalize two different amounts
+ * onto the same string. */
 function normDecimal(s) {
   if (typeof s !== "string") return s;
-  return s.replace(/0+$/, "").replace(/\.$/, "");
+  return s.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
 }
 
 const CRITICAL_CATEGORIES = ["project", "amount", "date", "commitment", "source_basis"];
@@ -52,7 +55,7 @@ function compareValue(expected, actual, where) {
     ];
     for (const [name, exp, act] of fields) {
       if (normDecimal(exp ?? "") !== normDecimal(act ?? "") && (exp ?? "") !== (act ?? "")) {
-        if (exp !== undefined || act !== undefined) {
+        {
           issues.push({
             category: "amount",
             critical: true,
@@ -146,7 +149,7 @@ function annotateProhibitedWrites(issue, prohibitedWrites, knownKeys) {
   // stale 15 000 overwrite sentence), then fall back to findingKey mentions.
   // Digit forms are compared with trailing zeros stripped so "15000.00" and
   // "15 000" can match.
-  const strip = (s) => s.replace(/\D/g, "").replace(/0+$/, "");
+  const strip = (s) => normDecimal(s).replace(/\D/g, "");
   const gotMatch = issue.detail.match(/got ([\d .,]+)/);
   const gotDigits = gotMatch ? strip(gotMatch[1]) : null;
   const candidates = prohibitedWrites.filter((pw) => pw.category === issue.category);

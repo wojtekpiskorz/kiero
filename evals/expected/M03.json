@@ -97,7 +97,7 @@
         }
       ],
       "prohibitedWrites": [
-        { "mustNot": "Record the basis as net or gross — neither the note nor the answer states it.", "category": "source_basis", "because": "Never infer VAT." }
+        { "mustNot": "Record the basis as net or gross: neither the note nor the answer states it.", "category": "source_basis", "because": "Never infer VAT." }
       ]
     }
   ]

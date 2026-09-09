@@ -468,11 +468,11 @@ for (const file of expectedFiles) {
         if (!scope) return;
         if (scope.level === "company") {
           if (scope.ref !== "COMPANY") {
-            fail(`${label}: ${where} company scope must use ref "COMPANY", got "${scope.ref}"`);
+          fail(`${label}: ${where} company scope must use ref "COMPANY", got "${scope.ref}"`);
           }
         } else if (scope.level === "project") {
           if (change.operation !== "create_project" && !tenantProjects.has(scope.ref)) {
-            fail(`${label}: ${where} references project "${scope.ref}" not defined in case ${id}'s tenant (cross-case leak or typo)`);
+          fail(`${label}: ${where} references project "${scope.ref}" not defined in case ${id}'s tenant (cross-case leak or typo)`);
           }
         }
       });
@@ -587,7 +587,7 @@ for (const file of expectedFiles) {
       // (e.g. a calendar day cell plus a separate month header).
       if (typeof ep.assetTextEvidence === "string") {
         if (!haystack.includes(ep.assetTextEvidence.replace(/\s+/g, ""))) {
-          fail(`${label}: expectedVision[${i}] assetTextEvidence "${ep.assetTextEvidence}" not found in asset`);
+        fail(`${label}: expectedVision[${i}] assetTextEvidence "${ep.assetTextEvidence}" not found in asset`);
         }
         continue;
       }
@@ -613,7 +613,7 @@ for (const file of expectedFiles) {
         .map((c) => c.replace(/\s+/g, ""));
       const present = candidates.some((c) => c.length >= 1 && haystack.includes(c));
       if (!present) {
-          fail(`${label}: expectedVision[${i}] value [${needles.filter(Boolean).join(", ")}] not found in asset text content; asset and answer key disagree`);
+        fail(`${label}: expectedVision[${i}] value [${needles.filter(Boolean).join(", ")}] not found in asset text content; asset and answer key disagree`);
       }
     }
   }
