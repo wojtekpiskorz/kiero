@@ -1,0 +1,149 @@
+/**
+ * Host feature-entry registry tests (A4).
+ *
+ * Proves the registry enforces the registration contract loudly (aligned
+ * with @kiero/contracts: FeatureId discipline, operations that exist) and
+ * that the SHIPPED composition is valid, pending and starts at the company
+ * conversation. The composed list and entry modules are intentionally
+ * JSX-free so this node program can import the real thing.
+ */
+
+import { describe, expect, it } from "vitest";
+import { operations } from "@kiero/contracts";
+import { appFeatures } from "../../apps/web/src/app/app-features";
+import {
+  appFeatureEntry,
+  composeAppFeatures,
+  type AppFeatureCommonInput,
+} from "../../apps/web/src/app/registry";
+
+const mountedScreen = () => null;
+
+function commonInput(overrides: Partial<AppFeatureCommonInput> = {}): AppFeatureCommonInput {
+  return {
+    featureId: "test.feature",
+    routePath: "/test",
+    navLabel: "Test",
+    screenHeading: "Test",
+    consumedOperations: ["platform.probeEcho"],
+    ...overrides,
+  };
+}
+
+function pendingInput(overrides: Partial<AppFeatureCommonInput> = {}) {
+  return appFeatureEntry({
+    ...commonInput(overrides),
+    implementation: "pending",
+    pendingNote: "Funkcja testowa jest w przygotowaniu.",
+  });
+}
+
+describe("app feature entry validation", () => {
+  it("accepts a valid pending entry and brands the feature id", () => {
+    const entry = pendingInput();
+    expect(entry.implementation).toBe("pending");
+    expect(entry.featureId).toBe("test.feature");
+    expect(entry.routePath).toBe("/test");
+  });
+
+  it("accepts a valid mounted entry carrying its screen", () => {
+    const entry = appFeatureEntry({
+      ...commonInput(),
+      implementation: "mounted",
+      screen: mountedScreen,
+    });
+    expect(entry.implementation).toBe("mounted");
+    if (entry.implementation === "mounted") {
+      expect(entry.screen).toBe(mountedScreen);
+    }
+  });
+
+  it("rejects a featureId outside the contracts FeatureId pattern", () => {
+    expect(() => pendingInput({ featureId: "drifted" })).toThrow(/FeatureId/);
+    expect(() => pendingInput({ featureId: "Has.Upper" })).toThrow(/FeatureId/);
+  });
+
+  it("rejects route paths that are not '/' or a lowercase ascii segment", () => {
+    for (const routePath of ["/test/", "/Test", "/projekty-ł", "test", ""]) {
+      expect(() => pendingInput({ routePath })).toThrow(/routePath/);
+    }
+  });
+
+  it("rejects a consumed operation no contract module surface declared", () => {
+    expect(() =>
+      pendingInput({ consumedOperations: ["drifted.nonexistent"] }),
+    ).toThrow(/unknown operation drifted\.nonexistent/);
+  });
+
+  it("rejects entries with no operations, no labels or no pending note", () => {
+    expect(() => pendingInput({ consumedOperations: [] })).toThrow(/no consumed operations/);
+    expect(() => pendingInput({ navLabel: " " })).toThrow(/nav label/);
+    expect(() =>
+      appFeatureEntry({
+        ...commonInput(),
+        implementation: "pending",
+        pendingNote: " ",
+      }),
+    ).toThrow(/pending note/);
+  });
+});
+
+describe("composed feature list invariants", () => {
+  it("rejects duplicate feature ids or route paths", () => {
+    const a = pendingInput();
+    const b = pendingInput({ featureId: "test.other" });
+    expect(() => composeAppFeatures([a, b])).toThrow(/duplicate routePath/);
+    const c = pendingInput({ routePath: "/other" });
+    expect(() => composeAppFeatures([a, c])).toThrow(/duplicate featureId/);
+  });
+
+  it("requires exactly one default route, and it must be first", () => {
+    const a = pendingInput({ routePath: "/one" });
+    const b = pendingInput({ featureId: "test.other", routePath: "/two" });
+    expect(() => composeAppFeatures([a, b])).toThrow(/exactly one default route/);
+    const d = pendingInput({ featureId: "test.default", routePath: "/" });
+    expect(() => composeAppFeatures([a, d])).toThrow(/default route \(\/\) must be the first/);
+    expect(composeAppFeatures([d, a])).toHaveLength(2);
+  });
+});
+
+describe("the shipped host features", () => {
+  it("starts at the company conversation default route", () => {
+    expect(appFeatures[0]?.routePath).toBe("/");
+    expect(appFeatures[0]?.featureId).toBe("conversation.company");
+    expect(appFeatures[0]?.navLabel).toBe("Rozmowa firmy");
+  });
+
+  it("keeps project context and Co teraz reachable through module entries", () => {
+    const paths = appFeatures.map((entry) => entry.routePath);
+    expect(paths).toContain("/projekty");
+    expect(paths).toContain("/co-teraz");
+  });
+
+  it("consumes only operations that exist in the contracts registry", () => {
+    for (const entry of appFeatures) {
+      expect(entry.consumedOperations.length).toBeGreaterThan(0);
+      for (const operation of entry.consumedOperations) {
+        expect(operation in operations).toBe(true);
+      }
+    }
+  });
+
+  it("registers every feature as pending with a note; only the conversation carries its own placeholder screen", () => {
+    for (const entry of appFeatures) {
+      expect(entry.implementation).toBe("pending");
+      if (entry.implementation === "pending") {
+        expect(entry.pendingNote.length).toBeGreaterThan(0);
+      }
+    }
+    const conversation = appFeatures[0];
+    if (conversation?.implementation === "pending") {
+      expect(conversation.pendingScreen).toBeTypeOf("function");
+    }
+    for (const entry of appFeatures.slice(1)) {
+      if (entry.implementation === "pending") {
+        expect(entry.pendingScreen).toBeUndefined();
+      }
+    }
+  });
+});
