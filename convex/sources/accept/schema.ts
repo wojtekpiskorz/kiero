@@ -1,6 +1,6 @@
 /**
  * Source acceptance, project links, extractions and fragments
- * (A2 candidate, certified by A3).
+ * (A2 candidate, certified by A3; completed by D1 for text acceptance).
  *
  * Owning implementers: D1 (accept and publish views), E3/E4 (extraction
  * joins), C5 (withdrawal reads), I3/I4 (export/deletion reads).
@@ -11,6 +11,17 @@
  * One source may concern several projects; project conversations project the
  * same original rather than copying it. Each new STT/vision version is
  * another immutable extraction; historical evidence never silently moves.
+ *
+ * D1 amendments (the owning lane completes the candidate fragment):
+ * - `sources.acceptanceKey`/`acceptanceFingerprint`: the client-generated
+ *   logical-source key (the command idempotency key) and a fingerprint of
+ *   the first accepted logical payload. A replay of the key returns the same
+ *   receipt; the same key with a DIFFERENT payload is a typed idempotency
+ *   conflict — never a second source and never an edit of the original.
+ * - `sourceProjectLinks.sentAtMs`: the linked source's immutable send time,
+ *   denormalized at link time so the project conversation paginates in
+ *   conversation order through a real index (the projection never copies
+ *   editable content, and `sentAtMs` never changes after acceptance).
  *
  * Tables: sources, sourceProjectLinks, extractions, sourceFragments.
  */
@@ -36,7 +47,7 @@ export const acceptTables = {
     /** Original send time and zone snapshot anchor relative language. */
     sentAtMs: shared.tsMs,
     sentAtTimezone: v.string(),
-    /** Processing latency starts here: all required attachments durable. */
+    /** Processing latency starts here: all required attachments are durable. */
     fullyAcceptedAtMs: shared.tsMs,
     lifecycle: v.union(
       v.literal("active"),
@@ -46,7 +57,21 @@ export const acceptTables = {
     withdrawnReason: v.optional(v.string()),
     withdrawnAtMs: v.optional(shared.tsMs),
     purgedAtMs: v.optional(shared.tsMs),
-  }).index("by_company_order", ["companyId", "sentAtMs"]),
+    /**
+     * The client-generated logical-source key (the accepting command's
+     * idempotency key), when one was supplied. Unique per company: one
+     * logical source per key, retries return the same source.
+     */
+    acceptanceKey: v.optional(v.string()),
+    /**
+     * SHA-256 of the first accepted logical payload. A replay of the same
+     * acceptance key with a different payload is refused as an idempotency
+     * conflict instead of editing the immutable original.
+     */
+    acceptanceFingerprint: v.optional(v.string()),
+  })
+    .index("by_company_order", ["companyId", "sentAtMs"])
+    .index("by_company_acceptance_key", ["companyId", "acceptanceKey"]),
 
   /** Which projects one source concerns; reassignment keeps read state. */
   sourceProjectLinks: defineTable({
@@ -54,8 +79,11 @@ export const acceptTables = {
     projectId: shared.projectId,
     assignedByUserId: shared.userId,
     assignedAtMs: shared.tsMs,
+    /** The source's immutable send time, copied for conversation-ordered reads. */
+    sentAtMs: shared.tsMs,
   })
     .index("by_project_source", ["projectId", "sourceId"])
+    .index("by_project_order", ["projectId", "sentAtMs"])
     .index("by_source", ["sourceId"]),
 
   /** Immutable extraction version over a source or representation. */

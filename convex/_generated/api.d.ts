@@ -21,6 +21,13 @@ import type * as platform_pipeline from "../platform/pipeline.js";
 import type * as platform_probe from "../platform/probe.js";
 import type * as platform_publish from "../platform/publish.js";
 import type * as schema_shared from "../schema/shared.js";
+import type * as sources_accept_acceptance from "../sources/accept/acceptance.js";
+import type * as sources_accept_commands from "../sources/accept/commands.js";
+import type * as sources_accept_dispatch from "../sources/accept/dispatch.js";
+import type * as sources_accept_probe from "../sources/accept/probe.js";
+import type * as sources_read_probe from "../sources/read/probe.js";
+import type * as sources_read_rows from "../sources/read/rows.js";
+import type * as sources_read_views from "../sources/read/views.js";
 
 import type {
   ApiFromModules,
@@ -42,6 +49,13 @@ declare const fullApi: ApiFromModules<{
   "platform/probe": typeof platform_probe;
   "platform/publish": typeof platform_publish;
   "schema/shared": typeof schema_shared;
+  "sources/accept/acceptance": typeof sources_accept_acceptance;
+  "sources/accept/commands": typeof sources_accept_commands;
+  "sources/accept/dispatch": typeof sources_accept_dispatch;
+  "sources/accept/probe": typeof sources_accept_probe;
+  "sources/read/probe": typeof sources_read_probe;
+  "sources/read/rows": typeof sources_read_rows;
+  "sources/read/views": typeof sources_read_views;
 }>;
 
 /**
