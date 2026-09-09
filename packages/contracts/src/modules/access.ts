@@ -32,6 +32,49 @@ export const accessOperations = {
     result: Schema.NullOr(AccessSnapshot),
     errorKinds: ["unauthenticated"],
   }),
+  // B3 amendment (coordinated addition, named in issue #22): the company
+  // bootstrap and invitation-admission seams the bounded solution requires.
+  // `access.createCompany` is NOT public self-service signup: a caller with
+  // an active firm is refused (one-active-company), and the creator becomes
+  // the first administrator ("Administrator firmy", CONTEXT.md).
+  "access.createCompany": operationEntry({
+    kind: "operation",
+    name: "access.createCompany",
+    input: Schema.Struct({
+      name: Schema.NonEmptyString,
+      timezone: Schema.String.pipe(
+        Schema.check(Schema.isPattern(/^[A-Za-z_]+\/[A-Za-z_]+$/)),
+      ),
+      defaultCurrency: Schema.String.pipe(Schema.check(Schema.isPattern(/^[A-Z]{3}$/))),
+    }),
+    result: Schema.Struct({
+      companyId: tableIdSchema("companies"),
+      membershipId: tableIdSchema("memberships"),
+    }),
+    errorKinds: ["validation", "conflict"],
+  }),
+  "access.createInvitation": operationEntry({
+    kind: "operation",
+    name: "access.createInvitation",
+    input: Schema.Struct({
+      email: Schema.String.pipe(Schema.check(Schema.isPattern(/^[^@\s]+@[^@\s]+\.[^@\s]+$/))),
+      role: MembershipRole,
+    }),
+    result: Schema.Struct({
+      invitationId: tableIdSchema("invitations"),
+      expiresAtMs: Schema.Number,
+      /** Honest email delivery state; the code never crosses this result. */
+      delivery: Schema.Literals(["sent", "delivery_failed"]),
+    }),
+    errorKinds: ["forbidden", "validation", "conflict"],
+  }),
+  "access.rejectInvitation": operationEntry({
+    kind: "operation",
+    name: "access.rejectInvitation",
+    input: Schema.Struct({ invitationId: tableIdSchema("invitations") }),
+    result: Schema.Struct({ state: Schema.Literal("rejected") }),
+    errorKinds: ["not_found", "conflict"],
+  }),
   "access.acceptInvitation": operationEntry({
     kind: "operation",
     name: "access.acceptInvitation",
@@ -64,6 +107,20 @@ export const accessOperations = {
     name: "access.revokeMembership",
     input: Schema.Struct({ membershipId: tableIdSchema("memberships") }),
     result: Schema.Struct({ revokedAtMs: Schema.Number }),
+    errorKinds: ["forbidden", "not_found", "conflict"],
+  }),
+  // B3 amendment: the atomic administrator transfer ("transfer
+  // administration"). One transaction promotes the target member to admin
+  // and demotes the actor to member, so the last-admin invariant cannot dip
+  // between two separate role changes.
+  "access.transferAdministration": operationEntry({
+    kind: "operation",
+    name: "access.transferAdministration",
+    input: Schema.Struct({ toUserId: tableIdSchema("users") }),
+    result: Schema.Struct({
+      adminMembershipId: tableIdSchema("memberships"),
+      demotedMembershipId: tableIdSchema("memberships"),
+    }),
     errorKinds: ["forbidden", "not_found", "conflict"],
   }),
   "access.linkVerifiedMethod": operationEntry({
@@ -115,6 +172,13 @@ export const accessEvents = {
     payload: Schema.Struct({
       membershipId: tableIdSchema("memberships"),
       userId: tableIdSchema("users"),
+      // B3 amendment (issue #22 revocation transaction contract): the event
+      // carries the revocation instant and the chosen successor
+      // administration policy — the membership that received administration
+      // when the revoked boss was the last admin (transfer-before-revoke),
+      // or null when another admin already remained (unassignment).
+      revokedAtMs: Schema.Number,
+      successorUserId: Schema.NullOr(tableIdSchema("users")),
     }),
   }),
   "access.sessionRevoked": eventEntry({

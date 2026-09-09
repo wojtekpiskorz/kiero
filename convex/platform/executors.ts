@@ -13,6 +13,10 @@
  * - `processing.analyze_change_plan` (./pipeline.ts): the mechanical
  *   durable-pipeline proof executor over processingRuns/processingSteps
  *   through @convex-dev/workflow.
+ * - `access.cleanup_revocation` (../access/membership/cleanup.ts, B3): the
+ *   durable revocation fan-out the access lane owns (device-session
+ *   revocation after membership removal; the declared consumer proof of
+ *   `access.membershipRevoked` / `access.sessionRevoked`).
  */
 
 import type { FunctionReference } from "convex/server";
@@ -21,6 +25,7 @@ import type { MutationCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { echoExecutor } from "./echo";
 import { analyzeChangePlanExecutor } from "./pipeline";
+import { cleanupRevocationExecutor } from "../access/membership/cleanup";
 
 /** One durable job row (the executable counterpart of an outbox event). */
 export type DurableJobDoc = Doc<"durableJobs">;
@@ -46,4 +51,5 @@ export interface JobExecutor {
 export const jobExecutors: Record<string, JobExecutor> = {
   [echoExecutor.jobKind]: echoExecutor,
   [analyzeChangePlanExecutor.jobKind]: analyzeChangePlanExecutor,
+  [cleanupRevocationExecutor.jobKind]: cleanupRevocationExecutor,
 };
