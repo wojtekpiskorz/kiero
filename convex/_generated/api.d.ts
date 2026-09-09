@@ -18,6 +18,12 @@ import type * as access_identity_proofDomain from "../access/identity/proofDomai
 import type * as access_identity_providerAvailability from "../access/identity/providerAvailability.js";
 import type * as access_identity_resolution from "../access/identity/resolution.js";
 import type * as access_identity_userPolicy from "../access/identity/userPolicy.js";
+import type * as access_linking_authHook from "../access/linking/authHook.js";
+import type * as access_linking_cores from "../access/linking/cores.js";
+import type * as access_linking_functions from "../access/linking/functions.js";
+import type * as access_linking_operations from "../access/linking/operations.js";
+import type * as access_linking_policy from "../access/linking/policy.js";
+import type * as access_linking_probe from "../access/linking/probe.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
@@ -77,6 +83,12 @@ declare const fullApi: ApiFromModules<{
   "access/identity/providerAvailability": typeof access_identity_providerAvailability;
   "access/identity/resolution": typeof access_identity_resolution;
   "access/identity/userPolicy": typeof access_identity_userPolicy;
+  "access/linking/authHook": typeof access_linking_authHook;
+  "access/linking/cores": typeof access_linking_cores;
+  "access/linking/functions": typeof access_linking_functions;
+  "access/linking/operations": typeof access_linking_operations;
+  "access/linking/policy": typeof access_linking_policy;
+  "access/linking/probe": typeof access_linking_probe;
   auth: typeof auth;
   crons: typeof crons;
   http: typeof http;

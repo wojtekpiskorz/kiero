@@ -45,6 +45,7 @@ import {
   type IdentityDb,
 } from "./resolution";
 import { liveSessionPolicy } from "./policy";
+import { linkingHandlers } from "../linking/operations";
 
 const resolveCurrentAccessEntry = accessOperations["access.resolveCurrentAccess"];
 const revokeSessionEntry = accessOperations["access.revokeSession"];
@@ -167,6 +168,7 @@ export async function buildAccessSnapshot(
 /** The B1 handler table for the typed access operations. */
 function accessHandlers(): HandlerRegistry<MutationCtx> {
   return {
+    ...linkingHandlers(),
     "access.resolveCurrentAccess": {
       intent: "read",
       run: async (tx, context, input) => {
@@ -221,7 +223,9 @@ function accessHandlers(): HandlerRegistry<MutationCtx> {
 /**
  * The B1 dispatch entry: the checked command path with the live-session
  * identity source and B1 policy. Operations not listed here (invitations,
- * linking, GM mode — B2/B3/B4) stay fail-closed `unsupported`.
+ * GM mode — B3/B4) stay fail-closed `unsupported`. The B2 amendment
+ * composes the linking handlers (`access.linkVerifiedMethod`) into the
+ * same registry: one dispatch, one checked path, no drift.
  */
 export async function dispatchAccessCommand(
   ctx: MutationCtx,

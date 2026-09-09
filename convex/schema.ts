@@ -26,6 +26,7 @@ import { TABLE_ID_NAMES } from "@kiero/contracts";
 import { identityTables } from "./access/identity/schema";
 import { membershipTables } from "./access/membership/schema";
 import { gmTables } from "./access/gm/schema";
+import { linkingTables } from "./access/linking/schema";
 import { projectsTables } from "./projects/schema";
 import { findingsTables } from "./memory/findings/schema";
 import { extensionsTables } from "./memory/extensions/schema";
@@ -48,6 +49,7 @@ const fragments: ReadonlyArray<Record<string, TableDefinition>> = [
   identityTables,
   membershipTables,
   gmTables,
+  linkingTables,
   projectsTables,
   findingsTables,
   extensionsTables,
@@ -103,6 +105,7 @@ export default defineSchema({
   ...identityTables,
   ...membershipTables,
   ...gmTables,
+  ...linkingTables,
   ...projectsTables,
   ...findingsTables,
   ...extensionsTables,

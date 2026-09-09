@@ -62,8 +62,9 @@ describe("telemetry fragment tables", () => {
     for (const table of ["healthHeartbeats", "costEntries", "costAlertStates"]) {
       expect(inventory.has(table as (typeof TABLE_ID_NAMES)[number]), table).toBe(true);
     }
-    // 55 at I2 integration (52 + 3); 61 after B1's six Convex Auth tables.
-    expect(TABLE_ID_NAMES).toHaveLength(61);
+    // 55 at I2 integration (52 + 3); 61 after B1's six Convex Auth tables;
+    // 64 after B2's three linking tables.
+    expect(TABLE_ID_NAMES).toHaveLength(64);
   });
 
   it("the table unions are pinned to the single model definitions", () => {

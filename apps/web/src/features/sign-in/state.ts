@@ -70,7 +70,7 @@ export const signInCopy = {
     too_many_attempts: "Zbyt wiele prób. Odczekaj kilka minut i spróbuj ponownie.",
     email_delivery_failed: "Nie udało się wysłać wiadomości z kodem. Spróbuj ponownie za chwilę.",
     method_conflict:
-      "Konto z tym adresem e-mail używa innej metody logowania. Zaloguj się pierwotną metodą; łączenie metod będzie dostępne później.",
+      "Konto z tym adresem e-mail używa innej metody logowania. Zaloguj się pierwotną metodą; metody połączysz w ustawieniach konta, potwierdzając obie.",
     network: "Brak połączenia. Sprawdź internet i spróbuj ponownie.",
     unknown: "Coś nie zadziałało. Spróbuj ponownie.",
   } as const satisfies Record<SignInFailure, string>,
