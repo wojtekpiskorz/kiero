@@ -18,6 +18,7 @@ import {
   ROUTING_CONFIG_VERSION,
   STT_MODEL_ORDER,
   VISION_MODEL_ORDER,
+  classifySdkFailure,
   failureToClosedError,
   providerFailure,
 } from "@kiero/providers";
@@ -57,6 +58,42 @@ describe("server-owned routing configuration", () => {
     expect(PROVIDER_ROUTING.speech_to_text.order).toEqual(STT_MODEL_ORDER);
     expect(PROVIDER_ROUTING.embedding.order).toEqual(EMBEDDING_MODEL_ORDER);
     expect(ROUTING_CONFIG_VERSION).toMatch(/^e\d+\.\d+$/);
+  });
+
+  it("SDK classification is authoritative on the HTTP status, even when wrapped", () => {
+    // A retry-machinery wrapper (PermanentError) carrying a status must not
+    // be misread as a terminal parameter problem: the STT fallback to
+    // Whisper depends on 404/429 staying eligible.
+    const wrapped = Object.assign(
+      new Error("sdk wrapper"),
+      { name: "PermanentError", statusCode: 404 },
+    );
+    const classified = classifySdkFailure(wrapped);
+    expect(classified.kind).toBe("provider_unavailable");
+    expect(classified.fallbackEligible).toBe(true);
+    expect(classifySdkFailure(
+      Object.assign(new Error("limited"), { name: "PermanentError", statusCode: 429 }),
+    ).kind).toBe("rate_limited");
+    expect(classifySdkFailure(
+      Object.assign(new Error("auth"), { statusCode: 401 }),
+    ).kind).toBe("unauthenticated");
+    expect(classifySdkFailure(Object.assign(new Error("t"), { name: "RequestTimeoutError" })).kind).toBe(
+      "deadline_exceeded",
+    );
+    expect(classifySdkFailure(Object.assign(new Error("a"), { name: "AbortError" })).kind).toBe(
+      "deadline_exceeded",
+    );
+    expect(classifySdkFailure(new TypeError("bug")).kind).toBe("connection_failed");
+  });
+
+  it("an internal (pre-stream) defect is terminal and never burns the order", () => {
+    const failure = providerFailure("internal_error");
+    expect(failure.fallbackEligible).toBe(false);
+    const closed = failureToClosedError(failure);
+    expect(closed._tag).toBe("unavailable");
+    if (closed._tag === "unavailable") {
+      expect(closed.retryable).toBe(false);
+    }
   });
 
   it("failure projections are closed sanitized errors with no provider payloads", () => {

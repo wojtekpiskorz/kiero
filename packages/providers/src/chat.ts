@@ -310,6 +310,13 @@ function parseCompletionJson(text: string): { ok: true; value: unknown } | { ok:
 /**
  * Runs ONE chat attempt against one model through the TanStack OpenRouter
  * adapter: one bounded request, raw stream harvested, no fallback decisions.
+ *
+ * A stream-level failure (RUN_ERROR event) returns the harvested observation
+ * alongside the failure, so the record still carries the model observed in
+ * RUN_STARTED and any first-output time — the contract records route, model
+ * AND failure. An error THROWN before any stream existed has no observation
+ * and classifies as `internal_error` (our side of the seam): terminal, so an
+ * internal defect never silently burns the accepted order.
  */
 export async function chatAttempt(
   credentials: OpenRouterCredentials,
@@ -317,7 +324,7 @@ export async function chatAttempt(
   request: ChatAttemptRequest,
 ): Promise<
   | { ok: true; observation: StreamObservation }
-  | { ok: false; failure: ProviderFailure }
+  | { ok: false; failure: ProviderFailure; observation?: StreamObservation }
 > {
   const adapter = createOpenRouterText(
     // The frozen accepted order (and probe prefixes over its slugs) contains
@@ -381,15 +388,23 @@ export async function chatAttempt(
     });
     const observation = await harvestStream(stream);
     if (observation.failed) {
-      return { ok: false, failure: classifyChatFailure(observation.failureCode) };
+      // Stream-level failure: the observation still carries the model that
+      // served RUN_STARTED and any first-output time — recorded with the
+      // failure, not discarded.
+      return {
+        ok: false,
+        failure: classifyChatFailure(observation.failureCode),
+        observation,
+      };
     }
     return { ok: true, observation };
   } catch (cause) {
     if (cause instanceof Error && (cause.name === "AbortError" || cause.name === "TimeoutError")) {
       return { ok: false, failure: providerFailure("deadline_exceeded") };
     }
-    // Transport-level failure before any provider output existed.
-    return { ok: false, failure: classifyChatFailure(undefined) };
+    // Thrown before any stream existed (adapter construction, request
+    // wiring): our side of the seam, not a provider route failure.
+    return { ok: false, failure: providerFailure("internal_error") };
   } finally {
     clearTimeout(deadline);
   }
@@ -488,6 +503,20 @@ function withObservation<T extends object>(
 }
 
 /**
+ * A failed attempt's outcome for the runner: the classified failure plus the
+ * observation's routing metadata when the failure came from a stream (a
+ * thrown pre-stream failure has none to attach).
+ */
+function attemptFailure(failure: {
+  readonly failure: ProviderFailure;
+  readonly observation?: StreamObservation;
+}): { ok: false; failure: ProviderFailure } & AttemptObservation {
+  return failure.observation === undefined
+    ? { ok: false, failure: failure.failure }
+    : withObservation({ ok: false as const, failure: failure.failure }, failure.observation);
+}
+
+/**
  * Runs one chat-shaped call over an ordered route (server-owned): the shared
  * ordered-route runner owns the loop, records, eligibility short-circuit and
  * record seal; this adapter supplies only the per-model attempt (one bounded
@@ -510,7 +539,7 @@ export async function chatWithRoute(
   return runOrderedRoute(recordRouteId, route, async (model) => {
     const attempt = await attemptFunction(credentials, model, request);
     if (!attempt.ok) {
-      return { ok: false as const, failure: attempt.failure };
+      return attemptFailure(attempt);
     }
     const decoded = decodeToolTurn(request, attempt.observation);
     return withObservation(decoded, attempt.observation);
@@ -528,7 +557,7 @@ export async function structuredChatWithRoute<Output>(
   return runOrderedRoute(recordRouteId, route, async (model) => {
     const attempt = await attemptFunction(credentials, model, request);
     if (!attempt.ok) {
-      return { ok: false as const, failure: attempt.failure };
+      return attemptFailure(attempt);
     }
     const decoded = decodeStructuredTurn(request, attempt.observation);
     return withObservation(decoded, attempt.observation);

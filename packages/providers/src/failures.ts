@@ -40,6 +40,14 @@ export const ProviderFailureKind = Schema.Literals([
   "output_rejected",
   /** The model called a tool that was not declared in the request. */
   "unknown_tool",
+  /**
+   * A failure was thrown on Kiero's side of the seam before any provider
+   * stream existed (adapter construction, request wiring). Distinct from a
+   * stream-level failure so unknown-code classification can be tightened
+   * later without touching this case: an internal defect is terminal for the
+   * call and must never silently burn the accepted order.
+   */
+  "internal_error",
 ]);
 export type ProviderFailureKind = Schema.Schema.Type<typeof ProviderFailureKind>;
 
@@ -86,15 +94,17 @@ export function classifyStatus(status: number): ProviderFailure {
 }
 
 /**
- * Classifies a failure reported by the TanStack adapter as an AG-UI
- * RUN_ERROR event (or a thrown error) using only its machine-readable
- * `code` — never the message text, which is provider-controlled.
+ * Classifies a failure the TanStack adapter reported as a stream-level AG-UI
+ * RUN_ERROR event, using only its machine-readable `code` — never the
+ * message text, which is provider-controlled.
  *
  * `code === "aborted"` is the adapter's shape for an aborted/deadline hit;
  * numeric codes are HTTP statuses. An unrecognized/absent code from a
  * stream-level failure is treated as route unavailability: it keeps the
  * bounded loop moving instead of hanging, and the kind is recorded so the
- * probe evidence can demand better codes later.
+ * probe evidence can demand better codes later. This function is ONLY for
+ * stream-level events; an error THROWN before any stream existed is our
+ * side of the seam and classifies as `internal_error` (see ./chat.ts).
  */
 export function classifyChatFailure(code: string | number | undefined): ProviderFailure {
   if (code === "aborted" || code === "AbortError" || code === "TimeoutError") {
@@ -109,19 +119,14 @@ export function classifyChatFailure(code: string | number | undefined): Provider
 
 /**
  * Classifies an error thrown by the OpenRouter SDK (STT/embeddings paths).
- * Uses `statusCode` when present; abort/timeout shapes map to the deadline;
- * everything unrecognized is connection-level (nothing was decoded).
+ * The HTTP status is authoritative whenever the error carries one — the SDK
+ * can wrap statuses (including in its retry machinery's error classes), and
+ * a wrapped 404/429 must never be misread as a terminal parameter problem
+ * that silently disables the ordered fallback. Abort/timeout shapes map to
+ * the deadline; everything unrecognized is connection-level (nothing was
+ * decoded).
  */
 export function classifySdkFailure(cause: unknown): ProviderFailure {
-  if (
-    typeof cause === "object" &&
-    cause !== null &&
-    "name" in cause &&
-    (cause as { name: string }).name === "PermanentError"
-  ) {
-    // SDK retry machinery signalled a non-retryable condition upstream.
-    return providerFailure("unsupported_parameters");
-  }
   if (
     typeof cause === "object" &&
     cause !== null &&
@@ -155,6 +160,7 @@ const CLOSED_KIND: Readonly<Record<ProviderFailureKind, ClosedErrorKind>> = {
   unsupported_parameters: "unavailable",
   output_rejected: "validation",
   unknown_tool: "validation",
+  internal_error: "unavailable",
 };
 
 /** Stable machine-readable closed-error codes per provider failure kind. */
@@ -168,6 +174,7 @@ const CLOSED_CODE: Readonly<Record<ProviderFailureKind, string>> = {
   unsupported_parameters: "provider_rejected_parameters",
   output_rejected: "provider_output_rejected",
   unknown_tool: "provider_unknown_tool",
+  internal_error: "provider_internal_error",
 };
 
 /** Polish user-facing copy for provider failures (safe to show; no internals). */
@@ -181,6 +188,7 @@ const CLOSED_MESSAGE: Readonly<Record<ProviderFailureKind, string>> = {
   unsupported_parameters: "Wybrana trasa modelu nie obsługuje wymaganych parametrów.",
   output_rejected: "Model zwrócił nieprawidłową odpowiedź. Spróbuj ponownie.",
   unknown_tool: "Model wywołał nieznaną funkcję. Spróbuj ponownie.",
+  internal_error: "Chwilowy błąd po stronie Kiero. Spróbuj ponownie za chwilę.",
 };
 
 /** The closed-error projection of one provider failure kind (sanitized). */

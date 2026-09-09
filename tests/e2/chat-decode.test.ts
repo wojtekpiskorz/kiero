@@ -96,7 +96,8 @@ function runError(code?: string | number): unknown {
 /**
  * Builds a fake chat attempt that replaces ONLY the network adapter: the
  * REAL harvestStream consumes the fixture events, exactly like chatAttempt
- * consumes the adapter's stream.
+ * consumes the adapter's stream — including carrying the harvested
+ * observation on stream-level failures.
  */
 function fakeStreamAttempts(script: Record<string, unknown[]>) {
   const calls: string[] = [];
@@ -106,7 +107,7 @@ function fakeStreamAttempts(script: Record<string, unknown[]>) {
     _request: ChatRequest,
   ): Promise<
     | { ok: true; observation: StreamObservation }
-    | { ok: false; failure: ProviderFailure }
+    | { ok: false; failure: ProviderFailure; observation?: StreamObservation }
   > => {
     calls.push(model);
     const scripted = script[model];
@@ -115,7 +116,11 @@ function fakeStreamAttempts(script: Record<string, unknown[]>) {
     }
     const observation = await harvestStream(eventsOf(scripted));
     if (observation.failed) {
-      return { ok: false, failure: classifyChatFailure(observation.failureCode) };
+      return {
+        ok: false,
+        failure: classifyChatFailure(observation.failureCode),
+        observation,
+      };
     }
     return { ok: true, observation };
   };
@@ -414,6 +419,10 @@ describe("chat provider output decode (harvest -> decode -> record)", () => {
     expect(result.outcome.outcome).toBe("succeeded");
     expect(fake.calls).toEqual(["model-a", "model-b"]);
     expect(result.record.attempts[0]?.failureKind).toBe("provider_unavailable");
+    // The failed attempt still records the model its RUN_STARTED observed
+    // (route, model AND failure), not just the requested name.
+    expect(result.record.attempts[0]?.observedModel).toBe("model-a");
+    expect(result.record.attempts[0]?.requestedModel).toBe("model-a");
     expect(result.record.attempts[1]?.observedModel).toBe("model-b");
   });
 });

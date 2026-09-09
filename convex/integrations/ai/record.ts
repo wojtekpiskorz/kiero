@@ -15,7 +15,17 @@ import { v } from "convex/values";
 import { internalMutation } from "../../_generated/server";
 import { publishEvent } from "../../platform/publish";
 
-/** Publishes one sanitized provider-call completion event (outbox transaction). */
+/**
+ * Publishes one sanitized provider-call completion event (outbox
+ * transaction).
+ *
+ * `dedupKey` carries the CAUSING command's operation identity (its
+ * idempotency key, threaded from the dispatch envelope): a retry or replay
+ * of the dispatching action reuses the caller's key and the outbox
+ * publication collapses instead of writing a duplicate event. Without a
+ * caller-supplied identity each executed call is a distinct event and a
+ * fresh key is generated.
+ */
 export const recordProviderCall = internalMutation({
   args: {
     companyId: v.string(),
@@ -26,13 +36,12 @@ export const recordProviderCall = internalMutation({
       v.literal("failed"),
       v.literal("timeout_unknown"),
     ),
+    dedupKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // publishEvent decodes the payload against the event's registry schema
-    // (the contracts authority) and writes the outbox row in this mutation's
-    // transaction. The dedup key is unique per call: each executed call is a
-    // distinct event; replay protection for the CAUSING operation lives in
-    // that operation's own idempotency, not here.
+    // (the contracts authority) and writes the outbox row in this
+    // mutation's transaction.
     await publishEvent(ctx, {
       companyId: args.companyId,
       eventName: "integrations.providerCallCompleted",
@@ -41,7 +50,7 @@ export const recordProviderCall = internalMutation({
         actualModel: args.actualModel,
         outcome: args.outcome,
       },
-      dedupKey: `integrations.modelCall:${crypto.randomUUID()}`,
+      dedupKey: args.dedupKey ?? `integrations.modelCall:${crypto.randomUUID()}`,
     });
   },
 });

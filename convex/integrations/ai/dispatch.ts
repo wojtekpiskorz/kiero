@@ -84,8 +84,13 @@ function openRouterCredentials(): OpenRouterCredentials | null {
   return { apiKey };
 }
 
-/** Event-outcome vocabulary mapping per the echo uncertain-outcome template. */
-function eventOutcome(
+/**
+ * Event-outcome vocabulary mapping per the echo uncertain-outcome template:
+ * uncertain external outcomes (deadline, connection-level failure) are
+ * `timeout_unknown`, never silently retried. Exported for the focused
+ * verification fixtures (tests/e2).
+ */
+export function eventOutcome(
   failureKind: ProviderFailureKind | undefined,
 ): "succeeded" | "failed" | "timeout_unknown" {
   if (failureKind === undefined) {
@@ -96,7 +101,14 @@ function eventOutcome(
     : "failed";
 }
 
-/** Publishes the sanitized per-call record event through the standard outbox. */
+/**
+ * Publishes the sanitized per-call record event through the standard outbox.
+ *
+ * `operationId` is the command's idempotency key when the caller supplied
+ * one: a retry or replay of the dispatching action then reuses the SAME
+ * outbox dedup key and the publisher collapses the duplicate instead of
+ * writing a second providerCallCompleted event.
+ */
 async function publishCallCompleted(
   ctx: AiBridgeCtx,
   companyId: string,
@@ -105,12 +117,16 @@ async function publishCallCompleted(
     readonly actualModel: string;
     readonly failureKind?: ProviderFailureKind;
   },
+  operationId: string | undefined,
 ): Promise<void> {
   await ctx.action.runMutation(internal.integrations.ai.record.recordProviderCall, {
     companyId,
     routeId: record.routeId,
     actualModel: record.actualModel,
     outcome: eventOutcome(record.failureKind),
+    ...(operationId === undefined
+      ? {}
+      : { dedupKey: `integrations.modelCall:${operationId}` }),
   });
 }
 
@@ -128,8 +144,13 @@ interface CallRecordSummary {
   readonly failureKind?: ProviderFailureKind;
 }
 
-/** Summarizes one adapter call into the executed-payload outcome. */
-function summarize(
+/**
+ * Summarizes one adapter call into the executed-payload outcome (contract
+ * metadata on success; sanitized failure classification and the
+ * observed-then-requested model fallback on failure). Exported for the
+ * focused verification fixtures (tests/e2).
+ */
+export function summarize(
   routeId: string,
   call: { readonly record: ProviderCallRecord },
 ): PayloadExecution {
@@ -161,18 +182,25 @@ function summarize(
 }
 
 /** The outcome of executing one serializable payload. */
-type PayloadExecution =
+export type PayloadExecution =
   | {
       readonly kind: "executed";
       readonly ok: boolean;
       readonly metadata?: CallMetadata;
       readonly summary: CallRecordSummary;
     }
-  | { readonly kind: "invalid_payload" };
+  | { readonly kind: "invalid_payload" }
+  | { readonly kind: "route_mismatch"; readonly payloadKind: string };
 
-/** Maps one serializable payload to its adapter call (external, in-action). */
+/**
+ * Maps one serializable payload to its adapter call (external, in-action).
+ * The payload's discriminating kind MUST equal the requested route id: a
+ * mismatch is rejected before any provider call, so a chat payload can
+ * never execute and be reported as another route.
+ */
 async function executePayload(
   credentials: OpenRouterCredentials,
+  routeId: string,
   payload: unknown,
 ): Promise<PayloadExecution> {
   const decodedPayload = Schema.decodeUnknownOption(ProviderPayload)(payload);
@@ -180,6 +208,9 @@ async function executePayload(
     return { kind: "invalid_payload" };
   }
   const value = decodedPayload.value;
+  if (value.kind !== routeId) {
+    return { kind: "route_mismatch", payloadKind: value.kind };
+  }
   switch (value.kind) {
     case "chat_analysis": {
       // The wire payload offers only user/assistant turns; system
@@ -237,7 +268,7 @@ export async function dispatchAiCommand(
     handlers: {
       "integrations.executeModelCall": {
         intent: "execute",
-        run: async (bridge, context, input) => {
+        run: async (bridge, context, input, meta) => {
           // dispatchCommand already decoded the input against the contract
           // entry; this is the same defensive re-read the A3 probe handlers
           // use (one schema, one authority).
@@ -246,13 +277,26 @@ export async function dispatchAiCommand(
           if (credentials === null) {
             return errorResult(unavailableError(false, "provider_key_not_configured"));
           }
-          const outcome = await executePayload(credentials, decoded.payload);
+          const outcome = await executePayload(credentials, decoded.routeId, decoded.payload);
           if (outcome.kind === "invalid_payload") {
-            // Route/payload mismatch: a validation failure, not a provider
+            // Undecodable payload: a validation failure, not a provider
             // failure; no provider call happened, so no event is published.
+            return errorResult(validationError("provider_payload_invalid"));
+          }
+          if (outcome.kind === "route_mismatch") {
+            // The payload's kind disagrees with the requested route id: a
+            // validation failure BEFORE any provider call; nothing executed,
+            // so nothing is published or reported under the wrong route.
             return errorResult(validationError("provider_payload_route_mismatch"));
           }
-          await publishCallCompleted(bridge, context.actor.companyId, outcome.summary);
+          // The command's idempotency key, when supplied, is the operation
+          // identity replays dedup on (publishCallCompleted -> outbox).
+          await publishCallCompleted(
+            bridge,
+            context.actor.companyId,
+            outcome.summary,
+            meta.idempotencyKey,
+          );
           if (!outcome.ok || outcome.metadata === undefined) {
             return errorResult(
               failureToClosedError(

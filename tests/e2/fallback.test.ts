@@ -172,7 +172,7 @@ describe("bounded ordered fallback (chat)", () => {
   });
 
   it("exhausted credits (402) and rejected parameters (400) are terminal", async () => {
-    for (const kind of ["insufficient_credits", "unsupported_parameters"] as const) {
+    for (const kind of ["insufficient_credits", "unsupported_parameters", "internal_error"] as const) {
       const [first] = CHAT_MODEL_ORDER;
       if (first === undefined) {
         throw new Error("chat order fixture");

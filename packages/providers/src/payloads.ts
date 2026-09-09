@@ -95,6 +95,6 @@ export const ProbeExtractionSchema = Schema.Struct({
         Schema.check(Schema.isMaxLength(2_000)),
       ),
     }),
-  ).pipe(Schema.check(Schema.isMaxLength(50))),
+  ).pipe(Schema.check(Schema.isMinLength(1)), Schema.check(Schema.isMaxLength(50))),
 });
 export type ProbeExtraction = Schema.Schema.Type<typeof ProbeExtractionSchema>;
