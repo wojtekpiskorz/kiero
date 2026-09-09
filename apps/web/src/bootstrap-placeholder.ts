@@ -20,7 +20,7 @@ const rootRoute = createRootRoute({
     createElement(
       "main",
       { lang: "pl" },
-      createElement("h1", null, "Kiero: rdzeń w przygotowaniu"),
+      createElement("h1", null, "Kiero — rdzeń w przygotowaniu"),
       createElement(
         "p",
         null,
