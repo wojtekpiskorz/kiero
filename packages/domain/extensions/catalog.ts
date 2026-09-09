@@ -89,35 +89,58 @@ export function nameSimilarity(a: string, b: string): number {
   return intersection / Math.min(tokensA.size, tokensB.size);
 }
 
-/** The machine-checkable meaning signature of one field. */
-function fieldSignature(field: FieldShapeView): string {
-  return [field.kind, field.unit ?? "", field.itemKind ?? "", (field.options ?? []).length]
-    .join("|");
+/**
+ * Whether one candidate field can type one draft field with the SAME
+ * meaning. Non-enum fields compare their machine-checkable anchors (kind,
+ * declared unit, declared item kind). Enum fields compare OPTION-ID
+ * MEMBERSHIP — the same rule `decideVersionSuccession` applies to versions:
+ * the draft's closed option set must be a subset of the candidate's (the
+ * candidate may offer more options, exactly as a later version may add
+ * them); equal counts with disjoint ids are different meanings.
+ */
+function fieldCanType(draftField: FieldShapeView, candidateField: FieldShapeView): boolean {
+  if (draftField.kind !== candidateField.kind) {
+    return false;
+  }
+  if (draftField.kind === "enum") {
+    if (candidateField.kind !== "enum") {
+      return false;
+    }
+    const candidateOptionIds = new Set(
+      (candidateField.options ?? []).map((option) => option.optionId),
+    );
+    return (draftField.options ?? []).every((option) =>
+      candidateOptionIds.has(option.optionId),
+    );
+  }
+  return (
+    (draftField.unit ?? undefined) === (candidateField.unit ?? undefined) &&
+    (draftField.itemKind ?? undefined) === (candidateField.itemKind ?? undefined)
+  );
 }
 
 /**
  * Meaning-and-type compatibility between a DRAFT structure and a candidate
- * version's structure: every draft field must have a candidate field with
- * the same signature (kind, declared unit, declared item kind, enum option
- * count). A candidate may offer MORE fields (later versions add optional
- * ones); a draft field the candidate cannot type is an incompatible meaning.
+ * version's structure: every draft field must have an unconsumed candidate
+ * field that can type it with the same meaning (kind, declared unit,
+ * declared item kind, enum option-ID membership). A candidate may offer
+ * MORE fields (later versions add optional ones, and later enum versions
+ * only ever ADD option ids); a draft field the candidate cannot type is an
+ * incompatible meaning.
  */
 export function structureCompatible(
   draft: readonly FieldShapeView[],
   candidate: readonly FieldShapeView[],
 ): boolean {
-  const candidateSignatures = new Map<string, number>();
-  for (const field of candidate) {
-    const signature = fieldSignature(field);
-    candidateSignatures.set(signature, (candidateSignatures.get(signature) ?? 0) + 1);
-  }
-  for (const field of draft) {
-    const signature = fieldSignature(field);
-    const available = candidateSignatures.get(signature) ?? 0;
-    if (available === 0) {
+  const available = [...candidate];
+  for (const draftField of draft) {
+    const match = available.findIndex((candidateField) =>
+      fieldCanType(draftField, candidateField),
+    );
+    if (match === -1) {
       return false;
     }
-    candidateSignatures.set(signature, available - 1);
+    available.splice(match, 1);
   }
   return true;
 }

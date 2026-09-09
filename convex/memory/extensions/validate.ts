@@ -11,107 +11,80 @@
  *   the value names — never a newer or older one;
  * - the tenant layer: the version's definition must be visible to the
  *   company (own or shared), and every entity reference inside the value
- *   must resolve to a row OF THIS COMPANY.
+ *   (enumerated by the pure domain walk) must resolve to a row OF THIS
+ *   COMPANY.
  *
- * `checkExtensionFindingValue` consumes the ENCODED (wire) finding value —
- * the shape stored in planned-change rows and revisions; it returns null
- * for non-extension values (nothing to check) and the domain check outcome
- * otherwise. `recordExtensionValueUsage` moves the committed-usage counter
- * for an extension value, atomically with the revision that carries it.
+ * `checkExtensionValue` is the ONE resolution sequence both callers share;
+ * `checkExtensionFindingValue` adapts it to the encoded finding-value shape
+ * the C2 seam checks, and `performValidateExtensionValue` surfaces it as the
+ * validate-value operation. `recordExtensionValueUsage` moves the
+ * committed-usage counter for an extension value, atomically with the
+ * revision that carries it.
  */
 
 import { Schema } from "effect";
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
-import { notFoundError, validationError, type RequestContext } from "@kiero/runtime";
-import { validateExtensionValueAgainstVersion, type ExtensionCheck } from "@kiero/domain";
+import {
+  notFoundError,
+  validationError,
+  type RequestContext,
+} from "@kiero/runtime";
+import {
+  collectEntityReferences,
+  validateExtensionValueAgainstVersion,
+  type ExtensionCheck,
+} from "@kiero/domain";
 import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
-import { normalizedCompany, requireSource } from "../findings/references";
-import { bumpExtensionUsage, firstVersionOf, requireDefinitionVersion, type Db } from "./references";
+import { normalizedCompany } from "../findings/references";
+import { bumpExtensionUsage, firstVersionOf, requireDefinitionVersion, type Db, type DefinitionDoc, type VersionDoc } from "./references";
 import { validateExtensionValueEntry, type ValidateExtensionValueInput } from "./semantics";
 
-/** The encoded finding value shape the seam checks (structural view). */
-interface EncodedFindingValueView {
-  readonly _tag: string;
-  readonly definitionVersionId?: string | undefined;
-  readonly extensionValue?: unknown | undefined;
-}
+/** The target table of each entity-reference kind (all carry companyId). */
+const REFERENCE_TABLES = {
+  project: "projects",
+  task: "tasks",
+  event: "events",
+  contact: "contacts",
+  source: "sources",
+} as const;
 
-/** Structural walk of entity references inside one extension value. */
+/** The tenant check over one walked entity reference. */
 async function checkEntityReferences(
   db: Db,
   companyId: Id<"companies">,
   value: unknown,
 ): Promise<ExtensionCheck> {
-  if (value === null || typeof value !== "object") {
-    return { ok: true };
+  const walk = collectEntityReferences(value);
+  if (!walk.ok) {
+    return { ok: false, code: walk.code };
   }
-  const view = value as {
-    _tag?: unknown;
-    reference?: { _tag?: unknown } & Record<string, unknown>;
-    fields?: { value?: unknown }[];
-    items?: unknown[];
-  };
-  if (view._tag === "entity_ref" && view.reference !== undefined) {
-    const kind = String(view.reference._tag);
-    const referenced =
-      kind === "project"
-        ? view.reference.projectId
-        : kind === "task"
-          ? view.reference.taskId
-          : kind === "event"
-            ? view.reference.eventId
-            : kind === "contact"
-              ? view.reference.contactId
-              : kind === "source"
-                ? view.reference.sourceId
-                : undefined;
-    if (referenced === undefined) {
-      return { ok: false, code: "entity_reference_malformed" };
-    }
-    if (kind === "source") {
-      const source = await requireSource(db, String(referenced), companyId);
-      return source === null ? { ok: false, code: "entity_reference_not_in_company" } : { ok: true };
-    }
-    // projects/tasks/events/contacts all carry companyId: the tenant check
-    // reads the row and compares it, without existence leaks.
-    const table: "projects" | "tasks" | "events" | "contacts" =
-      kind === "project"
-        ? "projects"
-        : kind === "task"
-          ? "tasks"
-          : kind === "event"
-            ? "events"
-            : "contacts";
-    const normalized = db.normalizeId(table, String(referenced));
+  for (const reference of walk.references) {
+    const table = REFERENCE_TABLES[reference.kind];
+    const normalized = db.normalizeId(table, reference.id);
     const row = normalized === null ? null : await db.get(normalized);
     if (row === null || row.companyId !== companyId) {
       return { ok: false, code: "entity_reference_not_in_company" };
-    }
-    return { ok: true };
-  }
-  for (const entry of view.fields ?? []) {
-    const nested = await checkEntityReferences(db, companyId, entry.value);
-    if (!nested.ok) {
-      return nested;
-    }
-  }
-  for (const item of view.items ?? []) {
-    const nested = await checkEntityReferences(db, companyId, item);
-    if (!nested.ok) {
-      return nested;
     }
   }
   return { ok: true };
 }
 
-/** Resolves and validates one extension value against its exact stored version. */
+/** The resolved outcome of validating one extension value against its version. */
+export type ExtensionValueResolution =
+  | { readonly ok: true; readonly definition: DefinitionDoc; readonly version: VersionDoc }
+  | { readonly ok: false; readonly code: string };
+
+/**
+ * The ONE resolution sequence: exact-version visibility, the pure
+ * value-versus-version rule, and the entity-reference tenant checks.
+ */
 async function checkExtensionValue(
   db: Db,
   companyId: Id<"companies">,
   definitionVersionRef: string,
   extensionValue: unknown,
-): Promise<ExtensionCheck> {
+): Promise<ExtensionValueResolution> {
   const resolved = await requireDefinitionVersion(db, definitionVersionRef, companyId);
   if (resolved === null) {
     // Missing, malformed, another firm's or corrupt: no existence leak.
@@ -126,7 +99,18 @@ async function checkExtensionValue(
   if (!check.ok) {
     return check;
   }
-  return await checkEntityReferences(db, companyId, extensionValue);
+  const entityCheck = await checkEntityReferences(db, companyId, extensionValue);
+  if (!entityCheck.ok) {
+    return entityCheck;
+  }
+  return { ok: true, definition: resolved.definition, version: resolved.version };
+}
+
+/** The encoded finding value shape the seam checks (structural view). */
+interface EncodedFindingValueView {
+  readonly _tag: string;
+  readonly definitionVersionId?: string | undefined;
+  readonly extensionValue?: unknown | undefined;
 }
 
 /**
@@ -146,12 +130,13 @@ export async function checkExtensionFindingValue(
   if (encodedValue.definitionVersionId === undefined || encodedValue.extensionValue === undefined) {
     return { ok: false, code: "extension_value_malformed" };
   }
-  return await checkExtensionValue(
+  const resolution = await checkExtensionValue(
     db,
     companyId,
     encodedValue.definitionVersionId,
     encodedValue.extensionValue,
   );
+  return resolution.ok ? { ok: true } : { ok: false, code: resolution.code };
 }
 
 /**
@@ -192,27 +177,18 @@ export async function performValidateExtensionValue(
   if (companyId === null) {
     return errorResult(validationError("company_scope_unresolved"));
   }
-  const resolved = await requireDefinitionVersion(tx.db, input.versionId, companyId);
-  if (resolved === null) {
-    return errorResult(notFoundError("extensionVersions"));
-  }
-  const first = await firstVersionOf(tx.db, resolved.definition._id);
-  const check = validateExtensionValueAgainstVersion({
-    fields: resolved.version.fields,
-    firstFields: first?.fields ?? resolved.version.fields,
-    value: input.value as never,
-  });
-  if (!check.ok) {
-    return errorResult(validationError(check.code));
-  }
-  const entityCheck = await checkEntityReferences(tx.db, companyId, input.value);
-  if (!entityCheck.ok) {
-    return errorResult(validationError(entityCheck.code));
+  const resolution = await checkExtensionValue(tx.db, companyId, input.versionId, input.value);
+  if (!resolution.ok) {
+    // An invisible version (missing, malformed or another firm's) is the
+    // honest not-found; every other refusal is a validation outcome.
+    return resolution.code === "extension_version_not_visible"
+      ? errorResult(notFoundError("extensionVersions"))
+      : errorResult(validationError(resolution.code));
   }
   return okResult(
     Schema.decodeUnknownSync(validateExtensionValueEntry.result)({
-      definitionId: resolved.definition._id,
-      version: resolved.version.version,
+      definitionId: resolution.definition._id,
+      version: resolution.version.version,
     }),
   );
 }

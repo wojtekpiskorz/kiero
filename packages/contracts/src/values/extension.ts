@@ -108,8 +108,14 @@ export const ExtensionValue = Schema.Union([
 ]);
 export type ExtensionValue = Schema.Schema.Type<typeof ExtensionValue>;
 
-/** Field kind declared by a definition version (the A2 value vocabulary). */
-export const ExtensionFieldKind = Schema.Literals([
+/**
+ * The single-source kind arrays (C3, the bounds pattern): every kind schema
+ * below is BUILT from one of these, so a vocabulary change is one edit and
+ * the arrays, the schemas and the domain rule layer cannot drift apart.
+ */
+
+/** The scalar subset of the value vocabulary: what fields and list items take. */
+export const SCALAR_FIELD_KINDS = [
   "text",
   "quantity",
   "boolean",
@@ -117,9 +123,23 @@ export const ExtensionFieldKind = Schema.Literals([
   "financial",
   "temporal",
   "entity_ref",
-  "object",
-  "list",
-]);
+] as const;
+
+/** What a definition FIELD may take: the scalar kinds plus bounded lists. */
+export const DEFINITION_FIELD_KINDS = [...SCALAR_FIELD_KINDS, "list"] as const;
+
+/** The full A2 value vocabulary: scalar kinds plus objects and lists. */
+export const EXTENSION_FIELD_KINDS = [...SCALAR_FIELD_KINDS, "object", "list"] as const;
+
+/**
+ * The full A2 value vocabulary, as a schema. This names the VALUE space
+ * (what an ExtensionValue branch may be); the tagged union
+ * `ScalarExtensionValue`/`ExtensionValue` is the enforcing schema, and
+ * definition FIELDS pin to the narrower `DefinitionFieldKind` (`object` is
+ * not a legal field kind). Kept as the certified A2 export for consumers
+ * that reason about the value vocabulary as one set.
+ */
+export const ExtensionFieldKind = Schema.Literals(EXTENSION_FIELD_KINDS);
 export type ExtensionFieldKind = Schema.Schema.Type<typeof ExtensionFieldKind>;
 
 /**
@@ -127,15 +147,7 @@ export type ExtensionFieldKind = Schema.Schema.Type<typeof ExtensionFieldKind>;
  * a list item may take (C3). Everything bounded ends here — objects and
  * lists are containers, never members.
  */
-export const ScalarFieldKind = Schema.Literals([
-  "text",
-  "quantity",
-  "boolean",
-  "enum",
-  "financial",
-  "temporal",
-  "entity_ref",
-]);
+export const ScalarFieldKind = Schema.Literals(SCALAR_FIELD_KINDS);
 export type ScalarFieldKind = Schema.Schema.Type<typeof ScalarFieldKind>;
 
 /**
@@ -144,16 +156,7 @@ export type ScalarFieldKind = Schema.Schema.Type<typeof ScalarFieldKind>;
  * multi-field definition version IS the object type; an object field would
  * demand the recursive nesting the value contract forbids.
  */
-export const DefinitionFieldKind = Schema.Literals([
-  "text",
-  "quantity",
-  "boolean",
-  "enum",
-  "financial",
-  "temporal",
-  "entity_ref",
-  "list",
-]);
+export const DefinitionFieldKind = Schema.Literals(DEFINITION_FIELD_KINDS);
 export type DefinitionFieldKind = Schema.Schema.Type<typeof DefinitionFieldKind>;
 
 /**

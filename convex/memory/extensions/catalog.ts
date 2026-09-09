@@ -92,17 +92,6 @@ export async function performSearchExtensionCatalog(
   );
 
   return okResult(
-    Schema.decodeUnknownSync(searchExtensionCatalogEntry.result)({
-      candidates: candidates.map((candidate) => ({
-        ...candidate,
-        similarity: {
-          score: candidate.similarity.score,
-          verdict: candidate.similarity.verdict,
-          ...(candidate.similarity.structureCompatible === null
-            ? { structureCompatible: null }
-            : { structureCompatible: candidate.similarity.structureCompatible }),
-        },
-      })),
-    }),
+    Schema.decodeUnknownSync(searchExtensionCatalogEntry.result)({ candidates }),
   );
 }

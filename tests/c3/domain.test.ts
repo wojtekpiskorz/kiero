@@ -467,11 +467,13 @@ describe("catalog reuse assessment (Polish label collisions)", () => {
         { optionId: "b", label: "B" },
       ] },
     ];
+    // Same meaning, re-WORDED: field labels and option LABELS move, the
+    // machine-checkable anchors (kind, unit, option ids) do not.
     const sameTypesRelabeled = [
       quantityField("w", "mm", "Wymiar poziomy"),
       { fieldId: "c", label: "Barwa", kind: "enum", options: [
-        { optionId: "x", label: "X" },
-        { optionId: "y", label: "Y" },
+        { optionId: "a", label: "Pierwsza" },
+        { optionId: "b", label: "Druga" },
       ] },
     ];
     expect(structureCompatible(draft, sameTypesRelabeled)).toBe(true);
@@ -479,6 +481,42 @@ describe("catalog reuse assessment (Polish label collisions)", () => {
     expect(structureCompatible(draft, superset)).toBe(true);
     expect(structureCompatible(superset, draft)).toBe(false);
     expect(structureCompatible(draft, [quantityField("szerokosc", "cm", "Szerokość")])).toBe(false);
+  });
+
+  it("enum compatibility is OPTION-ID MEMBERSHIP, the same rule versions use (regressions)", () => {
+    const enumV1 = (optionIds: string[]) => [
+      {
+        fieldId: "kolor",
+        label: "Kolor",
+        kind: "enum",
+        options: optionIds.map((optionId) => ({ optionId, label: optionId })),
+      },
+    ];
+    // Regression 1 (review round 1): a definition whose v2 legitimately ADDED
+    // an option must not turn its own v1-shaped draft into a false conflict —
+    // the draft's option set is a SUBSET of the candidate's, so it reuses.
+    expect(structureCompatible(enumV1(["bezowa", "szara"]), enumV1(["bezowa", "szara", "antracytowa"]))).toBe(true);
+    expect(
+      assessCatalogCandidate(
+        { name: "Kolor fugi", fields: enumV1(["bezowa", "szara"]) },
+        { name: "Kolor fugi", fields: enumV1(["bezowa", "szara", "antracytowa"]) },
+      ),
+    ).toEqual({
+      score: 1,
+      verdict: "reuse_candidate",
+      structureCompatible: true,
+    });
+    // Regression 2: same SIZE with DISJOINT option sets is a different
+    // meaning — never a silent reuse (count-based comparison said true).
+    expect(structureCompatible(enumV1(["bezowa", "szara"]), enumV1(["biala", "czarna"]))).toBe(false);
+    expect(
+      assessCatalogCandidate(
+        { name: "Kolor fugi", fields: enumV1(["bezowa", "szara"]) },
+        { name: "Kolor fugi", fields: enumV1(["biala", "czarna"]) },
+      ).verdict,
+    ).toBe("name_conflict");
+    // An EMPTY draft option set is degenerate but a subset of anything.
+    expect(structureCompatible(enumV1([]), enumV1(["bezowa"]))).toBe(true);
   });
 
   it("reports unassessed compatibility explicitly when no draft was given", () => {

@@ -30,28 +30,33 @@ import {
   validationError,
   type RequestContext,
 } from "@kiero/runtime";
-import { stableKeyOf, structureCompatible, validateDefinitionShape, type FieldShapeView } from "@kiero/domain";
+import { stableKeyOf, structureCompatible, validateDefinitionShape } from "@kiero/domain";
 import type { MutationCtx } from "../../_generated/server";
 import { normalizedCompany } from "../findings/references";
 import {
   currentVersionOf,
   findDefinitionByStableKey,
+  type Db,
+  type DefinitionDoc,
 } from "./references";
 import { defineExtensionEntry, TEMPLATE_ID, type DefineExtensionInput } from "./semantics";
 
-/** Reuse-or-refuse decision for one existing same-key definition. */
-function reuseOutcome(
-  existing: { readonly _id: string; readonly currentVersionId?: string | undefined },
-  currentFields: readonly FieldShapeView[],
+/**
+ * The reuse-or-refuse decision for one existing same-key definition: fetch
+ * its current version (a definition without one is corrupt and refused
+ * loudly), decide compatibility, and answer with the reuse receipt or the
+ * typed conflict. Always answers — never falls through to creation.
+ */
+async function reuseOutcome(
+  db: Db,
+  existing: DefinitionDoc,
   input: DefineExtensionInput,
-): ResultEnvelope | null {
-  if (existing.currentVersionId === undefined) {
-    // A definition without a current version is corrupt: refuse loudly
-    // rather than build on it.
+): Promise<ResultEnvelope> {
+  const current = await currentVersionOf(db, existing);
+  if (current === null || existing.currentVersionId === undefined) {
     return errorResult(conflictError("extension_definition_corrupt"));
   }
-  const compatible = structureCompatible(input.fields, currentFields);
-  if (!compatible) {
+  if (!structureCompatible(input.fields, current.fields)) {
     return errorResult(
       conflictError("extension_definition_name_conflict", "extensionDefinitions", existing._id),
     );
@@ -82,24 +87,10 @@ export async function performDefineExtension(
   const stableKey = stableKeyOf(input.name);
   const existing = await findDefinitionByStableKey(tx.db, companyId, stableKey);
   if (existing.own !== null) {
-    const current = await currentVersionOf(tx.db, existing.own);
-    if (current === null) {
-      return errorResult(conflictError("extension_definition_corrupt"));
-    }
-    const outcome = reuseOutcome(existing.own, current.fields, input);
-    if (outcome !== null) {
-      return outcome;
-    }
+    return await reuseOutcome(tx.db, existing.own, input);
   }
   if (existing.shared !== null) {
-    const current = await currentVersionOf(tx.db, existing.shared);
-    if (current === null) {
-      return errorResult(conflictError("extension_definition_corrupt"));
-    }
-    const outcome = reuseOutcome(existing.shared, current.fields, input);
-    if (outcome !== null) {
-      return outcome;
-    }
+    return await reuseOutcome(tx.db, existing.shared, input);
   }
 
   // Pre-insert decode template: the receipt this transaction constructs.

@@ -36,7 +36,7 @@
  * rule runs at the operation boundary and over stored rows.
  */
 
-import { MAX_LIST_ITEMS, MAX_OBJECT_FIELDS } from "@kiero/contracts";
+import { MAX_LIST_ITEMS, MAX_OBJECT_FIELDS, SCALAR_FIELD_KINDS, DEFINITION_FIELD_KINDS } from "@kiero/contracts";
 
 /** The structural view of one definition field (decoded or encoded form). */
 export interface FieldShapeView {
@@ -61,19 +61,11 @@ export interface ExtensionValueView {
   readonly [extra: string]: unknown;
 }
 
-/** The scalar kinds a field (or list item) may take. */
-const SCALAR_KINDS: ReadonlySet<string> = new Set([
-  "text",
-  "quantity",
-  "boolean",
-  "enum",
-  "financial",
-  "temporal",
-  "entity_ref",
-]);
+/** The scalar kinds a field (or list item) may take: the contracts array. */
+const SCALAR_KINDS: ReadonlySet<string> = new Set(SCALAR_FIELD_KINDS);
 
 /** All legal field kinds: the scalar kinds plus a bounded list. */
-const FIELD_KINDS: ReadonlySet<string> = new Set([...SCALAR_KINDS, "list"]);
+const FIELD_KINDS: ReadonlySet<string> = new Set(DEFINITION_FIELD_KINDS);
 
 /** A sanitized check outcome: ok, or a stable refusal code. */
 export type ExtensionCheck = { readonly ok: true } | { readonly ok: false; readonly code: string };
@@ -81,6 +73,81 @@ export type ExtensionCheck = { readonly ok: true } | { readonly ok: false; reado
 /** A scalar value's tag must be one of the scalar kinds. */
 function isScalarValue(value: ExtensionValueView): boolean {
   return SCALAR_KINDS.has(value._tag);
+}
+
+// ---------------------------------------------------------------------------
+// Entity-reference walk: the pure half of the tenant check.
+// ---------------------------------------------------------------------------
+
+/** One approved entity reference found inside an extension value. */
+export interface EntityReferenceView {
+  /** The value-space reference tag; names the referenced table. */
+  readonly kind: "project" | "task" | "event" | "contact" | "source";
+  /** The referenced document id, exactly as carried in the value. */
+  readonly id: string;
+}
+
+/** The walk outcome: every reference in the value, or a malformed marker. */
+export type EntityReferenceWalk =
+  | { readonly ok: true; readonly references: readonly EntityReferenceView[] }
+  | { readonly ok: false; readonly code: "entity_reference_malformed" };
+
+/** The id property each reference kind carries (keyed by the reference tag). */
+const REFERENCE_ID_FIELDS: Record<string, string> = {
+  project: "projectId",
+  task: "taskId",
+  event: "eventId",
+  contact: "contactId",
+  source: "sourceId",
+};
+
+/**
+ * Purely enumerates every entity reference inside one extension value
+ * (decoded or encoded form): object members and list items are descended,
+ * `entity_ref` scalars are collected. The transaction layer owns what the
+ * references are checked AGAINST (tenant visibility of the target rows).
+ */
+export function collectEntityReferences(value: unknown): EntityReferenceWalk {
+  if (value === null || typeof value !== "object") {
+    return { ok: true, references: [] };
+  }
+  const view = value as {
+    _tag?: unknown;
+    reference?: Record<string, unknown> | undefined;
+    fields?: { value?: unknown }[] | undefined;
+    items?: unknown[] | undefined;
+  };
+  if (view._tag === "entity_ref") {
+    const reference = view.reference;
+    if (reference === null || typeof reference !== "object") {
+      return { ok: false, code: "entity_reference_malformed" };
+    }
+    const idField = reference._tag === undefined ? undefined : REFERENCE_ID_FIELDS[String(reference._tag)];
+    const id = idField === undefined ? undefined : reference[idField];
+    if (typeof id !== "string") {
+      return { ok: false, code: "entity_reference_malformed" };
+    }
+    return {
+      ok: true,
+      references: [{ kind: String(reference._tag) as EntityReferenceView["kind"], id }],
+    };
+  }
+  const collected: EntityReferenceView[] = [];
+  for (const entry of view.fields ?? []) {
+    const nested = collectEntityReferences(entry.value);
+    if (!nested.ok) {
+      return nested;
+    }
+    collected.push(...nested.references);
+  }
+  for (const item of view.items ?? []) {
+    const nested = collectEntityReferences(item);
+    if (!nested.ok) {
+      return nested;
+    }
+    collected.push(...nested.references);
+  }
+  return { ok: true, references: collected };
 }
 
 /**
