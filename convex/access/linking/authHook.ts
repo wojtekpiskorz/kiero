@@ -3,9 +3,10 @@
  *
  * The library calls `createOrUpdateUser` from its own generic mutation
  * context (untyped data model), which is why this adapter exists
- * separately from the generated-ctx adapter in ./cores.ts: it maps the
- * generic rows onto the SAME `GoogleHookStore` surface through explicit
- * field validation (no casts), then runs the identical cores. Two hooks:
+ * separately from the generated-ctx adapter (./storeAdapter.ts): it maps
+ * the generic rows onto the SAME `GoogleHookStore` surface through
+ * explicit field validation (no casts), then runs the identical ceremony
+ * cores (./ceremony.ts). Two hooks:
  *
  * - `recordGoogleProofHook`: a Google sign-in RESUMED an existing account
  *   — if that account's ceremony awaits its fresh Google first proof, the
@@ -21,13 +22,13 @@
 import type { AnyDataModel, GenericMutationCtx } from "convex/server";
 import { normalizeEmail } from "../identity/userPolicy";
 import {
-  googleLinkFromCallbackCore,
-  recordGoogleProofCore,
-  type AttemptPatch,
-  type AttemptSnapshot,
-  type GoogleHookStore,
-} from "./cores";
-import { decodeGoogleLinkProfile, type LinkRejectionCode } from "./policy";
+  attemptActive,
+  attemptStateOpen,
+  decodeGoogleLinkProfile,
+  type LinkRejectionCode,
+} from "./policy";
+import { googleLinkFromCallbackCore, recordGoogleProofCore } from "./ceremony";
+import type { AttemptPatch, AttemptSnapshot, GoogleHookStore } from "./store";
 
 /** The generic db of the library's callback context. */
 type HookDb = GenericMutationCtx<AnyDataModel>["db"];
@@ -46,8 +47,11 @@ function num(value: unknown, field: string): number {
   return value;
 }
 
-/** Maps one generic ceremony row onto the snapshot (validated, no casts). */
-function attemptOf(row: Record<string, unknown>): AttemptSnapshot | null {
+/**
+ * Maps one generic ceremony row onto the snapshot. Validated field by
+ * field, no casts; every failure THROWS, so the result is never null.
+ */
+function attemptOf(row: Record<string, unknown>): AttemptSnapshot {
   const state = row.state;
   if (
     state !== "awaiting_first_proof" &&
@@ -81,17 +85,7 @@ function attemptOf(row: Record<string, unknown>): AttemptSnapshot | null {
   };
 }
 
-/** True for the two states a hook may still advance. */
-function openState(attempt: AttemptSnapshot): boolean {
-  return attempt.state === "awaiting_first_proof" || attempt.state === "awaiting_target_proof";
-}
-
-/**
- * Builds the hook store over the generic db. The generic data model only
- * types system indexes, so lookups use the same filter-builder style the
- * B1 auth entry already uses in its callback (equality on one field; the
- * tables are tiny). Ids bridge through `normalizeId`, never casts.
- */
+/** Builds the hook store over the generic db (the cores' GoogleHookStore). */
 export function hookStore(db: HookDb): GoogleHookStore {
   return {
     userById: async (id) => {
@@ -114,12 +108,9 @@ export function hookStore(db: HookDb): GoogleHookStore {
         .query("linkingAttempts")
         .filter((q) => q.eq(q.field("email"), normalizeEmail(email)))
         .collect();
-      return rows
-        .map(attemptOf)
-        .filter(
-          (attempt): attempt is AttemptSnapshot =>
-            attempt !== null && openState(attempt),
-        );
+      // The canonical open-state predicate (policy.ts); freshness is
+      // decided per proof leg by the ceremony cores.
+      return rows.map(attemptOf).filter(attemptStateOpen);
     },
     activeAttemptByUser: async (userId, nowMs) => {
       const rows = await db
@@ -128,10 +119,7 @@ export function hookStore(db: HookDb): GoogleHookStore {
         .collect();
       const active = rows
         .map(attemptOf)
-        .filter(
-          (attempt): attempt is AttemptSnapshot =>
-            attempt !== null && openState(attempt) && nowMs <= attempt.expiresAtMs,
-        )
+        .filter((attempt) => attemptActive(attempt, nowMs))
         .sort((a, b) => b.startedAtMs - a.startedAtMs);
       return active[0] ?? null;
     },

@@ -17,22 +17,19 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  LINKING_WINDOW_MS,
-} from "../../convex/access/linking/policy";
+import { LINKING_WINDOW_MS } from "../../convex/access/linking/policy";
 import {
   beginLinkingCore,
   cancelLinkingCore,
-  confirmEmailChangeCore,
   googleLinkFromCallbackCore,
   linkingStatusCore,
-  recoverAccountCore,
   recordGoogleProofCore,
-  revokeOtherSessionsCore,
-  stageEmailChangeCore,
   stageProofCodeCore,
   verifyProofCodeCore,
-} from "../../convex/access/linking/cores";
+} from "../../convex/access/linking/ceremony";
+import { confirmEmailChangeCore, stageEmailChangeCore } from "../../convex/access/linking/emailChange";
+import { revokeOtherSessionsCore } from "../../convex/access/linking/sessionControls";
+import { recoverAccountCore } from "../../convex/access/linking/recovery";
 import { fakeAttempt, fakeDb, fakeLinkingTx, fakeUser, type FakeLinkingDb } from "./fake";
 
 const NOW = 1_800_000_000_000;

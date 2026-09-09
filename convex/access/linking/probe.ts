@@ -40,7 +40,9 @@ import {
   liveSessionStore,
   resolveLiveSession,
 } from "../identity/resolution";
-import { linkingTx, recoverAccountCore, sha256Hex } from "./cores";
+import { sha256Hex } from "./codes";
+import { recoverAccountCore } from "./recovery";
+import { linkingTx } from "./storeAdapter";
 
 function guardEnabled(): boolean {
   return process.env.KIERO_B2_PROOF_ENABLED === "1";

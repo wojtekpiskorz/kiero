@@ -118,13 +118,27 @@ export function proofFresh(
   return nowMs - proofAtMs <= LINKING_PROOF_FRESHNESS_MS && nowMs <= expiresAtMs;
 }
 
-/** A ceremony is active when non-terminal and not past its window. */
-export function attemptActive(attempt: AttemptView, nowMs: number): boolean {
-  return (
-    (attempt.state === "awaiting_first_proof" ||
-      attempt.state === "awaiting_target_proof") &&
-    nowMs <= attempt.expiresAtMs
-  );
+/**
+ * The two ceremony lifecycle predicates every module shares (the ONE
+ * canonical pair; adapters, cores and fakes all import them — never a
+ * private twin).
+ *
+ * Structural on purpose: policy views, store snapshots and hook snapshots
+ * all satisfy them.
+ */
+export interface AttemptStateView {
+  readonly state: AttemptView["state"];
+  readonly expiresAtMs: number;
+}
+
+/** A ceremony state is open while proofs may still land (terminal states are not). */
+export function attemptStateOpen(attempt: { readonly state: AttemptView["state"] }): boolean {
+  return attempt.state === "awaiting_first_proof" || attempt.state === "awaiting_target_proof";
+}
+
+/** A ceremony is active when open and not past its window. */
+export function attemptActive(attempt: AttemptStateView, nowMs: number): boolean {
+  return attemptStateOpen(attempt) && nowMs <= attempt.expiresAtMs;
 }
 
 /** Why a begin was refused; begin either proceeds or states its typed reason. */

@@ -2,12 +2,15 @@
  * The B2 Convex function surface (generated-call APIs).
  *
  * B1's doctrine, unchanged: TWO entry ways, ONE core. The typed command
- * seam (`access.linkVerifiedMethod` through dispatchAccess) needs the full
- * actor chain (membership), which a boss without a company lacks; the
- * identity-layer functions here are that pre-membership surface, running
- * the same cores (./cores.ts) with the same live-session resolution. Every
- * function enforces the live-session rules first: an upstream token whose
- * session is gone, revoked or 30-days inactive is denied.
+ * seam (`access.linkVerifiedMethod` through dispatchAccess) is the
+ * read-only confirmation; the identity-layer functions here are the
+ * write surface (they run the same cores — ./ceremony.ts,
+ * ./emailChange.ts, ./sessionControls.ts — with the same live-session
+ * resolution, and work before any membership exists). Every function
+ * enforces the live-session rules first: an upstream token whose session
+ * is gone, revoked or 30-days inactive is denied. The live session is
+ * resolved ONCE per invocation and the snapshot is reused for the
+ * company scope and the recent-authentication clock.
  *
  * Code delivery follows B1's honest pattern: the code is staged (hashed)
  * in an internal mutation, then emailed from the action; on delivery
@@ -35,22 +38,21 @@ import {
   liveSessionStore,
   resolveLiveSession,
   type LiveSessionDenial,
+  type LiveSessionSnapshot,
 } from "../identity/resolution";
 import { resolveRequestContext } from "../../platform/context";
+import type { QueryCtx } from "../../_generated/server";
 import {
   beginLinkingCore,
   cancelLinkingCore,
-  confirmEmailChangeCore,
   linkingStatusCore,
-  linkingStore,
-  linkingTx,
-  revokeOtherSessionsCore,
-  stageEmailChangeCore,
   stageProofCodeCore,
   verifyProofCodeCore,
-} from "./cores";
+} from "./ceremony";
+import { confirmEmailChangeCore, stageEmailChangeCore } from "./emailChange";
+import { revokeOtherSessionsCore } from "./sessionControls";
+import { linkingStore, linkingTx } from "./storeAdapter";
 import { LINK_REJECTED_MARKER, linkingRejectionCopy, type LinkRejectionCode } from "./policy";
-import type { MutationCtx, QueryCtx } from "../../_generated/server";
 
 /** The sanitized denial error every protected function fails with. */
 function denialError(reason: LiveSessionDenial): never {
@@ -66,38 +68,29 @@ function linkRejected(code: LinkRejectionCode): never {
   throw new ConvexError(`${LINK_REJECTED_MARKER}[${code}] ${linkingRejectionCopy[code]}`);
 }
 
-/** One resolved live session (the app `sessions` row snapshot). */
-interface LiveActor {
-  readonly sessionId: string;
-  readonly userId: string;
-}
-
-/** Resolves the caller's live session or fails sanitized (read-only). */
+/** Resolves the caller's live session ONCE, or fails sanitized (read-only). */
 async function requireLiveSession(
   db: QueryCtx["db"],
   auth: { getUserIdentity(): Promise<{ subject: string } | null> },
-): Promise<LiveActor> {
+): Promise<LiveSessionSnapshot> {
   const live = await resolveLiveSession(liveSessionStore(db), auth, Date.now());
   if (live.tag === "denied") {
     denialError(live.reason);
   }
-  return { sessionId: live.session.sessionId, userId: live.session.userId };
+  return live.session;
 }
 
 /**
- * The canonical company scope for revocation events, resolved through the
- * SAME A3 chain B1's revokeSession uses (live session -> user -> earliest
- * active membership -> company); null when no membership exists.
+ * The canonical company scope for revocation events, from the SAME
+ * resolved live-session snapshot (live session -> user -> earliest active
+ * membership -> company, the A3 chain B1's revokeSession uses); null when
+ * no membership exists.
  */
 async function companyIdForEvent(
   db: QueryCtx["db"],
-  auth: { getUserIdentity(): Promise<{ subject: string } | null> },
+  session: LiveSessionSnapshot,
 ): Promise<string | null> {
-  const live = await resolveLiveSession(liveSessionStore(db), auth, Date.now());
-  if (live.tag === "denied") {
-    return null;
-  }
-  const context = await resolveRequestContext(db, liveSessionIdentity(live.session, Date.now()));
+  const context = await resolveRequestContext(db, liveSessionIdentity(session, Date.now()));
   return context === null ? null : context.actor.companyId;
 }
 
@@ -216,7 +209,9 @@ export const stageEmailChange = internalMutation({
     const staged = await stageEmailChangeCore(linkingTx(ctx), {
       actorUserId: session.userId,
       newEmail: args.newEmail,
-      sessionStartedAtMs: await sessionStartedAtMs(ctx, session.sessionId),
+      // The trusted device-session start time (the recent-auth clock),
+      // from the SAME resolved snapshot — no second read.
+      sessionStartedAtMs: session.startedAtMs,
       nowMs: Date.now(),
     });
     if (!staged.ok) {
@@ -230,19 +225,6 @@ export const stageEmailChange = internalMutation({
     };
   },
 });
-
-/** The trusted device-session start time (the recent-authentication clock). */
-async function sessionStartedAtMs(
-  ctx: MutationCtx | QueryCtx,
-  sessionId: string,
-): Promise<number> {
-  const normalized = ctx.db.normalizeId("sessions", sessionId);
-  if (normalized === null) {
-    return 0;
-  }
-  const row = await ctx.db.get(normalized);
-  return row?.startedAtMs ?? 0;
-}
 
 /** Authenticated action: request an email change (code to the NEW address). */
 export const requestEmailChange = action({
@@ -288,8 +270,11 @@ export const confirmEmailChange = mutation({
 export const revokeOtherSessions = mutation({
   args: {},
   handler: async (ctx) => {
+    // ONE resolution drives both the revocation scope and the canonical
+    // event's company scope (previously resolved twice with different
+    // failure policies — the review's finding 3).
     const session = await requireLiveSession(ctx.db, ctx.auth);
-    const companyId = await companyIdForEvent(ctx.db, ctx.auth);
+    const companyId = await companyIdForEvent(ctx.db, session);
     return await revokeOtherSessionsCore(linkingTx(ctx), {
       actorUserId: session.userId,
       currentSessionId: session.sessionId,

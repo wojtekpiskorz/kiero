@@ -4,8 +4,11 @@
  * Implements `LinkingTx` (and through it `LinkingStore`) over plain maps,
  * with the same semantics the Convex adapters provide: normalizeId becomes
  * a table-prefix check, an explicit undefined in a patch clears the field,
- * and revocation delegates to B1's REAL `revokeSessionCore` over a fake
- * `RevocationSurface` (one revocation semantics everywhere).
+ * the ceremony lifecycle predicates come from the REAL policy module, the
+ * issuance throttle delegates to the REAL shared core
+ * (`commitIssuanceAttempt`), and revocation delegates to B1's REAL
+ * `revokeSessionCore` over a fake `RevocationSurface` (one semantics
+ * everywhere).
  *
  * Fake ids are TEST FIXTURE DATA constructed in this one documented helper
  * — not values crossing an external boundary (the no-cast rule governs
@@ -15,13 +18,14 @@
 import type { Doc } from "../../convex/_generated/dataModel";
 import { revokeSessionCore } from "../../convex/access/identity/operations";
 import { normalizeEmail } from "../../convex/access/identity/userPolicy";
-import { decideIssuance } from "../../convex/access/identity/issuanceLimit";
+import { commitIssuanceAttempt } from "../../convex/access/identity/issuanceLimit";
+import { attemptActive, attemptStateOpen } from "../../convex/access/linking/policy";
 import type {
   AttemptPatch,
   AttemptSnapshot,
   EmailChangeSnapshot,
   LinkingTx,
-} from "../../convex/access/linking/cores";
+} from "../../convex/access/linking/store";
 
 export interface FakeUserRow {
   id: string;
@@ -164,7 +168,7 @@ function snapshotOf(row: FakeAttemptRow): AttemptSnapshot {
 }
 
 function isOpen(row: FakeAttemptRow): boolean {
-  return row.state === "awaiting_first_proof" || row.state === "awaiting_target_proof";
+  return attemptStateOpen(row);
 }
 
 /** Builds the fake LinkingTx over one FakeLinkingDb (sequential ids). */
@@ -193,7 +197,7 @@ export function fakeLinkingTx(db: FakeLinkingDb): LinkingTx {
     },
     activeAttemptByUser: async (userId: string, nowMs: number) => {
       const active = [...db.attempts.values()]
-        .filter((row) => row.userId === userId && isOpen(row) && nowMs <= row.expiresAtMs)
+        .filter((row) => row.userId === userId && attemptActive(row, nowMs))
         .sort((a, b) => b.startedAtMs - a.startedAtMs);
       const row = active[0];
       return row === undefined ? null : snapshotOf(row);
@@ -366,18 +370,25 @@ export function fakeLinkingTx(db: FakeLinkingDb): LinkingTx {
         row.expiresAtMs = patch.expiresAtMs;
       }
     },
-    applyIssuanceThrottle: async (identifier: string, nowMs: number) => {
-      const row = db.rateLimits.get(identifier) ?? null;
-      const limit = decideIssuance(
-        row === null ? null : { lastAttemptTime: row.lastAttemptTime, attemptsLeft: row.attemptsLeft },
+    applyIssuanceThrottle: (identifier: string, nowMs: number) =>
+      // The REAL shared budget core over the fake's rate-limit map (the
+      // map is keyed by identifier, so the row's "document id" IS the key).
+      commitIssuanceAttempt(
+        {
+          throttleRow: async (id) => {
+            const row = db.rateLimits.get(id);
+            return row === undefined ? null : { id, ...row };
+          },
+          insertThrottleRow: async (id, row) => {
+            db.rateLimits.set(id, { ...row });
+          },
+          patchThrottleRow: async (id, row) => {
+            db.rateLimits.set(id, { ...row });
+          },
+        },
+        identifier,
         nowMs,
-      );
-      if (!limit.allowed) {
-        return false;
-      }
-      db.rateLimits.set(identifier, limit.next);
-      return true;
-    },
+      ),
     insertRecovery: async (row) => {
       db.recoveries.push({ ...row });
     },

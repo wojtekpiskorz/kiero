@@ -20,7 +20,8 @@ import {
   beginLinkingCore,
   recordGoogleProofCore,
   stageProofCodeCore,
-} from "../../convex/access/linking/cores";
+  verifyProofCodeCore,
+} from "../../convex/access/linking/ceremony";
 import { fakeDb, fakeLinkingTx, fakeUser, type FakeLinkingDb } from "./fake";
 
 const NOW = 1_800_000_000_000;
@@ -76,10 +77,47 @@ describe("access.linkVerifiedMethod through the checked dispatch", () => {
     return db;
   }
 
-  it("commits the email-direction link with the mailed code as verifiedIdentity", async () => {
+  it("confirms the email-direction link AFTER the identity-layer commit (verifiedIdentity names the ceremony)", async () => {
     const db = googlePersonDb();
     const tx = fakeLinkingTx(db);
-    await beginLinkingCore(tx, { actorUserId: "k57user1", targetMethod: "email_code", nowMs: NOW });
+    const begun = await beginLinkingCore(tx, { actorUserId: "k57user1", targetMethod: "email_code", nowMs: NOW });
+    if (!begun.ok) {
+      throw new Error("fixture: begin failed");
+    }
+    await recordGoogleProofCore(tx, {
+      userId: "k57user1",
+      profile: { sub: "g-sub-1", email: EMAIL },
+      nowMs: NOW,
+    });
+    const staged = await stageProofCodeCore(tx, { actorUserId: "k57user1", nowMs: NOW });
+    if (!staged.ok) {
+      throw new Error("fixture: staging failed");
+    }
+    // The WRITE path is the identity layer (verifyProofCode commits).
+    const committed = await verifyProofCodeCore(tx, {
+      actorUserId: "k57user1",
+      code: staged.value.code,
+      nowMs: NOW + 1000,
+    });
+    expect(committed).toEqual({ ok: true, value: { leg: "target_proof", linked: true } });
+
+    // The typed operation is the read-only confirmation of that commit.
+    const result = await dispatch(db, envelope("access.linkVerifiedMethod", {
+      userId: "k57user1",
+      method: "email_code",
+      verifiedIdentity: begun.value.attemptId,
+    }));
+    expect(result).toEqual({ _tag: "ok", value: { linked: "linked" } });
+    expect(db.authAccounts.some((row) => row.provider === "email_code")).toBe(true);
+  });
+
+  it("is READ-ONLY mid-ceremony: a typed conflict consumes no staged code", async () => {
+    const db = googlePersonDb();
+    const tx = fakeLinkingTx(db);
+    const begun = await beginLinkingCore(tx, { actorUserId: "k57user1", targetMethod: "email_code", nowMs: NOW });
+    if (!begun.ok) {
+      throw new Error("fixture: begin failed");
+    }
     await recordGoogleProofCore(tx, {
       userId: "k57user1",
       profile: { sub: "g-sub-1", email: EMAIL },
@@ -90,13 +128,25 @@ describe("access.linkVerifiedMethod through the checked dispatch", () => {
       throw new Error("fixture: staging failed");
     }
 
+    // One typed error must never follow a write (review finding 2): the
+    // confirmation refuses proofs-incomplete WITHOUT consuming the code…
     const result = await dispatch(db, envelope("access.linkVerifiedMethod", {
       userId: "k57user1",
       method: "email_code",
-      verifiedIdentity: staged.value.code,
+      verifiedIdentity: begun.value.attemptId,
     }));
-    expect(result).toEqual({ _tag: "ok", value: { linked: "linked" } });
-    expect(db.authAccounts.some((row) => row.provider === "email_code")).toBe(true);
+    expect(result._tag).toBe("error");
+    if (result._tag === "error") {
+      expect(result.error._tag).toBe("conflict");
+      expect(result.error.code).toBe("link_proofs_incomplete");
+    }
+    // …so the SAME code still commits through the identity layer.
+    const committed = await verifyProofCodeCore(tx, {
+      actorUserId: "k57user1",
+      code: staged.value.code,
+      nowMs: NOW + 1000,
+    });
+    expect(committed).toEqual({ ok: true, value: { leg: "target_proof", linked: true } });
   });
 
   it("fails forbidden for another user id (self-service scope)", async () => {
@@ -128,20 +178,20 @@ describe("access.linkVerifiedMethod through the checked dispatch", () => {
     }
   });
 
-  it("fails conflict with the typed code when proofs are incomplete", async () => {
+  it("fails conflict when the referenced ceremony does not exist", async () => {
     const db = googlePersonDb();
     const result = await dispatch(
       db,
       envelope("access.linkVerifiedMethod", {
         userId: "k57user1",
         method: "email_code",
-        verifiedIdentity: "31415926",
+        verifiedIdentity: "rd7attempt404",
       }),
     );
     expect(result._tag).toBe("error");
     if (result._tag === "error") {
       expect(result.error._tag).toBe("conflict");
-      expect(result.error.code).toBe("link_no_active_ceremony");
+      expect(result.error.code).toBe("link_ceremony_mismatch");
     }
   });
 

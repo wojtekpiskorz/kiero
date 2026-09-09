@@ -3,22 +3,14 @@
  * session view over B1's registry (`listMySessions`, with its honest
  * upstream states), per-device revocation through B1's live-session
  * operation, and "revoke every OTHER device" through the B2 loop over the
- * same canonical core.
+ * same canonical core. Every label renders from ./state.ts
+ * (`accountCopy` — the single copy home).
  */
 
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { accountCopy } from "./state";
-
-const sessionStateCopy = {
-  active: "Aktywne",
-  revoked: "Unieważnione",
-  upstreamGone: "Sesja zamknięta",
-  upstreamExpired: "Sesja wygasła",
-  upstreamInactive: "Wygasła po 30 dniach nieaktywności",
-  currentDevice: "To urządzenie",
-} as const;
 
 function lastSeenPl(ms: number): string {
   return new Date(ms).toLocaleString("pl-PL", { dateStyle: "medium", timeStyle: "short" });
@@ -50,26 +42,28 @@ export function AccountSessionsPanel(): React.ReactNode {
         {(sessions ?? []).map((session) => (
           <li key={session.sessionId}>
             <strong>
-              {session.isCurrent ? sessionStateCopy.currentDevice : session.deviceLabel}
+              {session.isCurrent ? accountCopy.sessionCurrentDevice : session.deviceLabel}
             </strong>{" "}
             <span>
               {session.revokedAtMs !== null
-                ? sessionStateCopy.revoked
+                ? accountCopy.sessionRevoked
                 : session.upstreamState === "gone"
-                  ? sessionStateCopy.upstreamGone
+                  ? accountCopy.sessionUpstreamGone
                   : session.upstreamState === "expired"
-                    ? sessionStateCopy.upstreamExpired
+                    ? accountCopy.sessionUpstreamExpired
                     : session.upstreamState === "inactive"
-                      ? sessionStateCopy.upstreamInactive
-                      : sessionStateCopy.active}
+                      ? accountCopy.sessionUpstreamInactive
+                      : accountCopy.sessionActive}
             </span>{" "}
-            <span>ostatnia aktywność: {lastSeenPl(session.lastSeenAtMs)}</span>{" "}
+            <span>
+              {accountCopy.sessionLastSeenLabel}: {lastSeenPl(session.lastSeenAtMs)}
+            </span>{" "}
             {session.revokedAtMs === null && (
               <button
                 type="button"
                 onClick={() => void revoke({ sessionId: session.sessionId })}
               >
-                Wyloguj to urządzenie
+                {accountCopy.revokeThisDevice}
               </button>
             )}
           </li>

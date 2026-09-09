@@ -56,8 +56,8 @@ import {
   type UserPolicyUser,
 } from "./userPolicy";
 import {
+  commitIssuanceAttempt,
   ISSUANCE_RATE_LIMITED_MARKER,
-  decideIssuance,
 } from "./issuanceLimit";
 import {
   googleLinkFromCallbackHook,
@@ -185,34 +185,53 @@ const authConfig: ConvexAuthConfig = {
       // collection filter (same pattern as the users lookup below).
       if (args.type === "email") {
         const identifier = `issuance:email_code:${normalizeEmail(input.profile.email)}`;
-        const limitRow = await ctx.db
-          .query("authRateLimits")
-          .filter((q) => q.eq(q.field("identifier"), identifier))
-          .first();
-        const limit = decideIssuance(
-          limitRow === null
-            ? null
-            : { lastAttemptTime: limitRow.lastAttemptTime, attemptsLeft: limitRow.attemptsLeft },
+        // B2 amendment: the row read/write is the ONE shared budget core
+        // (./issuanceLimit.ts commitIssuanceAttempt); this inline adapter is
+        // the generic-callback db half. A blocked attempt writes nothing
+        // (rewriting the row would keep pushing the recovery window and
+        // starve the honest user).
+        const throttled = await commitIssuanceAttempt(
+          {
+            throttleRow: async (id) => {
+              const row = await ctx.db
+                .query("authRateLimits")
+                .filter((q) => q.eq(q.field("identifier"), id))
+                .first();
+              return row === null
+                ? null
+                : {
+                    id: row._id,
+                    lastAttemptTime: row.lastAttemptTime,
+                    attemptsLeft: row.attemptsLeft,
+                  };
+            },
+            insertThrottleRow: async (id, row) => {
+              await ctx.db.insert("authRateLimits", {
+                identifier: id,
+                lastAttemptTime: row.lastAttemptTime,
+                attemptsLeft: row.attemptsLeft,
+              });
+            },
+            patchThrottleRow: async (rowId, row) => {
+              // normalizeId is the proved bridge back to the branded id
+              // (the surface carries plain strings, like the policy).
+              const id = ctx.db.normalizeId("authRateLimits", rowId);
+              if (id === null) {
+                throw new Error("issuance throttle: nieprawidłowy identyfikator");
+              }
+              await ctx.db.patch(id, {
+                lastAttemptTime: row.lastAttemptTime,
+                attemptsLeft: row.attemptsLeft,
+              });
+            },
+          },
+          identifier,
           Date.now(),
         );
-        if (!limit.allowed) {
-          // No write on a blocked attempt: rewriting the row would keep
-          // pushing the recovery window and starve the honest user.
+        if (!throttled) {
           throw new Error(
             `${ISSUANCE_RATE_LIMITED_MARKER} Zbyt wiele próśb o kod na ten adres. Odczekaj kilka minut i spróbuj ponownie.`,
           );
-        }
-        if (limitRow === null) {
-          await ctx.db.insert("authRateLimits", {
-            identifier,
-            lastAttemptTime: limit.next.lastAttemptTime,
-            attemptsLeft: limit.next.attemptsLeft,
-          });
-        } else {
-          await ctx.db.patch(limitRow._id, {
-            lastAttemptTime: limit.next.lastAttemptTime,
-            attemptsLeft: limit.next.attemptsLeft,
-          });
         }
       }
 
