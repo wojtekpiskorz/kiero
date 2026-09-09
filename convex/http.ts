@@ -1,5 +1,5 @@
 /**
- * Convex HTTP actions composition entry (A3).
+ * Convex HTTP actions composition entry (A3; telemetry routes appended by I2).
  *
  * Convex serves the default export of the `http` module as the deployment's
  * HTTP router. Route handlers live in their owning lane files; this entry
@@ -9,11 +9,19 @@
 
 import { httpRouter } from "convex/server";
 import { bridgeHandler, echoHandler, healthHandler } from "./platform/http";
+import {
+  heartbeatHandler,
+  ingestHandler,
+  telemetryHealthHandler,
+} from "./operations/telemetry/http";
 
 const http = httpRouter();
 
 http.route({ path: "/platform/bridge", method: "POST", handler: bridgeHandler });
 http.route({ path: "/platform/echo", method: "POST", handler: echoHandler });
 http.route({ path: "/platform/health", method: "GET", handler: healthHandler });
+http.route({ path: "/platform/telemetry/ingest", method: "POST", handler: ingestHandler });
+http.route({ path: "/platform/telemetry/heartbeat", method: "POST", handler: heartbeatHandler });
+http.route({ path: "/platform/telemetry/health", method: "GET", handler: telemetryHealthHandler });
 
 export default http;

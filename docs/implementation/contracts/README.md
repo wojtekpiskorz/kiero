@@ -93,11 +93,11 @@ There is deliberately **no general-purpose Schema→Validator compiler**. The on
 | `convex/operations/exports/schema.ts` | `exports`, `exportSourceLinks` | I3 |
 | `convex/operations/deletion/schema.ts` | `deletionRecords` | I4 |
 | `convex/operations/backups/schema.ts` | `recoveryManifests` | I5 (+I6 drills) |
-| `convex/operations/telemetry/schema.ts` | `auditRecords`, `diagnosticEvents` | I2 |
+| `convex/operations/telemetry/schema.ts` | `auditRecords`, `diagnosticEvents`, `healthHeartbeats`, `costEntries`, `costAlertStates` | I2 |
 | `convex/schema/shared.ts` | shared values + proved conversion | A2 → A3 |
 | `convex/schema.ts` | composition entry | A2 → A3 |
 
-52 tables total since the A3 certification amendment (`externalEffects`); the inventory is the closed `TABLE_ID_NAMES` union in `@kiero/contracts`, and `convex/schema.ts` fails at import time if the composed tables and the inventory differ in either direction. `outboxEvents` (platform fragment) is the durable home of `DomainEventEnvelope`: publishers write it atomically with their state change, and the 9 registered consumer edges drain it through durable jobs.
+52 tables total since the A3 certification amendment (`externalEffects`); the inventory is the closed `TABLE_ID_NAMES` union in `@kiero/contracts`, and `convex/schema.ts` fails at import time if the composed tables and the inventory differ in either direction. I2 amendment (2026-09-09): 55 tables - the telemetry fragment gained `healthHeartbeats`, `costEntries`, `costAlertStates` (backend-silence ledger + the 400/500 PLN cost-alert accounting), registered in `TABLE_ID_NAMES` as the sanctioned small coordinated change; `diagnosticEvents` gained closed kind unions, origin fields, dedup key and retention indexes (fragment-owned). `outboxEvents` (platform fragment) is the durable home of `DomainEventEnvelope`: publishers write it atomically with their state change, and the 9 registered consumer edges drain it through durable jobs.
 
 Lanes that create NEW tables (B2 `convex/access/linking/**`, D6 `convex/processing/audio/**`, F3 `convex/attention/push/**`, F4 `convex/attention/reminders/**`, G3 `convex/calendar/sync/**`, H4 `convex/operations/processing/**`, E5 additions) add their own fragment file and register the new table names in `TABLE_ID_NAMES` plus the composition import: a small coordinated change named in their issue, not a shared mega-schema edit.
 

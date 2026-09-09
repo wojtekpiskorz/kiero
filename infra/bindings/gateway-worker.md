@@ -16,7 +16,7 @@ media upload/playback/export routes). Configuration skeleton:
 
 | Name | Purpose | Injected via | Status |
 | --- | --- | --- | --- |
-| `AXIOM_API_TOKEN` | Axiom ingestion for redacted diagnostics and Cloudflare Worker telemetry | `wrangler secret put AXIOM_API_TOKEN --config apps/gateway/wrangler.jsonc [--env <env>]` | PENDING (I2) |
+| `AXIOM_API_TOKEN` | Axiom ingestion for redacted diagnostics and Cloudflare Worker telemetry | `wrangler secret put AXIOM_API_TOKEN --config apps/gateway/wrangler.jsonc [--env <env>]` | PENDING owner account provisioning (I2 consumer implemented; without it the gateway falls back to the Convex ingest endpoint) |
 
 ## Notes
 

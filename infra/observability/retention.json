@@ -1,0 +1,17 @@
+{
+  "description": "Retention configuration for Kiero diagnostics (I2). The accepted policy: redacted technical events are retained 30 days. Enforcement is two-sided and BOTH sides are recorded honestly: Convex-side windowed pruning (retention.ts + pruneExpired) and the Axiom dataset retention setting (30 days is the Personal-plan default). Axiom dataset trimming operates on storage blocks, so the setting is not evidence of exact per-event physical deletion at a boundary - dashboards must state the window, not promise byte-exact expiry.",
+  "diagnosticEvents": {
+    "windowDays": 30,
+    "enforcedBy": "convex pruneExpired mutation (bounded batches, every telemetry tick)",
+    "sinkSide": "axiom dataset retention 30 days (Personal default; verify after provisioning)"
+  },
+  "healthHeartbeats": {
+    "keptPerService": 20,
+    "enforcedBy": "heartbeat recorder prunes the tail on every insert"
+  },
+  "costAccounting": {
+    "windowDays": 400,
+    "note": "Cost entries/alert states are accounting, not diagnostics; they outlive the diagnostic window so the 400/500 PLN budget history survives."
+  },
+  "canonicalRecords": "Domain and audit tables are NOT affected by these windows; telemetry is best effort and never audit history."
+}
