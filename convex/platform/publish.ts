@@ -181,6 +181,15 @@ export async function registerDurableJob(
       .query("durableJobs")
       .withIndex("by_jobKey", (q) => q.eq("jobKey", jobKey))
       .first());
+  if (existing !== null && existing.kind !== registration.kind) {
+    // A dedup key colliding across job kinds must fail in EVERY existing
+    // state, not only definite failures: a silent skip would strand the
+    // registration (and its drain row) with no executor that ever completes
+    // it. Fail like the unknown-executor and malformed-id cases above.
+    throw new Error(
+      `registerDurableJob: dedup key collision across job kinds (${existing.kind} vs ${registration.kind})`,
+    );
+  }
   const decision = decideJobRegistration(
     existing === null
       ? null
@@ -198,14 +207,6 @@ export async function registerDurableJob(
   }
 
   if (existing !== null) {
-    if (existing.kind !== registration.kind) {
-      // A dedup key colliding across job kinds would silently re-queue the
-      // row under the old kind and the old executor would run it; fail like
-      // the unknown-executor and malformed-id cases above.
-      throw new Error(
-        `registerDurableJob: dedup key collision across job kinds (${existing.kind} vs ${registration.kind})`,
-      );
-    }
     // Re-registration of a definitely-failed row: ONE row per dedup key.
     // Re-queue the existing row and keep its attempt count, so total
     // executions stay bounded by the row's maxAttempts across replays.
