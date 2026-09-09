@@ -5,7 +5,7 @@
   "title": "Dwa projekty, dwa formaty płytek",
   "coverage": ["mixed_projects", "technical_dimensions"],
   "fixtureClock": "2026-09-22T09:00:00+02:00",
-  "notes": "60x60 cm for Krucza, 100x100 cm for Dębowa — spoken dimension words must not be scrambled between projects or units.",
+  "notes": "60x60 cm for Krucza, 100x100 cm for Dębowa: spoken dimension words must not be scrambled between projects or units.",
   "tenant": {
     "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
     "bosses": [{ "ref": "B-MAREK", "name": "Marek", "role": "administrator firmy" }],

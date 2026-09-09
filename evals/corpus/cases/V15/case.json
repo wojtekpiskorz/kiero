@@ -5,7 +5,7 @@
   "title": "Dwa niezależne nagrania potwierdzają jeden termin",
   "coverage": ["corroboration", "date_precision"],
   "fixtureClock": "2026-09-24T10:00:00+02:00",
-  "notes": "Two different bosses report the same delivery date from independent conversations. One finding, two evidence entries, one typed independent_corroboration — not two separate findings.",
+  "notes": "Two different bosses report the same delivery date from independent conversations. One finding, two evidence entries, one typed independent_corroboration; not two separate findings.",
   "tenant": {
     "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
     "bosses": [

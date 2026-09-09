@@ -10,38 +10,41 @@ Status: **corpus and answer keys built and validated; NO real runs executed.** E
 | `evals/corpus/cases/<ID>/case.json` | 50 fixtures: `T01`–`T14` text, `V01`–`V16` voice, `I01`–`I12` image, `M01`–`M08` mixed follow-up. Each carries its own tenant (firma, szefowie, kontakty, projekty z aliasami, istniejące ustalenia), immutable sources with parts, a fixture clock, and an explicit lifecycle `timeline` where needed. |
 | `evals/corpus/cases/<ID>/*.svg` | Deterministic synthetic images for image/mixed cases (see provenance below). |
 | `evals/corpus/assets/generate-images.mjs` | Seeded, byte-identical-on-rerun generator for all SVG assets; records sha256 into each fixture. |
-| `evals/corpus/schema/case.schema.json`, `expected.schema.json` | JSON Schema (draft-07 subset) for fixtures and answer keys. |
+| `evals/corpus/schema/case.schema.json`, `expected.schema.json` | JSON Schema (draft-07 subset) for fixtures and answer keys. The shared typed-value definitions are duplicated across the two files on purpose; the validator fails on any divergence between them. |
 | `evals/expected/<ID>.json` | 50 human-authored answer keys, `answerKeyAuthoring: human_independent_of_model_output`. Structured per stage: durable memory changes (typed values per the value contracts), required clarifications with the exact ambiguity, prohibited writes, plus expected STT fidelity points, vision extraction points and retrieval expectations. |
-| `evals/expected/scoring/` | Scorer INPUT contract (`run-report.schema.json`), critical-error rule encoding (`critical-rules.mjs`), the deliberate probe (`probe/`), and the scoring README. |
+| `evals/expected/scoring/` | Scorer INPUT contract (`run-report.schema.json`, with binding per-beat `published` semantics), critical-error rule encoding (`critical-rules.mjs`), the deliberate probe (`probe/`), and the scoring README. |
 
 ## How to run the checks
 
 Plain `node`, zero dependencies:
 
 ```bash
-# Full corpus validation: counts, IDs, schemas, assets, anchors, isolation, coverage
+# Full corpus validation: counts, IDs, schemas, shared-definition identity,
+# assets, anchors, part references, tenant isolation (fixtures AND answer-key
+# scopes), coverage
 node evals/corpus/validate/validate.mjs
 
-# Deliberate scorer probe: three planted critical errors must all be flagged
+# Deliberate scorer probe: four planted critical errors must all be flagged
 node evals/expected/scoring/probe/probe.mjs
 
 # Regenerate all image assets deterministically (sha256 is re-recorded into fixtures)
 node evals/corpus/assets/generate-images.mjs
 ```
 
-Observed on 2026-09-09 (branch `codex/kiero-e1`): validator exit 0 with `50 (text 14, voice 16, image 12, mixed 8)` and all 16 coverage dimensions used; probe exit 0 with three criticals (`amount`, `project`, `source_basis`) flagged at caseScores 0.95–0.99; generator output byte-identical across repeated runs.
+Observed on 2026-09-09 (branch `codex/kiero-e1`): validator exit 0 with `50 (text 14, voice 16, image 12, mixed 8)` and all 16 coverage dimensions used; probe exit 0 with four criticals (`amount`, `project`, `source_basis`, and the T13 stale-overwrite `amount` at caseScore 1.0); generator output byte-identical across repeated runs.
 
 Negative controls (temporarily breaking a fixture, then restoring):
 
 - duplicate `caseId` (T03 claiming to be T02) → `duplicate caseId "T02" (also in cases/T02/case.json)` plus directory-mismatch and orphaned-expected-file errors, exit 1;
 - removing the required `transcript` field from V01 → schema error naming `missing required field "transcript"`, exit 1;
-- tampering with `I01/sketch.svg` → `asset sha256 mismatch (recorded 90c50c78cf7b..., actual 76758b9d7930...)`, exit 1.
+- tampering with `I01/sketch.svg` → `asset sha256 mismatch (recorded ..., actual ...)`, exit 1;
+- pointing an answer-key scope at another case's project (T02 key scope `P-BANAN`, which exists only in T01/T06 fixtures) → `references project "P-BANAN" not defined in case T02's tenant (cross-case leak or typo)`, exit 1.
 
 ## Reset-per-case requirement for any future runner
 
 Every case is an isolated tenant universe: its own firma, bosses, contacts, projects with aliases and `existingFindings`. Any runner (D6, J3, E2–E6 proof owners) MUST:
 
-1. Instantiate fresh state from `case.json`'s `tenant` for every case, in every run. No case may inherit findings, aliases, projects or corrections from another case — including between the three qualification runs and between cases of one run.
+1. Instantiate fresh state from `case.json`'s `tenant` for every case, in every run. No case may inherit findings, aliases, projects or corrections from another case, including between the three qualification runs and between cases of one run.
 2. Anchor relative dates to the fixture's `sentAt` values in Europe/Warsaw, never to processing wall-clock time.
 3. Follow `timeline` beats: delayed `run_completion` entries model in-flight stale plans (a late older analysis must not overwrite a published correction); `source_withdrawn` and `source_deleted` model lifecycle operations with dependency-aware re-evaluation.
 4. Score against `evals/expected/<ID>.json` only, and never let provider-side code read or rewrite answer keys (they live outside provider implementation paths).
@@ -52,9 +55,15 @@ The whole corpus carries one explicit revision (`corpusRevision`, currently `202
 
 ## Assets: present vs pending
 
-- **Present (14 deterministic SVGs):** `I01`–`I12`, `M03`, `M05` — generated by `evals/corpus/assets/generate-images.mjs` (fixed seeds, generator version recorded per asset, sha256 verified by the validator). Handwriting-style sketches use a cursive font stack with seeded jitter; exact rendering varies by viewer fonts, so each fixture's `contentDescription` and the SVG `<desc>` are the authoritative content, and the validator cross-checks answer-key values against them.
+- **Present (14 deterministic SVGs):** `I01`–`I12`, `M03`, `M05`, generated by `evals/corpus/assets/generate-images.mjs` (fixed seeds, generator version recorded per asset, sha256 verified by the validator). Handwriting-style sketches use a cursive font stack with seeded jitter; exact rendering varies by viewer fonts, so each fixture's `contentDescription` and the SVG `<desc>` are the authoritative content, and the validator cross-checks answer-key values against them.
 - **Pending (all voice audio):** 24 voice parts across `V01`–`V16` and the mixed cases declare `assetProvenance.status = "pending_generation"` with an explicit statement that the fixture `transcript` is the source of truth for expected STT. No audio files are faked; generating honest synthetic speech matching the transcripts and `recordingContext` descriptions is owned by D6/J3 tooling.
 - **Text:** inline in fixtures; no external assets.
+
+## Pending integration work
+
+| Item | Owner | Note |
+| --- | --- | --- |
+| PENDING | A3 | Wire corpus validation + probe into CI (`checks.yml`, root manifest). A3 owns the root manifest/checks wiring per the coordinator; E1 deliberately does not edit those paths. |
 
 ## Relationship to qualification
 

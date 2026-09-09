@@ -23,28 +23,33 @@
       "status": "complete",
       "published": [
         {
-          "findingKey": "material_invoice",
-          "scope": { "level": "project", "ref": "P-BANAN" },
-          "operation": "set",
-          "knowledgeState": "known",
-          "value": {
-            "kind": "financial",
-            "role": "material_cost",
-            "precision": "exact",
-            "amount": "3400.00",
-            "currency": "PLN",
-            "currencyOrigin": "firm_default",
-            "vatBasis": "net"
-          },
-          "evidence": [{ "sourceId": "S1" }]
-        },
-        {
-          "findingKey": "tile_color",
-          "scope": { "level": "project", "ref": "P-BANAN" },
-          "operation": "set",
-          "knowledgeState": "known",
-          "value": { "kind": "text", "value": "białe" },
-          "evidence": [{ "sourceId": "S1" }]
+          "stageId": "final",
+          "changes": [
+            {
+              "findingKey": "material_invoice",
+              "scope": { "level": "project", "ref": "P-BANAN" },
+              "operation": "set",
+              "knowledgeState": "known",
+              "value": {
+                "kind": "financial",
+                "role": "material_cost",
+                "precision": "exact",
+                "amount": "3400.00",
+                "currency": "PLN",
+                "currencyOrigin": "firm_default",
+                "vatBasis": "net"
+              },
+              "evidence": [{ "sourceId": "S1" }]
+            },
+            {
+              "findingKey": "tile_color",
+              "scope": { "level": "project", "ref": "P-BANAN" },
+              "operation": "set",
+              "knowledgeState": "known",
+              "value": { "kind": "text", "value": "białe" },
+              "evidence": [{ "sourceId": "S1" }]
+            }
+          ]
         }
       ]
     },

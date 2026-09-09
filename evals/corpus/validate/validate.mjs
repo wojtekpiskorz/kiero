@@ -191,7 +191,7 @@ function validateSchema(value, schema, root, path, errs) {
         .filter(Boolean)
         .slice(0, 2)
         .join("; ");
-      errs.push(`${path}: must satisfy exactly one allowed variant (oneOf), satisfied ${satisfied}${hints ? ` — first issues per variant: ${hints}` : ""}`);
+      errs.push(`${path}: must satisfy exactly one allowed variant (oneOf), satisfied ${satisfied}${hints ? `; first issues per variant: ${hints}` : ""}`);
     }
   }
 }
@@ -213,6 +213,41 @@ const caseSchemaPath = join(ROOT, "schema", "case.schema.json");
 const expectedSchemaPath = join(ROOT, "schema", "expected.schema.json");
 
 const EXPECTED_COUNTS = { text: 14, voice: 16, image: 12, mixed: 8 };
+
+// The two schemas intentionally duplicate the typed value-contract definitions.
+// Divergence would silently fork the meaning of values between fixtures and
+// answer keys, so any difference fails validation. Comparison is key-order
+// insensitive; descriptions must still match verbatim.
+const SHARED_VALUE_DEFS = [
+  "value",
+  "temporalValue",
+  "financialValue",
+  "quantityValue",
+  "textValue",
+  "enumValue",
+  "entityRefValue",
+  "knowledgeState",
+];
+{
+  const canon = (v) =>
+    JSON.stringify(v, (k, val) => {
+      if (val && typeof val === "object" && !Array.isArray(val)) {
+        return Object.keys(val)
+          .sort()
+          .reduce((acc, key) => ({ ...acc, [key]: val[key] }), {});
+      }
+      return val;
+    });
+  const caseDefs = readJson(caseSchemaPath).definitions ?? {};
+  const expectedDefs = readJson(expectedSchemaPath).definitions ?? {};
+  for (const name of SHARED_VALUE_DEFS) {
+    if (!caseDefs[name] || !expectedDefs[name]) {
+      fail(`schema divergence: shared definition "${name}" missing from one of the schema files`);
+    } else if (canon(caseDefs[name]) !== canon(expectedDefs[name])) {
+      fail(`schema divergence: shared definition "${name}" differs between case.schema.json and expected.schema.json; keep the copies identical`);
+    }
+  }
+}
 
 const caseDirs = readdirSync(CASES_DIR)
   .filter((name) => statSync(join(CASES_DIR, name)).isDirectory())
@@ -310,7 +345,7 @@ for (const dir of caseDirs) {
   const scopeRefs = (obj, path) => {
     if (Array.isArray(obj)) return obj.forEach((v, i) => scopeRefs(v, `${path}[${i}]`));
     if (obj && typeof obj === "object") {
-      // create_project expectations intentionally reference a project NOT yet in the tenant —
+      // create_project expectations intentionally reference a project NOT yet in the tenant:
       // creating it from the inquiry is exactly what the runner must do. Tenant isolation still
       // forbids referencing another CASE's refs.
       if (obj.scope && obj.scope.level === "project" && obj.operation !== "create_project" && !projectRefs.has(obj.scope.ref)) {
@@ -363,7 +398,7 @@ for (const dir of caseDirs) {
     const sha = createHash("sha256").update(bytes).digest("hex");
     if (typeof prov.sha256 === "string") {
       if (prov.sha256 !== sha) {
-        fail(`${label}: ${part.partId} asset sha256 mismatch (recorded ${prov.sha256.slice(0, 12)}..., actual ${sha.slice(0, 12)}...) — regenerate or fix provenance`);
+        fail(`${label}: ${part.partId} asset sha256 mismatch (recorded ${prov.sha256.slice(0, 12)}..., actual ${sha.slice(0, 12)}...); regenerate or fix provenance`);
       }
     } else {
       fail(`${label}: ${part.partId} present asset must record sha256 provenance`);
@@ -420,6 +455,29 @@ for (const file of expectedFiles) {
   if (file !== `${id}.json`) fail(`${label}: file name must be ${id}.json`);
 
   const kase = readJson(casePath);
+
+  // Tenant isolation for answer keys: every scope ref must resolve inside THIS
+  // case's tenant (create_project expectations excepted, they create the ref).
+  // A ref from another case's fixture (e.g. a borrowed P-BANAN) must fail.
+  {
+    const tenantProjects = new Set((kase.tenant?.projects ?? []).map((p) => p.ref));
+    (exp.stages ?? []).forEach((stage) => {
+      (stage.memoryChanges ?? []).forEach((change, i) => {
+        const where = `stages[${stage.stageId}].memoryChanges[${i}]`;
+        const scope = change.scope;
+        if (!scope) return;
+        if (scope.level === "company") {
+          if (scope.ref !== "COMPANY") {
+            fail(`${label}: ${where} company scope must use ref "COMPANY", got "${scope.ref}"`);
+          }
+        } else if (scope.level === "project") {
+          if (change.operation !== "create_project" && !tenantProjects.has(scope.ref)) {
+            fail(`${label}: ${where} references project "${scope.ref}" not defined in case ${id}'s tenant (cross-case leak or typo)`);
+          }
+        }
+      });
+    });
+  }
   if (exp.corpusRevision !== kase.corpusRevision) {
     fail(`${label}: corpusRevision "${exp.corpusRevision}" != case "${kase.corpusRevision}"`);
   }
@@ -437,23 +495,44 @@ for (const file of expectedFiles) {
   }
   const sourceIds = new Set((kase.sources ?? []).map((s) => s.sourceId));
 
+  // Strict part resolution: a typo'd partId must FAIL, never silently degrade
+  // to a haystack of all parts. An omitted partId is allowed only when exactly
+  // one part of the anchor's type exists.
+  const resolvePart = (partId, map, typeLabel, path) => {
+    if (partId !== undefined) {
+      const part = map.get(partId);
+      if (!part) {
+        fail(`${label}: ${path} references unknown ${typeLabel} part "${partId}"`);
+        return null;
+      }
+      return part;
+    }
+    const all = [...map.values()];
+    if (all.length === 1) return all[0];
+    if (all.length === 0) {
+      fail(`${label}: ${path} uses a ${typeLabel} anchor but the case has no ${typeLabel} part`);
+      return null;
+    }
+    fail(`${label}: ${path} omits partId while the case has ${all.length} ${typeLabel} parts; the anchor is ambiguous`);
+    return null;
+  };
+
   const checkEvidence = (e, path) => {
     if (!sourceIds.has(e.sourceId)) fail(`${label}: ${path} references unknown sourceId "${e.sourceId}"`);
     if (e.anchor?.kind === "text_quote") {
-      const part = e.partId ? textParts.get(e.partId) : [...textParts.values()][0];
-      const text = part?.text ?? [...textParts.values()].map((p) => p.text).join(" ");
-      if (!text || !text.includes(e.anchor.quote)) {
+      const part = resolvePart(e.partId, textParts, "text", path);
+      if (part && !part.text.includes(e.anchor.quote)) {
         fail(`${label}: ${path} text_quote not found verbatim in source text: "${e.anchor.quote}"`);
       }
     }
     if (e.anchor?.kind === "audio_interval") {
-      const part = e.partId ? voiceParts.get(e.partId) : [...voiceParts.values()][0];
+      const part = resolvePart(e.partId, voiceParts, "voice", path);
       if (part && (e.anchor.to > part.durationSeconds + 0.001 || e.anchor.from < 0)) {
         fail(`${label}: ${path} audio interval [${e.anchor.from}, ${e.anchor.to}] outside part duration ${part.durationSeconds}s`);
       }
     }
     if (e.anchor?.kind === "image_region") {
-      const part = e.partId ? imageParts.get(e.partId) : [...imageParts.values()][0];
+      const part = resolvePart(e.partId, imageParts, "image", path);
       if (part && (e.anchor.x + e.anchor.w > part.widthPx + 0.001 || e.anchor.y + e.anchor.h > part.heightPx + 0.001)) {
         fail(`${label}: ${path} image region outside ${part.widthPx}x${part.heightPx} bounds`);
       }
@@ -534,7 +613,7 @@ for (const file of expectedFiles) {
         .map((c) => c.replace(/\s+/g, ""));
       const present = candidates.some((c) => c.length >= 1 && haystack.includes(c));
       if (!present) {
-        fail(`${label}: expectedVision[${i}] value [${needles.filter(Boolean).join(", ")}] not found in asset text content — asset and answer key disagree`);
+          fail(`${label}: expectedVision[${i}] value [${needles.filter(Boolean).join(", ")}] not found in asset text content; asset and answer key disagree`);
       }
     }
   }

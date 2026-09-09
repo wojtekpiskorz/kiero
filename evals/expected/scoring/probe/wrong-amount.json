@@ -23,21 +23,26 @@
       "status": "complete",
       "published": [
         {
-          "findingKey": "agreed_price",
-          "scope": { "level": "project", "ref": "P-KACZMAREK" },
-          "operation": "set",
-          "knowledgeState": "known",
-          "value": {
-            "kind": "financial",
-            "role": "agreed_price",
-            "precision": "exact",
-            "amount": "1200000.00",
-            "currency": "PLN",
-            "currencyOrigin": "firm_default",
-            "vatBasis": "net",
-            "originalExpression": "12 000 zł netto"
-          },
-          "evidence": [{ "sourceId": "S1", "anchor": { "kind": "text_quote", "quote": "12 000 zł netto za całe zlecenie" } }]
+          "stageId": "final",
+          "changes": [
+            {
+              "findingKey": "agreed_price",
+              "scope": { "level": "project", "ref": "P-KACZMAREK" },
+              "operation": "set",
+              "knowledgeState": "known",
+              "value": {
+                "kind": "financial",
+                "role": "agreed_price",
+                "precision": "exact",
+                "amount": "1200000.00",
+                "currency": "PLN",
+                "currencyOrigin": "firm_default",
+                "vatBasis": "net",
+                "originalExpression": "12 000 zł netto"
+              },
+              "evidence": [{ "sourceId": "S1", "anchor": { "kind": "text_quote", "quote": "12 000 zł netto za całe zlecenie" } }]
+            }
+          ]
         }
       ]
     },

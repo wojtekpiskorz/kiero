@@ -67,7 +67,7 @@
             { "sourceId": "S2", "partId": "S2-aud", "supportType": "support", "anchor": { "kind": "audio_interval", "from": 3.0, "to": 8.0, "transcriptQuote": "gres, dziewięćdziesiąt metrów kwadratowych" } }
           ],
           "historyExpectation": "S1's support link is removed with the withdrawal; S2's independent confirmation keeps its role.",
-          "rationale": "A withdrawn source cannot solely support current information — but the 90 m² fact survives on S2's independent support."
+          "rationale": "A withdrawn source cannot solely support current information, but the 90 m² fact survives on S2's independent support."
         }
       ],
       "prohibitedWrites": [

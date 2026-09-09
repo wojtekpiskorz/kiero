@@ -33,7 +33,7 @@
         {
           "clarificationId": "CL-1",
           "ambiguity": "Wiadomość zapowiada 'Wysyłam zdjęcie rzutu Banana', ale źródło nie ma żadnego załącznika zdjęcia; powierzchnia do policzenia zależy od tego brakującego materiału.",
-          "asksAbout": "Missing announced image attachment — the boss must be told the photo never arrived before the area can be computed.",
+          "asksAbout": "Missing announced image attachment: the boss must be told the photo never arrived before the area can be computed.",
           "options": ["Szef wyśle zdjęcie ponownie", "Szef poda powierzchnię słownie"]
         }
       ],

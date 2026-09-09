@@ -5,7 +5,7 @@
   "title": "Wymiary schodów słownie",
   "coverage": ["technical_dimensions"],
   "fixtureClock": "2026-09-25T09:00:00+02:00",
-  "notes": "Spoken dimensions: steps 60x30 cm, 14 pieces, sheet metal 4 mm. Units must be preserved verbatim — no silent cm->mm or mm->cm conversion.",
+  "notes": "Spoken dimensions: steps 60x30 cm, 14 pieces, sheet metal 4 mm. Units must be preserved verbatim: no silent cm->mm or mm->cm conversion.",
   "tenant": {
     "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
     "bosses": [{ "ref": "B-MAREK", "name": "Marek", "role": "administrator firmy" }],

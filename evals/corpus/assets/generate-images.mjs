@@ -161,7 +161,7 @@ function buildI03() {
 }
 
 function buildI04() {
-  const c = doc({ w: 800, h: 500, bg: "#ffffff", desc: "Wizytówka: WIŚNIEWSKI INSTALACJE, Marek Wiśniewski, tel. 601 202 303, kontakt@deweloper-instalacje.example.pl." });
+  const c = doc({ w: 800, h: 500, bg: "#ffffff", desc: "Wizytówka: WIŚNIEWSKI INSTALACJE, Marek Wiśniewski, tel. 601 202 303, kontakt@wisniewski-instalacje.example.pl." });
   c.rect(40, 40, 720, 420, { fill: "#f4f6fa", stroke: "#1c2f6e", sw: 4 });
   c.print(80, 140, 34, "WIŚNIEWSKI INSTALACJE", { color: "#1c2f6e", weight: "bold", spacing: "2" });
   c.print(80, 200, 22, "Marek Wiśniewski");
@@ -344,7 +344,7 @@ for (const [caseId, build] of Object.entries(SPECS)) {
       }
     }
   }
-  if (patched === 0) throw new Error(`${caseId}: no image part references ${file} — fixture and generator disagree`);
+  if (patched === 0) throw new Error(`${caseId}: no image part references ${file}; fixture and generator disagree`);
   writeFileSync(caseJsonPath, JSON.stringify(kase, null, 2) + "\n", "utf8");
   results.push({ caseId, file, sha256: sha.slice(0, 16) + "...", bytes: Buffer.byteLength(svg) });
 }

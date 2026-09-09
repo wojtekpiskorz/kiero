@@ -25,7 +25,7 @@
           "evidence": [
             { "sourceId": "S1", "partId": "S1-txt", "supportType": "support", "anchor": { "kind": "text_quote", "quote": "18 000 zł za całość. Chyba brutto... nie pamiętam dokładnie" } }
           ],
-          "rationale": "The amount is certain and recordable; only the basis is uncertain, so it must stay not_specified — 'chyba brutto' is not evidence of brutto."
+          "rationale": "The amount is certain and recordable; only the basis is uncertain, so it must stay not_specified: 'chyba brutto' is not evidence of brutto."
         }
       ],
       "clarifications": [

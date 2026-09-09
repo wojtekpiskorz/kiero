@@ -5,25 +5,47 @@
   "description": "One synthetic Polish case: tenant starting state, immutable source(s) with anchors, and lifecycle timeline. English keys, Polish content. All company/person names are synthetic.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["caseId", "modality", "corpusRevision", "title", "coverage", "fixtureClock", "tenant", "sources"],
+  "required": [
+    "caseId",
+    "modality",
+    "corpusRevision",
+    "title",
+    "coverage",
+    "fixtureClock",
+    "tenant",
+    "sources"
+  ],
   "properties": {
     "caseId": {
       "type": "string",
       "pattern": "^(T(0[1-9]|1[0-4])|V(0[1-9]|1[0-6])|I(0[1-9]|1[0-2])|M0[1-8])$",
       "description": "T=text, V=voice, I=image, M=mixed follow-up. Must match the fixture directory name."
     },
-    "modality": { "enum": ["text", "voice", "image", "mixed"] },
+    "modality": {
+      "enum": [
+        "text",
+        "voice",
+        "image",
+        "mixed"
+      ]
+    },
     "corpusRevision": {
       "type": "string",
       "pattern": "^\\d{4}\\.\\d{2}\\.\\d+$",
       "description": "Corpus revision this fixture belongs to. Must equal manifest.json corpusRevision. Any corpus edit bumps it."
     },
-    "title": { "type": "string", "minLength": 5, "description": "Short Polish title of the scenario." },
+    "title": {
+      "type": "string",
+      "minLength": 5,
+      "description": "Short Polish title of the scenario."
+    },
     "coverage": {
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "$ref": "#/definitions/coverageTag" },
+      "items": {
+        "$ref": "#/definitions/coverageTag"
+      },
       "description": "Evaluation dimensions exercised by this case. Every vocabulary tag must be used somewhere in the corpus."
     },
     "fixtureClock": {
@@ -31,17 +53,26 @@
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+02:00$",
       "description": "Authoritative send time of the first source in the firm timezone (Europe/Warsaw, CEST +02:00 in corpus period). Anchors relative-date interpretation; never the runner's clock."
     },
-    "notes": { "type": "string", "description": "Optional authoring notes for humans (English)." },
-    "tenant": { "$ref": "#/definitions/tenant" },
+    "notes": {
+      "type": "string",
+      "description": "Optional authoring notes for humans (English)."
+    },
+    "tenant": {
+      "$ref": "#/definitions/tenant"
+    },
     "sources": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/definitions/source" },
+      "items": {
+        "$ref": "#/definitions/source"
+      },
       "description": "Immutable source messages in send order. Text modality: exactly 1 source, text parts only. Voice: voice part(s) required. Image: image part(s) required. Mixed: at least 2 sources."
     },
     "timeline": {
       "type": "array",
-      "items": { "$ref": "#/definitions/timelineEntry" },
+      "items": {
+        "$ref": "#/definitions/timelineEntry"
+      },
       "description": "Explicit lifecycle and run-timing facts beyond send order: delayed run completions (stale plans), source withdrawal, permanent deletion."
     }
   },
@@ -66,7 +97,11 @@
         "corroboration"
       ]
     },
-    "ref": { "type": "string", "pattern": "^(B|C|P)-[A-Z0-9-]{2,24}$", "description": "Tenant-local entity reference: B-* boss, C-* contact, P-* project." },
+    "ref": {
+      "type": "string",
+      "pattern": "^(B|C|P)-[A-Z0-9-]{2,24}$",
+      "description": "Tenant-local entity reference: B-* boss, C-* contact, P-* project."
+    },
     "isoDateTimePlus0200": {
       "type": "string",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+02:00$",
@@ -75,16 +110,32 @@
     "tenant": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["firm", "bosses", "projects"],
+      "required": [
+        "firm",
+        "bosses",
+        "projects"
+      ],
       "properties": {
         "firm": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["name", "timezone", "defaultCurrency"],
+          "required": [
+            "name",
+            "timezone",
+            "defaultCurrency"
+          ],
           "properties": {
-            "name": { "type": "string", "minLength": 2, "description": "Synthetic Polish firm name." },
-            "timezone": { "const": "Europe/Warsaw" },
-            "defaultCurrency": { "const": "PLN" }
+            "name": {
+              "type": "string",
+              "minLength": 2,
+              "description": "Synthetic Polish firm name."
+            },
+            "timezone": {
+              "const": "Europe/Warsaw"
+            },
+            "defaultCurrency": {
+              "const": "PLN"
+            }
           }
         },
         "bosses": {
@@ -93,11 +144,25 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["ref", "name", "role"],
+            "required": [
+              "ref",
+              "name",
+              "role"
+            ],
             "properties": {
-              "ref": { "$ref": "#/definitions/ref" },
-              "name": { "type": "string", "minLength": 2 },
-              "role": { "enum": ["administrator firmy", "szef"] }
+              "ref": {
+                "$ref": "#/definitions/ref"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 2
+              },
+              "role": {
+                "enum": [
+                  "administrator firmy",
+                  "szef"
+                ]
+              }
             }
           }
         },
@@ -106,13 +171,32 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["ref", "name", "kind"],
+            "required": [
+              "ref",
+              "name",
+              "kind"
+            ],
             "properties": {
-              "ref": { "$ref": "#/definitions/ref" },
-              "name": { "type": "string", "minLength": 2 },
-              "kind": { "enum": ["person", "organization"] },
-              "phone": { "type": "string" },
-              "detail": { "type": "string", "description": "Polish free-text detail, e.g. handlowiec." }
+              "ref": {
+                "$ref": "#/definitions/ref"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 2
+              },
+              "kind": {
+                "enum": [
+                  "person",
+                  "organization"
+                ]
+              },
+              "phone": {
+                "type": "string"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Polish free-text detail, e.g. handlowiec."
+              }
             }
           }
         },
@@ -122,16 +206,40 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["ref", "alias", "stage"],
+            "required": [
+              "ref",
+              "alias",
+              "stage"
+            ],
             "properties": {
-              "ref": { "$ref": "#/definitions/ref" },
-              "alias": { "type": "string", "minLength": 2, "description": "Alias projektu per glossary; firm-unique." },
-              "client": { "$ref": "#/definitions/ref" },
-              "stage": {
-                "enum": ["zapytanie", "wycena", "uzgodnienie", "realizacja", "oddanie", "zakonczone", "wstrzymany"]
+              "ref": {
+                "$ref": "#/definitions/ref"
               },
-              "location": { "type": "string" },
-              "detail": { "type": "string" }
+              "alias": {
+                "type": "string",
+                "minLength": 2,
+                "description": "Alias projektu per glossary; firm-unique."
+              },
+              "client": {
+                "$ref": "#/definitions/ref"
+              },
+              "stage": {
+                "enum": [
+                  "zapytanie",
+                  "wycena",
+                  "uzgodnienie",
+                  "realizacja",
+                  "oddanie",
+                  "zakonczone",
+                  "wstrzymany"
+                ]
+              },
+              "location": {
+                "type": "string"
+              },
+              "detail": {
+                "type": "string"
+              }
             }
           }
         },
@@ -141,13 +249,30 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["scope", "findingKey", "knowledgeState"],
+            "required": [
+              "scope",
+              "findingKey",
+              "knowledgeState"
+            ],
             "properties": {
-              "scope": { "$ref": "#/definitions/scope" },
-              "findingKey": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "minLength": 3 },
-              "knowledgeState": { "$ref": "#/definitions/knowledgeState" },
-              "value": { "$ref": "#/definitions/value" },
-              "note": { "type": "string", "description": "Polish summary of the pre-existing ustalenie." }
+              "scope": {
+                "$ref": "#/definitions/scope"
+              },
+              "findingKey": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "minLength": 3
+              },
+              "knowledgeState": {
+                "$ref": "#/definitions/knowledgeState"
+              },
+              "value": {
+                "$ref": "#/definitions/value"
+              },
+              "note": {
+                "type": "string",
+                "description": "Polish summary of the pre-existing ustalenie."
+              }
             }
           }
         }
@@ -156,9 +281,17 @@
     "scope": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["level", "ref"],
+      "required": [
+        "level",
+        "ref"
+      ],
       "properties": {
-        "level": { "enum": ["project", "company"] },
+        "level": {
+          "enum": [
+            "project",
+            "company"
+          ]
+        },
         "ref": {
           "type": "string",
           "pattern": "^(COMPANY|[A-Z0-9-]{2,26})$",
@@ -166,50 +299,110 @@
         }
       }
     },
-    "knowledgeState": { "enum": ["known", "unknown", "conflicted", "not_applicable"] },
+    "knowledgeState": {
+      "enum": [
+        "known",
+        "unknown",
+        "conflicted",
+        "not_applicable"
+      ]
+    },
     "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sourceId", "author", "sentAt", "parts"],
+      "required": [
+        "sourceId",
+        "author",
+        "sentAt",
+        "parts"
+      ],
       "properties": {
-        "sourceId": { "type": "string", "pattern": "^S[1-9][0-9]?$" },
-        "author": { "$ref": "#/definitions/ref" },
-        "sentAt": { "$ref": "#/definitions/isoDateTimePlus0200" },
-        "fullyAcceptedAt": { "$ref": "#/definitions/isoDateTimePlus0200" },
+        "sourceId": {
+          "type": "string",
+          "pattern": "^S[1-9][0-9]?$"
+        },
+        "author": {
+          "$ref": "#/definitions/ref"
+        },
+        "sentAt": {
+          "$ref": "#/definitions/isoDateTimePlus0200"
+        },
+        "fullyAcceptedAt": {
+          "$ref": "#/definitions/isoDateTimePlus0200"
+        },
         "projectPill": {
           "type": "string",
           "pattern": "^P-[A-Z0-9-]{2,24}$",
           "description": "Optional project context pill attached in the UI; context only, never forces attribution of every clause."
         },
-        "parts": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/part" } }
+        "parts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/part"
+          }
+        }
       }
     },
     "part": {
       "type": "object",
       "oneOf": [
-        { "$ref": "#/definitions/textPart" },
-        { "$ref": "#/definitions/voicePart" },
-        { "$ref": "#/definitions/imagePart" }
+        {
+          "$ref": "#/definitions/textPart"
+        },
+        {
+          "$ref": "#/definitions/voicePart"
+        },
+        {
+          "$ref": "#/definitions/imagePart"
+        }
       ]
     },
     "textPart": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["partId", "type", "text"],
+      "required": [
+        "partId",
+        "type",
+        "text"
+      ],
       "properties": {
-        "partId": { "type": "string", "pattern": "^S[1-9][0-9]?-txt[0-9]?$" },
-        "type": { "const": "text" },
-        "text": { "type": "string", "minLength": 8, "description": "Exact Polish message text. Text-quote anchors reference substrings of this string." }
+        "partId": {
+          "type": "string",
+          "pattern": "^S[1-9][0-9]?-txt[0-9]?$"
+        },
+        "type": {
+          "const": "text"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 8,
+          "description": "Exact Polish message text. Text-quote anchors reference substrings of this string."
+        }
       }
     },
     "voicePart": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["partId", "type", "durationSeconds", "transcript", "assetProvenance"],
+      "required": [
+        "partId",
+        "type",
+        "durationSeconds",
+        "transcript",
+        "assetProvenance"
+      ],
       "properties": {
-        "partId": { "type": "string", "pattern": "^S[1-9][0-9]?-aud[0-9]?$" },
-        "type": { "const": "voice" },
-        "durationSeconds": { "type": "number", "exclusiveMinimum": 0 },
+        "partId": {
+          "type": "string",
+          "pattern": "^S[1-9][0-9]?-aud[0-9]?$"
+        },
+        "type": {
+          "const": "voice"
+        },
+        "durationSeconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "transcript": {
           "type": "string",
           "minLength": 8,
@@ -219,185 +412,458 @@
           "type": "string",
           "description": "Polish description of recording conditions the audio must reproduce (noise, crosstalk, phone quality)."
         },
-        "assetProvenance": { "$ref": "#/definitions/assetProvenance" }
+        "assetProvenance": {
+          "$ref": "#/definitions/assetProvenance"
+        }
       }
     },
     "imagePart": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["partId", "type", "asset", "widthPx", "heightPx", "contentDescription", "assetProvenance"],
+      "required": [
+        "partId",
+        "type",
+        "asset",
+        "widthPx",
+        "heightPx",
+        "contentDescription",
+        "assetProvenance"
+      ],
       "properties": {
-        "partId": { "type": "string", "pattern": "^S[1-9][0-9]?-img[0-9]?$" },
-        "type": { "const": "image" },
-        "asset": { "type": "string", "pattern": "^[A-Za-z0-9_-]+\\.svg$", "description": "File name, resolved relative to this case directory." },
-        "widthPx": { "type": "integer", "minimum": 100 },
-        "heightPx": { "type": "integer", "minimum": 100 },
+        "partId": {
+          "type": "string",
+          "pattern": "^S[1-9][0-9]?-img[0-9]?$"
+        },
+        "type": {
+          "const": "image"
+        },
+        "asset": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+\\.svg$",
+          "description": "File name, resolved relative to this case directory."
+        },
+        "widthPx": {
+          "type": "integer",
+          "minimum": 100
+        },
+        "heightPx": {
+          "type": "integer",
+          "minimum": 100
+        },
         "contentDescription": {
           "type": "string",
           "minLength": 10,
           "description": "Human-authored ground-truth description of everything legible in the image. Authoritative for expected vision extraction."
         },
-        "assetProvenance": { "$ref": "#/definitions/assetProvenance" }
+        "assetProvenance": {
+          "$ref": "#/definitions/assetProvenance"
+        }
       }
     },
     "assetProvenance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status"],
+      "required": [
+        "status"
+      ],
       "properties": {
-        "status": { "enum": ["generated", "pending_generation"] },
-        "generator": { "type": "string", "description": "Repository path of the deterministic generator script (generated assets)." },
-        "generatorVersion": { "type": "integer", "minimum": 1 },
-        "seed": { "type": "integer", "minimum": 0 },
-        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "status": {
+          "enum": [
+            "generated",
+            "pending_generation"
+          ]
+        },
+        "generator": {
+          "type": "string",
+          "description": "Repository path of the deterministic generator script (generated assets)."
+        },
+        "generatorVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
         "statement": {
           "type": "string",
           "description": "For pending_generation: explicit honest statement of what stands in for the missing asset."
         },
-        "note": { "type": "string" }
+        "note": {
+          "type": "string"
+        }
       }
     },
     "timelineEntry": {
       "type": "object",
       "oneOf": [
-        { "$ref": "#/definitions/runCompletionEntry" },
-        { "$ref": "#/definitions/sourceWithdrawnEntry" },
-        { "$ref": "#/definitions/sourceDeletedEntry" }
+        {
+          "$ref": "#/definitions/runCompletionEntry"
+        },
+        {
+          "$ref": "#/definitions/sourceWithdrawnEntry"
+        },
+        {
+          "$ref": "#/definitions/sourceDeletedEntry"
+        }
       ]
     },
     "runCompletionEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "sourceId", "completesAt"],
+      "required": [
+        "type",
+        "sourceId",
+        "completesAt"
+      ],
       "properties": {
-        "type": { "const": "run_completion" },
-        "sourceId": { "type": "string", "pattern": "^S[1-9][0-9]?$" },
-        "completesAt": { "$ref": "#/definitions/isoDateTimePlus0200" },
-        "reason": { "type": "string", "description": "Why processing was delayed (backlog, provider outage) — the stale-plan setup." }
+        "type": {
+          "const": "run_completion"
+        },
+        "sourceId": {
+          "type": "string",
+          "pattern": "^S[1-9][0-9]?$"
+        },
+        "completesAt": {
+          "$ref": "#/definitions/isoDateTimePlus0200"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why processing was delayed (backlog, provider outage); the stale-plan setup."
+        }
       }
     },
     "sourceWithdrawnEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "sourceId", "at", "by", "reason"],
+      "required": [
+        "type",
+        "sourceId",
+        "at",
+        "by",
+        "reason"
+      ],
       "properties": {
-        "type": { "const": "source_withdrawn" },
-        "sourceId": { "type": "string", "pattern": "^S[1-9][0-9]?$" },
-        "at": { "$ref": "#/definitions/isoDateTimePlus0200" },
-        "by": { "$ref": "#/definitions/ref" },
-        "reason": { "type": "string", "minLength": 5, "description": "Polish reason recorded in history." }
+        "type": {
+          "const": "source_withdrawn"
+        },
+        "sourceId": {
+          "type": "string",
+          "pattern": "^S[1-9][0-9]?$"
+        },
+        "at": {
+          "$ref": "#/definitions/isoDateTimePlus0200"
+        },
+        "by": {
+          "$ref": "#/definitions/ref"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 5,
+          "description": "Polish reason recorded in history."
+        }
       }
     },
     "sourceDeletedEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "sourceId", "at", "by", "reason"],
+      "required": [
+        "type",
+        "sourceId",
+        "at",
+        "by",
+        "reason"
+      ],
       "properties": {
-        "type": { "const": "source_deleted" },
-        "sourceId": { "type": "string", "pattern": "^S[1-9][0-9]?$" },
-        "at": { "$ref": "#/definitions/isoDateTimePlus0200" },
-        "by": { "$ref": "#/definitions/ref" },
-        "reason": { "type": "string", "minLength": 5 }
+        "type": {
+          "const": "source_deleted"
+        },
+        "sourceId": {
+          "type": "string",
+          "pattern": "^S[1-9][0-9]?$"
+        },
+        "at": {
+          "$ref": "#/definitions/isoDateTimePlus0200"
+        },
+        "by": {
+          "$ref": "#/definitions/ref"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 5
+        }
       }
     },
     "value": {
       "description": "Typed value union per the architecture value contracts.",
       "anyOf": [
-        { "$ref": "#/definitions/temporalValue" },
-        { "$ref": "#/definitions/financialValue" },
-        { "$ref": "#/definitions/quantityValue" },
-        { "$ref": "#/definitions/textValue" },
-        { "$ref": "#/definitions/enumValue" },
-        { "$ref": "#/definitions/entityRefValue" }
+        {
+          "$ref": "#/definitions/temporalValue"
+        },
+        {
+          "$ref": "#/definitions/financialValue"
+        },
+        {
+          "$ref": "#/definitions/quantityValue"
+        },
+        {
+          "$ref": "#/definitions/textValue"
+        },
+        {
+          "$ref": "#/definitions/enumValue"
+        },
+        {
+          "$ref": "#/definitions/entityRefValue"
+        }
       ]
     },
     "temporalValue": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "precision", "role"],
+      "required": [
+        "kind",
+        "precision",
+        "role"
+      ],
       "properties": {
-        "kind": { "const": "temporal" },
-        "precision": { "enum": ["date", "datetime", "range", "week"] },
+        "kind": {
+          "const": "temporal"
+        },
+        "precision": {
+          "enum": [
+            "date",
+            "datetime",
+            "range",
+            "week"
+          ]
+        },
         "role": {
-          "enum": ["proposal", "internal_plan", "agreed", "actual", "deadline"],
+          "enum": [
+            "proposal",
+            "internal_plan",
+            "agreed",
+            "actual",
+            "deadline"
+          ],
           "description": "Znaczenie terminu: propozycja, wewnętrzny plan, uzgodniony, faktyczny, termin krytyczny."
         },
-        "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
-        "datetime": { "$ref": "#/definitions/isoDateTimePlus0200" },
-        "timeOfDay": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
-        "fromDate": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
-        "toDate": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
-        "fromTime": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
-        "toTime": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
-        "originalExpression": { "type": "string", "description": "Polish expression as actually said/written; preserved verbatim." },
-        "qualifier": { "type": "string", "description": "e.g. 'rano' — kept as qualifier, never converted into an invented hour." }
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "datetime": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+02:00$"
+        },
+        "timeOfDay": {
+          "type": "string",
+          "pattern": "^\\d{2}:\\d{2}$"
+        },
+        "fromDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "toDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "fromTime": {
+          "type": "string",
+          "pattern": "^\\d{2}:\\d{2}$"
+        },
+        "toTime": {
+          "type": "string",
+          "pattern": "^\\d{2}:\\d{2}$"
+        },
+        "originalExpression": {
+          "type": "string",
+          "description": "Polish expression as actually said/written; preserved verbatim."
+        },
+        "qualifier": {
+          "type": "string",
+          "description": "e.g. rano: kept as qualifier, never converted into an invented hour."
+        }
       }
     },
     "financialValue": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "role", "precision", "currency", "currencyOrigin", "vatBasis"],
+      "required": [
+        "kind",
+        "role",
+        "precision",
+        "currency",
+        "currencyOrigin",
+        "vatBasis"
+      ],
       "properties": {
-        "kind": { "const": "financial" },
-        "role": {
-          "enum": ["agreed_price", "quoted_price", "estimated_price", "proposal_price", "material_cost", "labor_cost", "deposit", "payment"]
+        "kind": {
+          "const": "financial"
         },
-        "amount": { "type": "string", "pattern": "^\\d+\\.\\d{2}$", "description": "Exact decimal string, e.g. 12500.00. Decimal-safe; never a float." },
-        "minAmount": { "type": "string", "pattern": "^\\d+\\.\\d{2}$" },
-        "maxAmount": { "type": "string", "pattern": "^\\d+\\.\\d{2}$" },
-        "precision": { "enum": ["exact", "approximate", "range"] },
-        "currency": { "pattern": "^[A-Z]{3}$" },
-        "currencyOrigin": { "enum": ["stated", "firm_default"] },
+        "role": {
+          "enum": [
+            "agreed_price",
+            "quoted_price",
+            "estimated_price",
+            "proposal_price",
+            "material_cost",
+            "labor_cost",
+            "deposit",
+            "payment"
+          ]
+        },
+        "amount": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d{2}$",
+          "description": "Exact decimal string, e.g. 12500.00. Decimal-safe; never a float."
+        },
+        "minAmount": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d{2}$"
+        },
+        "maxAmount": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d{2}$"
+        },
+        "precision": {
+          "enum": [
+            "exact",
+            "approximate",
+            "range"
+          ]
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$"
+        },
+        "currencyOrigin": {
+          "enum": [
+            "stated",
+            "firm_default"
+          ]
+        },
         "vatBasis": {
-          "enum": ["net", "gross", "not_specified"],
+          "enum": [
+            "net",
+            "gross",
+            "not_specified"
+          ],
           "description": "never-infer-VAT: an unstated basis stays not_specified forever until a source states it."
         },
-        "originalExpression": { "type": "string" }
+        "originalExpression": {
+          "type": "string"
+        }
       }
     },
     "quantityValue": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "value", "unit"],
+      "required": [
+        "kind",
+        "value",
+        "unit"
+      ],
       "properties": {
-        "kind": { "const": "quantity" },
-        "value": { "type": "string", "pattern": "^\\d+([.,]\\d+)?$" },
+        "kind": {
+          "const": "quantity"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^\\d+([.,]\\d+)?$"
+        },
         "unit": {
-          "enum": ["mm", "cm", "m", "m2", "szt", "paleta", "kursy"],
+          "enum": [
+            "mm",
+            "cm",
+            "m",
+            "m2",
+            "szt",
+            "paleta",
+            "kursy"
+          ],
           "description": "Original unit preserved; never silently converted."
         },
-        "secondValue": { "type": "string", "pattern": "^\\d+([.,]\\d+)?$", "description": "For LxW pairs, e.g. 60x30 cm." },
-        "originalExpression": { "type": "string" }
+        "secondValue": {
+          "type": "string",
+          "pattern": "^\\d+([.,]\\d+)?$",
+          "description": "For LxW pairs, e.g. 60x30 cm."
+        },
+        "originalExpression": {
+          "type": "string"
+        }
       }
     },
     "textValue": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "value"],
+      "required": [
+        "kind",
+        "value"
+      ],
       "properties": {
-        "kind": { "const": "text" },
-        "value": { "type": "string", "minLength": 1, "description": "Exact Polish text, diacritics preserved." }
+        "kind": {
+          "const": "text"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact Polish text, diacritics preserved."
+        }
       }
     },
     "enumValue": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "value"],
+      "required": [
+        "kind",
+        "value"
+      ],
       "properties": {
-        "kind": { "const": "enum" },
-        "value": { "type": "string", "minLength": 1 } ,
-        "options": { "type": "array", "items": { "type": "string" } }
+        "kind": {
+          "const": "enum"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "entityRefValue": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "entity", "ref", "display"],
+      "required": [
+        "kind",
+        "entity",
+        "ref",
+        "display"
+      ],
       "properties": {
-        "kind": { "const": "entity_ref" },
-        "entity": { "enum": ["contact", "project", "boss"] },
-        "ref": { "$ref": "#/definitions/ref" },
-        "display": { "type": "string" }
+        "kind": {
+          "const": "entity_ref"
+        },
+        "entity": {
+          "enum": [
+            "contact",
+            "project",
+            "boss"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "pattern": "^(B|C|P)-[A-Z0-9-]{2,24}$"
+        },
+        "display": {
+          "type": "string"
+        }
       }
     }
   }

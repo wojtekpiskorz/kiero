@@ -5,7 +5,7 @@
   "title": "Podstawę kwoty trzeba wyjaśnić",
   "coverage": ["unknown_tax_basis", "amounts"],
   "fixtureClock": "2026-09-24T11:00:00+02:00",
-  "notes": "S1 records an 18 000 contract but the boss himself says 'chyba brutto, nie pamiętam' — an explicit uncertainty about basis on a signed contract. Correct stage 1: record 18000 with not_specified (no guessing) AND ask; asking is a SUCCESS here. S2 resolves: netto, applied as a revision, history keeps the not_specified phase.",
+  "notes": "S1 records an 18 000 contract but the boss himself says 'chyba brutto, nie pamiętam': an explicit uncertainty about basis on a signed contract. Correct stage 1: record 18000 with not_specified (no guessing) AND ask; asking is a SUCCESS here. S2 resolves: netto, applied as a revision, history keeps the not_specified phase.",
   "tenant": {
     "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
     "bosses": [

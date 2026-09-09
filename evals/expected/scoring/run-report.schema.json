@@ -76,32 +76,9 @@
             "status": { "$ref": "#/definitions/stageStatus" },
             "published": {
               "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["findingKey", "scope", "knowledgeState"],
-                "properties": {
-                  "findingKey": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-                  "scope": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": ["level", "ref"],
-                    "properties": { "level": { "enum": ["project", "company"] }, "ref": { "type": "string" } }
-                  },
-                  "operation": { "type": "string" },
-                  "knowledgeState": { "enum": ["known", "unknown", "conflicted", "not_applicable"] },
-                  "value": { "type": "object" },
-                  "evidence": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": ["sourceId"],
-                      "properties": { "sourceId": { "type": "string" }, "anchor": { "type": "object" } }
-                    }
-                  }
-                }
-              }
+              "minItems": 1,
+              "description": "PUBLISHED SEMANTICS: ordered per-beat snapshots mirroring the answer key's stages array. One snapshot per expected stage, in the same order, each carrying stageId copied from the key. Each snapshot lists the FULL current state at that beat of every finding the run touched: exactly one entry per findingKey+scope (duplicates are ambiguous publication and fail). The last snapshot is the final state after the whole case timeline (all sources processed, all run_completion beats done, lifecycle ops applied). Entries matching no expected change at any stage are extra writes and fail. Missing stageId snapshots fail.",
+              "items": { "$ref": "#/definitions/beatSnapshot" }
             }
           }
         },
@@ -131,6 +108,51 @@
     }
   },
   "definitions": {
+    "publishedChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["findingKey", "scope", "knowledgeState"],
+      "properties": {
+        "findingKey": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["level", "ref"],
+          "properties": { "level": { "enum": ["project", "company"] }, "ref": { "type": "string" } }
+        },
+        "operation": {
+          "type": "string",
+          "description": "The operation that produced this current value: set, supersede, mark_unknown, mark_conflicted, mark_not_applicable or create_project. Verified for the state-changing operations (mark_*, create_project); set and supersede are verified through value, knowledgeState and beats."
+        },
+        "knowledgeState": { "enum": ["known", "unknown", "conflicted", "not_applicable"] },
+        "value": { "type": "object" },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sourceId"],
+            "properties": { "sourceId": { "type": "string" }, "anchor": { "type": "object" } }
+          }
+        }
+      }
+    },
+    "beatSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stageId", "changes"],
+      "properties": {
+        "stageId": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]{2,32}$",
+          "description": "Mirrors the answer key's stageId for this beat."
+        },
+        "changes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/publishedChange" }
+        }
+      }
+    },
     "componentConfig": {
       "type": "object",
       "additionalProperties": false,
