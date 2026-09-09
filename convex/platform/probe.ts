@@ -343,7 +343,6 @@ export const probeFailPublication = action({
 export const failPublication = internalMutation({
   args: { message: v.string() },
   handler: async (ctx, args) => {
-    // publishEvent/registerDurableJob are imported statically at the top.
     const company = await ctx.db.query("companies").first();
     if (company === null) {
       throw new Error("probe: no company fixture");
