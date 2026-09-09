@@ -60,7 +60,9 @@ export const projectsTables = {
     createdAtMs: shared.tsMs,
   })
     .index("by_project_role", ["projectId", "role"])
-    .index("by_contact", ["contactId"]),
+    .index("by_project_contact_role", ["projectId", "contactId", "role"])
+    .index("by_contact", ["contactId"])
+    .index("by_company", ["companyId"]),
 
   /** One concrete matter from first inquiry to completion or cancellation. */
   projects: defineTable({
@@ -87,6 +89,8 @@ export const projectsTables = {
     codename: v.string(),
     active: v.boolean(),
     assignedAtMs: shared.tsMs,
+    /** When the codename was renamed away from; the row is retained. */
+    retiredAtMs: v.optional(shared.tsMs),
   })
     .index("by_company_codename", ["companyId", "codename"])
     .index("by_project", ["projectId"]),
