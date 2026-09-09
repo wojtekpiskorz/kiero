@@ -1,0 +1,66 @@
+{
+  "caseId": "M07",
+  "modality": "mixed",
+  "corpusRevision": "2026.09.1",
+  "title": "Propozycja, uzgodnienie i wykonanie terminu",
+  "coverage": ["date_precision"],
+  "fixtureClock": "2026-10-01T10:00:00+02:00",
+  "notes": "Temporal-role chain for one delivery: proposal 2026-10-05 (text), agreed 2026-10-06 09:00 (voice), actual 2026-10-06 (text 'wczoraj' sent on 2026-10-07). Roles never overwrite each other; history keeps all three.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-JURCZAK", "name": "Jurczak", "kind": "person", "detail": "klient" }],
+    "projects": [{ "ref": "P-JURCZAK", "alias": "Jurczak", "client": "C-JURCZAK", "stage": "realizacja" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-10-01T10:00:00+02:00",
+      "fullyAcceptedAt": "2026-10-01T10:00:02+02:00",
+      "projectPill": "P-JURCZAK",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Zaproponowałem Jurczakowi montaż na 5 października, czekam na jego odpowiedź."
+        }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-10-02T08:15:00+02:00",
+      "fullyAcceptedAt": "2026-10-02T08:15:07+02:00",
+      "projectPill": "P-JURCZAK",
+      "parts": [
+        {
+          "partId": "S2-aud",
+          "type": "voice",
+          "durationSeconds": 12.0,
+          "transcript": "Jurczak przyjął termin: montaż szóstego października o dziewiątej rano.",
+          "recordingContext": "Głosówka Wojtka.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker A."
+          }
+        }
+      ]
+    },
+    {
+      "sourceId": "S3",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-10-07T18:30:00+02:00",
+      "fullyAcceptedAt": "2026-10-07T18:30:03+02:00",
+      "projectPill": "P-JURCZAK",
+      "parts": [
+        {
+          "partId": "S3-txt",
+          "type": "text",
+          "text": "Wczoraj skończyliśmy cały montaż u Jurczaka, do odnotowania."
+        }
+      ]
+    }
+  ]
+}

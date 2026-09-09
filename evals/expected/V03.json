@@ -1,0 +1,51 @@
+{
+  "caseId": "V03",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 4.0, "to": 6.0, "expectedText": "trzynastego", "risk": "Discarded value must still transcribe so the correction chain is auditable." },
+        { "from": 8.0, "to": 11.0, "expectedText": "trzydziestego", "risk": "'trzydziestego' vs 'trzynastego' confusion — the load-bearing distinction of this case." },
+        { "from": 12.0, "to": 14.5, "expectedText": "Trzydziestego września", "risk": "Month dropped or corrupted." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "works_start_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "internal_plan",
+            "date": "2026-09-30",
+            "originalExpression": "trzydziestego września"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 8.0, "to": 14.5, "transcriptQuote": "trzydziestego. Trzydziestego września na pewno" }
+            }
+          ],
+          "historyExpectation": "The retracted 'trzynastego' wording stays in the transcript/source history as a superseded self-correction.",
+          "rationale": "Explicit spoken self-correction: 13th retracted, 30th affirmed twice. Final value wins without any question."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record 2026-09-13 as the start date.", "category": "date", "because": "The speaker retracted the 13th in the same message." },
+        { "mustNot": "Mark the finding conflicted or ask which date applies.", "category": "clarification", "because": "The correction is explicit and repeated; asking is needless." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "caseId": "T11",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed (no image was ever attached).",
+      "memoryChanges": [
+        {
+          "findingKey": "screed_thickness",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "quantity",
+            "value": "6",
+            "unit": "cm",
+            "originalExpression": "wylewka ma być 6 cm"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "wylewka ma być 6 cm" }
+            }
+          ],
+          "rationale": "The thickness is stated in the text itself and is complete evidence on its own."
+        }
+      ],
+      "clarifications": [
+        {
+          "clarificationId": "CL-1",
+          "ambiguity": "Wiadomość zapowiada 'Wysyłam zdjęcie rzutu Banana', ale źródło nie ma żadnego załącznika zdjęcia; powierzchnia do policzenia zależy od tego brakującego materiału.",
+          "asksAbout": "Missing announced image attachment — the boss must be told the photo never arrived before the area can be computed.",
+          "options": ["Szef wyśle zdjęcie ponownie", "Szef poda powierzchnię słownie"]
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Claim the announced photo was inspected or mark its vision extraction complete.", "category": "source_basis", "because": "Text-only fallback cannot claim to have inspected a pending image (accepted processing protocol)." },
+        { "mustNot": "Invent a floor area value or mark the source fully processed while the announced image is absent.", "category": "amount", "because": "The area was to be computed from an image that never arrived; it stays explicitly incomplete." },
+        { "mustNot": "Stay silent about the missing attachment.", "category": "other", "because": "The boss expects an area computation from the photo; the blocked request requires telling him the photo is missing." }
+      ]
+    }
+  ]
+}

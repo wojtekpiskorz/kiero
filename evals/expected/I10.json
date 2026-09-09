@@ -1,0 +1,89 @@
+{
+  "caseId": "I10",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 330, "y": 280, "w": 90, "h": 60, "note": "The 15 circled in red on the October grid." },
+          "assetTextEvidence": "15",
+          "expectedValue": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "deadline",
+            "date": "2026-10-15",
+            "originalExpression": "15 (PAŹDZIERNIK 2026)"
+          },
+          "risk": "Wrong cell read (14 or 16) or month ignored."
+        },
+        {
+          "region": { "kind": "image_region", "x": 40, "y": 525, "w": 300, "h": 50, "note": "Red note under the grid." },
+          "expectedValue": {
+            "kind": "financial",
+            "role": "deposit",
+            "precision": "exact",
+            "amount": "5000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "wpłata 5 000"
+          },
+          "risk": "Zeros miscounted (500 / 50 000)."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1's vision extraction is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "deposit_deadline",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "deadline",
+            "date": "2026-10-15",
+            "originalExpression": "wpłata 5 000 (15.10)"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 330, "y": 280, "w": 90, "h": 60, "note": "Circled day 15." } }
+          ],
+          "rationale": "The circled day on the October page plus the payment note gives a deposit deadline of 2026-10-15, date-only."
+        },
+        {
+          "findingKey": "deposit",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "deposit",
+            "precision": "exact",
+            "amount": "5000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "wpłata 5 000"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 40, "y": 525, "w": 300, "h": 50, "note": "Payment note." } }
+          ],
+          "rationale": "A 5 000 deposit due on the circled day; basis unstated."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record the deadline on any other October day.", "category": "date", "because": "Only the 15th is marked." },
+        { "mustNot": "Add a time of day to the deadline.", "category": "date", "because": "A calendar day carries no hour." },
+        { "mustNot": "Store the deposit as 500 or 50 000.", "category": "amount", "because": "The note reads 5 000." }
+      ]
+    }
+  ]
+}

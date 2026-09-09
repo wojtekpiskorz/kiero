@@ -1,0 +1,38 @@
+{
+  "caseId": "T07",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Wiadomość o trzech projektach, w tym nowym zapytaniu",
+  "coverage": ["mixed_projects", "amounts"],
+  "fixtureClock": "2026-09-22T13:40:00+02:00",
+  "notes": "One source touching two existing projects plus a brand-new inquiry that must create a third project from the first question. Scorer-probe target for wrong project attribution.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [
+      { "ref": "C-KOWALSKI", "name": "Kowalski", "kind": "person" },
+      { "ref": "C-KACZMAREK", "name": "Kaczmarek", "kind": "person" },
+      { "ref": "C-ZIOLKOWSKI", "name": "Ziółkowski", "kind": "person", "detail": "nowe zapytanie" }
+    ],
+    "projects": [
+      { "ref": "P-BANAN", "alias": "Banan", "client": "C-KOWALSKI", "stage": "realizacja" },
+      { "ref": "P-KACZMAREK", "alias": "Kaczmarek", "client": "C-KACZMAREK", "stage": "uzgodnienie" }
+    ],
+    "existingFindings": []
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-22T13:40:00+02:00",
+      "fullyAcceptedAt": "2026-09-22T13:40:05+02:00",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Zbiorczo: Banan — zaliczka od Kowalskiego wpłynęła, 4 000 zł. Kaczmarek — dopłata umówiona na 3 października. I nowe zapytanie: Ziółkowski, malowanie domu na Krzywej, chciałby start w połowie października, ceny jeszcze nie znamy."
+        }
+      ]
+    }
+  ]
+}

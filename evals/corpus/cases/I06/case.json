@@ -1,0 +1,61 @@
+{
+  "caseId": "I06",
+  "modality": "image",
+  "corpusRevision": "2026.09.1",
+  "title": "Układ płytek: 14,4 m² i zapas",
+  "coverage": [
+    "handwriting",
+    "technical_dimensions"
+  ],
+  "fixtureClock": "2026-09-25T14:20:00+02:00",
+  "notes": "Tile layout sketch: area '14,4 m²' (must parse as 14.4 with comma decimal) plus 'zapas 10%'. No silent rounding of 14.4 to 14 or 15.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-WOJTEK",
+        "name": "Wojtek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [],
+    "projects": [
+      {
+        "ref": "P-BANANOWA",
+        "alias": "Bananowa",
+        "stage": "realizacja"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-25T14:20:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T14:20:04+02:00",
+      "projectPill": "P-BANANOWA",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "tile-layout.svg",
+          "widthPx": 800,
+          "heightPx": 600,
+          "contentDescription": "Szkic na papierie w kratkę: prostokąt pomieszczenia pokryty siatką płytek, nad nim czerwonym flamastrem '14,4 m²', pod prostokątem niebieskim 'zapas 10%'.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 106,
+            "note": "Deterministic synthetic SVG (handwriting style on grid paper).",
+            "sha256": "c96473815b1a05feca69c7db47f6db87f2be61c5faa4a6ae3c9f3d9d94508574"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "caseId": "I11",
+  "modality": "image",
+  "corpusRevision": "2026.09.1",
+  "title": "Rysunek techniczny z trzema jednostkami",
+  "coverage": [
+    "technical_dimensions"
+  ],
+  "fixtureClock": "2026-09-25T17:30:00+02:00",
+  "notes": "Mixed units in one drawing: 1200 mm, 80 cm, 3,5 m. Each length keeps its own unit; any silent conversion (e.g. 1200 mm -> 120 cm) is a prohibited write.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-MAREK",
+        "name": "Marek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [],
+    "projects": [
+      {
+        "ref": "P-SOSNOWA",
+        "alias": "Sosnowa",
+        "stage": "realizacja"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-25T17:30:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T17:30:04+02:00",
+      "projectPill": "P-SOSNOWA",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "dimensions.svg",
+          "widthPx": 800,
+          "heightPx": 600,
+          "contentDescription": "Rysunek techniczny pomieszczenia z trzema liniami wymiarowymi: szerokość '1200 mm', wysokość '80 cm', długość '3,5 m'. Jednostki mieszane, każda podpisana osobno.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 111,
+            "note": "Deterministic synthetic SVG (technical drawing style).",
+            "sha256": "36983c04fd63350197a26a4d20273aafca7bcf5eabed1798764aec85fb5a7679"
+          }
+        }
+      ]
+    }
+  ]
+}

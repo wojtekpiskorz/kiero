@@ -1,0 +1,59 @@
+{
+  "caseId": "V05",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 3.0, "to": 7.0, "expectedText": "Zdzisław Grześkowiak", "risk": "Surname diacritics lost ('Grzeskowiak') or mangled." },
+        { "from": 7.5, "to": 11.0, "expectedText": "Grześkowiak i Synowie", "risk": "Firm name shortened or spelled differently than the surname." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "subcontractor_name",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "Zdzisław Grześkowiak" },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 3.0, "to": 7.0, "transcriptQuote": "pan Zdzisław Grześkowiak" }
+            }
+          ],
+          "rationale": "Subcontractor without a Kiero account; stored as a contact name with exact diacritics."
+        },
+        {
+          "findingKey": "subcontractor_org",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "Grześkowiak i Synowie" },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 7.5, "to": 11.0, "transcriptQuote": "firma Grześkowiak i Synowie" }
+            }
+          ],
+          "rationale": "Organization name verbatim; the boss explicitly spells the tricky letters."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Store 'Grzeskowiak' without diacritics.", "category": "other", "because": "The boss explicitly asks for exact spelling with 'sz' and 'ś'." },
+        { "mustNot": "Swap first name and surname or split the person into two contacts.", "category": "other", "because": "One person, one organization, both stated once." }
+      ]
+    }
+  ]
+}

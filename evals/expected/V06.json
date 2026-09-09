@@ -1,0 +1,78 @@
+{
+  "caseId": "V06",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 2.5, "to": 6.5, "expectedText": "powiedzmy z dwanaście tysięcy", "risk": "Hedge 'powiedzmy' dropped, erasing the approximate marker." },
+        { "from": 11.0, "to": 15.0, "expectedText": "czternaście brutto", "risk": "Amount or basis corrupted between the two figures." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "customer_estimate",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-MALINOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "estimated_price",
+            "precision": "approximate",
+            "amount": "12000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "powiedzmy z dwanaście tysięcy"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 2.5, "to": 7.0, "transcriptQuote": "powiedzmy z dwanaście tysięcy, ale to luźne" }
+            }
+          ],
+          "rationale": "'Powiedzmy... luźne' = approximate estimate with no basis."
+        },
+        {
+          "findingKey": "labor_cost",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-MALINOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "labor_cost",
+            "precision": "exact",
+            "amount": "14000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "gross",
+            "originalExpression": "ustaliłem już twardo czternaście brutto"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 11.0, "to": 15.0, "transcriptQuote": "ustaliłem już twardo czternaście brutto za robociznę" }
+            }
+          ],
+          "rationale": "'Ustaliłem twardo' with 'brutto' = exact agreed labor cost, distinct from the customer estimate."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record 12 000 as agreed or exact.", "category": "commitment", "because": "It is explicitly hedged twice." },
+        { "mustNot": "Copy the 'brutto' basis from the crew agreement onto the customer estimate.", "category": "source_basis", "because": "The basis belongs to the 14 000 statement only; never infer VAT for the other." },
+        { "mustNot": "Merge the two amounts into one finding.", "category": "commitment", "because": "Different business roles and bases." }
+      ]
+    }
+  ]
+}

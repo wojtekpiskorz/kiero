@@ -1,0 +1,65 @@
+{
+  "caseId": "T09",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "supplier_org_name",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "Żelbet-Pro z Legnicy" },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "firma Żelbet-Pro z Legnicy" }
+            }
+          ],
+          "rationale": "Organization name stored verbatim with diacritics."
+        },
+        {
+          "findingKey": "supplier_contact_person",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "Bączkowska" },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "handlowczyni pani Bączkowska" }
+            }
+          ],
+          "rationale": "Person name stored verbatim with diacritics."
+        },
+        {
+          "findingKey": "supplier_phone",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "721 664 019" },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "tel. 721 664 019" }
+            }
+          ],
+          "rationale": "Phone digits transferred exactly."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Store the names without Polish diacritics ('Zelbet-Pro', 'Baczkowska').", "category": "other", "because": "The boss explicitly asks for exact spelling; names are identity data, not searchable approximations." },
+        { "mustNot": "Alter the phone digits or reformat them into a different number.", "category": "other", "because": "Exact transfer is required." }
+      ]
+    }
+  ]
+}

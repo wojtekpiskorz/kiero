@@ -1,0 +1,50 @@
+{
+  "caseId": "T02",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "notes": "Probe target for the guessed-VAT rule: this case has an explicit, unambiguous net basis.",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "agreed_price",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-KACZMAREK" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "agreed_price",
+            "precision": "exact",
+            "amount": "12000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "net",
+            "originalExpression": "12 000 zł netto"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "Kaczmarek zaakceptował wycenę: 12 000 zł netto za całe zlecenie" }
+            }
+          ],
+          "historyExpectation": "The earlier quoted_price ustalenie (12 000, not_specified) remains visible in history; this revision supersedes it as the current value.",
+          "rationale": "Client accepted, contract signed, net stated: this is the agreed price with an explicit basis."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record the price as gross or convert it to 14 760 zł brutto.", "category": "source_basis", "because": "The basis is explicitly netto; any conversion or basis change is a guessed tax basis." },
+        { "mustNot": "Record a different amount than 12000.00 (e.g. 12 000 missing a digit).", "category": "amount", "because": "The exact decimal amount is stated." },
+        { "mustNot": "Ask whether the amount is net or gross.", "category": "clarification", "because": "The source states 'netto' explicitly; asking is needless." }
+      ]
+    }
+  ],
+  "retrievalExpectations": {
+    "expectHits": [
+      { "query": "uzgodniona cena Kaczmarek", "mustReturnEvidenceFrom": ["S1"], "findingKeys": ["agreed_price"] }
+    ]
+  }
+}

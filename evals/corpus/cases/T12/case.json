@@ -1,0 +1,34 @@
+{
+  "caseId": "T12",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Kwota w euro podana jawnie",
+  "coverage": ["amounts"],
+  "fixtureClock": "2026-09-25T12:00:00+02:00",
+  "notes": "Currency stated in the utterance (origin=stated, EUR). A silent PLN conversion stored as the value is prohibited.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-MAREK", "name": "Marek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-HANSA", "name": "Hansa Baustoffe", "kind": "organization", "detail": "hurtownia" }],
+    "projects": [
+      { "ref": "P-BANANOWA", "alias": "Bananowa", "stage": "realizacja" }
+    ],
+    "existingFindings": []
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-25T12:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T12:00:03+02:00",
+      "projectPill": "P-BANANOWA",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Materiały na Bananową zamówione u Hansa Baustoffe: 7 500 euro, płatność przelewem w euro. Zapisz kwotę w euro, nie przeliczaj sam."
+        }
+      ]
+    }
+  ]
+}

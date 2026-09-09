@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+<desc>Odręczna notatka: Faktura Kowalski; kwota 7 200 zł przekreślona, obok poprawiona na 7 900 zł z dopiskiem była 7 2.</desc>
+<rect width="800" height="600" fill="#f6f2e4"/>
+<line x1="30" y1="90" x2="770" y2="90" stroke="#dcd6c4" stroke-width="1"/>
+<line x1="30" y1="134" x2="770" y2="134" stroke="#dcd6c4" stroke-width="1"/>
+<line x1="30" y1="178" x2="770" y2="178" stroke="#dcd6c4" stroke-width="1"/>
+<line x1="30" y1="222" x2="770" y2="222" stroke="#dcd6c4" stroke-width="1"/>
+<line x1="30" y1="266" x2="770" y2="266" stroke="#dcd6c4" stroke-width="1"/>
+<line x1="30" y1="310" x2="770" y2="310" stroke="#dcd6c4" stroke-width="1"/>
+<line x1="30" y1="354" x2="770" y2="354" stroke="#dcd6c4" stroke-width="1"/>
+<line x1="30" y1="398" x2="770" y2="398" stroke="#dcd6c4" stroke-width="1"/>
+<line x1="30" y1="442" x2="770" y2="442" stroke="#dcd6c4" stroke-width="1"/>
+<line x1="30" y1="486" x2="770" y2="486" stroke="#dcd6c4" stroke-width="1"/>
+<line x1="30" y1="530" x2="770" y2="530" stroke="#dcd6c4" stroke-width="1"/>
+<text x="90" y="160.67" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="40" fill="#16324f" font-weight="bold" transform="rotate(0.46 90 160)">Faktura Kowalski</text>
+<text x="130" y="259.28" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="44" fill="#999999" font-weight="normal" transform="rotate(0.20 130 260)">7 200 zł</text>
+<line x1="120" y1="246" x2="360" y2="254" stroke="#7a1f1f" stroke-width="4"/>
+<text x="430" y="260.85" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="48" fill="#7a1f1f" font-weight="bold" transform="rotate(-1.41 430 260)">7 900 zł</text>
+<text x="150" y="381.75" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="28" fill="#7a1f1f" font-weight="normal" transform="rotate(-0.46 150 380)">była 7 2</text>
+</svg>

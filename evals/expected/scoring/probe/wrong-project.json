@@ -1,0 +1,55 @@
+{
+  "caseId": "T06",
+  "corpusRevision": "2026.09.1",
+  "run": {
+    "runId": "probe-deliberate-2",
+    "attempt": 1,
+    "startedAt": "2026-09-09T10:01:00+02:00",
+    "finishedAt": "2026-09-09T10:01:38+02:00",
+    "environment": "hand-built probe report (no real run)",
+    "revision": "not-a-real-run"
+  },
+  "configuration": {
+    "chat": { "provider": "probe", "model": "probe/fictional", "route": "n/a", "promptVersion": "probe", "schemaVersion": "probe" }
+  },
+  "latencyMs": { "firstUsefulOutputMs": 700, "totalMs": 38000 },
+  "attempts": 1,
+  "cost": { "amountUsd": "0.0000", "metered": false },
+  "stages": {
+    "stt": { "status": "skipped" },
+    "vision": { "status": "skipped" },
+    "retrieval": { "status": "complete", "evidenceReturned": ["S1"] },
+    "memoryChanges": {
+      "status": "complete",
+      "published": [
+        {
+          "findingKey": "material_invoice",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "operation": "set",
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "material_cost",
+            "precision": "exact",
+            "amount": "3400.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "net"
+          },
+          "evidence": [{ "sourceId": "S1" }]
+        },
+        {
+          "findingKey": "tile_color",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "operation": "set",
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "białe" },
+          "evidence": [{ "sourceId": "S1" }]
+        }
+      ]
+    },
+    "clarifications": { "status": "complete", "asked": [] }
+  },
+  "caseScore": 0.97,
+  "caseOutcome": "pass"
+}

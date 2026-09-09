@@ -1,0 +1,38 @@
+{
+  "caseId": "V07",
+  "modality": "voice",
+  "corpusRevision": "2026.09.1",
+  "title": "Propozycja klienta bez podstawy",
+  "coverage": ["unknown_tax_basis", "amounts"],
+  "fixtureClock": "2026-09-21T11:00:00+02:00",
+  "notes": "Client's counter-proposal, 8000, basis never mentioned: stays proposal_price + not_specified; must not be stored as an agreed price nor with a guessed basis.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-LIS", "name": "Lis", "kind": "person", "detail": "klient" }],
+    "projects": [{ "ref": "P-LISCIANA", "alias": "Liściana", "client": "C-LIS", "stage": "wycena" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-21T11:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-21T11:00:06+02:00",
+      "projectPill": "P-LISCIANA",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 15.0,
+          "transcript": "Lis dzwonił: chce zejść do ośmiu tysięcy za tę łazienkę. Tylko propozycja, jeszcze nie odpowiedziałem.",
+          "recordingContext": "Nagranie z samochodu.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker, car noise."
+          }
+        }
+      ]
+    }
+  ]
+}

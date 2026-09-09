@@ -1,0 +1,95 @@
+{
+  "caseId": "M03",
+  "modality": "mixed",
+  "corpusRevision": "2026.09.1",
+  "title": "Odręczna cena bez projektu — pytanie i odpowiedź",
+  "coverage": [
+    "handwriting",
+    "amounts"
+  ],
+  "fixtureClock": "2026-09-17T12:00:00+02:00",
+  "notes": "S1 handwriting names only 'ŁAZIENKA'; the tenant has TWO bathroom projects, so attribution is genuinely ambiguous -> required clarification (a correct question is a SUCCESS outcome at stage 1). S2 resolves it; stage 2 lands 6 500 on Zielińska.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-WOJTEK",
+        "name": "Wojtek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "C-KACZMAREK",
+        "name": "Kaczmarek",
+        "kind": "person",
+        "detail": "klient, łazienka"
+      },
+      {
+        "ref": "C-ZIELINSKA",
+        "name": "Zielińska",
+        "kind": "person",
+        "detail": "klientka, łazienka"
+      }
+    ],
+    "projects": [
+      {
+        "ref": "P-KACZMAREK",
+        "alias": "Kaczmarek",
+        "client": "C-KACZMAREK",
+        "stage": "wycena",
+        "detail": "remont łazienki"
+      },
+      {
+        "ref": "P-ZIELINSKA",
+        "alias": "Zielińska",
+        "client": "C-ZIELINSKA",
+        "stage": "wycena",
+        "detail": "remont łazienki"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-17T12:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-17T12:00:04+02:00",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "quote-note.svg",
+          "widthPx": 800,
+          "heightPx": 600,
+          "contentDescription": "Żółta kartka z odręcznymi napisami: 'ŁAZIENKA' na górze i '6 500 zł' poniżej. Na kartce nie ma nazwy klienta ani projektu.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 203,
+            "note": "Deterministic synthetic SVG (handwriting style).",
+            "sha256": "71befc687bc35831c89ef7f6fb128f5e6753ebe7dcb80f260d585b05245a6762"
+          }
+        }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-17T13:05:00+02:00",
+      "fullyAcceptedAt": "2026-09-17T13:05:02+02:00",
+      "parts": [
+        {
+          "partId": "S2-txt",
+          "type": "text",
+          "text": "Odpowiedź na pytanie o kartkę z łazienką: to łazienka Zielińskiej, cena 6 500 zł."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "caseId": "V09",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 1.0, "to": 6.0, "expectedText": "gres sześćdziesiąt na sześćdziesiąt centymetrów", "risk": "'sześćdziesiąt' vs 'sześćset' scale error." },
+        { "from": 7.5, "to": 10.0, "expectedText": "metr na metr", "risk": "Format collapsed to cm or attached to Krucza." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "tile_format",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-KRUCZA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "quantity",
+            "value": "60",
+            "secondValue": "60",
+            "unit": "cm",
+            "originalExpression": "gres sześćdziesiąt na sześćdziesiąt"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 1.0, "to": 6.0, "transcriptQuote": "Krucza bierze gres sześćdziesiąt na sześćdziesiąt centymetrów" }
+            }
+          ],
+          "rationale": "60x60 cm for Krucza, spoken in words; stored as a quantity pair in cm."
+        },
+        {
+          "findingKey": "tile_format",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-DEBOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "quantity",
+            "value": "1",
+            "secondValue": "1",
+            "unit": "m",
+            "originalExpression": "metr na metr"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 7.5, "to": 12.0, "transcriptQuote": "Dębowa — metr na metr, klientka się uparła na duże płyty" }
+            }
+          ],
+          "rationale": "1x1 m for Dębowa, in meters as spoken; no unit conversion needed or allowed."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Swap the formats between Krucza and Dębowa.", "category": "project", "because": "Each clause names its project first." },
+        { "mustNot": "Store 60x60 as 6x6 or 600x600 through scale confusion.", "category": "other", "because": "'Sześćdziesiąt' is 60, in centimeters." },
+        { "mustNot": "Convert 'metr na metr' to a different unit representation as the stored value.", "category": "other", "because": "Original unit preservation is the accepted rule." }
+      ]
+    }
+  ]
+}

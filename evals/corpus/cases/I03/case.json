@@ -1,0 +1,67 @@
+{
+  "caseId": "I03",
+  "modality": "image",
+  "corpusRevision": "2026.09.1",
+  "title": "Wydruk dostawy z netto i brutto",
+  "coverage": [
+    "amounts"
+  ],
+  "fixtureClock": "2026-09-25T11:00:00+02:00",
+  "notes": "Printed delivery note with both bases. Net 6300.00 and gross 7749.00 coexist as stated; the system must not recompute one from the other or mark the basis not_specified.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-WOJTEK",
+        "name": "Wojtek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "C-CERAMICA-SYNTH",
+        "name": "Ceramica Synth",
+        "kind": "organization",
+        "detail": "dostawca płytek"
+      }
+    ],
+    "projects": [
+      {
+        "ref": "P-BANAN",
+        "alias": "Banan",
+        "stage": "realizacja"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-25T11:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T11:00:06+02:00",
+      "projectPill": "P-BANAN",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "delivery-note.svg",
+          "widthPx": 600,
+          "heightPx": 800,
+          "contentDescription": "Wydruk DOSTAWA nr 118/2026 od Ceramica Synth: pozycja 'Płytki gres', ilość '45 m²', wartość '6 300,00 zł'. Podsumowanie: netto 6 300,00 zł, VAT 23% 1 449,00 zł, razem brutto 7 749,00 zł.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 103,
+            "note": "Deterministic synthetic SVG (print style).",
+            "sha256": "abee60d42cd67bc1a43e7d459c7b0e73673361b7a4621e9557f62daffc6ef529"
+          }
+        }
+      ]
+    }
+  ]
+}

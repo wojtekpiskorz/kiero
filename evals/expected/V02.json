@@ -1,0 +1,51 @@
+{
+  "caseId": "V02",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 2.0, "to": 6.0, "expectedText": "szesnastego października", "risk": "'szesnastego' mis-heard as 'sześćdziesiątego' (no such day)." },
+        { "from": 7.0, "to": 9.5, "expectedText": "na dziesiątej rano", "risk": "Hour dropped or changed to 'dziesiątej' meaning something else." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "handover_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-JURCZAK" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "datetime",
+            "role": "agreed",
+            "date": "2026-10-16",
+            "timeOfDay": "10:00",
+            "datetime": "2026-10-16T10:00:00+02:00",
+            "originalExpression": "szesnastego października, odbiór na dziesiątej rano"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 2.0, "to": 9.5, "transcriptQuote": "szesnastego października, odbiór na dziesiątej rano" }
+            }
+          ],
+          "rationale": "Explicit day plus hour gives datetime precision with resolved instant; the boss explicitly asks for the hour to be recorded."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record any date other than 2026-10-16 (e.g. 2026-10-60 nonsense or 2026-10-06).", "category": "date", "because": "'Szesnastego października' is unambiguous." },
+        { "mustNot": "Drop the 10:00 hour or replace it with another time.", "category": "date", "because": "The hour is explicit and load-bearing (client arrives with plans)." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "caseId": "M06",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "before-deletion",
+      "when": "After S1 and S2 are processed, before the permanent deletion.",
+      "memoryChanges": [
+        {
+          "findingKey": "deposit",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-WROBEL" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "deposit",
+            "precision": "exact",
+            "amount": "2000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "zaliczkę 2 000 zł gotówką"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-txt", "supportType": "support", "anchor": { "kind": "text_quote", "quote": "Wróbel dał zaliczkę 2 000 zł gotówką" } }
+          ],
+          "rationale": "Cash deposit recorded from S1 (sole support)."
+        },
+        {
+          "findingKey": "final_payment",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-WROBEL" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "payment",
+            "precision": "exact",
+            "amount": "15000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "reszta, 15 000 zł, przy odbiorze"
+          },
+          "evidence": [
+            { "sourceId": "S2", "partId": "S2-txt", "supportType": "support", "anchor": { "kind": "text_quote", "quote": "reszta, 15 000 zł, przy odbiorze" } }
+          ],
+          "rationale": "A separate payment agreement standing on S2 alone."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Merge the deposit and the final payment into one total.", "category": "amount", "because": "Different roles (deposit vs payment at pickup)." }
+      ]
+    },
+    {
+      "stageId": "final",
+      "when": "After S1 is permanently deleted at 2026-09-24 09:30.",
+      "memoryChanges": [
+        {
+          "findingKey": "deposit",
+          "operation": "mark_unknown",
+          "scope": { "level": "project", "ref": "P-WROBEL" },
+          "knowledgeState": "unknown",
+          "trigger": "source_deleted",
+          "historyExpectation": "A deletion trace survives (operation, actor, time) WITHOUT the deleted content; the 2 000 amount is no longer reconstructible from the withdrawn record.",
+          "rationale": "Permanent deletion removes the content and its derived support; the solely-supported deposit finding must be re-evaluated to unknown."
+        },
+        {
+          "findingKey": "final_payment",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-WROBEL" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "payment",
+            "precision": "exact",
+            "amount": "15000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "reszta, 15 000 zł, przy odbiorze"
+          },
+          "evidence": [
+            { "sourceId": "S2", "partId": "S2-txt", "supportType": "support", "anchor": { "kind": "text_quote", "quote": "reszta, 15 000 zł, przy odbiorze" } }
+          ],
+          "rationale": "S2 is untouched and independently supports the final-payment agreement; it survives the deletion."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Keep the 2 000 deposit as established knowledge after deletion.", "category": "source_basis", "because": "Its only source was permanently deleted; dependent knowledge must be re-evaluated." },
+        { "mustNot": "Drop the 15 000 final-payment agreement as collaterally deleted.", "category": "amount", "because": "Deletion affects the deleted source and its dependents, not independent facts." },
+        { "mustNot": "Leave the deleted message's text readable anywhere (exports, search, summaries).", "category": "other", "because": "Permanent deletion invalidates derived reproductions of the content." }
+      ]
+    }
+  ]
+}

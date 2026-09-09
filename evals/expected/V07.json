@@ -1,0 +1,53 @@
+{
+  "caseId": "V07",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 3.0, "to": 7.0, "expectedText": "zejść do ośmiu tysięcy", "risk": "'ośmiu' vs 'osiemdziesięciu' scale error." },
+        { "from": 10.0, "to": 12.5, "expectedText": "jeszcze nie odpowiedziałem", "risk": "Commitment marker lost, upgrading a proposal to an agreement." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "counter_proposal",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-LISCIANA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "proposal_price",
+            "precision": "exact",
+            "amount": "8000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "chce zejść do ośmiu tysięcy"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 3.0, "to": 7.0, "transcriptQuote": "chce zejść do ośmiu tysięcy za tę łazienkę" }
+            }
+          ],
+          "rationale": "The client's counter-proposal: a proposal the boss has explicitly not answered; not an agreement."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record 8 000 as the quoted, estimated or agreed price.", "category": "commitment", "because": "'Tylko propozycja, jeszcze nie odpowiedziałem'." },
+        { "mustNot": "Guess whether 8 000 is net or gross.", "category": "source_basis", "because": "No basis was spoken." },
+        { "mustNot": "Ask about the tax basis of this proposal.", "category": "clarification", "because": "The gap does not block anything; it stays visibly 'nie podano'." }
+      ]
+    }
+  ]
+}

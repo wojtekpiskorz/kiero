@@ -1,0 +1,71 @@
+{
+  "caseId": "M02",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S2",
+      "partId": "S2-aud",
+      "fidelityPoints": [
+        { "from": 3.5, "to": 8.5, "expectedText": "dopiero dwudziestego trzeciego września", "risk": "'dwudziestego trzeciego' mis-heard as 'dwudziestego' (20th) or 'dwudziestego pierwszego' (21st)." },
+        { "from": 9.5, "to": 11.5, "expectedText": "Zapisz dwudziestego trzeciego", "risk": "The explicit instruction repeating the date is lost." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "correction-published",
+      "when": "After S2 is processed at 09:12, before the delayed S1 run completes at 09:45.",
+      "memoryChanges": [
+        {
+          "findingKey": "works_start_date",
+          "operation": "supersede",
+          "scope": { "level": "project", "ref": "P-SIKORA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "agreed",
+            "date": "2026-09-23",
+            "originalExpression": "dwudziestego trzeciego września"
+          },
+          "evidence": [
+            { "sourceId": "S2", "partId": "S2-aud", "supportType": "supersession", "anchor": { "kind": "audio_interval", "from": 3.5, "to": 11.5, "transcriptQuote": "ruszamy dopiero dwudziestego trzeciego września. Zapisz dwudziestego trzeciego" } }
+          ],
+          "historyExpectation": "If the S1 Monday plan was already visible, it is superseded with history kept.",
+          "rationale": "The client moved the start; the explicit new date replaces the relative-date plan."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Ask which start date applies.", "category": "clarification", "because": "S2 is an explicit correction with a clear reason." }
+      ]
+    },
+    {
+      "stageId": "final",
+      "when": "After the delayed S1 run completes at 09:45 and its stale plan is reconsidered.",
+      "memoryChanges": [
+        {
+          "findingKey": "works_start_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-SIKORA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "agreed",
+            "date": "2026-09-23",
+            "originalExpression": "dwudziestego trzeciego września"
+          },
+          "evidence": [
+            { "sourceId": "S2", "partId": "S2-aud", "supportType": "supersession", "anchor": { "kind": "audio_interval", "from": 3.5, "to": 8.5, "transcriptQuote": "dopiero dwudziestego trzeciego września" } }
+          ],
+          "historyExpectation": "The S1 plan (Monday 2026-09-21, from 'w przyszły poniedziałek') remains in history as superseded; the stale plan is reconsidered and does not republish.",
+          "rationale": "Tuesday 2026-09-15 send: 'przyszły poniedziałek' = 2026-09-21, later corrected to 2026-09-23. Re-running the older source cannot defeat the correction."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Overwrite 2026-09-23 with 2026-09-21 when the delayed S1 analysis lands.", "category": "date", "because": "A stale plan must obtain current context and be reconsidered, not blindly publish." }
+      ]
+    }
+  ]
+}

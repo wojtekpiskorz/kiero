@@ -1,0 +1,42 @@
+{
+  "caseId": "T12",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "material_cost",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "material_cost",
+            "precision": "exact",
+            "amount": "7500.00",
+            "currency": "EUR",
+            "currencyOrigin": "stated",
+            "vatBasis": "not_specified",
+            "originalExpression": "7 500 euro, płatność przelewem w euro"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "7 500 euro, płatność przelewem w euro" }
+            }
+          ],
+          "rationale": "Currency explicitly stated in the utterance: EUR with origin 'stated'. The amount is exact."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Store a PLN-converted amount as the finding value.", "category": "amount", "because": "The boss explicitly says 'nie przeliczaj sam'; the stated currency is authoritative." },
+        { "mustNot": "Record the currency as PLN from the firm default.", "category": "amount", "because": "The currency was explicitly stated, so origin is 'stated', not firm_default." }
+      ]
+    }
+  ]
+}

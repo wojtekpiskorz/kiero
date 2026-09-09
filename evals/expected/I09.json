@@ -1,0 +1,57 @@
+{
+  "caseId": "I09",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 80, "y": 120, "w": 640, "h": 70, "note": "Top line, blue handwriting." },
+          "expectedValue": { "kind": "text", "value": "BANAN — płytki GRIS" },
+          "risk": "Color read from the wrong line."
+        },
+        {
+          "region": { "kind": "image_region", "x": 80, "y": 280, "w": 640, "h": 70, "note": "Bottom line, red handwriting." },
+          "expectedValue": { "kind": "text", "value": "BANANOWA — płytki BIAŁE" },
+          "risk": "Alias truncated to BANAN, collapsing both projects."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1's vision extraction is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "tile_color",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "GRIS" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 80, "y": 120, "w": 640, "h": 70, "note": "Blue line." } }
+          ],
+          "rationale": "Top (blue) line assigns GRIS to Banan."
+        },
+        {
+          "findingKey": "tile_color",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "BIAŁE" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 80, "y": 280, "w": 640, "h": 70, "note": "Red line." } }
+          ],
+          "rationale": "Bottom (red) line assigns BIAŁE to Bananowa."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Swap the colors between Banan and Bananowa.", "category": "project", "because": "Handwriting explicitly pairs each alias with its color." },
+        { "mustNot": "Normalize 'BANANOWA' down to 'BANAN' and merge the two color findings.", "category": "project", "because": "The aliases name two distinct projects." }
+      ]
+    }
+  ]
+}

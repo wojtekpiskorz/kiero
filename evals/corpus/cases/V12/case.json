@@ -1,0 +1,38 @@
+{
+  "caseId": "V12",
+  "modality": "voice",
+  "corpusRevision": "2026.09.1",
+  "title": "Dostawczyni Jola z Fliz Jawo — bardzo złe nagranie",
+  "coverage": ["noisy_speech", "names"],
+  "fixtureClock": "2026-09-21T14:05:00+02:00",
+  "notes": "Monday send: 'na czwartek' = 2026-09-24. Heavy noise; supplier name 'Fliz Jawo' and contact 'Jola' are the load-bearing spans.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [],
+    "projects": [{ "ref": "P-BANANOWA", "alias": "Bananowa", "stage": "realizacja" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-21T14:05:00+02:00",
+      "fullyAcceptedAt": "2026-09-21T14:05:10+02:00",
+      "projectPill": "P-BANANOWA",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 20.0,
+          "transcript": "Jola z Fliz Jawo... (trzask) ...no więc potwierdzała dostawę płytek na Bananową na czwartek. Tak, na czwartek, rano.",
+          "recordingContext": "Trzaski złącza telefonicznego, dwa głosy w tle, mówca półgłosem.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker, phone-line crackle, background crosstalk."
+          }
+        }
+      ]
+    }
+  ]
+}

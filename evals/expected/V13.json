@@ -1,0 +1,92 @@
+{
+  "caseId": "V13",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 3.0, "to": 6.0, "expectedText": "pięćset złotych", "risk": "Verbal amount lost; this is the superseded value that must stay auditable." }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "partId": "S2-aud",
+      "fidelityPoints": [
+        { "from": 3.5, "to": 6.5, "expectedText": "będzie siedemset", "risk": "Corrected amount mis-heard as 'siedem' (7) instead of 700." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "correction-published",
+      "when": "After S2 is processed at 08:04 (before the delayed S1 run completes at 08:40).",
+      "memoryChanges": [
+        {
+          "findingKey": "silicone_cost",
+          "operation": "supersede",
+          "scope": { "level": "project", "ref": "P-CISOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "material_cost",
+            "precision": "exact",
+            "amount": "700.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "będzie siedemset"
+          },
+          "evidence": [
+            {
+              "sourceId": "S2",
+              "partId": "S2-aud",
+              "supportType": "supersession",
+              "anchor": { "kind": "audio_interval", "from": 3.5, "to": 6.5, "transcriptQuote": "będzie siedemset, podnieśli ceny" }
+            }
+          ],
+          "historyExpectation": "The 500.00 value from S1 remains in history as superseded input.",
+          "rationale": "Explicit price correction by new voice message; no approval needed."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Ask which amount is correct.", "category": "clarification", "because": "S2 is an explicit correction with a stated reason (price increase)." }
+      ]
+    },
+    {
+      "stageId": "final",
+      "when": "After the delayed S1 run completes at 08:40.",
+      "memoryChanges": [
+        {
+          "findingKey": "silicone_cost",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-CISOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "material_cost",
+            "precision": "exact",
+            "amount": "700.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified"
+          },
+          "evidence": [
+            {
+              "sourceId": "S2",
+              "partId": "S2-aud",
+              "supportType": "supersession",
+              "anchor": { "kind": "audio_interval", "from": 3.5, "to": 6.5, "transcriptQuote": "będzie siedemset" }
+            }
+          ],
+          "historyExpectation": "The stale S1 plan (500.00) is reconsidered against current state and discarded; history shows both inputs.",
+          "rationale": "Stale-plan rule: the late-completing older analysis cannot defeat the newer explicit correction."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Overwrite 700.00 with 500.00 when the delayed S1 analysis lands.", "category": "amount", "because": "The correction is already published; precedence is semantic, not chronological by run completion." }
+      ]
+    }
+  ]
+}

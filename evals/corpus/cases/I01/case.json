@@ -1,0 +1,70 @@
+{
+  "caseId": "I01",
+  "modality": "image",
+  "corpusRevision": "2026.09.1",
+  "title": "Odręczna kartka: umowa 9 800 zł",
+  "coverage": [
+    "handwriting",
+    "amounts",
+    "unknown_tax_basis"
+  ],
+  "fixtureClock": "2026-09-25T08:30:00+02:00",
+  "notes": "Handwritten sticky note. 'UMOWA' establishes an agreed price; no netto/brutto anywhere on the note, so basis stays not_specified.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-WOJTEK",
+        "name": "Wojtek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "C-KACZMAREK",
+        "name": "Kaczmarek",
+        "kind": "person",
+        "detail": "klient"
+      }
+    ],
+    "projects": [
+      {
+        "ref": "P-KACZMAREK",
+        "alias": "Kaczmarek",
+        "client": "C-KACZMAREK",
+        "stage": "uzgodnienie"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-25T08:30:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T08:30:05+02:00",
+      "projectPill": "P-KACZMAREK",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "sketch.svg",
+          "widthPx": 800,
+          "heightPx": 600,
+          "contentDescription": "Żółta kartka samoprzylepna z odręcznymi napisami niebieskim flamastrem: na górze 'KACZMAREK', poniżej duża kwota '9 800 zł' podkreślona dwiema kreskami, na dole czerwonym flamastrem 'UMOWA'. Brak jakiejkolwiek informacji o netto/brutto.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 101,
+            "note": "Deterministic synthetic SVG (handwriting style). Rendering varies with viewer fonts; contentDescription and <desc> are authoritative.",
+            "sha256": "90c50c78cf7bc3453e2a92a3b57c9f106211bbe8e099d655a3e6236331499ab4"
+          }
+        }
+      ]
+    }
+  ]
+}

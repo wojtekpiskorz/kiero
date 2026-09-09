@@ -1,0 +1,62 @@
+{
+  "caseId": "V15",
+  "modality": "voice",
+  "corpusRevision": "2026.09.1",
+  "title": "Dwa niezależne nagrania potwierdzają jeden termin",
+  "coverage": ["corroboration", "date_precision"],
+  "fixtureClock": "2026-09-24T10:00:00+02:00",
+  "notes": "Two different bosses report the same delivery date from independent conversations. One finding, two evidence entries, one typed independent_corroboration — not two separate findings.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [
+      { "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" },
+      { "ref": "B-MAREK", "name": "Marek", "role": "szef" }
+    ],
+    "contacts": [],
+    "projects": [{ "ref": "P-SOSNOWA", "alias": "Sosnowa", "stage": "realizacja" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-24T10:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-24T10:00:07+02:00",
+      "projectPill": "P-SOSNOWA",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 10.0,
+          "transcript": "Sosnowa: dostawa okien dwudziestego ósmego września, tak mi powiedział hurtownik.",
+          "recordingContext": "Głosówka Wojtka.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker A."
+          }
+        }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-24T16:40:00+02:00",
+      "fullyAcceptedAt": "2026-09-24T16:40:07+02:00",
+      "projectPill": "P-SOSNOWA",
+      "parts": [
+        {
+          "partId": "S2-aud",
+          "type": "voice",
+          "durationSeconds": 11.0,
+          "transcript": "Ja też dzwoniłem na Sosnową i słyszałem to samo: okna przychodzą dwudziestego ósmego września.",
+          "recordingContext": "Głosówka Marka.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker B."
+          }
+        }
+      ]
+    }
+  ]
+}

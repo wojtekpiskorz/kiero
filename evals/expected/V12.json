@@ -1,0 +1,68 @@
+{
+  "caseId": "V12",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 0.5, "to": 3.0, "expectedText": "Jola z Fliz Jawo", "risk": "Supplier/person names mangled through crackle ('Fliz Javo', 'Jola z Fliz')."},
+        { "from": 8.0, "to": 12.5, "expectedText": "dostawę płytek na Bananową na czwartek", "risk": "Weekday or project alias lost." },
+        { "from": 15.0, "to": 17.5, "expectedText": "na czwartek, rano", "risk": "The repeated weekday confirms the date; the 'rano' qualifier must survive." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "supplier_contact",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "Jola z Fliz Jawo" },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 0.5, "to": 3.0, "transcriptQuote": "Jola z Fliz Jawo" }
+            }
+          ],
+          "rationale": "Contact person and supplier recorded verbatim from a heavily degraded recording."
+        },
+        {
+          "findingKey": "delivery_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "internal_plan",
+            "date": "2026-09-24",
+            "qualifier": "rano",
+            "originalExpression": "na czwartek"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 8.0, "to": 12.5, "transcriptQuote": "potwierdzała dostawę płytek na Bananową na czwartek" }
+            }
+          ],
+          "rationale": "Monday 2026-09-21 send, weekday repeated twice: Thursday = 2026-09-24 with a 'rano' qualifier, no invented hour."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Attribute the delivery to Banan because 'Bananowa' sounds similar.", "category": "project", "because": "The project name is stated and repeated." },
+        { "mustNot": "Turn 'rano' into an 08:00 datetime.", "category": "date", "because": "'Rano' is a qualifier, not an hour." },
+        { "mustNot": "Store a garbled supplier name ('Fliz Javo', 'Flis Jawo').", "category": "other", "because": "Names are identity data." }
+      ]
+    }
+  ]
+}

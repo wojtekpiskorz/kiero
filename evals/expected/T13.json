@@ -1,0 +1,77 @@
+{
+  "caseId": "T13",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "correction-published",
+      "when": "After S2 is processed at 08:08 (before the delayed S1 run completes at 08:31).",
+      "memoryChanges": [
+        {
+          "findingKey": "agreed_price",
+          "operation": "supersede",
+          "scope": { "level": "project", "ref": "P-KACZMAREK" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "agreed_price",
+            "precision": "exact",
+            "amount": "12500.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "net",
+            "originalExpression": "finalnie ustaliliśmy 12 500 zł netto"
+          },
+          "evidence": [
+            {
+              "sourceId": "S2",
+              "partId": "S2-txt",
+              "supportType": "supersession",
+              "anchor": { "kind": "text_quote", "quote": "finalnie ustaliliśmy 12 500 zł netto. Ta kwota obowiązuje" }
+            }
+          ],
+          "historyExpectation": "The 15 000 value from S1 (if already visible) is superseded with history kept.",
+          "rationale": "An explicit correction by new message replaces the earlier value without extra approval."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Mark the price conflicted or ask which amount applies.", "category": "clarification", "because": "S2 is an explicit, unambiguous correction; asking is needless." }
+      ]
+    },
+    {
+      "stageId": "final",
+      "when": "After the delayed S1 run completes at 08:31 and its stale plan is reconsidered.",
+      "memoryChanges": [
+        {
+          "findingKey": "agreed_price",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-KACZMAREK" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "agreed_price",
+            "precision": "exact",
+            "amount": "12500.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "net"
+          },
+          "evidence": [
+            {
+              "sourceId": "S2",
+              "partId": "S2-txt",
+              "supportType": "supersession",
+              "anchor": { "kind": "text_quote", "quote": "finalnie ustaliliśmy 12 500 zł netto" }
+            }
+          ],
+          "historyExpectation": "The stale S1 plan must obtain current context and be reconsidered; 15 000 may appear in history as superseded input, never as the current value.",
+          "rationale": "Re-processing an older source cannot overwrite a newer explicit correction; precedence follows the meaning of the correction, not run completion order."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Overwrite the current price with 15 000 when the delayed S1 analysis completes.", "category": "amount", "because": "The correction was already published; a stale plan must not defeat it." },
+        { "mustNot": "Create a second, duplicate agreed_price finding for the same scope.", "category": "amount", "because": "One ustalenie, one current value." }
+      ]
+    }
+  ]
+}

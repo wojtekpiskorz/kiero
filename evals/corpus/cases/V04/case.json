@@ -1,0 +1,38 @@
+{
+  "caseId": "V04",
+  "modality": "voice",
+  "corpusRevision": "2026.09.1",
+  "title": "Odbiór kluczy w przyszły wtorek",
+  "coverage": ["relative_dates"],
+  "fixtureClock": "2026-09-15T10:30:00+02:00",
+  "notes": "Tuesday send: 'w przyszły wtorek' = Tuesday of next week = 2026-09-22 (not tomorrow). Relative interpretation is anchored to sentAt, never to processing time.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-KOWALSCY", "name": "Kowalscy", "kind": "person", "detail": "klienci, dom na Bananie" }],
+    "projects": [{ "ref": "P-BANAN", "alias": "Banan", "stage": "oddanie" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-15T10:30:00+02:00",
+      "fullyAcceptedAt": "2026-09-15T10:30:06+02:00",
+      "projectPill": "P-BANAN",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 14.0,
+          "transcript": "Odbiór kluczy u Kowalskich jest w przyszły wtorek. Zapisz, bo muszę zamówić transport rzeczy.",
+          "recordingContext": "Czyste nagranie dyktafonowe.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: single male speaker, quiet room."
+          }
+        }
+      ]
+    }
+  ]
+}

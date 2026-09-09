@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+<desc>Zdjęcie białej tablicy: kolumna BANAN — start 28.09, kolumna BANANOWA — start 5.10.</desc>
+<rect width="800" height="600" fill="#ffffff"/>
+<rect x="20" y="20" width="760" height="560" fill="#ffffff" stroke="#cfd4da" stroke-width="6"/>
+<text x="90" y="139.24" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="48" fill="#1565c0" font-weight="bold" transform="rotate(-1.48 90 140)">BANAN</text>
+<text x="110" y="241.02" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="36" fill="#1565c0" font-weight="normal" transform="rotate(1.77 110 240)">start 28.09</text>
+<line x1="400" y1="80" x2="400" y2="540" stroke="#e0e0e0" stroke-width="3"/>
+<text x="470" y="139.25" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="48" fill="#2e7d32" font-weight="bold" transform="rotate(0.46 470 140)">BANANOWA</text>
+<text x="490" y="241.66" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="36" fill="#2e7d32" font-weight="normal" transform="rotate(1.39 490 240)">start 5.10</text>
+</svg>

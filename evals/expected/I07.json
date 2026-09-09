@@ -1,0 +1,53 @@
+{
+  "caseId": "I07",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 40, "y": 345, "w": 420, "h": 45, "note": "Bold completion date line." },
+          "expectedValue": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "agreed",
+            "date": "2026-10-20",
+            "originalExpression": "Termin realizacji: 20.10.2026"
+          },
+          "risk": "Date digits permuted (02.10 / 20.11)."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1's vision extraction is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "completion_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-MALINOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "agreed",
+            "date": "2026-10-20",
+            "originalExpression": "Termin realizacji: 20.10.2026"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 40, "y": 345, "w": 420, "h": 45, "note": "Signed quote's completion date." } }
+          ],
+          "rationale": "A signed quote fixes an agreed completion date. The document carries no hour, so precision stays date-only."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Attach an hour to the completion date.", "category": "date", "because": "No time is printed; precision must be preserved." },
+        { "mustNot": "Record the date as a proposal.", "category": "commitment", "because": "'Podpisano' makes it agreed, not proposed." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "caseId": "T11",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Zapowiedziany brakujący załącznik",
+  "coverage": ["incomplete_evidence", "technical_dimensions"],
+  "fixtureClock": "2026-09-24T14:30:00+02:00",
+  "notes": "The text announces a photo that was NOT attached. The 6 cm fact is stated in text and can be recorded; the image-dependent part must stay explicitly incomplete — the system must not claim to have inspected an image it never received, and must not invent the missing attachment.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [],
+    "projects": [
+      { "ref": "P-BANAN", "alias": "Banan", "stage": "realizacja" }
+    ],
+    "existingFindings": []
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-24T14:30:00+02:00",
+      "fullyAcceptedAt": "2026-09-24T14:30:02+02:00",
+      "projectPill": "P-BANAN",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Wysyłam zdjęcie rzutu Banana — z niego policzysz powierzchnię. Na pewno już teraz: wylewka ma być 6 cm, to gruba, zgodnie z projektem."
+        }
+      ]
+    }
+  ]
+}

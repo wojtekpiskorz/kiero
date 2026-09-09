@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+<desc>Kartka z odręcznym zapisem: ŁAZIENKA — 6 500 zł. Brak nazwy projektu.</desc>
+<rect width="800" height="600" fill="#8a7f6b"/>
+<rect x="140" y="90" width="520" height="440" fill="#f6e58d" stroke="#e0c96a" stroke-width="2"/>
+<text x="210" y="219.05" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="46" fill="#1c2f6e" font-weight="bold" transform="rotate(1.10 210 220)">ŁAZIENKA</text>
+<text x="230" y="328.23" font-family="'Bradley Hand','Comic Sans MS','Segoe Script','Comic Neue',cursive" font-size="56" fill="#16324f" font-weight="bold" transform="rotate(-0.58 230 330)">6 500 zł</text>
+</svg>

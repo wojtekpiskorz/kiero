@@ -1,0 +1,73 @@
+{
+  "caseId": "I11",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 260, "y": 70, "w": 180, "h": 50, "note": "Horizontal dimension, top." },
+          "expectedValue": { "kind": "quantity", "value": "1200", "unit": "mm", "originalExpression": "1200 mm" },
+          "risk": "Unit dropped or converted to cm on read."
+        },
+        {
+          "region": { "kind": "image_region", "x": 690, "y": 280, "w": 100, "h": 45, "note": "Vertical dimension, right." },
+          "expectedValue": { "kind": "quantity", "value": "80", "unit": "cm", "originalExpression": "80 cm" },
+          "risk": "Read as 800 mm through unit normalization."
+        },
+        {
+          "region": { "kind": "image_region", "x": 300, "y": 505, "w": 150, "h": 45, "note": "Bottom dimension." },
+          "expectedValue": { "kind": "quantity", "value": "3.5", "unit": "m", "originalExpression": "3,5 m" },
+          "risk": "Decimal comma lost (35 m)."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1's vision extraction is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "width",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-SOSNOWA" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "1200", "unit": "mm", "originalExpression": "1200 mm" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 260, "y": 70, "w": 180, "h": 50, "note": "Top dimension." } }
+          ],
+          "rationale": "Each length keeps the exact unit printed beside it."
+        },
+        {
+          "findingKey": "height",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-SOSNOWA" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "80", "unit": "cm", "originalExpression": "80 cm" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 690, "y": 280, "w": 100, "h": 45, "note": "Right dimension." } }
+          ],
+          "rationale": "Stated in centimeters."
+        },
+        {
+          "findingKey": "length",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-SOSNOWA" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "3.5", "unit": "m", "originalExpression": "3,5 m" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 300, "y": 505, "w": 150, "h": 45, "note": "Bottom dimension." } }
+          ],
+          "rationale": "Decimal comma parses to 3.5 m."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Normalize all three lengths into one unit as the stored values (e.g. 120 cm, 0.8 m, 3500 mm).", "category": "other", "because": "Silent unit conversion changes the meaning of stored technical data; the original units are part of the finding." },
+        { "mustNot": "Misplace a decimal (35 m, 3.5 cm).", "category": "other", "because": "Each printed value is exact as printed." }
+      ]
+    }
+  ]
+}

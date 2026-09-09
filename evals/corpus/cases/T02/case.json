@@ -1,0 +1,50 @@
+{
+  "caseId": "T02",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Uzgodniona cena z jawnym „netto”",
+  "coverage": ["amounts"],
+  "fixtureClock": "2026-09-15T09:12:00+02:00",
+  "notes": "Clear net basis stated in text. Scorer-probe target case: recording a gross (VAT-inclusive) value here is a guessed tax basis = critical source_basis error.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-KACZMAREK", "name": "Kaczmarek", "kind": "person", "detail": "klient" }],
+    "projects": [
+      { "ref": "P-KACZMAREK", "alias": "Kaczmarek", "client": "C-KACZMAREK", "stage": "uzgodnienie", "location": "ul. Sosnowa 3, Wrocław" }
+    ],
+    "existingFindings": [
+      {
+        "scope": { "level": "project", "ref": "P-KACZMAREK" },
+        "findingKey": "quoted_price",
+        "knowledgeState": "known",
+        "value": {
+          "kind": "financial",
+          "role": "quoted_price",
+          "precision": "exact",
+          "amount": "12000.00",
+          "currency": "PLN",
+          "currencyOrigin": "firm_default",
+          "vatBasis": "not_specified"
+        },
+        "note": "Wysłana wcześniej wycena 12 000 zł bez podanej podstawy."
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-15T09:12:00+02:00",
+      "fullyAcceptedAt": "2026-09-15T09:12:02+02:00",
+      "projectPill": "P-KACZMAREK",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Kaczmarek zaakceptował wycenę: 12 000 zł netto za całe zlecenie. Umowa podpisana, proszę zapisać cenę uzgodnioną."
+        }
+      ]
+    }
+  ]
+}

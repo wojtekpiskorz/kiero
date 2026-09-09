@@ -1,0 +1,38 @@
+{
+  "caseId": "V02",
+  "modality": "voice",
+  "corpusRevision": "2026.09.1",
+  "title": "Data z godziną — ryzyko sześćdziesiątego",
+  "coverage": ["date_precision"],
+  "fixtureClock": "2026-09-16T15:45:00+02:00",
+  "notes": "'szesnastego października... na dziesiątej rano' = 2026-10-16T10:00+02:00. Typical STT risk: 'szesnastego' vs 'sześćdziesiątego'.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-MAREK", "name": "Marek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-JURCZAK", "name": "Jurczak", "kind": "person", "detail": "klient" }],
+    "projects": [{ "ref": "P-JURCZAK", "alias": "Jurczak", "client": "C-JURCZAK", "stage": "realizacja" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-16T15:45:00+02:00",
+      "fullyAcceptedAt": "2026-09-16T15:45:08+02:00",
+      "projectPill": "P-JURCZAK",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 19.0,
+          "transcript": "Termin oddania u Jurczaka: szesnastego października, odbiór na dziesiątej rano. Zapisz z godziną, bo klient przyjeżdża z rzutem.",
+          "recordingContext": "Spokojne nagranie z samochodu, lekki szum drogi.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: single male speaker, car interior noise."
+          }
+        }
+      ]
+    }
+  ]
+}

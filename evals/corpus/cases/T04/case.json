@@ -1,0 +1,33 @@
+{
+  "caseId": "T04",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Wycena bez podanej podstawy netto/brutto",
+  "coverage": ["unknown_tax_basis", "amounts"],
+  "fixtureClock": "2026-09-17T11:05:00+02:00",
+  "notes": "Quoted price with no net/gross statement. Correct outcome: vatBasis stays not_specified and NO clarification is required (the missing basis does not block recording; asking would be needless).",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-LIS", "name": "Lis", "kind": "person", "detail": "klient" }],
+    "projects": [
+      { "ref": "P-LISCIANA", "alias": "Liściana", "client": "C-LIS", "stage": "wycena", "location": "ul. Liściana 40, Wrocław" }
+    ],
+    "existingFindings": []
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-17T11:05:00+02:00",
+      "fullyAcceptedAt": "2026-09-17T11:05:02+02:00",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Oddałem Lisowi wycenę remontu łazienki na Liścianej: 8 200 zł. Nic nie wspominałem ani o netto, ani o brutto — zapisać dokładnie tak, jak podałem."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "caseId": "M04",
+  "modality": "mixed",
+  "corpusRevision": "2026.09.1",
+  "title": "Wycofanie źródła przy niezależnym potwierdzeniu",
+  "coverage": ["withdrawal_deletion", "corroboration"],
+  "fixtureClock": "2026-09-22T08:30:00+02:00",
+  "notes": "S1 is later withdrawn. The supplier name existed only in S1 -> that finding loses its sole support and is re-evaluated. The 90 m² quantity survives via S2's independent corroboration.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [
+      { "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" },
+      { "ref": "B-MAREK", "name": "Marek", "role": "szef" }
+    ],
+    "contacts": [{ "ref": "C-CERAMICA-NOVA", "name": "Ceramica Nova", "kind": "organization", "detail": "dostawca" }],
+    "projects": [{ "ref": "P-MODLINSKA", "alias": "Modlińska", "stage": "realizacja" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-22T08:30:00+02:00",
+      "fullyAcceptedAt": "2026-09-22T08:30:03+02:00",
+      "projectPill": "P-MODLINSKA",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Zamówiłem u Ceramica Nova gres na Modlińską: 90 m², odbiór osobisty."
+        }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-22T10:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-22T10:00:07+02:00",
+      "projectPill": "P-MODLINSKA",
+      "parts": [
+        {
+          "partId": "S2-aud",
+          "type": "voice",
+          "durationSeconds": 12.0,
+          "transcript": "Też słyszałem o Modlińskiej: gres, dziewięćdziesiąt metrów kwadratowych, wszystko się zgadza.",
+          "recordingContext": "Głosówka Marka.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker B."
+          }
+        }
+      ]
+    }
+  ],
+  "timeline": [
+    { "type": "run_completion", "sourceId": "S1", "completesAt": "2026-09-22T08:32:00+02:00", "reason": "Standard processing." },
+    { "type": "run_completion", "sourceId": "S2", "completesAt": "2026-09-22T10:02:00+02:00", "reason": "Standard processing." },
+    {
+      "type": "source_withdrawn",
+      "sourceId": "S1",
+      "at": "2026-09-22T15:00:00+02:00",
+      "by": "B-WOJTEK",
+      "reason": "Źle opisałem — zamówienie u Ceramica Nova dotyczyło innej budowy. Wycofuję wiadomość."
+    }
+  ]
+}

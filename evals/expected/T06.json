@@ -1,0 +1,68 @@
+{
+  "caseId": "T06",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "material_invoice",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "material_cost",
+            "precision": "exact",
+            "amount": "3400.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "net",
+            "originalExpression": "faktura od dostawcy 3 400 zł netto"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "Banan — płytki przyjęte na magazyn, faktura od dostawcy 3 400 zł netto" }
+            }
+          ],
+          "rationale": "Invoice amount belongs to Banan, stated netto."
+        },
+        {
+          "findingKey": "tile_color",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANANOWA" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "białe" },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "Bananowa — klientka Banasik zmienia płytki na białe" }
+            }
+          ],
+          "rationale": "The color change concerns Bananowa despite the project pill pointing at Banan; the pill is context, not routing."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Attribute the 3 400 invoice or the tile reception to Bananowa.", "category": "project", "because": "The clause is explicitly scoped to Banan; similar aliases must not be conflated." },
+        { "mustNot": "Attribute the white-tile change to Banan.", "category": "project", "because": "The clause names Bananowa and Klientka Banasik explicitly." },
+        { "mustNot": "Force every clause into the project pill's project (Banan).", "category": "project", "because": "The accepted contract: the pill offers context and does not force attribution." }
+      ]
+    }
+  ],
+  "retrievalExpectations": {
+    "expectHits": [
+      { "query": "faktura za płytki Banan", "mustReturnEvidenceFrom": ["S1"], "findingKeys": ["material_invoice"], "mustRankAbove": [] },
+      { "query": "jaki kolor płytek Bananowa", "mustReturnEvidenceFrom": ["S1"], "findingKeys": ["tile_color"] }
+    ],
+    "mustNotSurface": [
+      { "query": "faktura za płytki Bananowa", "forbiddenSourceOrProject": "evidence anchored to the Banan invoice clause being returned as Bananowa's invoice", "because": "Cross-project evidence leakage between similar aliases." }
+    ]
+  }
+}

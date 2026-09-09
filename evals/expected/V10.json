@@ -1,0 +1,53 @@
+{
+  "caseId": "V10",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 12.0, "to": 16.0, "expectedText": "w przyszłym tygodniu na pewno", "risk": "Week marker lost, leaving an unusable bare 'w tygodniu'." }
+      ],
+      "incompleteSegments": [
+        { "from": 2.0, "to": 10.0, "status": "must_remain_incomplete" }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "delivery_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "week",
+            "role": "internal_plan",
+            "fromDate": "2026-09-21",
+            "toDate": "2026-09-27",
+            "originalExpression": "w przyszłym tygodniu"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 12.0, "to": 16.0, "transcriptQuote": "w każdym razie w przyszłym tygodniu na pewno" }
+            }
+          ],
+          "rationale": "Monday 2026-09-14 send: 'przyszły tydzień' = Mon 2026-09-21 .. Sun 2026-09-27. The day itself was unintelligible, so only the justified week bound is recorded."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Pick any specific day within the week (e.g. 2026-09-22).", "category": "date", "because": "The day-name segment is unintelligible; inventing precision from noise is a date error." },
+        { "mustNot": "Mark the transcript segment 2.0-10.0s as understood or fabricate its content.", "category": "source_basis", "because": "A missing required segment is pending, not a complete transcript." },
+        { "mustNot": "Discard the delivery fact entirely because part of the message is noisy.", "category": "date", "because": "The week-level fact is fully supported by the audible remainder." }
+      ]
+    }
+  ]
+}

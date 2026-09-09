@@ -1,0 +1,48 @@
+{
+  "caseId": "V04",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-aud",
+      "fidelityPoints": [
+        { "from": 1.5, "to": 4.5, "expectedText": "w przyszły wtorek", "risk": "'przyszły' dropped, yielding tomorrow (the same weekday) instead of next week." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "key_handover_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "agreed",
+            "date": "2026-09-22",
+            "originalExpression": "w przyszły wtorek"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-aud",
+              "supportType": "support",
+              "anchor": { "kind": "audio_interval", "from": 1.5, "to": 4.5, "transcriptQuote": "Odbiór kluczy u Kowalskich jest w przyszły wtorek" }
+            }
+          ],
+          "rationale": "Tuesday 2026-09-15 send: 'przyszły wtorek' = Tuesday of next week = 2026-09-22. Interpretation anchors to sentAt, never to when analysis happens to run."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record 2026-09-15 (same day) or 2026-09-16 as the handover.", "category": "date", "because": "'Przyszły' shifts the weekday to next week." },
+        { "mustNot": "Re-resolve the relative phrase against processing time in any later reanalysis.", "category": "date", "because": "Relative language anchors to the send day and timezone snapshot permanently." }
+      ]
+    }
+  ]
+}

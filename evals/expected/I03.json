@@ -1,0 +1,110 @@
+{
+  "caseId": "I03",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 340, "y": 215, "w": 220, "h": 40, "note": "Quantity column of the item row." },
+          "expectedValue": { "kind": "quantity", "value": "45", "unit": "m2", "originalExpression": "45 m²" },
+          "risk": "m² misread as m or the quantity swapped with the value."
+        },
+        {
+          "region": { "kind": "image_region", "x": 430, "y": 285, "w": 160, "h": 40, "note": "Net total line." },
+          "expectedValue": {
+            "kind": "financial",
+            "role": "material_cost",
+            "precision": "exact",
+            "amount": "6300.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "net",
+            "originalExpression": "netto: 6 300,00 zł"
+          },
+          "risk": "Amount transposed (6 030) or basis flipped."
+        },
+        {
+          "region": { "kind": "image_region", "x": 430, "y": 355, "w": 160, "h": 40, "note": "Gross total line." },
+          "expectedValue": {
+            "kind": "financial",
+            "role": "material_cost",
+            "precision": "exact",
+            "amount": "7749.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "gross",
+            "originalExpression": "brutto: 7 749,00 zł"
+          },
+          "risk": "Gross recomputed differently than printed, or read as 7 794."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1's vision extraction is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "tile_quantity",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "45", "unit": "m2", "originalExpression": "45 m²" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 340, "y": 215, "w": 220, "h": 40, "note": "Quantity column." } }
+          ],
+          "rationale": "Delivered tile area from the delivery note."
+        },
+        {
+          "findingKey": "material_cost_net",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "material_cost",
+            "precision": "exact",
+            "amount": "6300.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "net",
+            "originalExpression": "netto 6 300,00 zł"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 430, "y": 285, "w": 160, "h": 40, "note": "Net line." } }
+          ],
+          "rationale": "Printed net amount; the document states the basis explicitly."
+        },
+        {
+          "findingKey": "material_cost_gross",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "material_cost",
+            "precision": "exact",
+            "amount": "7749.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "gross",
+            "originalExpression": "brutto 7 749,00 zł"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 430, "y": 355, "w": 160, "h": 40, "note": "Gross line." } }
+          ],
+          "rationale": "Known net and gross coexist per the value contract; both are stated on the document."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record either amount with basis not_specified.", "category": "source_basis", "because": "The document prints both bases explicitly; losing them discards stated evidence." },
+        { "mustNot": "Recompute and store a different gross than the printed 7 749,00.", "category": "amount", "because": "Printed values are the evidence, not the system's arithmetic." },
+        { "mustNot": "Merge net and gross into a single value.", "category": "amount", "because": "Both bases coexist by contract." }
+      ]
+    }
+  ]
+}

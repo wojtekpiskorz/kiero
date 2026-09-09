@@ -1,0 +1,79 @@
+{
+  "caseId": "I02",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedVision": [
+    {
+      "sourceId": "S1",
+      "partId": "S1-img",
+      "extractionPoints": [
+        {
+          "region": { "kind": "image_region", "x": 120, "y": 65, "w": 380, "h": 50, "note": "Room label above the sketch." },
+          "expectedValue": {
+            "kind": "quantity",
+            "value": "2.4",
+            "secondValue": "1.8",
+            "unit": "m",
+            "originalExpression": "łazienka 2,4 × 1,8 m"
+          },
+          "risk": "Comma decimal misread as thousands separator or swapped digits (4,2)."
+        },
+        {
+          "region": { "kind": "image_region", "x": 210, "y": 445, "w": 240, "h": 50, "note": "Screed annotation under the dimension line." },
+          "expectedValue": { "kind": "quantity", "value": "6", "unit": "cm", "originalExpression": "wylewka 6 cm" },
+          "risk": "Unit dropped, leaving a bare number."
+        },
+        {
+          "region": { "kind": "image_region", "x": 520, "y": 165, "w": 220, "h": 50, "note": "Tile format on the right margin." },
+          "expectedValue": { "kind": "quantity", "value": "60", "secondValue": "60", "unit": "cm", "originalExpression": "płytki 60×60" },
+          "risk": "Format read as 60x6 or 600x600."
+        }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1's vision extraction is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "room_dimensions",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "2.4", "secondValue": "1.8", "unit": "m", "originalExpression": "2,4 × 1,8 m" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 120, "y": 65, "w": 380, "h": 50, "note": "Room label." } }
+          ],
+          "rationale": "Polish comma decimal 2,4 x 1,8 m must parse to 2.4 and 1.8 in meters."
+        },
+        {
+          "findingKey": "screed_thickness",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "6", "unit": "cm", "originalExpression": "wylewka 6 cm" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 210, "y": 445, "w": 240, "h": 50, "note": "Screed annotation." } }
+          ],
+          "rationale": "Thickness with explicit unit."
+        },
+        {
+          "findingKey": "tile_format",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "60", "secondValue": "60", "unit": "cm", "originalExpression": "płytki 60×60" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-img", "supportType": "support", "anchor": { "kind": "image_region", "x": 520, "y": 165, "w": 220, "h": 50, "note": "Tile format annotation." } }
+          ],
+          "rationale": "Tile pair in cm, no scale drift."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Store 24 x 18 or 2,4 as 24 through decimal-comma confusion.", "category": "other", "because": "Polish decimal commas are standard in handwriting." },
+        { "mustNot": "Store any dimension without its unit.", "category": "other", "because": "Unitless dimensions lose meaning." }
+      ]
+    }
+  ]
+}

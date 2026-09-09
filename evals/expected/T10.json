@@ -1,0 +1,44 @@
+{
+  "caseId": "T10",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "floor_renovation_estimate",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-DEBOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "estimated_price",
+            "precision": "range",
+            "minAmount": "25000.00",
+            "maxAmount": "30000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "orientacyjnie 25–30 tysięcy"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "orientacyjnie 25–30 tysięcy za remont podłogi" }
+            }
+          ],
+          "rationale": "A loose on-the-spot estimate: approximate range, no basis, no commitment."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record a single exact amount (27 500 or either bound) instead of the range.", "category": "amount", "because": "The bounds are justified by the source; picking a point value invents precision." },
+        { "mustNot": "Guess a net/gross basis.", "category": "source_basis", "because": "None stated." },
+        { "mustNot": "Record the estimate as a quoted or agreed price.", "category": "commitment", "because": "'To luźny szacunek na poczekaniu'." }
+      ]
+    }
+  ]
+}

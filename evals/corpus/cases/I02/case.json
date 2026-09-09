@@ -1,0 +1,60 @@
+{
+  "caseId": "I02",
+  "modality": "image",
+  "corpusRevision": "2026.09.1",
+  "title": "Szkic łazienki z wymiarami",
+  "coverage": [
+    "technical_dimensions"
+  ],
+  "fixtureClock": "2026-09-25T10:15:00+02:00",
+  "notes": "Grid-paper sketch: room 2,4 x 1,8 m, wylewka 6 cm, płytki 60x60. Three quantity findings with original units; comma decimal separator must survive as 2.4.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-WOJTEK",
+        "name": "Wojtek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [],
+    "projects": [
+      {
+        "ref": "P-BANAN",
+        "alias": "Banan",
+        "stage": "realizacja"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-25T10:15:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T10:15:04+02:00",
+      "projectPill": "P-BANAN",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "plan.svg",
+          "widthPx": 800,
+          "heightPx": 600,
+          "contentDescription": "Szkic na papierie w kratkę niebieskim długopisem: prostokąt pomieszczenia z opisem u góry 'łazienka 2,4 × 1,8 m', pod spodem wymiarowanie z dopiskiem czerwonym 'wylewka 6 cm', po prawej adnotacja 'płytki 60×60'.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 102,
+            "note": "Deterministic synthetic SVG (handwriting style on grid paper).",
+            "sha256": "2c773b56aaeb8015fdfef9c927b954df6cbee5167ba6e1b9bb35733ab1f50f6f"
+          }
+        }
+      ]
+    }
+  ]
+}

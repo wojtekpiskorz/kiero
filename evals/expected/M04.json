@@ -1,0 +1,80 @@
+{
+  "caseId": "M04",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S2",
+      "partId": "S2-aud",
+      "fidelityPoints": [
+        { "from": 3.0, "to": 8.0, "expectedText": "gres, dziewięćdziesiąt metrów kwadratowych", "risk": "'dziewięćdziesiąt' vs 'dziewięć' (9) scale error." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "both-processed",
+      "when": "After S1 and S2 are both processed, before the withdrawal.",
+      "memoryChanges": [
+        {
+          "findingKey": "tile_supplier",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-MODLINSKA" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "Ceramica Nova" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-txt", "supportType": "support", "anchor": { "kind": "text_quote", "quote": "Zamówiłem u Ceramica Nova gres na Modlińską" } }
+          ],
+          "rationale": "Supplier named in the order message (sole source for this detail)."
+        },
+        {
+          "findingKey": "tile_quantity",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-MODLINSKA" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "90", "unit": "m2", "originalExpression": "90 m² / dziewięćdziesiąt metrów kwadratowych" },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-txt", "supportType": "support", "anchor": { "kind": "text_quote", "quote": "gres na Modlińską: 90 m²" } },
+            { "sourceId": "S2", "partId": "S2-aud", "supportType": "independent_corroboration", "anchor": { "kind": "audio_interval", "from": 3.0, "to": 8.0, "transcriptQuote": "gres, dziewięćdziesiąt metrów kwadratowych" } }
+          ],
+          "rationale": "Two bosses, two independent conversations: the quantity has two sources."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Split the quantity into two findings because two people stated it.", "category": "other", "because": "One ustalenie, corroborated." }
+      ]
+    },
+    {
+      "stageId": "final",
+      "when": "After S1 is withdrawn at 15:00.",
+      "memoryChanges": [
+        {
+          "findingKey": "tile_supplier",
+          "operation": "mark_unknown",
+          "scope": { "level": "project", "ref": "P-MODLINSKA" },
+          "knowledgeState": "unknown",
+          "trigger": "source_withdrawn",
+          "historyExpectation": "S1's earlier role and the withdrawal reason stay in history.",
+          "rationale": "The supplier name existed only in the withdrawn S1; with its sole support gone the finding must be re-evaluated to unknown."
+        },
+        {
+          "findingKey": "tile_quantity",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-MODLINSKA" },
+          "knowledgeState": "known",
+          "value": { "kind": "quantity", "value": "90", "unit": "m2", "originalExpression": "dziewięćdziesiąt metrów kwadratowych" },
+          "evidence": [
+            { "sourceId": "S2", "partId": "S2-aud", "supportType": "support", "anchor": { "kind": "audio_interval", "from": 3.0, "to": 8.0, "transcriptQuote": "gres, dziewięćdziesiąt metrów kwadratowych" } }
+          ],
+          "historyExpectation": "S1's support link is removed with the withdrawal; S2's independent confirmation keeps its role.",
+          "rationale": "A withdrawn source cannot solely support current information — but the 90 m² fact survives on S2's independent support."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Keep 'Ceramica Nova' as the current supplier.", "category": "source_basis", "because": "Its only support was withdrawn; presenting it as established has no source basis." },
+        { "mustNot": "Drop the 90 m² quantity together with the withdrawal.", "category": "other", "because": "Independent corroboration survives the withdrawal of the other source." },
+        { "mustNot": "Withdraw S2 or mark it suspicious.", "category": "other", "because": "S2 is an independent, untouched source." }
+      ]
+    }
+  ]
+}

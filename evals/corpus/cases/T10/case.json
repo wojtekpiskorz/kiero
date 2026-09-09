@@ -1,0 +1,34 @@
+{
+  "caseId": "T10",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Orientacyjna widełka cenowa bez podstawy",
+  "coverage": ["amounts", "unknown_tax_basis"],
+  "fixtureClock": "2026-09-23T09:15:00+02:00",
+  "notes": "Approximate range with unknown basis. The range must persist as a range; picking a midpoint or an exact value is prohibited.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-MAREK", "name": "Marek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-DABROWA", "name": "Dąbrowski", "kind": "person", "detail": "klient" }],
+    "projects": [
+      { "ref": "P-DEBOWA", "alias": "Dębowa", "client": "C-DABROWA", "stage": "wycena" }
+    ],
+    "existingFindings": []
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-23T09:15:00+02:00",
+      "fullyAcceptedAt": "2026-09-23T09:15:02+02:00",
+      "projectPill": "P-DEBOWA",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Dębowa: orientacyjnie 25–30 tysięcy za remont podłogi na całym parterze. To luźny szacunek na poczekaniu, nic więcej."
+        }
+      ]
+    }
+  ]
+}

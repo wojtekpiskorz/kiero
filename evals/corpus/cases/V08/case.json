@@ -1,0 +1,40 @@
+{
+  "caseId": "V08",
+  "modality": "voice",
+  "corpusRevision": "2026.09.1",
+  "title": "Bananowa dostawa, Banan spotkanie",
+  "coverage": ["similar_aliases"],
+  "fixtureClock": "2026-09-21T07:30:00+02:00",
+  "notes": "Monday send: czwartek = 2026-09-24 (Bananowa), piątek = 2026-09-25 (Banan). Similar aliases in fast speech; each date lands on its own project.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [],
+    "projects": [
+      { "ref": "P-BANAN", "alias": "Banan", "stage": "realizacja" },
+      { "ref": "P-BANANOWA", "alias": "Bananowa", "stage": "realizacja" }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-21T07:30:00+02:00",
+      "fullyAcceptedAt": "2026-09-21T07:30:08+02:00",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 13.0,
+          "transcript": "Pamiętaj: na Bananowej dostawa płytek w czwartek, a na Bananie spotkanie z klientem w piątek. Nie pomyl.",
+          "recordingContext": "Szybka głosówka po drodze.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker, brisk pace."
+          }
+        }
+      ]
+    }
+  ]
+}

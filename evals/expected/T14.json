@@ -1,0 +1,27 @@
+{
+  "caseId": "T14",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After the withdrawal of S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "deposit",
+          "operation": "mark_unknown",
+          "scope": { "level": "project", "ref": "P-WROBEL" },
+          "knowledgeState": "unknown",
+          "trigger": "source_withdrawn",
+          "historyExpectation": "S1's text, author and the withdrawal reason ('Pomyłka — zaliczkę dał Wrona, nie Wróbel') remain in history; the earlier role of the source and the cause of the correction stay visible.",
+          "rationale": "S1 was the sole support for the 3 000 deposit; a withdrawn source cannot keep supporting current findings, and no replacement value exists."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Keep 3 000 zł as the current deposit for Wróbel after the withdrawal.", "category": "source_basis", "because": "A withdrawn source cannot single-handedly support current information." },
+        { "mustNot": "Create a 3 000 deposit for Wrona on the agent's own initiative.", "category": "amount", "because": "The correction only retracts; attributing the money to Wrona requires a new source from a boss." },
+        { "mustNot": "Erase S1's history or pretend the message never existed.", "category": "other", "because": "Withdrawal preserves content, history and author of the operation per the accepted contract." }
+      ]
+    }
+  ]
+}

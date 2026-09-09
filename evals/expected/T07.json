@@ -1,0 +1,88 @@
+{
+  "caseId": "T07",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "deposit",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "deposit",
+            "precision": "exact",
+            "amount": "4000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "zaliczka od Kowalskiego wpłynęła, 4 000 zł"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "Banan — zaliczka od Kowalskiego wpłynęła, 4 000 zł" }
+            }
+          ],
+          "rationale": "A received deposit, recorded on Banan."
+        },
+        {
+          "findingKey": "final_payment_date",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-KACZMAREK" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "temporal",
+            "precision": "date",
+            "role": "agreed",
+            "date": "2026-10-03",
+            "originalExpression": "dopłata umówiona na 3 października"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "Kaczmarek — dopłata umówiona na 3 października" }
+            }
+          ],
+          "rationale": "'Umówiona' = agreed payment date, date-only, on Kaczmarek."
+        },
+        {
+          "findingKey": "project",
+          "operation": "create_project",
+          "scope": { "level": "project", "ref": "P-ZIOLKOWSKI" },
+          "knowledgeState": "known",
+          "value": { "kind": "text", "value": "Ziółkowski — malowanie domu na Krzywej" },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "nowe zapytanie: Ziółkowski, malowanie domu na Krzywej" }
+            }
+          ],
+          "historyExpectation": "New project created with alias 'Ziółkowski', stage zapytanie (inquiry); preferred start 'w połowie października' recorded as an approximate internal note, not an agreed date.",
+          "rationale": "A project exists from the first client inquiry per the glossary; the agent creates it autonomously."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record the 4 000 deposit or the Kaczmarek payment date under the wrong project.", "category": "project", "because": "Each clause names its own project explicitly." },
+        { "mustNot": "Turn 'start w połowie października' into an agreed start date for Ziółkowski.", "category": "commitment", "because": "The client only wishes it and no price is known yet." },
+        { "mustNot": "Skip creating the Ziółkowski project because no pill was attached.", "category": "other", "because": "Project creation from a clear inquiry is autonomous agent work." }
+      ]
+    }
+  ],
+  "retrievalExpectations": {
+    "expectHits": [
+      { "query": "zaliczka Kowalski Banan", "mustReturnEvidenceFrom": ["S1"], "findingKeys": ["deposit"] },
+      { "query": "kiedy dopłata Kaczmarek", "mustReturnEvidenceFrom": ["S1"], "findingKeys": ["final_payment_date"] }
+    ]
+  }
+}

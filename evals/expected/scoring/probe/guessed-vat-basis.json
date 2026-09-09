@@ -1,0 +1,48 @@
+{
+  "caseId": "T02",
+  "corpusRevision": "2026.09.1",
+  "run": {
+    "runId": "probe-deliberate-3",
+    "attempt": 1,
+    "startedAt": "2026-09-09T10:02:00+02:00",
+    "finishedAt": "2026-09-09T10:02:36+02:00",
+    "environment": "hand-built probe report (no real run)",
+    "revision": "not-a-real-run"
+  },
+  "configuration": {
+    "chat": { "provider": "probe", "model": "probe/fictional", "route": "n/a", "promptVersion": "probe", "schemaVersion": "probe" }
+  },
+  "latencyMs": { "firstUsefulOutputMs": 650, "totalMs": 36000 },
+  "attempts": 1,
+  "cost": { "amountUsd": "0.0000", "metered": false },
+  "stages": {
+    "stt": { "status": "skipped" },
+    "vision": { "status": "skipped" },
+    "retrieval": { "status": "complete", "evidenceReturned": ["S1"] },
+    "memoryChanges": {
+      "status": "complete",
+      "published": [
+        {
+          "findingKey": "agreed_price",
+          "scope": { "level": "project", "ref": "P-KACZMAREK" },
+          "operation": "set",
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "agreed_price",
+            "precision": "exact",
+            "amount": "12000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "gross",
+            "originalExpression": "12 000 zł netto"
+          },
+          "evidence": [{ "sourceId": "S1", "anchor": { "kind": "text_quote", "quote": "12 000 zł netto za całe zlecenie" } }]
+        }
+      ]
+    },
+    "clarifications": { "status": "complete", "asked": [] }
+  },
+  "caseScore": 0.99,
+  "caseOutcome": "pass"
+}

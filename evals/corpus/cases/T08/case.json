@@ -1,0 +1,34 @@
+{
+  "caseId": "T08",
+  "modality": "text",
+  "corpusRevision": "2026.09.1",
+  "title": "Samopoprawka w trakcie wiadomości",
+  "coverage": ["self_correction"],
+  "fixtureClock": "2026-09-15T07:55:00+02:00",
+  "notes": "Explicit mid-message self-correction resolves the ambiguity: final wording wins, no clarification needed. Tuesday send: 'w środę' = 2026-09-16 (superseded), 'w piątek' = 2026-09-18.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-SIKORA", "name": "Sikora", "kind": "person", "detail": "klient" }],
+    "projects": [
+      { "ref": "P-SIKORA", "alias": "Sikora", "client": "C-SIKORA", "stage": "realizacja", "location": "ul. Kwiatowa 5, Siechnice" }
+    ],
+    "existingFindings": []
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-15T07:55:00+02:00",
+      "fullyAcceptedAt": "2026-09-15T07:55:02+02:00",
+      "projectPill": "P-SIKORA",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Montaż kuchni u Sikory w środę... nie, moment, przepraszam — w piątek. Piątek jest pewny, umówione z montażystami."
+        }
+      ]
+    }
+  ]
+}

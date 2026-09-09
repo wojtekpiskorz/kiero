@@ -1,0 +1,59 @@
+{
+  "caseId": "V14",
+  "modality": "voice",
+  "corpusRevision": "2026.09.1",
+  "title": "Wycofanie własnej wypowiedzi nową wiadomością",
+  "coverage": ["withdrawal_deletion"],
+  "fixtureClock": "2026-09-23T09:30:00+02:00",
+  "notes": "S2 is a correction-by-new-message retracting S1's sole finding (not a source withdrawal op). The finding goes back to unknown; the original source keeps its text and history.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [{ "ref": "C-KOWALSKI", "name": "Kowalski", "kind": "person", "detail": "klient" }],
+    "projects": [{ "ref": "P-BANAN", "alias": "Banan", "client": "C-KOWALSKI", "stage": "realizacja" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-23T09:30:00+02:00",
+      "fullyAcceptedAt": "2026-09-23T09:30:07+02:00",
+      "projectPill": "P-BANAN",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 12.0,
+          "transcript": "Kowalski mówi, że chce zaczynać drugi etap na Bananie w październiku.",
+          "recordingContext": "Głosówka z drogi.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker, road noise."
+          }
+        }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-23T15:10:00+02:00",
+      "fullyAcceptedAt": "2026-09-23T15:10:06+02:00",
+      "projectPill": "P-BANAN",
+      "parts": [
+        {
+          "partId": "S2-aud",
+          "type": "voice",
+          "durationSeconds": 13.0,
+          "transcript": "Wsiadaj — wycofuję to, co mówiłem rano o drugim etapie u Kowalskiego. Klient się zawahał, na razie nic z tego nie ma.",
+          "recordingContext": "Głosówka z biura.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker, office."
+          }
+        }
+      ]
+    }
+  ]
+}

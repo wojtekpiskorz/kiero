@@ -1,0 +1,68 @@
+{
+  "caseId": "T03",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "stages": [
+    {
+      "stageId": "final",
+      "when": "After S1 is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "labor_estimate",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-MALINOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "estimated_price",
+            "precision": "approximate",
+            "amount": "10000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "not_specified",
+            "originalExpression": "myślę, że zmieścimy się w 10 tysiącach"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "myślę, że zmieścimy się w 10 tysiącach, ale to jeszcze nie umowa" }
+            }
+          ],
+          "rationale": "An explicitly hedged estimate; certainty of the read does not upgrade its business role."
+        },
+        {
+          "findingKey": "agreed_price",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-MALINOWA" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "agreed_price",
+            "precision": "exact",
+            "amount": "10500.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "gross",
+            "originalExpression": "uzgodniłem ostatecznie całość za 10 500 zł brutto"
+          },
+          "evidence": [
+            {
+              "sourceId": "S1",
+              "partId": "S1-txt",
+              "supportType": "support",
+              "anchor": { "kind": "text_quote", "quote": "z klientką uzgodniłem ostatecznie całość za 10 500 zł brutto" }
+            }
+          ],
+          "rationale": "'Uzgodniłem ostatecznie' with 'brutto' is an exact agreed price; a separate ustalenie from the estimate."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record 10 000 as the agreed price or merge the two amounts into one finding.", "category": "commitment", "because": "The 10 000 is explicitly 'to jeszcze nie umowa'; only 10 500 is agreed." },
+        { "mustNot": "Record 10 500 as an estimate.", "category": "commitment", "because": "The source says 'uzgodniłem ostatecznie'." },
+        { "mustNot": "Guess a VAT basis for the 10 000 estimate.", "category": "source_basis", "because": "No basis is stated for the estimate; it stays not_specified." }
+      ]
+    }
+  ]
+}

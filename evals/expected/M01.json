@@ -1,0 +1,81 @@
+{
+  "caseId": "M01",
+  "corpusRevision": "2026.09.1",
+  "answerKeyAuthoring": "human_independent_of_model_output",
+  "expectedStt": [
+    {
+      "sourceId": "S2",
+      "partId": "S2-aud",
+      "fidelityPoints": [
+        { "from": 2.0, "to": 6.0, "expectedText": "24 tysiące netto za Banan", "risk": "Verbal '24 tysiące' read as 24 zł; basis word lost." }
+      ]
+    }
+  ],
+  "stages": [
+    {
+      "stageId": "text-first",
+      "when": "After S1 (text) is processed, before S2 arrives.",
+      "memoryChanges": [
+        {
+          "findingKey": "agreed_price",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "agreed_price",
+            "precision": "exact",
+            "amount": "24000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "net",
+            "originalExpression": "24 000 zł netto"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-txt", "supportType": "support", "anchor": { "kind": "text_quote", "quote": "Kowalski potwierdził cenę za cały remont na Bananie: 24 000 zł netto" } }
+          ],
+          "rationale": "Price confirmed by the client in S1: agreed, net."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Record the price as 24 zł or 240 000 zł.", "category": "amount", "because": "'24 tysiące' is 24000.00." }
+      ]
+    },
+    {
+      "stageId": "final",
+      "when": "After S2 (voice) is processed.",
+      "memoryChanges": [
+        {
+          "findingKey": "agreed_price",
+          "operation": "set",
+          "scope": { "level": "project", "ref": "P-BANAN" },
+          "knowledgeState": "known",
+          "value": {
+            "kind": "financial",
+            "role": "agreed_price",
+            "precision": "exact",
+            "amount": "24000.00",
+            "currency": "PLN",
+            "currencyOrigin": "firm_default",
+            "vatBasis": "net",
+            "originalExpression": "24 tysiące netto"
+          },
+          "evidence": [
+            { "sourceId": "S1", "partId": "S1-txt", "supportType": "support", "anchor": { "kind": "text_quote", "quote": "24 000 zł netto" } },
+            { "sourceId": "S2", "partId": "S2-aud", "supportType": "independent_corroboration", "anchor": { "kind": "audio_interval", "from": 2.0, "to": 6.0, "transcriptQuote": "24 tysiące netto za Banan, potwierdzam" } }
+          ],
+          "rationale": "The same ustalenie now has two sources: the text record and a second boss who independently witnessed the phone call."
+        }
+      ],
+      "prohibitedWrites": [
+        { "mustNot": "Create a second agreed_price finding for the corroborating message.", "category": "other", "because": "One ustalenie, two sources — duplication breaks identity." },
+        { "mustNot": "Mark the price conflicted because two sources mention it.", "category": "other", "because": "Agreement, not conflict." }
+      ]
+    }
+  ],
+  "retrievalExpectations": {
+    "expectHits": [
+      { "query": "cena remontu Banan Kowalski", "mustReturnEvidenceFrom": ["S1", "S2"], "findingKeys": ["agreed_price"] }
+    ]
+  }
+}

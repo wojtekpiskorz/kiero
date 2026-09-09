@@ -1,0 +1,68 @@
+{
+  "caseId": "I07",
+  "modality": "image",
+  "corpusRevision": "2026.09.1",
+  "title": "Podpisana oferta z terminem realizacji",
+  "coverage": [
+    "date_precision"
+  ],
+  "fixtureClock": "2026-09-25T15:00:00+02:00",
+  "notes": "Agreed completion date 2026-10-20 printed on a signed quote. Date-only: no hour exists in the document and none may be invented.",
+  "tenant": {
+    "firm": {
+      "name": "Bud-Ka Remonty",
+      "timezone": "Europe/Warsaw",
+      "defaultCurrency": "PLN"
+    },
+    "bosses": [
+      {
+        "ref": "B-MAREK",
+        "name": "Marek",
+        "role": "administrator firmy"
+      }
+    ],
+    "contacts": [
+      {
+        "ref": "C-ZIELINSKA",
+        "name": "Zielińska",
+        "kind": "person",
+        "detail": "klientka"
+      }
+    ],
+    "projects": [
+      {
+        "ref": "P-MALINOWA",
+        "alias": "Malinowa",
+        "client": "C-ZIELINSKA",
+        "stage": "uzgodnienie"
+      }
+    ]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-25T15:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-25T15:00:04+02:00",
+      "projectPill": "P-MALINOWA",
+      "parts": [
+        {
+          "partId": "S1-img",
+          "type": "image",
+          "asset": "quote.svg",
+          "widthPx": 600,
+          "heightPx": 800,
+          "contentDescription": "Wydruk 'OFERTA nr 41/2026' na remont łazienki. W środku pogrubione 'Termin realizacji: 20.10.2026'. Na dole linia podpisu z dopiskiem 'podpisano: 12.09.2026'.",
+          "assetProvenance": {
+            "status": "generated",
+            "generator": "evals/corpus/assets/generate-images.mjs",
+            "generatorVersion": 1,
+            "seed": 107,
+            "note": "Deterministic synthetic SVG (print style quote).",
+            "sha256": "435cf031e2675156252ae5eaf78c91d1e78650880065afa827c06147cf8354a9"
+          }
+        }
+      ]
+    }
+  ]
+}

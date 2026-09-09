@@ -1,0 +1,59 @@
+{
+  "caseId": "M06",
+  "modality": "mixed",
+  "corpusRevision": "2026.09.1",
+  "title": "Trwałe usunięcie źródła zaliczki",
+  "coverage": ["withdrawal_deletion", "amounts"],
+  "fixtureClock": "2026-09-23T10:00:00+02:00",
+  "notes": "Permanent deletion (admin op) of S1. The 2000 deposit loses its only support and must be re-evaluated to unknown; the 15000 payment-at-pickup agreement from S2 stands on its own. History keeps the deletion trace without the deleted content.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [
+      { "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" },
+      { "ref": "B-MAREK", "name": "Marek", "role": "szef" }
+    ],
+    "contacts": [{ "ref": "C-WROBEL", "name": "Wróbel", "kind": "person", "detail": "klient" }],
+    "projects": [{ "ref": "P-WROBEL", "alias": "Wróbel", "client": "C-WROBEL", "stage": "uzgodnienie" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-23T10:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-23T10:00:03+02:00",
+      "projectPill": "P-WROBEL",
+      "parts": [
+        {
+          "partId": "S1-txt",
+          "type": "text",
+          "text": "Wróbel dał zaliczkę 2 000 zł gotówką, odnotuj."
+        }
+      ]
+    },
+    {
+      "sourceId": "S2",
+      "author": "B-MAREK",
+      "sentAt": "2026-09-23T16:00:00+02:00",
+      "fullyAcceptedAt": "2026-09-23T16:00:03+02:00",
+      "projectPill": "P-WROBEL",
+      "parts": [
+        {
+          "partId": "S2-txt",
+          "type": "text",
+          "text": "Ustaliłem z Wróblem płatnościowo: reszta, 15 000 zł, przy odbiorze. Zapisz jako uzgodnienie."
+        }
+      ]
+    }
+  ],
+  "timeline": [
+    { "type": "run_completion", "sourceId": "S1", "completesAt": "2026-09-23T10:02:00+02:00", "reason": "Standard processing." },
+    { "type": "run_completion", "sourceId": "S2", "completesAt": "2026-09-23T16:02:00+02:00", "reason": "Standard processing." },
+    {
+      "type": "source_deleted",
+      "sourceId": "S1",
+      "at": "2026-09-24T09:30:00+02:00",
+      "by": "B-WOJTEK",
+      "reason": "Zaliczka wpłacona gotówką na konto prywatne — dane usunięte na życzenie klienta po wyjaśnieniu."
+    }
+  ]
+}

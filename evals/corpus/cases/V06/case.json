@@ -1,0 +1,38 @@
+{
+  "caseId": "V06",
+  "modality": "voice",
+  "corpusRevision": "2026.09.1",
+  "title": "Szacunek dla klienta i uzgodnienie z ekipą",
+  "coverage": ["estimate_vs_agreed", "amounts"],
+  "fixtureClock": "2026-09-18T17:10:00+02:00",
+  "notes": "Two roles in one breath: approximate customer estimate (~12000) and agreed labor with the crew (14000 gross). Confidence of the read must not upgrade the estimate to an agreement.",
+  "tenant": {
+    "firm": { "name": "Bud-Ka Remonty", "timezone": "Europe/Warsaw", "defaultCurrency": "PLN" },
+    "bosses": [{ "ref": "B-WOJTEK", "name": "Wojtek", "role": "administrator firmy" }],
+    "contacts": [],
+    "projects": [{ "ref": "P-MALINOWA", "alias": "Malinowa", "stage": "wycena" }]
+  },
+  "sources": [
+    {
+      "sourceId": "S1",
+      "author": "B-WOJTEK",
+      "sentAt": "2026-09-18T17:10:00+02:00",
+      "fullyAcceptedAt": "2026-09-18T17:10:07+02:00",
+      "projectPill": "P-MALINOWA",
+      "parts": [
+        {
+          "partId": "S1-aud",
+          "type": "voice",
+          "durationSeconds": 21.0,
+          "transcript": "Wycena dla klientki na Malinowej: powiedzmy z dwanaście tysięcy, ale to luźne. Z naszą ekipą ustaliłem już twardo czternaście brutto za robociznę.",
+          "recordingContext": "Nagranie z budowy, umiarkowany hałas.",
+          "assetProvenance": {
+            "status": "pending_generation",
+            "statement": "Synthetic audio pending generation; the transcript in this fixture is the source of truth for expected STT (audio tooling owned by D6/J3).",
+            "note": "Planned voice asset: male speaker, moderate site noise."
+          }
+        }
+      ]
+    }
+  ]
+}
