@@ -23,6 +23,12 @@
  *   (PLN minor units) behind the accepted 400/500 PLN alert thresholds,
  *   with per-level cooldown bookkeeping.
  *
+ * B4 amendment (issue #23, coordinated with I2): `auditRecords` carries the
+ * GM request's stated basis and closed outcome plus a `by_grant_time` index
+ * — the protected record the issue requires ("GM actor, target company,
+ * operation, reason and outcome") and the read path for the alpha-metrics
+ * exclusion and H4's audit views.
+ *
  * Tables: auditRecords, diagnosticEvents, healthHeartbeats, costEntries,
  * costAlertStates.
  */
@@ -56,10 +62,20 @@ export const telemetryTables = {
     operationName: v.string(),
     changeSetId: v.optional(shared.changeSetId),
     processingRunId: v.optional(shared.processingRunId),
+    /**
+     * B4 amendment (issue #23): the GM actor's stated basis ("podstawa") and
+     * the closed outcome of the audited action. Optional because only GM
+     * requests are required to state both; every GM row fills them ("ok" or
+     * the closed error code) together with `gmGrantId`, which stays the
+     * alpha-metrics exclusion tag.
+     */
+    gmBasis: v.optional(v.string()),
+    outcome: v.optional(v.string()),
     atMs: shared.tsMs,
   })
     .index("by_company_time", ["companyId", "atMs"])
-    .index("by_run", ["processingRunId"]),
+    .index("by_run", ["processingRunId"])
+    .index("by_grant_time", ["gmGrantId", "atMs"]),
 
   /**
    * Redacted technical event within the accepted retention window.

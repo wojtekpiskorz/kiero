@@ -157,7 +157,9 @@ export const accessOperations = {
     name: "access.enterGmMode",
     input: Schema.Struct({ reason: Schema.NonEmptyString }),
     result: Schema.Struct({ grantId: tableIdSchema("gmAccessGrants") }),
-    errorKinds: ["forbidden"],
+    // B4 amendment (issue #23): entering twice in one session is an honest
+    // conflict, not a silent grant swap.
+    errorKinds: ["forbidden", "conflict"],
   }),
   "access.exitGmMode": operationEntry({
     kind: "operation",
@@ -165,6 +167,145 @@ export const accessOperations = {
     input: Schema.Struct({ grantId: tableIdSchema("gmAccessGrants") }),
     result: Schema.Struct({ closedAtMs: Schema.Number }),
     errorKinds: ["forbidden", "not_found"],
+  }),
+  // B4 amendment (coordinated addition, named in issue #23): the audited GM
+  // operations. Every input that targets company data states the target
+  // company; every human-triggered action states its basis ("podstawa").
+  // GM authority is resolved from an OPEN `gmAccessGrants` row inside the
+  // same transaction (never from membership: a member without a GM grant
+  // gains nothing, and a GM without membership acts through the grant).
+  //
+  // The staged B2 manual-recovery command (issue #21 named prerequisite):
+  // the GM states the verification basis; the B2 core clears sessions,
+  // provider accounts and the Google subject while the users row, membership
+  // and authorship survive untouched.
+  "access.recoverAccount": operationEntry({
+    kind: "operation",
+    name: "access.recoverAccount",
+    input: Schema.Struct({
+      userId: tableIdSchema("users"),
+      verificationBasis: Schema.NonEmptyString,
+    }),
+    result: Schema.Struct({
+      recoveredAtMs: Schema.Number,
+      revokedSessions: Schema.Number,
+      clearedAccounts: Schema.Number,
+      clearedGoogleSubject: Schema.Boolean,
+    }),
+    errorKinds: ["forbidden", "not_found", "conflict", "validation"],
+  }),
+  // The audited GM inspection read (read-side surface over processingRuns /
+  // durableJobs; the retry/reanalysis ACTIONS are H4's). A read is still a
+  // GM request: it states the target company and basis, and its audit row
+  // lands in the same transaction.
+  "access.gmInspectCompany": operationEntry({
+    kind: "operation",
+    name: "access.gmInspectCompany",
+    input: Schema.Struct({
+      companyId: tableIdSchema("companies"),
+      basis: Schema.NonEmptyString,
+    }),
+    result: Schema.Struct({
+      company: Schema.Struct({
+        companyId: tableIdSchema("companies"),
+        name: Schema.String,
+        timezone: Schema.String,
+        defaultCurrency: Schema.String,
+      }),
+      alpha: Schema.Struct({
+        activationId: tableIdSchema("gmCompanyActivations"),
+        activatedAtMs: Schema.Number,
+      }),
+      activeAdminCount: Schema.Number,
+      processingRuns: Schema.Array(
+        Schema.Struct({
+          runId: tableIdSchema("processingRuns"),
+          kind: Schema.Literals(["initial_analysis", "reanalysis"]),
+          state: Schema.Literals(["running", "succeeded", "failed", "superseded"]),
+          startedAtMs: Schema.Number,
+          finishedAtMs: Schema.NullOr(Schema.Number),
+        }),
+      ),
+      durableJobs: Schema.Array(
+        Schema.Struct({
+          jobId: tableIdSchema("durableJobs"),
+          kind: Schema.String,
+          state: Schema.Literals(["queued", "running", "succeeded", "failed", "cancelled"]),
+          attempts: Schema.Number,
+          maxAttempts: Schema.Number,
+          lastErrorKind: Schema.NullOr(Schema.String),
+        }),
+      ),
+    }),
+    errorKinds: ["forbidden", "not_found", "validation"],
+  }),
+  // GM company onboarding: creates the firm UNDER GM AUTHORITY (no GM
+  // membership is ever created), opens its alpha activation and issues the
+  // first-administrator invitation — the operator control path that replaces
+  // direct database edits (issue #23 acceptance criteria).
+  "access.gmOnboardCompany": operationEntry({
+    kind: "operation",
+    name: "access.gmOnboardCompany",
+    input: Schema.Struct({
+      name: Schema.NonEmptyString,
+      // Plain string by design (same ruling as access.createCompany): the
+      // SINGLE validation authority is the transaction's IANA check
+      // (convex/access/membership/cores.ts `validateTimezone`).
+      timezone: Schema.String,
+      defaultCurrency: Schema.String.pipe(Schema.check(Schema.isPattern(/^[A-Z]{3}$/))),
+      adminEmail: Schema.String.pipe(Schema.check(Schema.isPattern(/^[^@\s]+@[^@\s]+\.[^@\s]+$/))),
+      basis: Schema.NonEmptyString,
+    }),
+    result: Schema.Struct({
+      companyId: tableIdSchema("companies"),
+      activationId: tableIdSchema("gmCompanyActivations"),
+      invitationId: tableIdSchema("invitations"),
+      expiresAtMs: Schema.Number,
+      /** Honest email delivery state; the code never crosses this result. */
+      delivery: Schema.Literals(["sent", "delivery_failed"]),
+    }),
+    errorKinds: ["forbidden", "validation", "conflict"],
+  }),
+  // Brings an existing firm under GM alpha authority (an open activation
+  // row). Without it the firm is invisible to every GM surface.
+  "access.gmActivateCompany": operationEntry({
+    kind: "operation",
+    name: "access.gmActivateCompany",
+    input: Schema.Struct({
+      companyId: tableIdSchema("companies"),
+      basis: Schema.NonEmptyString,
+    }),
+    result: Schema.Struct({ activationId: tableIdSchema("gmCompanyActivations") }),
+    errorKinds: ["forbidden", "not_found", "conflict"],
+  }),
+  // Administrator restoration: promotes one ACTIVE member of the target
+  // firm to administrator under GM authority (audited), when the firm lost
+  // usable administration. Not a membership power: the GM never gains a
+  // membership, and members never gain this operation.
+  "access.gmRestoreAdministrator": operationEntry({
+    kind: "operation",
+    name: "access.gmRestoreAdministrator",
+    input: Schema.Struct({
+      companyId: tableIdSchema("companies"),
+      userId: tableIdSchema("users"),
+      basis: Schema.NonEmptyString,
+    }),
+    result: Schema.Struct({ membershipId: tableIdSchema("memberships") }),
+    errorKinds: ["forbidden", "not_found", "validation"],
+  }),
+  // Ending company alpha participation: closes the activation row. Every
+  // grant-derived GM path over that firm denies immediately afterwards
+  // (each GM operation re-checks the open activation at commit); time
+  // elapsed alone never ends participation.
+  "access.gmEndCompanyAlpha": operationEntry({
+    kind: "operation",
+    name: "access.gmEndCompanyAlpha",
+    input: Schema.Struct({
+      companyId: tableIdSchema("companies"),
+      basis: Schema.NonEmptyString,
+    }),
+    result: Schema.Struct({ endedAtMs: Schema.Number }),
+    errorKinds: ["forbidden", "not_found", "conflict"],
   }),
 } as const;
 
