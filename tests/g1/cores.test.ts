@@ -21,7 +21,6 @@ import {
   decideCompletionFailure,
   decideDisconnect,
   decideExchangeOutcome,
-  decideMembershipAtCallback,
   decideRefreshOutcome,
   decideStartAuthorization,
   type ConnectionRowView,
@@ -124,14 +123,6 @@ describe("decideCallbackCorrelation (single-use state)", () => {
     expect(
       decideCallbackCorrelation({ state: "pending_authorization", oauthStateHash: "abc", authorizationExpiresAtMs: now }, now),
     ).toEqual({ kind: "matched" });
-  });
-});
-
-describe("membership re-check at the callback", () => {
-  it("accepts only the row's own company as the earliest active membership", () => {
-    expect(decideMembershipAtCallback("c1", "c1")).toBe(true);
-    expect(decideMembershipAtCallback("c2", "c1")).toBe(false);
-    expect(decideMembershipAtCallback(null, "c1")).toBe(false);
   });
 });
 

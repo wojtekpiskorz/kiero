@@ -67,7 +67,7 @@ export interface StartAuthorizationInput {
 
 export type StartDecision =
   | { readonly kind: "start" }
-  | { readonly kind: "refuse"; readonly code: "authorization_already_pending" | "already_connected" | "creation_unresolved" | "recreate_required" | "switch_required" };
+  | { readonly kind: "refuse"; readonly code: "authorization_already_pending" | "already_connected" | "creation_unresolved" | "switch_required" };
 
 /**
  * The checked start decision.
@@ -149,16 +149,10 @@ export function decideCallbackCorrelation(
   return { kind: "matched" };
 }
 
-/** Membership is re-checked at the callback over the canonical rule. */
-export function decideMembershipAtCallback(activeCompanyId: string | null, rowCompanyId: string): boolean {
-  return activeCompanyId !== null && activeCompanyId === rowCompanyId;
-}
-
 /** Which calendar step the completion may take. */
 export type CalendarStep =
   | { readonly kind: "verify_known"; readonly calendarId: string }
-  | { readonly kind: "create" }
-  | { readonly kind: "refuse"; readonly code: "recreate_required" };
+  | { readonly kind: "create" };
 
 /**
  * The find-or-create decision. The same Google account with a known

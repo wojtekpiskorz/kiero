@@ -29,6 +29,35 @@ import { defineTable } from "convex/server";
 import { v } from "convex/values";
 import { shared } from "../../schema/shared";
 
+/**
+ * The closed machine-reason vocabulary while `state === "error"` (the
+ * runtime list is RECONNECT_REASONS in ./cores.ts; keep the two aligned —
+ * every core reason must appear here so a row can record it, and a schema
+ * literal without a core reason would be unreachable dead vocabulary).
+ * Typed as a literal union like `state`/`authorizationMode`: the generated
+ * document type then carries the vocabulary and consumers stop casting.
+ */
+export const reconnectReason = v.union(
+  v.literal("authorization_denied"),
+  v.literal("authorization_expired"),
+  v.literal("exchange_failed"),
+  v.literal("exchange_unknown"),
+  v.literal("scopes_missing"),
+  v.literal("creation_failed"),
+  v.literal("creation_unknown"),
+  v.literal("calendar_read_unknown"),
+  v.literal("calendar_access_lost"),
+  v.literal("refresh_failed"),
+  v.literal("membership_lost"),
+);
+
+/** How a row's credential material is stored (see credentialStore.ts). */
+export const credentialStorageKind = v.union(
+  v.literal("encrypted_aesgcm"),
+  v.literal("plaintext_dev"),
+  v.literal("none"),
+);
+
 export const calendarConnectionTables = {
   /**
    * One boss's optional dedicated Google calendar connection. One row per
@@ -68,19 +97,13 @@ export const calendarConnectionTables = {
     ),
     authorizationExpiresAtMs: v.optional(shared.tsMs),
     // --- Credential material (never a client-visible value) --------------
-    credentialStorage: v.optional(
-      v.union(
-        v.literal("encrypted_aesgcm"),
-        v.literal("plaintext_dev"),
-        v.literal("none"),
-      ),
-    ),
+    credentialStorage: v.optional(credentialStorageKind),
     /** Encrypted (or dev-plaintext) credential bundle; see credentialStore. */
     credentialCiphertext: v.optional(v.string()),
     accessTokenExpiresAtMs: v.optional(shared.tsMs),
     // --- Reconnect/cleanup bookkeeping -----------------------------------
     /** Machine reason while `state === "error"` (drives the UI's actions). */
-    reconnectReason: v.optional(v.string()),
+    reconnectReason: v.optional(reconnectReason),
     /** Honest cleanup state of Kiero-managed copies after a disconnect. */
     cleanupStatus: v.optional(
       v.union(v.literal("not_applicable"), v.literal("unconfirmed")),

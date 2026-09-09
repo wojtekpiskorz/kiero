@@ -31,8 +31,6 @@ export const calendarCopy = {
     `Połączono ${new Date(ms).toLocaleString("pl-PL", { dateStyle: "medium", timeStyle: "short" })}.`,
   cleanupUnconfirmed:
     "Po odłączeniu Kiero nie potwierdziło jeszcze usunięcia swoich wpisów z kalendarza Google. Sprawdź kalendarz i usuń wpisy Kiero ręcznie, jeśli zostały.",
-  lastContact: (ms: number): string =>
-    `Ostatni udany kontakt z Google: ${new Date(ms).toLocaleString("pl-PL", { dateStyle: "medium", timeStyle: "short" })}.`,
   // Error reasons (machine code -> honest Polish)
   reason: {
     authorization_denied: "Zgoda w Google nie została udzielona. Możesz spróbować ponownie.",
@@ -68,7 +66,6 @@ export const calendarCopy = {
     "Rozumiem, że kalendarz Kiero mógł już zostać utworzony na moim koncie Google, i chcę spróbować ponownie.",
   // Notices
   redirecting: "Otwieramy zgodę w Google…",
-  disconnecting: "Odłączamy…",
   disconnectedNotice: "Kalendarz został odłączony. Logowanie do Kiero pozostaje bez zmian.",
   unexpectedFailure: "Chwilowy błąd po stronie Kiero. Spróbuj ponownie za chwilę.",
 } as const;

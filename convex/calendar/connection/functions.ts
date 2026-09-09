@@ -32,7 +32,13 @@ import {
   resolveLiveSession,
 } from "../../access/identity/resolution";
 import { resolveRequestContext } from "../../platform/context";
-import { availableActions, decideRefreshOutcome, type AuthorizationMode, type ConnectionAction } from "./cores";
+import {
+  availableActions,
+  decideRefreshOutcome,
+  type AuthorizationMode,
+  type ConnectionAction,
+  type ReconnectReason,
+} from "./cores";
 import { openCredential, sealCredential } from "./credentialStore";
 import { calendarOAuthConfig, callbackRedirectUri, performStartAuthorization } from "./operations";
 import { dispatchCalendarCommand } from "./dispatch";
@@ -167,7 +173,7 @@ export interface CalendarConnectionStatus {
   readonly connectedAtMs: number | null;
   readonly disconnectedAtMs: number | null;
   readonly authorizationExpiresAtMs: number | null;
-  readonly reconnectReason: string | null;
+  readonly reconnectReason: ReconnectReason | null;
   readonly cleanupStatus: "not_applicable" | "unconfirmed" | null;
   readonly lastSuccessfulContactMs: number | null;
   /** The scopes Google granted on the last successful exchange. */
@@ -256,7 +262,7 @@ export const calendarStatus = query({
         authorizationExpiresAtMs: row.authorizationExpiresAtMs ?? null,
         googleCalendarId: row.googleCalendarId ?? null,
         googleAccountSubject: row.googleAccountSubject ?? null,
-        reconnectReason: (row.reconnectReason as never) ?? null,
+        reconnectReason: row.reconnectReason ?? null,
       }),
       googleCalendarId: row.googleCalendarId ?? null,
       googleAccountEmail: row.googleAccountEmail ?? null,

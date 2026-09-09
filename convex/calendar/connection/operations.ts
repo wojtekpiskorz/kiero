@@ -37,9 +37,11 @@ import { internalMutation } from "../../_generated/server";
 import type { MutationCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { publishEvent } from "../../platform/publish";
+import { earliestActiveMembership, type MembershipViewWithTime } from "../../access/membership/cores";
 import {
   AUTHORIZATION_TTL_MS,
   decideCallbackCorrelation,
+  decideCompletionFailure,
   decideDisconnect,
   decideStartAuthorization,
   type AuthorizationMode,
@@ -52,6 +54,7 @@ import {
   generateAuthorizationChallenge,
   sha256Hex,
 } from "./protocol";
+import { credentialStorageKind, reconnectReason } from "./schema";
 import { proofFixtureClient } from "./proof";
 
 // ---------------------------------------------------------------------------
@@ -117,7 +120,7 @@ export function connectionView(row: Doc<"calendarConnections">): ConnectionRowVi
     authorizationExpiresAtMs: row.authorizationExpiresAtMs ?? null,
     googleCalendarId: row.googleCalendarId ?? null,
     googleAccountSubject: row.googleAccountSubject ?? null,
-    reconnectReason: (row.reconnectReason as ReconnectReason | undefined) ?? null,
+    reconnectReason: row.reconnectReason ?? null,
   };
 }
 
@@ -150,6 +153,28 @@ function bridgedUserId(rowId: Id<"users">): ReturnType<typeof parseTableId<"user
     throw new Error("calendar connection: malformed user id");
   }
   return bridged;
+}
+
+/**
+ * Adapts one Convex membership row to the core's branded view (the id
+ * bridge earliestActiveMembership consumes); null only for a malformed id,
+ * which the caller treats as "no active membership" (fail-closed).
+ */
+function bridgedMembershipView(row: Doc<"memberships">): MembershipViewWithTime | null {
+  const id = parseTableId("memberships", row._id);
+  const companyId = parseTableId("companies", row.companyId);
+  const userId = parseTableId("users", row.userId);
+  if (id === null || companyId === null || userId === null) {
+    return null;
+  }
+  return {
+    _id: id,
+    companyId,
+    userId,
+    role: row.role,
+    state: row.state,
+    createdAtMs: row.createdAtMs,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -296,26 +321,54 @@ export const prepareCallbackTransaction = internalMutation({
       return { status: "invalid_state" };
     }
     if (correlation.kind === "expired") {
-      await ctx.db.patch(row._id, {
-        oauthStateHash: undefined,
-        pkceVerifier: undefined,
-        state: "error",
-        reconnectReason: "authorization_expired",
-        updatedAtMs: Date.now(),
-      });
+      // An expired flow is a FLOW failure, not an access loss: a half-
+      // finished account change never destroys a live connection
+      // (decideCompletionFailure, the same rule the completion applies).
+      const failure = decideCompletionFailure(connectionView(row), "authorization_expired");
+      if (failure.kind === "restore_connected") {
+        await ctx.db.patch(row._id, {
+          oauthStateHash: undefined,
+          pkceVerifier: undefined,
+          authorizationMode: undefined,
+          authorizationExpiresAtMs: undefined,
+          state: "connected",
+          updatedAtMs: Date.now(),
+        });
+      } else {
+        await ctx.db.patch(row._id, {
+          oauthStateHash: undefined,
+          pkceVerifier: undefined,
+          authorizationMode: undefined,
+          authorizationExpiresAtMs: undefined,
+          state: "error",
+          reconnectReason: failure.reason,
+          updatedAtMs: Date.now(),
+        });
+      }
       return { status: "finish_error", reason: "authorization_expired" };
     }
-    // Membership re-check at the callback: the canonical earliest-active
-    // membership must still be this row's company (a revoked boss never
-    // completes a connection).
+    // Membership re-check at the callback over the v1 active-firm rule
+    // (earliestActiveMembership, the same house rule the canonical
+    // resolution applies): a revoked boss never completes a connection.
     const memberships = await ctx.db
       .query("memberships")
       .withIndex("by_user", (q) => q.eq("userId", row.userId))
       .collect();
-    const active = memberships
-      .filter((m) => m.state === "active")
-      .sort((a, b) => a.createdAtMs - b.createdAtMs)[0];
-    if (active === undefined || active.companyId !== row.companyId) {
+    const views: MembershipViewWithTime[] = [];
+    for (const membership of memberships) {
+      const view = bridgedMembershipView(membership);
+      if (view !== null) {
+        views.push(view);
+      }
+    }
+    const active = earliestActiveMembership(views);
+    const rowCompanyId = parseTableId("companies", row.companyId);
+    if (rowCompanyId === null || active === null || active.companyId !== rowCompanyId) {
+      // Membership loss is a STOP, not a flow failure: unlike an expired
+      // flow, it never restores the previous binding — the user's company
+      // scope is gone, so the connection (and its credentials) must not
+      // survive it (issue #45: membership loss follows the stop/cleanup
+      // path).
       await ctx.db.patch(row._id, {
         oauthStateHash: undefined,
         pkceVerifier: undefined,
@@ -350,6 +403,19 @@ export type CallbackCompletion =
   | { readonly kind: "connected"; readonly calendarId: string; readonly calendarReused: boolean }
   | { readonly kind: "error"; readonly reason: ReconnectReason };
 
+/** The validated argument form of CallbackCompletion (no v.any(), no cast). */
+const callbackCompletionValue = v.union(
+  v.object({
+    kind: v.literal("connected"),
+    calendarId: v.string(),
+    calendarReused: v.boolean(),
+  }),
+  v.object({
+    kind: v.literal("error"),
+    reason: reconnectReason,
+  }),
+);
+
 /**
  * Applies the terminal completion: exactly ONE row patch plus the canonical
  * events. Raw Google tokens never appear in this mutation's ARGUMENTS
@@ -362,9 +428,9 @@ export type CallbackCompletion =
 export const completeCallbackTransaction = internalMutation({
   args: {
     connectionId: v.id("calendarConnections"),
-    completion: v.any(),
+    completion: callbackCompletionValue,
     /** Sealed by the calling action (see sealCredential); never raw tokens. */
-    credentialStorage: v.optional(v.string()),
+    credentialStorage: v.optional(credentialStorageKind),
     credentialCiphertext: v.optional(v.string()),
     accessTokenExpiresAtMs: v.optional(v.float64()),
     googleAccountSubject: v.optional(v.string()),
@@ -378,7 +444,7 @@ export const completeCallbackTransaction = internalMutation({
       // by design (disconnect-during-pending wins).
       return { ok: false, state: row?.state ?? "missing" };
     }
-    const completion = args.completion as CallbackCompletion;
+    const completion: CallbackCompletion = args.completion;
     const nowMs = Date.now();
     const view = connectionView(row);
     const wasSwitch = view.authorizationMode === "switch" && view.googleCalendarId !== null;
@@ -399,7 +465,7 @@ export const completeCallbackTransaction = internalMutation({
         grantedScopes: (args.grantedScope ?? "").split(/\s+/).filter((s) => s.length > 0),
         ...(args.credentialStorage === undefined
           ? {}
-          : { credentialStorage: args.credentialStorage as "encrypted_aesgcm" | "plaintext_dev" | "none" }),
+          : { credentialStorage: args.credentialStorage }),
         ...(args.credentialCiphertext === undefined
           ? {}
           : { credentialCiphertext: args.credentialCiphertext }),
@@ -439,8 +505,11 @@ export const completeCallbackTransaction = internalMutation({
       return { ok: true, state: "connected" };
     }
 
-    // Failure shapes: a failed switch restores the still-working binding.
-    if (wasSwitch) {
+    // Failure shapes: a failed/denied switch restores the still-working
+    // binding instead of erroring it (decideCompletionFailure, the same
+    // rule the expired-prepare branch applies).
+    const failure = decideCompletionFailure(view, completion.reason);
+    if (failure.kind === "restore_connected") {
       await ctx.db.patch(row._id, {
         state: "connected",
         pkceVerifier: undefined,
@@ -460,7 +529,7 @@ export const completeCallbackTransaction = internalMutation({
       args.googleAccountSubject !== row.googleAccountSubject;
     await ctx.db.patch(row._id, {
       state: "error",
-      reconnectReason: completion.kind === "error" ? completion.reason : "exchange_failed",
+      reconnectReason: failure.reason,
       pkceVerifier: undefined,
       authorizationMode: undefined,
       authorizationExpiresAtMs: undefined,
@@ -649,7 +718,7 @@ export const recordRefreshTransaction = internalMutation({
       v.literal("unknown"),
     ),
     /** Sealed by the calling action; raw tokens never cross this boundary. */
-    credentialStorage: v.optional(v.string()),
+    credentialStorage: v.optional(credentialStorageKind),
     credentialCiphertext: v.optional(v.string()),
     accessTokenExpiresAtMs: v.optional(v.float64()),
   },
@@ -667,7 +736,7 @@ export const recordRefreshTransaction = internalMutation({
       await ctx.db.patch(row._id, {
         ...(args.credentialStorage === undefined
           ? {}
-          : { credentialStorage: args.credentialStorage as "encrypted_aesgcm" | "plaintext_dev" | "none" }),
+          : { credentialStorage: args.credentialStorage }),
         ...(args.credentialCiphertext === undefined
           ? {}
           : { credentialCiphertext: args.credentialCiphertext }),

@@ -45,6 +45,7 @@ import type * as calendar_connection_functions from "../calendar/connection/func
 import type * as calendar_connection_http from "../calendar/connection/http.js";
 import type * as calendar_connection_operations from "../calendar/connection/operations.js";
 import type * as calendar_connection_proof from "../calendar/connection/proof.js";
+import type * as calendar_connection_proofHttp from "../calendar/connection/proofHttp.js";
 import type * as calendar_connection_protocol from "../calendar/connection/protocol.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
@@ -131,6 +132,7 @@ declare const fullApi: ApiFromModules<{
   "calendar/connection/http": typeof calendar_connection_http;
   "calendar/connection/operations": typeof calendar_connection_operations;
   "calendar/connection/proof": typeof calendar_connection_proof;
+  "calendar/connection/proofHttp": typeof calendar_connection_proofHttp;
   "calendar/connection/protocol": typeof calendar_connection_protocol;
   crons: typeof crons;
   http: typeof http;

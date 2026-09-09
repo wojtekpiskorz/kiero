@@ -12,8 +12,8 @@
  * (convex/access/identity/authEntry.ts) via `auth.addHttpRoutes`.
  *
  * G1 addition: the Calendar OAuth boundary (authorization start, callback,
- * bridge completion, guarded proof fixtures) from
- * convex/calendar/connection/http.ts.
+ * bridge completion) from convex/calendar/connection/http.ts, plus its
+ * guarded proof fixtures from convex/calendar/connection/proofHttp.ts.
  */
 
 import { httpRouter } from "convex/server";
@@ -28,12 +28,14 @@ import {
   calendarStartHandler,
   calendarCallbackHandler,
   calendarCallbackCompleteHandler,
+} from "./calendar/connection/http";
+import {
   proofFakeTokenEndpoint,
   proofFakeCalendarCreate,
   proofFakeCalendarRead,
   proofRefreshHandler,
   proofStateHandler,
-} from "./calendar/connection/http";
+} from "./calendar/connection/proofHttp";
 
 const http = httpRouter();
 

@@ -20,10 +20,9 @@
  *   credential>); the gateway's calendar-oauth callback route forwards
  *   Google's query here server-to-server. JSON envelope answers.
  *
- * Proof fixtures (all guarded by KIERO_G1_PROOF_ENABLED, clearly labeled):
- * a fake Google token endpoint and Calendar API that RECORD THEIR EFFECTS
- * in `externalEffects` before answering (the A3 echo pattern), so the
- * no-duplicate-effect proofs count rows per dedup key.
+ * The guarded proof fixtures (the fake Google endpoints and the sanitized
+ * evidence reads) live in ./proofHttp.ts, beside the fixture vocabulary
+ * (./proof.ts); their routes are wired by the same convex/http.ts append.
  *
  * Uncertainty semantics (echo template): every external leg is bounded by
  * an explicit deadline; a 5xx, timeout or unreadable success body is
@@ -32,10 +31,10 @@
  * no-blind-duplicate rule exists for.
  */
 
-import { v } from "convex/values";
-import { httpAction, internalMutation, internalQuery } from "../../_generated/server";
+import { httpAction } from "../../_generated/server";
 import type { ActionCtx } from "../../_generated/server";
 import { internal } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
 import { errorResult, okResult } from "@kiero/contracts";
 import { unauthenticatedError, forbiddenError, unsupportedError } from "@kiero/runtime";
 import { verifyServiceBearerToken } from "../../operations/telemetry/serviceToken";
@@ -44,6 +43,7 @@ import {
   decideCalendarReadOutcome,
   decideCalendarStep,
   decideExchangeOutcome,
+  type ReconnectReason,
 } from "./cores";
 import {
   createDedicatedCalendar,
@@ -57,17 +57,6 @@ import {
 import { callbackRedirectUri, calendarOAuthConfig } from "./operations";
 import { calendarApiBase } from "./functions";
 import { sealCredential } from "./credentialStore";
-import {
-  PROOF_CALENDAR_ID,
-  PROOF_TIMEOUT_DELAY_MS,
-  parseProofCode,
-  proofCalendarCreateEffectKey,
-  proofEnabled,
-  proofTokenEffectKey,
-  proofTokenResponse,
-  type ProofCalendarBehavior,
-  type ProofTokenBehavior,
-} from "./proof";
 
 // ---------------------------------------------------------------------------
 // Small shared helpers.
@@ -151,7 +140,16 @@ interface CallbackAnswer {
   readonly polishDetail: string;
 }
 
-const ANSWERS: Record<string, CallbackAnswer> = {
+/**
+ * The page vocabulary: every machine reconnect reason plus the two
+ * flow-level codes the callback surfaces. Keyed by the closed union so a
+ * missing reason page is a COMPILE error, never a silent fallback (the
+ * schema's reconnectReason union and ./cores RECONNECT_REASONS are the
+ * vocabulary).
+ */
+type AnswerCode = ReconnectReason | "invalid_state" | "google_client_not_configured";
+
+const ANSWERS: Record<AnswerCode, CallbackAnswer> = {
   invalid_state: {
     status: 400,
     ok: false,
@@ -233,6 +231,13 @@ const ANSWERS: Record<string, CallbackAnswer> = {
     polishTitle: "Stan kalendarza jest niepewny.",
     polishDetail: "Odpowiedź Google nie dotarła w całości. Kiero nie utworzy drugiego kalendarza automatycznie — spróbuj ponownie w Kiero.",
   },
+  refresh_failed: {
+    status: 200,
+    ok: false,
+    code: "refresh_failed",
+    polishTitle: "Google cofnął dostęp do kalendarza.",
+    polishDetail: "Połączenie zostało zatrzymane. Połącz kalendarz ponownie w Kiero.",
+  },
   google_client_not_configured: {
     status: 200,
     ok: false,
@@ -242,8 +247,37 @@ const ANSWERS: Record<string, CallbackAnswer> = {
   },
 };
 
-function answerFor(code: string): CallbackAnswer {
-  return ANSWERS[code] ?? ANSWERS.exchange_failed!;
+function answerFor(code: AnswerCode): CallbackAnswer {
+  return ANSWERS[code];
+}
+
+/**
+ * The one calendar-creation leg (find-or-create's "create" half): reads the
+ * company name for the dedicated calendar's summary, performs ONE bounded
+ * create POST, and maps the outcome onto the lifecycle — `creation_unknown`
+ * never triggers a blind second POST. Both create paths (no known calendar,
+ * and the recreate decision after an ambiguous read) run exactly this.
+ */
+async function createDedicatedCalendarLeg(
+  ctx: ActionCtx,
+  input: {
+    readonly apiBase: string;
+    readonly accessToken: string;
+    readonly companyId: Id<"companies">;
+  },
+): Promise<{ calendarId: string | null; failure: ReconnectReason | null }> {
+  const companyName = await ctx.runQuery(internal.calendar.connection.functions.companyNameFor, {
+    companyId: input.companyId,
+  });
+  const create = await createDedicatedCalendar({
+    apiBase: input.apiBase,
+    accessToken: input.accessToken,
+    summary: dedicatedCalendarSummary(companyName ?? "Kiero"),
+  });
+  const decision = decideCalendarCreateOutcome(create);
+  return decision.kind === "created"
+    ? { calendarId: decision.calendarId, failure: null }
+    : { calendarId: null, failure: decision.reason };
 }
 
 /** The full callback protocol; shared by the browser and bridge entries. */
@@ -333,7 +367,7 @@ async function runCallbackProtocol(
   const apiBase = calendarApiBase(process.env);
   let calendarId: string | null = null;
   let calendarReused = false;
-  let failure: string | null = null;
+  let failure: ReconnectReason | null = null;
 
   if (step.kind === "verify_known") {
     const read = await readKnownCalendar({ apiBase, accessToken: grant.accessToken, calendarId: step.calendarId });
@@ -342,38 +376,20 @@ async function runCallbackProtocol(
       calendarId = step.calendarId;
       calendarReused = true;
     } else if (decision.kind === "create") {
-      const companyName = await ctx.runQuery(internal.calendar.connection.functions.companyNameFor, {
-        companyId: prepared.flow.companyId,
-      });
-      const create = await createDedicatedCalendar({
+      ({ calendarId, failure } = await createDedicatedCalendarLeg(ctx, {
         apiBase,
         accessToken: grant.accessToken,
-        summary: dedicatedCalendarSummary(companyName ?? "Kiero"),
-      });
-      const createDecision = decideCalendarCreateOutcome(create);
-      if (createDecision.kind === "created") {
-        calendarId = createDecision.calendarId;
-      } else {
-        failure = createDecision.reason;
-      }
+        companyId: prepared.flow.companyId,
+      }));
     } else {
       failure = decision.reason;
     }
   } else {
-    const companyName = await ctx.runQuery(internal.calendar.connection.functions.companyNameFor, {
-      companyId: prepared.flow.companyId,
-    });
-    const create = await createDedicatedCalendar({
+    ({ calendarId, failure } = await createDedicatedCalendarLeg(ctx, {
       apiBase,
       accessToken: grant.accessToken,
-      summary: dedicatedCalendarSummary(companyName ?? "Kiero"),
-    });
-    const createDecision = decideCalendarCreateOutcome(create);
-    if (createDecision.kind === "created") {
-      calendarId = createDecision.calendarId;
-    } else {
-      failure = createDecision.reason;
-    }
+      companyId: prepared.flow.companyId,
+    }));
   }
 
   if (calendarId === null) {
@@ -475,201 +491,4 @@ export const calendarCallbackCompleteHandler = httpAction(async (ctx, request) =
     answer.status,
     okResult({ code: answer.code, connected: answer.connected }),
   );
-});
-
-// ---------------------------------------------------------------------------
-// Guarded proof fixtures (KIERO_G1_PROOF_ENABLED only; clearly labeled).
-// ---------------------------------------------------------------------------
-
-/** Records one observable fake-Google effect BEFORE answering (echo). */
-export const recordProofEffect = internalMutation({
-  args: { dedupKey: v.string(), serviceName: v.string(), payload: v.string() },
-  handler: async (ctx, args) => {
-    await ctx.db.insert("externalEffects", {
-      dedupKey: args.dedupKey,
-      serviceName: args.serviceName,
-      payload: args.payload,
-      receivedAtMs: Date.now(),
-    });
-  },
-});
-
-/** Counts recorded effects per dedup key (the no-duplicate proofs). */
-export const countProofEffects = internalQuery({
-  args: { dedupKey: v.string() },
-  handler: async (ctx, args) => {
-    const rows = await ctx.db
-      .query("externalEffects")
-      .withIndex("by_dedup", (q) => q.eq("dedupKey", args.dedupKey))
-      .collect();
-    return rows.length;
-  },
-});
-
-/** Sanitized connection-row read for the evidence script (no secrets). */
-export const proofConnectionState = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const rows = await ctx.db.query("calendarConnections").order("desc").collect();
-    return rows.map((row) => ({
-      connectionId: row._id,
-      userId: row.userId,
-      companyId: row.companyId,
-      state: row.state,
-      googleCalendarId: row.googleCalendarId ?? null,
-      googleAccountSubject: row.googleAccountSubject ?? null,
-      googleAccountEmail: row.googleAccountEmail ?? null,
-      grantedScopes: row.grantedScopes ?? null,
-      credentialStorage: row.credentialStorage ?? null,
-      credentialCiphertext: row.credentialCiphertext ?? null,
-      authorizationMode: row.authorizationMode ?? null,
-      reconnectReason: row.reconnectReason ?? null,
-      cleanupStatus: row.cleanupStatus ?? null,
-      connectedAtMs: row.connectedAtMs ?? null,
-      disconnectedAtMs: row.disconnectedAtMs ?? null,
-      lastSuccessfulContactMs: row.lastSuccessfulContactMs ?? null,
-    }));
-  },
-});
-
-/** Guard response for disabled fixtures. */
-function proofDisabled(): Response {
-  return jsonResponse(404, errorResult(unsupportedError("calendar.proof", "proof_guard_disabled")));
-}
-
-/**
- * POST /calendar/oauth/proof/fake-google/token — the fake token endpoint.
- * Clearly labeled fixture: real credentials are absent (owner action), so
- * the live proofs exchange against THIS endpoint, which records its effect
- * first and then answers per the code's `t-…`/`r-…` behavior selector.
- */
-export const proofFakeTokenEndpoint = httpAction(async (ctx, request) => {
-  if (!proofEnabled(process.env)) {
-    return proofDisabled();
-  }
-  const form = new URLSearchParams(await request.text());
-  const grantType = form.get("grant_type") ?? "";
-  const credential = form.get("code") ?? form.get("refresh_token") ?? "";
-  const verifier = form.get("code_verifier") ?? "";
-  const parsed = parseProofCode(credential);
-  const behavior: ProofTokenBehavior =
-    grantType === "refresh_token"
-      ? parsed.refreshBehavior === "invalid_grant"
-        ? "invalid_grant"
-        : parsed.refreshBehavior === "timeout"
-          ? "timeout"
-          : "ok"
-      : parsed.tokenBehavior;
-  // The effect (token issued / grant consumed) happens BEFORE the answer.
-  await ctx.runMutation(internal.calendar.connection.http.recordProofEffect, {
-    dedupKey: proofTokenEffectKey(`${grantType}:${credential}`),
-    serviceName: "g1-proof-fake-google-token",
-    payload: JSON.stringify({ grantType, credential, behavior, verifierUsed: verifier.length > 0 }),
-  });
-  if (behavior === "timeout") {
-    await new Promise((resolve) => setTimeout(resolve, PROOF_TIMEOUT_DELAY_MS));
-    return jsonResponse(200, { status: "recorded", slow: true });
-  }
-  const response = proofTokenResponse(behavior, credential, verifier);
-  return jsonResponse(response.status, response.body);
-});
-
-/** The effect-key subject + behavior the fake Calendar API derives from a bearer token. */
-function proofCalendarContext(authorization: string): { effectSubject: string; behavior: ProofCalendarBehavior } {
-  const token = authorization.replace(/^Bearer\s+/i, "").replace(/^proof-access-/, "");
-  const parsed = parseProofCode(token);
-  return {
-    // The full proof base (run-scoped) so effect-ledger counts stay per-run.
-    effectSubject: `proof-google-${parsed.base}`,
-    behavior: parsed.calendarBehavior,
-  };
-}
-
-/**
- * POST /calendar/oauth/proof/fake-google/api/calendars — the fake Calendar
- * create endpoint. `c-create_timeout` records the creation and then stalls
- * past every caller deadline: the calendar EXISTS while the caller can
- * only record `creation_unknown` (the load-bearing uncertainty case).
- */
-export const proofFakeCalendarCreate = httpAction(async (ctx, request) => {
-  if (!proofEnabled(process.env)) {
-    return proofDisabled();
-  }
-  const { effectSubject, behavior } = proofCalendarContext(request.headers.get("authorization") ?? "");
-  await ctx.runMutation(internal.calendar.connection.http.recordProofEffect, {
-    dedupKey: proofCalendarCreateEffectKey(effectSubject),
-    serviceName: "g1-proof-fake-google-calendar",
-    payload: JSON.stringify({ behavior, summary: "proof" }),
-  });
-  if (behavior === "create_timeout") {
-    await new Promise((resolve) => setTimeout(resolve, PROOF_TIMEOUT_DELAY_MS));
-    return jsonResponse(200, { status: "recorded", slow: true });
-  }
-  if (behavior === "create_rejected") {
-    return jsonResponse(400, { error: "invalid" });
-  }
-  return jsonResponse(200, { id: PROOF_CALENDAR_ID, summary: "Kiero — proof" });
-});
-
-/** GET /calendar/oauth/proof/fake-google/api/calendars/kiero-proof-calendar. */
-export const proofFakeCalendarRead = httpAction(async (_ctx, request) => {
-  if (!proofEnabled(process.env)) {
-    return proofDisabled();
-  }
-  const { behavior } = proofCalendarContext(request.headers.get("authorization") ?? "");
-  if (behavior === "read_timeout") {
-    await new Promise((resolve) => setTimeout(resolve, PROOF_TIMEOUT_DELAY_MS));
-    return jsonResponse(200, { status: "recorded", slow: true });
-  }
-  if (behavior === "ambiguous404") {
-    return jsonResponse(404, { error: "notFound" });
-  }
-  return jsonResponse(200, { id: PROOF_CALENDAR_ID, summary: "Kiero — proof" });
-});
-
-/**
- * POST /calendar/oauth/proof/refresh — the guarded entry that runs the REAL
- * credential capability action (one bounded refresh attempt) for the
- * evidence script. Dev proof deployments only.
- */
-export const proofRefreshHandler = httpAction(async (ctx, request) => {
-  if (!proofEnabled(process.env)) {
-    return proofDisabled();
-  }
-  let body: { connectionId?: unknown } = {};
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    body = {};
-  }
-  if (typeof body.connectionId !== "string") {
-    return jsonResponse(400, errorResult(unsupportedError("calendar.proof", "connection_id_missing")));
-  }
-  const outcome = await ctx.runAction(internal.calendar.connection.functions.refreshCredentials, {
-    connectionId: body.connectionId,
-  });
-  return jsonResponse(200, okResult(outcome));
-});
-
-/** POST /calendar/oauth/proof/state — sanitized evidence read (guarded). */
-export const proofStateHandler = httpAction(async (ctx, request) => {
-  if (!proofEnabled(process.env)) {
-    return proofDisabled();
-  }
-  let body: { dedupKey?: unknown } = {};
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    body = {};
-  }
-  const rows = await ctx.runQuery(internal.calendar.connection.http.proofConnectionState, {});
-  const effectCount =
-    typeof body.dedupKey === "string" && body.dedupKey.length > 0
-      ? await ctx.runQuery(internal.calendar.connection.http.countProofEffects, { dedupKey: body.dedupKey })
-      : null;
-  const value: Record<string, unknown> = { connections: rows };
-  if (effectCount !== null) {
-    value.effectCount = effectCount;
-  }
-  return jsonResponse(200, okResult(value));
 });
