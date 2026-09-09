@@ -10,9 +10,11 @@
 
 import type * as access_identity_authEntry from "../access/identity/authEntry.js";
 import type * as access_identity_functions from "../access/identity/functions.js";
+import type * as access_identity_issuanceLimit from "../access/identity/issuanceLimit.js";
 import type * as access_identity_operations from "../access/identity/operations.js";
 import type * as access_identity_policy from "../access/identity/policy.js";
 import type * as access_identity_probe from "../access/identity/probe.js";
+import type * as access_identity_proofDomain from "../access/identity/proofDomain.js";
 import type * as access_identity_providerAvailability from "../access/identity/providerAvailability.js";
 import type * as access_identity_resolution from "../access/identity/resolution.js";
 import type * as access_identity_userPolicy from "../access/identity/userPolicy.js";
@@ -43,9 +45,11 @@ import type {
 declare const fullApi: ApiFromModules<{
   "access/identity/authEntry": typeof access_identity_authEntry;
   "access/identity/functions": typeof access_identity_functions;
+  "access/identity/issuanceLimit": typeof access_identity_issuanceLimit;
   "access/identity/operations": typeof access_identity_operations;
   "access/identity/policy": typeof access_identity_policy;
   "access/identity/probe": typeof access_identity_probe;
+  "access/identity/proofDomain": typeof access_identity_proofDomain;
   "access/identity/providerAvailability": typeof access_identity_providerAvailability;
   "access/identity/resolution": typeof access_identity_resolution;
   "access/identity/userPolicy": typeof access_identity_userPolicy;

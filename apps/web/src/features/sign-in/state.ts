@@ -27,6 +27,7 @@ export type SignInState =
 export const OUR_ERROR_MARKERS = {
   emailDeliveryFailed: "[kiero:email_delivery_failed]",
   methodConflict: "[kiero:method_conflict]",
+  issuanceRateLimited: "[kiero:issuance_rate_limited]",
 } as const;
 
 /** Machine-readable failure causes the UI can distinguish. */
@@ -59,6 +60,10 @@ export const signInCopy = {
   codeSentNotice: (email: string): string => `Kod wysłaliśmy na ${email}. Jest ważny 15 minut.`,
   signOutEverywhere: "Wyloguj się",
   signedOutNotice: "Zostałeś wylogowany.",
+  sessionEndedNotice: "Sesja tego urządzenia została zakończona. Zaloguj się ponownie.",
+  sessionInactiveNotice: "Sesja wygasła po 30 dniach nieaktywności. Zaloguj się ponownie.",
+  sessionRegistryPendingNotice: "Rejestrujemy sesję tego urządzenia. Odśwież aplikację.",
+  signInAgain: "Zaloguj się ponownie",
   failures: {
     invalid_email: "Podaj poprawny adres e-mail.",
     code_wrong_or_expired: "Kod jest nieprawidłowy lub wygasł. Poproś o nowy kod.",
@@ -85,6 +90,48 @@ export function pendingLabel(state: SignInState): string | null {
   }
 }
 
+/** Machine-readable session-registry denial reasons (server contract). */
+export type SessionDenialReason =
+  | "no_identity"
+  | "malformed_subject"
+  | "subject_mismatch"
+  | "auth_session_missing"
+  | "auth_session_expired"
+  | "registry_missing"
+  | "revoked"
+  | "inactive";
+
+/** What the UI should do about a denied session. */
+export interface SessionDeniedView {
+  readonly notice: string;
+  /** True when the only sensible next step is signing in again. */
+  readonly requiresSignIn: boolean;
+}
+
+/**
+ * Maps a registry denial reason to honest Polish copy. Expired, revoked
+ * and signed-out-upstream sessions all end the device session: the client
+ * must sign out (its token may still verify, but every protected read
+ * will be denied).
+ */
+export function sessionDeniedView(reason: SessionDenialReason): SessionDeniedView {
+  switch (reason) {
+    case "auth_session_missing":
+      return { notice: signInCopy.signedOutNotice, requiresSignIn: true };
+    case "auth_session_expired":
+    case "inactive":
+      return { notice: signInCopy.sessionInactiveNotice, requiresSignIn: true };
+    case "revoked":
+      return { notice: signInCopy.sessionEndedNotice, requiresSignIn: true };
+    case "registry_missing":
+      return { notice: signInCopy.sessionRegistryPendingNotice, requiresSignIn: false };
+    case "no_identity":
+    case "malformed_subject":
+    case "subject_mismatch":
+      return { notice: signInCopy.failures.unknown, requiresSignIn: true };
+  }
+}
+
 /** Simple e-mail shape check (the server re-validates everything). */
 export function isValidEmail(input: string): boolean {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(input.trim());
@@ -103,6 +150,9 @@ export function classifySignInError(error: unknown): SignInFailure {
   }
   if (message.includes(OUR_ERROR_MARKERS.methodConflict)) {
     return "method_conflict";
+  }
+  if (message.includes(OUR_ERROR_MARKERS.issuanceRateLimited)) {
+    return "too_many_attempts";
   }
   if (/Could not verify code|Invalid verification code/i.test(message)) {
     return "code_wrong_or_expired";

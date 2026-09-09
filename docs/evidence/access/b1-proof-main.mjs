@@ -1,7 +1,7 @@
 /**
  * B1 live proof script (runs against the leased dev deployment ONLY).
  * Output is sanitized: no tokens, no keys, no real addresses are printed.
- * The proof email uses the reserved .invalid TLD; the fixture code is a
+ * Proof addresses use the reserved .invalid TLD; the fixture code is a
  * dev-deployment stand-in for the (BLOCKED) emailed code.
  */
 import { ConvexHttpClient } from "convex/browser";
@@ -64,15 +64,54 @@ async function errOf(fn) {
   ok("C1 issuance runs and delivery fails honestly with the machine marker (RESEND_API_KEY absent)",
     failure !== null && failure.includes("[kiero:email_delivery_failed]")
       && failure.includes("usługa poczty nie jest skonfigurowana"),
-    `marker+copy present`);
+    "marker+copy present");
+  // A distinct address for re-issuance: the per-identifier issuance
+  // throttle (5/hour) must not couple the two rows.
   const again = await errOf(() =>
-    client.action("auth:signIn", { provider: "email_code", params: { email: EMAIL } }),
+    client.action("auth:signIn", { provider: "email_code", params: { email: "b1-proof-c2@kiero.invalid" } }),
   );
   ok("C2 re-issuance fails identically (no duplicate issuance success)", again !== null);
   const wrongCode = await errOf(() =>
     client.action("auth:signIn", { provider: "email_code", params: { email: EMAIL, code: "00000000" } }),
   );
   ok("C3 wrong code rejected", wrongCode !== null && wrongCode.includes("Could not verify code"));
+}
+
+// --- Phase P: guarded fixture refuses real addresses ------------------------
+{
+  const client = anon();
+  const refusal = await client.action("access/identity/probe:b1ProofSetCode", {
+    email: "b1-victim@example.com",
+    code: "00000000",
+  });
+  ok("P1 fixture code REFUSED for a non-proof-domain address (flag on)",
+    refusal?._tag === "error" && refusal.error.code === "proof_domain_required",
+    JSON.stringify({ tag: refusal?.error?._tag, code: refusal?.error?.code }));
+  const suffixAttack = await client.action("access/identity/probe:b1ProofSetCode", {
+    email: "attacker@kiero.invalid.evil.com",
+    code: "00000000",
+  });
+  ok("P2 suffix-lookalike domain refused too",
+    suffixAttack?._tag === "error" && suffixAttack.error.code === "proof_domain_required");
+}
+
+// --- Phase R: per-identifier issuance throttle (send-side) ------------------
+{
+  const client = anon();
+  const throttleEmail = "b1-throttle@kiero.invalid";
+  const outcomes = [];
+  for (let i = 0; i < 6; i++) {
+    outcomes.push(
+      await errOf(() =>
+        client.action("auth:signIn", { provider: "email_code", params: { email: throttleEmail } }),
+      ),
+    );
+  }
+  ok("R1 first five issuances reach delivery (honest not-configured failure)",
+    outcomes.slice(0, 5).every((m) => m !== null && m.includes("[kiero:email_delivery_failed]")));
+  ok("R2 sixth issuance throttled with the machine marker",
+    outcomes[5] !== null && outcomes[5].includes("[kiero:issuance_rate_limited]"),
+    `message=${JSON.stringify(outcomes[5]?.slice(0, 60))}`);
 }
 
 // --- Phase D: fixture code + REAL verification, session and tokens ----------
@@ -83,14 +122,14 @@ let token = null;
     email: EMAIL,
     code: FIXTURE_CODE,
   });
-  ok("D1 fixture code installed (guarded dev action)", set?._tag === "ok");
+  ok("D1 fixture code installed for the proof-domain address (guarded dev action)", set?._tag === "ok");
   const result = await client.action("auth:signIn", {
     provider: "email_code",
     params: { email: EMAIL, code: FIXTURE_CODE },
   });
   token = result?.tokens?.token ?? null;
   ok("D2 REAL verify+session+token through the library", typeof token === "string" && token.length > 50,
-    `token received (value redacted)`);
+    "token received (value redacted)");
   const reuse = await errOf(() =>
     client.action("auth:signIn", {
       provider: "email_code",

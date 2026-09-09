@@ -25,7 +25,9 @@ import {
   classifySignInError,
   isValidEmail,
   pendingLabel,
+  sessionDeniedView,
   signInCopy,
+  type SessionDeniedView,
   type SignInFailure,
   type SignInState,
 } from "./state";
@@ -171,8 +173,9 @@ function SignInForm(): React.ReactNode {
 /** Authenticated shell: bootstrap the session registry, then the panel. */
 function AuthenticatedApp(): React.ReactNode {
   const ensureSession = useMutation(api.access.identity.functions.ensureSessionRegistry);
+  const { signOut } = useAuthActions();
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [denied, setDenied] = useState<SessionDeniedView | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -185,12 +188,12 @@ function AuthenticatedApp(): React.ReactNode {
         if (result.state === "live") {
           setSessionId(result.sessionId);
         } else {
-          setError(signInCopy.failures.unknown);
+          setDenied(sessionDeniedView(result.reason));
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setError(signInCopy.failures.unknown);
+          setDenied(sessionDeniedView("no_identity"));
         }
       });
     return () => {
@@ -198,8 +201,17 @@ function AuthenticatedApp(): React.ReactNode {
     };
   }, [ensureSession]);
 
-  if (error !== null) {
-    return <p role="alert">{error}</p>;
+  if (denied !== null) {
+    return (
+      <div role="alert">
+        <p>{denied.notice}</p>
+        {denied.requiresSignIn && (
+          <button type="button" onClick={() => void signOut()}>
+            {signInCopy.signInAgain}
+          </button>
+        )}
+      </div>
+    );
   }
   if (sessionId === null) {
     return <p>{signInCopy.verifying}</p>;

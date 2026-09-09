@@ -39,24 +39,42 @@ import {
 import {
   METHOD_CONFLICT_MARKER,
   decideCreateOrUpdateUser,
+  normalizeEmail,
   GoogleProfile,
   EmailCodeProfile,
   type UserPolicyInput,
   type UserPolicyUser,
 } from "./userPolicy";
+import {
+  ISSUANCE_RATE_LIMITED_MARKER,
+  decideIssuance,
+} from "./issuanceLimit";
 
 /** One-time email code: 8 digits, valid for 15 minutes. */
 const OTP_CODE_LENGTH = 8;
 const OTP_MAX_AGE_SECONDS = 15 * 60;
 
-/** Cryptographically secure digits (Web Crypto; no extra dependency). */
+/**
+ * Cryptographically secure digits with rejection sampling: bytes >= 250
+ * are rejected so the modulo mapping onto 0..9 stays uniform (no modulo
+ * bias). Web Crypto only; no extra dependency.
+ */
 function generateOtpCode(): string {
   const digits = "0123456789";
-  const bytes = new Uint8Array(OTP_CODE_LENGTH);
-  crypto.getRandomValues(bytes);
+  const maxUsableByte = Math.floor(256 / digits.length) * digits.length; // 250
   let code = "";
-  for (const byte of bytes) {
-    code += digits[byte % digits.length] ?? "0";
+  while (code.length < OTP_CODE_LENGTH) {
+    const bytes = new Uint8Array(OTP_CODE_LENGTH);
+    crypto.getRandomValues(bytes);
+    for (const byte of bytes) {
+      if (byte >= maxUsableByte) {
+        continue; // rejected sample, not used
+      }
+      code += digits[byte % digits.length] ?? "0";
+      if (code.length === OTP_CODE_LENGTH) {
+        break;
+      }
+    }
   }
   return code;
 }
@@ -145,6 +163,48 @@ const authConfig: ConvexAuthConfig = {
               profile: Schema.decodeUnknownSync(EmailCodeProfile)(args.profile),
             };
 
+      // Issuance throttle (email-code code requests only; the library
+      // rate-limits verification failures but not sends). Checked FIRST,
+      // before any user/code row is created or an email attempted, and
+      // only for the issuance callback (`type === "email"`), never for
+      // the verification pass. The generic callback ctx exposes only the
+      // collection filter (same pattern as the users lookup below).
+      if (args.type === "email") {
+        const identifier = `issuance:email_code:${normalizeEmail(input.profile.email)}`;
+        const limitRow = await ctx.db
+          .query("authRateLimits")
+          .filter((q) => q.eq(q.field("identifier"), identifier))
+          .first();
+        const limit = decideIssuance(
+          limitRow === null
+            ? null
+            : { lastAttemptTime: limitRow.lastAttemptTime, attemptsLeft: limitRow.attemptsLeft },
+          Date.now(),
+        );
+        if (!limit.allowed) {
+          // No write on a blocked attempt: rewriting the row would keep
+          // pushing the recovery window and starve the honest user.
+          throw new Error(
+            `${ISSUANCE_RATE_LIMITED_MARKER} Zbyt wiele próśb o kod na ten adres. Odczekaj kilka minut i spróbuj ponownie.`,
+          );
+        }
+        if (limitRow === null) {
+          await ctx.db.insert("authRateLimits", {
+            identifier,
+            lastAttemptTime: limit.next.lastAttemptTime,
+            attemptsLeft: limit.next.attemptsLeft,
+          });
+        } else {
+          await ctx.db.patch(limitRow._id, {
+            lastAttemptTime: limit.next.lastAttemptTime,
+            attemptsLeft: limit.next.attemptsLeft,
+          });
+        }
+      }
+
+      // Address lookups are case-insensitive at the policy boundary: the
+      // stored form is normalized (see ./userPolicy.ts), so mixed-case
+      // variants of one address collide in the no-implicit-linking check.
       const found: UserPolicyUser[] = [];
       if (input.profile.email.length > 0) {
         // The library's callback types expose only the generic data model,
@@ -153,7 +213,7 @@ const authConfig: ConvexAuthConfig = {
         // is tiny; B2's linking adapter moves this behind a typed seam.
         const docs = await ctx.db
           .query("users")
-          .filter((q) => q.eq(q.field("email"), input.profile.email))
+          .filter((q) => q.eq(q.field("email"), normalizeEmail(input.profile.email)))
           .take(2);
         for (const doc of docs) {
           const decoded = Schema.decodeUnknownSync(UserRecord)(doc);

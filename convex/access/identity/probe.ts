@@ -28,6 +28,7 @@ import { action, internalMutation } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
 import { unsupportedError } from "@kiero/runtime";
+import { isProofFixtureEmail } from "./proofDomain";
 
 const OTP_MAX_AGE_SECONDS = 15 * 60;
 
@@ -49,6 +50,14 @@ async function sha256Hex(input: string): Promise<string> {
 export const setFixtureCode = internalMutation({
   args: { email: v.string(), code: v.string() },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
+    // The fixture can NEVER target real person addresses, even with the
+    // dev guard on: the proof domain restriction is enforced in addition
+    // to the guard, so an enabled flag is not an account-takeover
+    // primitive. The check runs inside the mutation too, not only in the
+    // guarded action, so no other internal caller can bypass it.
+    if (!isProofFixtureEmail(args.email)) {
+      return errorResult(unsupportedError("access.b1Proof", "proof_domain_required"));
+    }
     const account = await ctx.db
       .query("authAccounts")
       .withIndex("providerAndAccountId", (q) =>
@@ -107,6 +116,9 @@ export const b1ProofSetCode = action({
   handler: async (ctx, args): Promise<ResultEnvelope> => {
     if (!guardEnabled()) {
       return disabled();
+    }
+    if (!isProofFixtureEmail(args.email)) {
+      return errorResult(unsupportedError("access.b1Proof", "proof_domain_required"));
     }
     return await ctx.runMutation(internal.access.identity.probe.setFixtureCode, {
       email: args.email,

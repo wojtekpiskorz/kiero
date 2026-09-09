@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery_experimental as useQueryState } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { signInCopy } from "./state";
 
@@ -36,13 +36,23 @@ function lastSeenPl(ms: number): string {
 }
 
 export function SessionPanel(props: { sessionId: string }): React.ReactNode {
-  const sessions = useQuery(api.access.identity.functions.listMySessions, {});
-  const access = useQuery(api.access.identity.functions.resolveCurrentAccess, {
-    sessionId: props.sessionId,
+  const sessions = useQueryState({
+    query: api.access.identity.functions.listMySessions,
+    args: {},
+  });
+  const access = useQueryState({
+    query: api.access.identity.functions.resolveCurrentAccess,
+    args: { sessionId: props.sessionId },
   });
   const revoke = useMutation(api.access.identity.functions.revokeSession);
   const { signOut } = useAuthActions();
   const [signingOut, setSigningOut] = useState(false);
+
+  // The panel's own queries error when THIS session stopped resolving
+  // (revoked from here, signed out upstream, expired): the honest
+  // fallback is the session-ended state with a way back to sign-in, not
+  // a dead screen over erroring queries.
+  const sessionEnded = sessions.status === "error" || access.status === "error";
 
   function requestSignOut(): void {
     setSigningOut(true);
@@ -51,23 +61,36 @@ export function SessionPanel(props: { sessionId: string }): React.ReactNode {
     });
   }
 
+  if (sessionEnded) {
+    return (
+      <div role="alert">
+        <p>{signInCopy.sessionEndedNotice}</p>
+        <button type="button" disabled={signingOut} onClick={requestSignOut}>
+          {signInCopy.signInAgain}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <section aria-label={sessionPanelCopy.heading}>
       <h2>{sessionPanelCopy.heading}</h2>
-      {access !== undefined && access !== null && (
+      {access.status === "success" && access.data !== null && (
         <p>
           {sessionPanelCopy.companyContext({
-            timezone: access.companyTimezone,
-            currency: access.defaultCurrency,
+            timezone: access.data.companyTimezone,
+            currency: access.data.defaultCurrency,
           })}{" "}
-          {access.membershipRole === "admin"
+          {access.data.membershipRole === "admin"
             ? sessionPanelCopy.roleAdmin
             : sessionPanelCopy.roleMember}
         </p>
       )}
-      {access !== undefined && access === null && <p>{sessionPanelCopy.noCompany}</p>}
+      {access.status === "success" && access.data === null && (
+        <p>{sessionPanelCopy.noCompany}</p>
+      )}
       <ul>
-        {(sessions ?? []).map((session) => (
+        {(sessions.status === "success" ? sessions.data : []).map((session) => (
           <li key={session.sessionId}>
             <strong>
               {session.isCurrent ? sessionPanelCopy.currentDevice : session.deviceLabel}

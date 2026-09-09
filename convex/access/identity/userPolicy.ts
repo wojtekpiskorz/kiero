@@ -81,6 +81,18 @@ export function displayNameFromEmail(email: string): string {
 }
 
 /**
+ * Normalizes an address at the policy boundary: identities are stored and
+ * compared case-insensitively (the local part of an address is technically
+ * case-sensitive in RFC terms, but no major provider treats it so, and
+ * mixed-case addresses MUST collide in the no-implicit-linking check —
+ * otherwise `Szef@Firma.pl` and `szef@firma.pl` would silently create two
+ * person rows).
+ */
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+/**
  * Decides the identity outcome of one provider sign-in.
  *
  * `existingUserId` is the library's "sign-in into this existing account"
@@ -93,11 +105,19 @@ export function decideCreateOrUpdateUser(args: {
   input: UserPolicyInput;
   usersWithEmail: readonly UserPolicyUser[];
 }): UserPolicyDecision {
-  const { existingUserId, input, usersWithEmail } = args;
+  const { existingUserId, input } = args;
 
   if (existingUserId !== null) {
     return { action: "resume", userId: existingUserId };
   }
+
+  // Case-insensitive at the boundary: the profile address is normalized
+  // once here, and pre-fetched rows are kept only when their stored
+  // address matches the normalized form (defensive against legacy rows).
+  const normalizedEmail = normalizeEmail(input.profile.email);
+  const usersWithEmail = args.usersWithEmail.filter(
+    (user) => normalizeEmail(user.email) === normalizedEmail,
+  );
 
   if (input.method === "google") {
     if (usersWithEmail.length > 0) {
@@ -108,7 +128,7 @@ export function decideCreateOrUpdateUser(args: {
     return {
       action: "create",
       input: {
-        email: input.profile.email,
+        email: normalizedEmail,
         displayName: input.profile.name ?? displayNameFromEmail(input.profile.email),
         googleSubject: input.profile.sub,
         emailVerified: input.profile.emailVerified === true,
@@ -132,7 +152,7 @@ export function decideCreateOrUpdateUser(args: {
   return {
     action: "create",
     input: {
-      email: input.profile.email,
+      email: normalizedEmail,
       displayName: displayNameFromEmail(input.profile.email),
       emailVerified: false,
     },

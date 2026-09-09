@@ -37,7 +37,7 @@ import {
   type HandlerRegistry,
 } from "@kiero/runtime";
 import type { MutationCtx } from "../../_generated/server";
-import type { Id } from "../../_generated/dataModel";
+import type { Doc, Id } from "../../_generated/dataModel";
 import { publishEvent } from "../../platform/publish";
 import {
   DEFAULT_DEVICE_LABEL,
@@ -56,6 +56,38 @@ export interface RevocationOutcome {
 }
 
 /**
+ * The minimal surface revocation consumes. The real mutation ctx adapts
+ * to it (below); in-memory fakes implement it in tests (tests/b1) so the
+ * revocation core is unit-testable without a deployment.
+ */
+export interface RevocationSurface {
+  getSession(id: Id<"sessions">): Promise<Doc<"sessions"> | null>;
+  revokeSession(id: Id<"sessions">, revokedAtMs: number): Promise<void>;
+  publishSessionRevoked(args: {
+    companyId: Id<"companies">;
+    sessionId: Id<"sessions">;
+  }): Promise<void>;
+}
+
+/** Adapts one Convex mutation transaction to the revocation surface. */
+export function revocationSurface(tx: MutationCtx): RevocationSurface {
+  return {
+    getSession: (id) => tx.db.get(id),
+    revokeSession: async (id, revokedAtMs) => {
+      await tx.db.patch(id, { revokedAtMs });
+    },
+    publishSessionRevoked: async ({ companyId, sessionId }) => {
+      await publishEvent(tx, {
+        companyId,
+        eventName: "access.sessionRevoked",
+        payload: { sessionId },
+        dedupKey: `access.sessionRevoked:${sessionId}`,
+      });
+    },
+  };
+}
+
+/**
  * Revokes one registry row, self-service: the acting user may revoke only
  * their own sessions. Idempotent: revoking an already-revoked session
  * returns its original revocation time. When `companyIdForEvent` is
@@ -63,7 +95,7 @@ export interface RevocationOutcome {
  * `access.sessionRevoked` event publishes atomically with the patch.
  */
 export async function revokeSessionCore(
-  tx: MutationCtx,
+  surface: RevocationSurface,
   args: {
     readonly actorUserId: Id<"users">;
     readonly targetSessionId: Id<"sessions">;
@@ -71,7 +103,7 @@ export async function revokeSessionCore(
     readonly companyIdForEvent: Id<"companies"> | null;
   },
 ): Promise<RevocationOutcome> {
-  const session = await tx.db.get(args.targetSessionId);
+  const session = await surface.getSession(args.targetSessionId);
   if (session === null) {
     return { result: errorResult(notFoundError("sessions")) };
   }
@@ -87,13 +119,11 @@ export async function revokeSessionCore(
       ),
     };
   }
-  await tx.db.patch(args.targetSessionId, { revokedAtMs: args.nowMs });
+  await surface.revokeSession(args.targetSessionId, args.nowMs);
   if (args.companyIdForEvent !== null) {
-    await publishEvent(tx, {
+    await surface.publishSessionRevoked({
       companyId: args.companyIdForEvent,
-      eventName: "access.sessionRevoked",
-      payload: { sessionId: args.targetSessionId },
-      dedupKey: `access.sessionRevoked:${args.targetSessionId}`,
+      sessionId: args.targetSessionId,
     });
   }
   return {
@@ -176,7 +206,7 @@ function accessHandlers(): HandlerRegistry<MutationCtx> {
         if (actorUserId === null) {
           return errorResult(notFoundError("users", "unresolvable_actor_reference"));
         }
-        const outcome = await revokeSessionCore(tx, {
+        const outcome = await revokeSessionCore(revocationSurface(tx), {
           actorUserId,
           targetSessionId,
           nowMs: Date.now(),

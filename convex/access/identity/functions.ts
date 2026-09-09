@@ -29,6 +29,8 @@ import {
   DEFAULT_DEVICE_LABEL,
   authSessionDecision,
   liveSessionDecision,
+  liveSessionStore,
+  liveSessionTx,
   resolveLiveSession,
   provisionOrRefreshLiveSession,
   resolveAccessContextFromConvexAuth,
@@ -39,6 +41,7 @@ import {
   buildAccessSnapshot,
   dispatchAccessCommand,
   revokeSessionCore,
+  revocationSurface,
 } from "./operations";
 import { resolveRequestContext } from "../../platform/context";
 import type { Id } from "../../_generated/dataModel";
@@ -74,7 +77,7 @@ export const ensureSessionRegistry = mutation({
   args: { deviceLabel: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const live = await provisionOrRefreshLiveSession(
-      ctx.db,
+      liveSessionTx(ctx.db),
       ctx.auth,
       Date.now(),
       deviceLabelOf(args.deviceLabel),
@@ -94,7 +97,7 @@ export const ensureSessionRegistry = mutation({
 export const resolveCurrentAccess = query({
   args: { sessionId: v.string() },
   handler: async (ctx, args) => {
-    const live = await resolveLiveSession(ctx.db, ctx.auth, Date.now());
+    const live = await resolveLiveSession(liveSessionStore(ctx.db), ctx.auth, Date.now());
     if (live.tag === "denied") {
       denialError(live.reason);
     }
@@ -143,7 +146,7 @@ export interface SessionRegistryEntry {
 export const listMySessions = query({
   args: {},
   handler: async (ctx): Promise<SessionRegistryEntry[]> => {
-    const live = await resolveLiveSession(ctx.db, ctx.auth, Date.now());
+    const live = await resolveLiveSession(liveSessionStore(ctx.db), ctx.auth, Date.now());
     if (live.tag === "denied") {
       denialError(live.reason);
     }
@@ -224,7 +227,7 @@ export const accessContextProbe = query({
 export const revokeSession = mutation({
   args: { sessionId: v.id("sessions") },
   handler: async (ctx, args) => {
-    const live = await resolveLiveSession(ctx.db, ctx.auth, Date.now());
+    const live = await resolveLiveSession(liveSessionStore(ctx.db), ctx.auth, Date.now());
     if (live.tag === "denied") {
       denialError(live.reason);
     }
@@ -232,7 +235,7 @@ export const revokeSession = mutation({
       ctx.db,
       liveSessionIdentity(live.session, Date.now()),
     );
-    const outcome = await revokeSessionCore(ctx, {
+    const outcome = await revokeSessionCore(revocationSurface(ctx), {
       actorUserId: live.session.userId,
       targetSessionId: args.sessionId,
       nowMs: Date.now(),

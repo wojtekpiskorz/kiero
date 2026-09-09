@@ -46,10 +46,64 @@ export type IdentityDb = QueryCtx["db"];
 /** The write surface provisioning needs. */
 export type IdentityTx = MutationCtx["db"];
 
+/**
+ * The minimal store surface the live-session cores consume. The real
+ * Convex db adapts to it (below); in-memory fakes implement it in tests
+ * (tests/b1) so the db-halves are unit-testable without a deployment.
+ * Direct per-entity methods (not the full query-chain types) keep both
+ * the adapter and the fakes one line each.
+ */
+export interface LiveSessionStore {
+  normalizeAuthSessionId(id: string): Id<"authSessions"> | null;
+  normalizeUserId(id: string): Id<"users"> | null;
+  authSessionById(id: Id<"authSessions">): Promise<Doc<"authSessions"> | null>;
+  userById(id: Id<"users">): Promise<Doc<"users"> | null>;
+  registryByAuthSession(authSessionId: Id<"authSessions">): Promise<Doc<"sessions"> | null>;
+}
+
+/** The write extension provisioning needs (fake-able the same way). */
+export interface LiveSessionTx extends LiveSessionStore {
+  insertRegistry(row: {
+    userId: Id<"users">;
+    startedAtMs: number;
+    lastSeenAtMs: number;
+    deviceLabel: string;
+    authSessionId: Id<"authSessions">;
+  }): Promise<Id<"sessions">>;
+  registryRowById(id: Id<"sessions">): Promise<Doc<"sessions"> | null>;
+  patchRegistry(id: Id<"sessions">, patch: { lastSeenAtMs?: number }): Promise<void>;
+}
+
+/** Adapts a Convex reader to the store surface. */
+export function liveSessionStore(db: IdentityDb): LiveSessionStore {
+  return {
+    normalizeAuthSessionId: (id) => db.normalizeId("authSessions", id),
+    normalizeUserId: (id) => db.normalizeId("users", id),
+    authSessionById: (id) => db.get(id),
+    userById: (id) => db.get(id),
+    registryByAuthSession: (authSessionId) =>
+      db
+        .query("sessions")
+        .withIndex("by_authSession", (q) => q.eq("authSessionId", authSessionId))
+        .unique(),
+  };
+}
+
+/** Adapts a Convex writer to the provisioning surface. */
+export function liveSessionTx(tx: IdentityTx): LiveSessionTx {
+  return {
+    ...liveSessionStore(tx),
+    insertRegistry: (row) => tx.insert("sessions", row),
+    registryRowById: (id) => tx.get(id),
+    patchRegistry: (id, patch) => tx.patch(id, patch),
+  };
+}
+
 /** Why a request did not resolve to a live session (machine-readable). */
 export type LiveSessionDenial =
   | "no_identity"
   | "malformed_subject"
+  | "subject_mismatch"
   | "auth_session_missing"
   | "auth_session_expired"
   | "registry_missing"
@@ -140,7 +194,9 @@ export function authSessionDecision(
     return { tag: "denied", reason: "auth_session_missing" };
   }
   if (authSession.userId !== expectedUserId) {
-    return { tag: "denied", reason: "malformed_subject" };
+    // The subject's user half disagrees with the session row: distinct
+    // from a malformed subject string, but equally fail-closed.
+    return { tag: "denied", reason: "subject_mismatch" };
   }
   if (authSession.expirationTime <= nowMs) {
     return { tag: "denied", reason: "auth_session_expired" };
@@ -158,16 +214,6 @@ function snapshotOf(row: Doc<"sessions">): LiveSessionSnapshot {
   };
 }
 
-async function registryRowByAuthSession(
-  db: IdentityDb,
-  authSessionId: Id<"authSessions">,
-): Promise<Doc<"sessions"> | null> {
-  return await db
-    .query("sessions")
-    .withIndex("by_authSession", (q) => q.eq("authSessionId", authSessionId))
-    .unique();
-}
-
 /**
  * The shared resolution prologue: verified identity -> strict subject
  * parse -> well-formed authSessions id -> upstream liveness decision.
@@ -175,7 +221,7 @@ async function registryRowByAuthSession(
  * with the registry row differs.
  */
 async function resolveVerifiedUpstreamSession(
-  db: IdentityDb,
+  db: LiveSessionStore,
   auth: AuthReader,
   nowMs: number,
 ): Promise<
@@ -190,11 +236,11 @@ async function resolveVerifiedUpstreamSession(
   if (parts === null) {
     return { tag: "denied", reason: "malformed_subject" };
   }
-  const authSessionId = db.normalizeId("authSessions", parts.authSessionId);
+  const authSessionId = db.normalizeAuthSessionId(parts.authSessionId);
   if (authSessionId === null) {
     return { tag: "denied", reason: "malformed_subject" };
   }
-  const authSession = await db.get(authSessionId);
+  const authSession = await db.authSessionById(authSessionId);
   const upstream = authSessionDecision(
     authSession === null
       ? null
@@ -214,7 +260,7 @@ async function resolveVerifiedUpstreamSession(
  * (`registry_missing`) — provisioning happens only in mutation contexts.
  */
 export async function resolveLiveSession(
-  db: IdentityDb,
+  db: LiveSessionStore,
   auth: AuthReader,
   nowMs: number,
 ): Promise<LiveSessionResult> {
@@ -222,7 +268,7 @@ export async function resolveLiveSession(
   if ("tag" in prologue) {
     return prologue;
   }
-  const row = await registryRowByAuthSession(db, prologue.authSessionId);
+  const row = await db.registryByAuthSession(prologue.authSessionId);
   if (row === null) {
     return { tag: "denied", reason: "registry_missing" };
   }
@@ -243,7 +289,7 @@ export async function resolveLiveSession(
  * dispatch (every command refreshes the session's activity).
  */
 export async function provisionOrRefreshLiveSession(
-  tx: IdentityTx,
+  tx: LiveSessionTx,
   auth: AuthReader,
   nowMs: number,
   deviceLabel: string,
@@ -252,22 +298,22 @@ export async function provisionOrRefreshLiveSession(
   if ("tag" in prologue) {
     return prologue;
   }
-  const existing = await registryRowByAuthSession(tx, prologue.authSessionId);
+  const existing = await tx.registryByAuthSession(prologue.authSessionId);
   if (existing === null) {
-    const user = await tx.normalizeId("users", prologue.authUserId);
-    if (user === null || (await tx.get(user)) === null) {
+    const user = tx.normalizeUserId(prologue.authUserId);
+    if (user === null || (await tx.userById(user)) === null) {
       // The verified token names no existing person row: fail closed
       // instead of provisioning a registry row for a ghost.
-      return { tag: "denied", reason: "malformed_subject" };
+      return { tag: "denied", reason: "subject_mismatch" };
     }
-    const inserted = await tx.insert("sessions", {
+    const inserted = await tx.insertRegistry({
       userId: user,
       startedAtMs: nowMs,
       lastSeenAtMs: nowMs,
       deviceLabel,
       authSessionId: prologue.authSessionId,
     });
-    const row = await tx.get(inserted);
+    const row = await tx.registryRowById(inserted);
     if (row === null) {
       return { tag: "denied", reason: "registry_missing" };
     }
@@ -280,7 +326,7 @@ export async function provisionOrRefreshLiveSession(
   if (decision.tag === "denied") {
     return decision;
   }
-  await tx.patch(existing._id, { lastSeenAtMs: nowMs });
+  await tx.patchRegistry(existing._id, { lastSeenAtMs: nowMs });
   return { tag: "live", session: { ...snapshotOf(existing), lastSeenAtMs: nowMs } };
 }
 
@@ -300,7 +346,7 @@ export async function resolveAccessContextFromConvexAuth(
   auth: AuthReader,
   nowMs: number,
 ): Promise<RequestContext | null> {
-  const live = await resolveLiveSession(db, auth, nowMs);
+  const live = await resolveLiveSession(liveSessionStore(db), auth, nowMs);
   if (live.tag === "denied") {
     return null;
   }
@@ -318,7 +364,7 @@ export async function resolveAccessContextWithProvisioning(
   nowMs: number,
   deviceLabel: string,
 ): Promise<RequestContext | null> {
-  const live = await provisionOrRefreshLiveSession(tx, auth, nowMs, deviceLabel);
+  const live = await provisionOrRefreshLiveSession(liveSessionTx(tx), auth, nowMs, deviceLabel);
   if (live.tag === "denied") {
     return null;
   }

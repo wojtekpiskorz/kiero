@@ -79,10 +79,10 @@ describe("authSessionDecision (upstream Convex Auth session)", () => {
     });
   });
 
-  it("denies a subject that names a different user", () => {
+  it("denies a subject that names a different user (distinct from malformed)", () => {
     expect(
       authSessionDecision({ userId: "k57other", expirationTime: NOW + 1000 }, userId, NOW),
-    ).toEqual({ tag: "denied", reason: "malformed_subject" });
+    ).toEqual({ tag: "denied", reason: "subject_mismatch" });
   });
 
   it("denies an expired upstream session", () => {
