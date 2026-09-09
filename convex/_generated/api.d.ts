@@ -8,6 +8,14 @@
  * @module
  */
 
+import type * as access_gm_cores from "../access/gm/cores.js";
+import type * as access_gm_dispatch from "../access/gm/dispatch.js";
+import type * as access_gm_functions from "../access/gm/functions.js";
+import type * as access_gm_operations from "../access/gm/operations.js";
+import type * as access_gm_policy from "../access/gm/policy.js";
+import type * as access_gm_probe from "../access/gm/probe.js";
+import type * as access_gm_store from "../access/gm/store.js";
+import type * as access_gm_storeAdapter from "../access/gm/storeAdapter.js";
 import type * as access_identity_authEntry from "../access/identity/authEntry.js";
 import type * as access_identity_functions from "../access/identity/functions.js";
 import type * as access_identity_issuanceLimit from "../access/identity/issuanceLimit.js";
@@ -55,6 +63,17 @@ import type * as integrations_ai_record from "../integrations/ai/record.js";
 import type * as integrations_email_copy from "../integrations/email/copy.js";
 import type * as integrations_email_resend from "../integrations/email/resend.js";
 import type * as integrations_email_send from "../integrations/email/send.js";
+import type * as memory_findings_corrections from "../memory/findings/corrections.js";
+import type * as memory_findings_dispatch from "../memory/findings/dispatch.js";
+import type * as memory_findings_functions from "../memory/findings/functions.js";
+import type * as memory_findings_plan from "../memory/findings/plan.js";
+import type * as memory_findings_prepare from "../memory/findings/prepare.js";
+import type * as memory_findings_probe from "../memory/findings/probe.js";
+import type * as memory_findings_publish from "../memory/findings/publish.js";
+import type * as memory_findings_read from "../memory/findings/read.js";
+import type * as memory_findings_references from "../memory/findings/references.js";
+import type * as memory_findings_semantics from "../memory/findings/semantics.js";
+import type * as memory_findings_withdrawal from "../memory/findings/withdrawal.js";
 import type * as operations_telemetry_costs from "../operations/telemetry/costs.js";
 import type * as operations_telemetry_cron from "../operations/telemetry/cron.js";
 import type * as operations_telemetry_emit from "../operations/telemetry/emit.js";
@@ -79,6 +98,11 @@ import type * as platform_outbox from "../platform/outbox.js";
 import type * as platform_pipeline from "../platform/pipeline.js";
 import type * as platform_probe from "../platform/probe.js";
 import type * as platform_publish from "../platform/publish.js";
+import type * as projects_dispatch from "../projects/dispatch.js";
+import type * as projects_functions from "../projects/functions.js";
+import type * as projects_operations from "../projects/operations.js";
+import type * as projects_policy from "../projects/policy.js";
+import type * as projects_probe from "../projects/probe.js";
 import type * as schema_shared from "../schema/shared.js";
 import type * as sources_accept_acceptance from "../sources/accept/acceptance.js";
 import type * as sources_accept_commands from "../sources/accept/commands.js";
@@ -96,6 +120,14 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "access/gm/cores": typeof access_gm_cores;
+  "access/gm/dispatch": typeof access_gm_dispatch;
+  "access/gm/functions": typeof access_gm_functions;
+  "access/gm/operations": typeof access_gm_operations;
+  "access/gm/policy": typeof access_gm_policy;
+  "access/gm/probe": typeof access_gm_probe;
+  "access/gm/store": typeof access_gm_store;
+  "access/gm/storeAdapter": typeof access_gm_storeAdapter;
   "access/identity/authEntry": typeof access_identity_authEntry;
   "access/identity/functions": typeof access_identity_functions;
   "access/identity/issuanceLimit": typeof access_identity_issuanceLimit;
@@ -143,6 +175,17 @@ declare const fullApi: ApiFromModules<{
   "integrations/email/copy": typeof integrations_email_copy;
   "integrations/email/resend": typeof integrations_email_resend;
   "integrations/email/send": typeof integrations_email_send;
+  "memory/findings/corrections": typeof memory_findings_corrections;
+  "memory/findings/dispatch": typeof memory_findings_dispatch;
+  "memory/findings/functions": typeof memory_findings_functions;
+  "memory/findings/plan": typeof memory_findings_plan;
+  "memory/findings/prepare": typeof memory_findings_prepare;
+  "memory/findings/probe": typeof memory_findings_probe;
+  "memory/findings/publish": typeof memory_findings_publish;
+  "memory/findings/read": typeof memory_findings_read;
+  "memory/findings/references": typeof memory_findings_references;
+  "memory/findings/semantics": typeof memory_findings_semantics;
+  "memory/findings/withdrawal": typeof memory_findings_withdrawal;
   "operations/telemetry/costs": typeof operations_telemetry_costs;
   "operations/telemetry/cron": typeof operations_telemetry_cron;
   "operations/telemetry/emit": typeof operations_telemetry_emit;
@@ -167,6 +210,11 @@ declare const fullApi: ApiFromModules<{
   "platform/pipeline": typeof platform_pipeline;
   "platform/probe": typeof platform_probe;
   "platform/publish": typeof platform_publish;
+  "projects/dispatch": typeof projects_dispatch;
+  "projects/functions": typeof projects_functions;
+  "projects/operations": typeof projects_operations;
+  "projects/policy": typeof projects_policy;
+  "projects/probe": typeof projects_probe;
   "schema/shared": typeof schema_shared;
   "sources/accept/acceptance": typeof sources_accept_acceptance;
   "sources/accept/commands": typeof sources_accept_commands;

@@ -1,15 +1,32 @@
 /**
  * Memory findings, revisions, provenance and publication tables
- * (A2 candidate, certified by A3).
+ * (A2 candidate, certified by A3; completed by C2 for the atomic
+ * findings/revisions/provenance/corrections lane).
  *
- * Owning implementers: C2 (atomic findings/revisions/provenance/corrections),
- * C5 (withdrawal and dependency-aware recomputation), E3 (change plans).
+ * Owning implementers: C2 (this lane), C5 (withdrawal recomputation over
+ * these rows), E3 (change-plan preparation feeding these transactions).
  *
- * Revisions are immutable; current state is readable without replaying the
- * conversation. `recordedAtMs` is trusted system time; `effectiveFrom` exists
- * only when evidence establishes when the agreement applied. Derivations are
- * acyclic and inference is never another witness; withdrawal/correction can
- * locate affected dependents without discarding independent evidence.
+ * Revisions are immutable; the findings row is the CURRENT projection and is
+ * only ever patched inside the same transaction that writes the revision it
+ * projects (publication, correction or withdrawal marking) — it is never
+ * separately editable. `recordedAtMs` is trusted system time;
+ * `effectiveFrom` exists only when evidence establishes when the agreement
+ * applied. Derivations are acyclic (checked at prepare AND re-checked at
+ * publish) and inference is never another witness; withdrawal/correction
+ * locates affected findings without discarding independent evidence.
+ *
+ * C2 amendments (the owning lane completes the candidate fragment):
+ * - `findingRevisions.origin` + optional `provenance`/`reason` +
+ *   `recordedByUserId`/`recordedAtMs`: a revision names WHERE it came from —
+ *   a source-backed publication (provenance: source, fragments, actor),
+ *   an explicit correction (author, time, reason; issue 8: "osobnym
+ *   rozstrzygnięciem z autorem, czasem i historią") or a withdrawal marking.
+ * - `evidenceLinks.sourceId` required with optional fragment: whole-source
+ *   evidence is first-class ("Gdy nie da się wiarygodnie wskazać fragmentu,
+ *   podstawą pozostaje cały materiał") and tenant checks key on the source;
+ *   fragment-typed links arrive with E3's extractions.
+ * - `publicationGroups.plannedChanges`: the staged, decoded plan with the
+ *   expectations captured at prepare time — the stale-plan guard's base.
  *
  * Tables: findings, findingRevisions, evidenceLinks, findingDependencies,
  * changeSets, publicationGroups, clarifications.
@@ -36,6 +53,39 @@ const publicationState: ValueValidator<Encoded<typeof PublicationState>> = v.uni
   v.literal("superseded"),
 );
 
+/** Where one recorded revision came from (its provenance shape follows). */
+const revisionOrigin = v.union(
+  v.literal("publication"),
+  v.literal("correction"),
+  v.literal("withdrawal_marking"),
+);
+
+/** Witness kinds a PLAN may claim (derivation/supersession are not witnesses). */
+const plannedSupportKind = v.union(
+  v.literal("support"),
+  v.literal("independent_corroboration"),
+);
+
+/** One staged planned change: the decoded plan persisted at prepare time. */
+const plannedChange = v.object({
+  findingId: v.optional(shared.findingId),
+  scopeKind: v.union(v.literal("company"), v.literal("project")),
+  scopeProjectId: v.optional(shared.projectId),
+  semanticKey: v.string(),
+  value: semanticValueValidators.findingValue,
+  knowledgeState: semanticValueValidators.knowledgeState,
+  effectiveFrom: semanticValueFields.temporalValue,
+  evidence: v.array(
+    v.object({
+      sourceId: shared.sourceId,
+      sourceFragmentId: v.optional(shared.sourceFragmentId),
+      supportKind: plannedSupportKind,
+      extractionId: v.optional(shared.extractionId),
+    }),
+  ),
+  derivesFrom: v.array(shared.findingId),
+});
+
 export const findingsTables = {
   /** Stable finding identity within one semantic scope (firm or project memory). */
   findings: defineTable({
@@ -53,7 +103,11 @@ export const findingsTables = {
     // a strict prefix of by_company_scope_key.
     .index("by_company_scope_key", ["companyId", "scopeProjectId", "semanticKey"]),
 
-  /** Immutable snapshot of one recorded revision. Never edited, only superseded. */
+  /**
+   * Immutable snapshot of one recorded revision. Never edited, only superseded.
+   * The origin names the change path; a publication carries source-backed
+   * provenance, a correction or marking carries author, time and reason.
+   */
   findingRevisions: defineTable({
     findingId: shared.findingId,
     revision: shared.counter,
@@ -62,13 +116,25 @@ export const findingsTables = {
     /** Present only when evidence establishes when the agreement applied. */
     effectiveFrom: semanticValueFields.temporalValue,
     supersedesRevisionId: v.optional(shared.findingRevisionId),
-    provenance: shared.provenance,
+    origin: revisionOrigin,
+    /** Source-backed provenance (publications); absent for corrections. */
+    provenance: v.optional(shared.provenance),
+    /** Why an explicit correction or withdrawal marking happened. */
+    reason: v.optional(v.string()),
+    recordedByUserId: shared.userId,
+    recordedAtMs: shared.tsMs,
   }).index("by_finding_revision", ["findingId", "revision"]),
 
-  /** Typed evidence support between a revision and a source fragment. */
+  /**
+   * Typed evidence support between a revision and a source or one of its
+   * fragments. `independent_corroboration` is a second witness, not a
+   * derivation; withdrawal keys on `sourceId` to find what it supported.
+   */
   evidenceLinks: defineTable({
     findingRevisionId: shared.findingRevisionId,
-    sourceFragmentId: shared.sourceFragmentId,
+    sourceId: shared.sourceId,
+    /** Absent = whole-source evidence (no fragment reliably identifiable). */
+    sourceFragmentId: v.optional(shared.sourceFragmentId),
     supportKind: v.union(
       v.literal("support"),
       v.literal("independent_corroboration"),
@@ -76,11 +142,13 @@ export const findingsTables = {
       v.literal("supersession"),
     ),
     extractionId: v.optional(shared.extractionId),
+    createdAtMs: shared.tsMs,
   })
     .index("by_revision", ["findingRevisionId"])
-    .index("by_fragment", ["sourceFragmentId"]),
+    .index("by_fragment", ["sourceFragmentId"])
+    .index("by_source", ["sourceId"]),
 
-  /** Dependency graph between findings (acyclic by domain rule, C5). */
+  /** Dependency graph between findings (acyclic by domain rule, re-checked). */
   findingDependencies: defineTable({
     companyId: shared.companyId,
     dependentFindingId: shared.findingId,
@@ -94,7 +162,8 @@ export const findingsTables = {
     createdAtMs: shared.tsMs,
   })
     .index("by_dependent", ["dependentFindingId"])
-    .index("by_depends_on", ["dependsOnFindingId"]),
+    .index("by_depends_on", ["dependsOnFindingId"])
+    .index("by_company", ["companyId"]),
 
   /** One checked memory change prepared from a source; staged publication. */
   changeSets: defineTable({
@@ -108,13 +177,18 @@ export const findingsTables = {
     .index("by_source", ["sourceId"])
     .index("by_company_state", ["companyId", "state"]),
 
-  /** Atomically-publishing dependent group inside a change set. */
+  /**
+   * The atomically-publishing dependent group inside a change set: the
+   * staged plan plus the expectations captured at prepare time (the
+   * stale-plan guard compares them to the CURRENT counters at publish).
+   */
   publicationGroups: defineTable({
     changeSetId: shared.changeSetId,
-    memberRevisionIds: v.array(shared.findingRevisionId),
+    plannedChanges: v.array(plannedChange),
     expectedRevisions: v.array(
       v.object({ findingId: shared.findingId, revision: shared.counter }),
     ),
+    memberRevisionIds: v.optional(v.array(shared.findingRevisionId)),
     state: v.union(
       v.literal("prepared"),
       v.literal("published"),

@@ -13,6 +13,7 @@ import { coTerazFeatureEntry } from "./features/co-teraz/entry";
 import { projectsFeatureEntry } from "./features/projects/entry";
 import { membershipFeatureEntry } from "./features/membership/entry";
 import { calendarFeatureEntry } from "./features/calendar/entry";
+import { gmAccessFeatureEntry } from "./features/gm/entry";
 
 /** Every registered host feature, in navigation order. The first entry ("/") is the default route. */
 export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
@@ -22,6 +23,9 @@ export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
   // B3's sanctioned host mount: the first mounted feature (sign-in gate +
   // membership surface); the entry file owns the shape, this line the wiring.
   membershipFeatureEntry,
+  // B4's sanctioned host mount: the audited GM operator surface (entry/exit
+  // GM mode, inspection, recovery, onboarding, activation, restoration).
+  gmAccessFeatureEntry,
   // G1's sanctioned host mount: the optional personal Calendar connection
   // (sign-in gate reused; connection lifecycle only, never identity).
   calendarFeatureEntry,

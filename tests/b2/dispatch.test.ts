@@ -226,16 +226,18 @@ describe("access.linkVerifiedMethod through the checked dispatch", () => {
     expect(result).toEqual({ _tag: "ok", value: { linked: "linked" } });
   });
 
-  it("stays fail-closed for unknown operations", async () => {
+  it("stays fail-closed on this surface for the GM-owned recovery command", async () => {
     const db = googlePersonDb();
     const result = await dispatch(db, envelope("access.recoverAccount", { userId: "k57user1" }));
     expect(result._tag).toBe("error");
     if (result._tag === "error") {
-      // The recovery command is DEFINED (operations.ts) but not in the
-      // composed contracts registry: dispatch fails closed until B4 wires
-      // the invoker — exactly the issue's "invoker unavailable" rule.
+      // B4 amendment (issue #23): the recovery command IS now in the
+      // composed contracts registry (B4 registered its entry), but THIS
+      // identity-layer dispatch implements no handler for it — the GM
+      // dispatch (convex/access/gm/) is the only invoker. Fail-closed
+      // moved from unknown_operation to not_implemented; the rule stands.
       expect(result.error._tag).toBe("unsupported");
-      expect(result.error.code).toBe("unknown_operation");
+      expect(result.error.code).toBe("not_implemented");
     }
   });
 });
