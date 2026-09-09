@@ -1,5 +1,5 @@
 /**
- * @kiero/media-worker — EU Container executor bootstrap skeleton.
+ * @kiero/media-worker: EU Container executor bootstrap skeleton.
  *
  * This executor will own bounded media processing (execution charter).
  * No container runtime, queue wiring or media logic exists in this

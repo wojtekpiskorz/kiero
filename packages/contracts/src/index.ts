@@ -1,5 +1,5 @@
 /**
- * @kiero/contracts — bootstrap placeholder.
+ * @kiero/contracts: bootstrap placeholder.
  *
  * This package will own external commands/results, domain value schemas,
  * operation/event names and version rules (execution charter). The real

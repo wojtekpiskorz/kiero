@@ -1,5 +1,5 @@
 /**
- * @kiero/backup-worker — EU backup Container bootstrap skeleton.
+ * @kiero/backup-worker: EU backup Container bootstrap skeleton.
  *
  * This executor will own the scheduled backup set build/verify/restore
  * flow (execution charter). No container runtime, scheduler wiring or

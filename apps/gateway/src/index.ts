@@ -1,5 +1,5 @@
 /**
- * @kiero/gateway — Cloudflare Worker bootstrap skeleton.
+ * @kiero/gateway: Cloudflare Worker bootstrap skeleton.
  *
  * This Worker will own the authorization gateway and streamed
  * media/upload/OAuth routes (execution charter). No routes, bindings or

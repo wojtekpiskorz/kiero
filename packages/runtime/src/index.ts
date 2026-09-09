@@ -1,5 +1,5 @@
 /**
- * @kiero/runtime — bootstrap placeholder.
+ * @kiero/runtime: bootstrap placeholder.
  *
  * This package will own Effect execution, checked runtime interfaces and
  * durable stage registration (execution charter). The runtime conversion

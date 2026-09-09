@@ -1,5 +1,5 @@
 /**
- * @kiero/export-worker — EU Container executor bootstrap skeleton.
+ * @kiero/export-worker: EU Container executor bootstrap skeleton.
  *
  * This executor will own firm export archive generation (execution
  * charter). No container runtime, queue wiring or export logic exists in

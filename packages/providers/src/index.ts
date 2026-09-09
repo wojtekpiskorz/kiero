@@ -1,5 +1,5 @@
 /**
- * @kiero/providers — bootstrap placeholder.
+ * @kiero/providers: bootstrap placeholder.
  *
  * This package will own the OpenRouter chat/STT/vision/embedding adapters
  * and server-owned routing (execution charter). No provider calls exist in

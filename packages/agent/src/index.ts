@@ -1,5 +1,5 @@
 /**
- * @kiero/agent — bootstrap placeholder.
+ * @kiero/agent: bootstrap placeholder.
  *
  * This package will own source-grounded planning and tools (execution
  * charter). No model calls, tool definitions or plans exist in this
