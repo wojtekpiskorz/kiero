@@ -8,8 +8,22 @@
  * @module
  */
 
+import type * as access_identity_authEntry from "../access/identity/authEntry.js";
+import type * as access_identity_functions from "../access/identity/functions.js";
+import type * as access_identity_issuanceLimit from "../access/identity/issuanceLimit.js";
+import type * as access_identity_operations from "../access/identity/operations.js";
+import type * as access_identity_policy from "../access/identity/policy.js";
+import type * as access_identity_probe from "../access/identity/probe.js";
+import type * as access_identity_proofDomain from "../access/identity/proofDomain.js";
+import type * as access_identity_providerAvailability from "../access/identity/providerAvailability.js";
+import type * as access_identity_resolution from "../access/identity/resolution.js";
+import type * as access_identity_userPolicy from "../access/identity/userPolicy.js";
+import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
+import type * as integrations_email_copy from "../integrations/email/copy.js";
+import type * as integrations_email_resend from "../integrations/email/resend.js";
+import type * as integrations_email_send from "../integrations/email/send.js";
 import type * as operations_telemetry_costs from "../operations/telemetry/costs.js";
 import type * as operations_telemetry_cron from "../operations/telemetry/cron.js";
 import type * as operations_telemetry_emit from "../operations/telemetry/emit.js";
@@ -51,8 +65,22 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "access/identity/authEntry": typeof access_identity_authEntry;
+  "access/identity/functions": typeof access_identity_functions;
+  "access/identity/issuanceLimit": typeof access_identity_issuanceLimit;
+  "access/identity/operations": typeof access_identity_operations;
+  "access/identity/policy": typeof access_identity_policy;
+  "access/identity/probe": typeof access_identity_probe;
+  "access/identity/proofDomain": typeof access_identity_proofDomain;
+  "access/identity/providerAvailability": typeof access_identity_providerAvailability;
+  "access/identity/resolution": typeof access_identity_resolution;
+  "access/identity/userPolicy": typeof access_identity_userPolicy;
+  auth: typeof auth;
   crons: typeof crons;
   http: typeof http;
+  "integrations/email/copy": typeof integrations_email_copy;
+  "integrations/email/resend": typeof integrations_email_resend;
+  "integrations/email/send": typeof integrations_email_send;
   "operations/telemetry/costs": typeof operations_telemetry_costs;
   "operations/telemetry/cron": typeof operations_telemetry_cron;
   "operations/telemetry/emit": typeof operations_telemetry_emit;

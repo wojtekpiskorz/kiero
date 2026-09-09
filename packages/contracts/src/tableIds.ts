@@ -28,8 +28,14 @@ export const TABLE_ID_NAMES = [
   // access/identity
   "users",
   "sessions",
-
-  // access/membership
+  // access/identity: Convex Auth provider tables (B1 amendment; the library
+  // owns their shape, the identity fragment registers them in the schema)
+  "authSessions",
+  "authAccounts",
+  "authRefreshTokens",
+  "authVerificationCodes",
+  "authVerifiers",
+  "authRateLimits",  // access/membership
   "companies",
   "memberships",
   "invitations",
