@@ -4,19 +4,22 @@
  * through the REAL deployed gateway Worker and the REAL EU R2 bucket
  * (kiero-dev-media, jurisdiction eu).
  *
- * Actor context: the A3 service-bridge identity (the service account's own
- * session, resolved through the canonical resolution and authorization seam
- * inside every gateway->Convex call) plus one server-seeded second-company
- * session for tenant isolation. No development-auth shortcut exists.
+ * IDENTITY (round-2 review): every actor is a REAL signed-in person — B1's
+ * email-code flow with proof-domain fixture addresses and fixture codes
+ * (the B3 evidence pattern). Each person's Convex Auth token is the
+ * credential the gateway forwards on every uploads route, so the whole
+ * chain (prepare/begin/part/complete/finalize/reconcile/accept) runs AS
+ * THAT USER against that user's company. The service account appears
+ * nowhere. Revocation rows drive the CERTIFIED B1/B3 commands
+ * (access.revokeSession, access.revokeMembership), not server-side edits.
  *
  * Run: KIERO_D2_GATEWAY=https://<worker>.workers.dev node tests/d2/live-proof.mjs
  * (Not a vitest file: live evidence, transcribed into the issue report.)
  */
 
 import { ConvexHttpClient } from "convex/browser";
-import { createHash } from "node:crypto";
-import { randomBytes } from "node:crypto";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { writeFileSync, unlinkSync, createReadStream } from "node:fs";
 
 const DEPLOYMENT = process.env.KIERO_D2_CONVEX ?? "hip-basilisk-390";
 const CLIENT_URL = `https://${DEPLOYMENT}.eu-west-1.convex.cloud`;
@@ -26,8 +29,19 @@ if (GATEWAY === undefined) {
 }
 
 const MIB = 1024 * 1024;
+const RUN = Date.now().toString(36);
+const person = (name) => `d2-${name}-${RUN}@kiero.invalid`;
+// Per-person fixture codes: the auth library looks verification codes up
+// by hash GLOBALLY with unique(), so two pending rows sharing one code
+// value (e.g. debris from a crashed run) would break every later sign-in.
+const fixtureCodeOf = (seed) => {
+  let hash = 0;
+  for (const byte of Buffer.from(seed)) {
+    hash = (hash * 31 + byte) % 90_000_000;
+  }
+  return String(42_000_000 + hash);
+};
 
-const client = () => new ConvexHttpClient(CLIENT_URL);
 const results = [];
 function record(id, outcome, detail) {
   results.push({ id, outcome, detail });
@@ -41,10 +55,75 @@ function summarize() {
 }
 const key = () => `idem_${globalThis.crypto.randomUUID()}`;
 
-// --- gateway helpers --------------------------------------------------------
+// --- real sign-in (B3's fixture pattern) ------------------------------------
 
-async function gw(path, init = {}) {
-  const response = await fetch(`${GATEWAY.replace(/\/$/, "")}${path}`, init);
+const anon = () => new ConvexHttpClient(CLIENT_URL, { logger: false });
+
+async function errOf(fn) {
+  try {
+    await fn();
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+/** Real B1 sign-in with a fixture code (proof-domain address only). */
+async function signInFixture(email) {
+  const code = fixtureCodeOf(email);
+  const bootstrap = anon();
+  await errOf(() => bootstrap.action("auth:signIn", { provider: "email_code", params: { email } }));
+  const set = await bootstrap.action("access/identity/probe:b1ProofSetCode", {
+    email,
+    code,
+  });
+  if (set?._tag !== "ok") {
+    throw new Error(`fixture code install failed for ${email}: ${JSON.stringify(set)}`);
+  }
+  const result = await bootstrap.action("auth:signIn", {
+    provider: "email_code",
+    params: { email, code },
+  });
+  const token = result?.tokens?.token;
+  if (typeof token !== "string") {
+    throw new Error(`sign-in failed for ${email}`);
+  }
+  const client = new ConvexHttpClient(CLIENT_URL, { logger: false, auth: token });
+  const ensured = await client.mutation("access/identity/functions:ensureSessionRegistry", {});
+  if (ensured?.state !== "live") {
+    throw new Error(`session provisioning failed for ${email}: ${JSON.stringify(ensured)}`);
+  }
+  return { client, token, sessionId: ensured.sessionId, email };
+}
+
+const admit = (client, operation, input) =>
+  client.mutation("access/membership/functions:admitCommand", {
+    envelope: { operation, input, expectedRevisions: [] },
+  });
+
+/** Creates the person's own firm (first administrator) and returns its id. */
+async function ownCompany(persona, name) {
+  const created = await admit(persona.client, "access.createCompany", {
+    name,
+    timezone: "Europe/Warsaw",
+    defaultCurrency: "PLN",
+  });
+  if (created?._tag !== "ok") {
+    throw new Error(`createCompany failed: ${JSON.stringify(created)}`);
+  }
+  return created.value.companyId;
+}
+
+// --- gateway helpers (every call carries the person's credential) -------------
+
+async function gw(token, path, init = {}) {
+  const response = await fetch(`${GATEWAY.replace(/\/$/, "")}${path}`, {
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      authorization: `Bearer ${token}`,
+    },
+  });
   let body;
   try {
     body = await response.json();
@@ -60,130 +139,112 @@ const jsonInit = (method, payload) => ({
   body: JSON.stringify(payload),
 });
 
-const prepareUpload = (draftId, parts, mediaKinds) =>
-  gw("/uploads/prepare", jsonInit("POST", { draftId, parts, mediaKinds }));
-const sessionOf = (uploadId) => gw(`/uploads/${uploadId}/session`);
-const putPart = (uploadId, attachmentId, partNumber, buffer) =>
-  gw(`/uploads/${uploadId}/attachments/${attachmentId}/parts/${partNumber}`, {
+const prepareUpload = (token, draftId, parts, mediaKinds) =>
+  gw(token, "/uploads/prepare", jsonInit("POST", { draftId, parts, mediaKinds }));
+const sessionOf = (token, uploadId) => gw(token, `/uploads/${uploadId}/session`);
+const putPart = (token, uploadId, attachmentId, partNumber, buffer) =>
+  gw(token, `/uploads/${uploadId}/attachments/${attachmentId}/parts/${partNumber}`, {
     method: "POST",
     headers: { "content-type": "application/octet-stream" },
     body: buffer,
     duplex: "half",
   });
-const completeAttachmentRoute = (uploadId, attachmentId) =>
-  gw(`/uploads/${uploadId}/attachments/${attachmentId}/complete`, jsonInit("POST", {}));
-const finalizeUpload = (uploadId) => gw(`/uploads/${uploadId}/finalize`, jsonInit("POST", {}));
-const reconcileUploads = () => gw("/uploads/reconcile", jsonInit("POST", {}));
+const completeAttachmentRoute = (token, uploadId, attachmentId) =>
+  gw(token, `/uploads/${uploadId}/attachments/${attachmentId}/complete`, jsonInit("POST", {}));
+const finalizeUpload = (token, uploadId) =>
+  gw(token, `/uploads/${uploadId}/finalize`, jsonInit("POST", {}));
+const reconcileUploads = (token) => gw(token, "/uploads/reconcile", jsonInit("POST", {}));
 
-// --- convex probe helpers ---------------------------------------------------
+// --- probe helpers (all resolve the CALLER's identity) ------------------------
 
-const action = (name, args) => client().action(name, args);
-const runStep = (step, input, sessionId) =>
-  action("sources/uploads/probe:probeRunStep", { step, input: input ?? {}, ...(sessionId ? { sessionId } : {}) });
-const uploadsState = (sessionId) =>
-  action("sources/uploads/probe:probeUploadsState", ...(sessionId ? [{ sessionId }] : [{}]));
-const ageUpload = (uploadId, ageMs) =>
-  action("sources/uploads/probe:probeAgeUpload", { uploadId, ageMs });
-const RUN_SUFFIX = String(Date.now()).slice(-6);
-const seedIsolation = () => action("sources/uploads/probe:probeSeedIsolation", { suffix: RUN_SUFFIX });
-const revokeSession = (sessionId) =>
-  action("sources/uploads/probe:probeRevokeSession", { sessionId });
-const revokeMembership = (membershipId) =>
-  action("sources/uploads/probe:probeRevokeMembership", { membershipId });
-const accept = (input, idempotencyKey, sessionId) =>
-  action("sources/accept/probe:probeAcceptSource", {
+const acceptAsCaller = (persona, input, idempotencyKey, crash = false) =>
+  persona.client.action("sources/uploads/probe:probeAcceptSourceAsCaller", {
     envelope: {
       operation: "sources.acceptSource",
       input,
       expectedRevisions: [],
       ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
     },
-    ...(sessionId === undefined ? {} : { sessionId }),
+    ...(crash ? { crash: true } : {}),
   });
-const crashAcceptance = (input, idempotencyKey) =>
-  action("sources/accept/probe:probeCrashAcceptance", {
-    envelope: {
-      operation: "sources.acceptSource",
-      input,
-      expectedRevisions: [],
-      ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
-    },
-  });
-const acceptanceState = () => action("sources/accept/probe:probeAcceptanceState", {});
+const uploadsStateOf = (persona) =>
+  persona.client.action("sources/uploads/probe:probeUploadsState", {});
+const ageUpload = (persona, uploadId, ageMs) =>
+  persona.client.action("sources/uploads/probe:probeAgeUpload", { uploadId, ageMs });
+const runStepAsCaller = (persona, step, input) =>
+  persona.client.action("sources/uploads/probe:probeRunStep", { step, input: input ?? {} });
 
-const envelopeOk = (result) => result._tag === "ok";
-
-// --- shared fixture helpers ---------------------------------------------------
 
 /** Drives one attachment's REMAINING parts through the real Worker and R2. */
-async function uploadAttachment(uploadId, attachmentId, partSizes, startPart = 1) {
+async function uploadAttachment(token, uploadId, attachmentId, partSizes, startPart = 1) {
   let partNumber = startPart - 1;
   for (const size of partSizes) {
     partNumber += 1;
-    const put = await putPart(uploadId, attachmentId, partNumber, Buffer.from(randomBytes(size)));
+    const put = await putPart(token, uploadId, attachmentId, partNumber, Buffer.from(randomBytes(size)));
     if (put.body._tag !== "ok") {
       throw new Error(`part ${partNumber} failed: ${JSON.stringify(put.body)}`);
     }
   }
-  const done = await completeAttachmentRoute(uploadId, attachmentId);
+  const done = await completeAttachmentRoute(token, uploadId, attachmentId);
   if (done.body._tag !== "ok") {
     throw new Error(`complete failed: ${JSON.stringify(done.body)}`);
   }
   return done.body.value;
 }
 
-/** How many parts the ledger already recorded for one attachment. */
-async function recordedParts(uploadId, attachmentId) {
-  const state = await sessionOf(uploadId);
-  const attachment = state.body.value.attachments.find((a) => a.attachmentId === attachmentId);
+async function recordedParts(token, uploadId, attachmentId) {
+  const state = await sessionOf(token, uploadId);
+  const attachment = state.body.value?.attachments?.find((a) => a.attachmentId === attachmentId);
   return attachment?.parts?.length ?? 0;
 }
 
-console.log(`# D2 live proofs :: ${DEPLOYMENT} via ${GATEWAY} :: ${new Date().toISOString()}`);
+console.log(`# D2 live proofs (per-user identity) :: ${DEPLOYMENT} via ${GATEWAY} :: ${new Date().toISOString()}`);
 
-// --- fixtures -----------------------------------------------------------------
+// --- fixture persons ----------------------------------------------------------
 
-const seed = await action("platform/probe:probeSeed", {});
-if (seed._tag !== "ok") throw new Error(`probeSeed failed: ${JSON.stringify(seed)}`);
-const companyA = seed.value.companyId;
+const A = await signInFixture(person("a"));
+const companyA = await ownCompany(A, `Budowa D2 A ${RUN}`);
+record(
+  "P0a the owner is a REAL signed-in person with their own firm",
+  typeof companyA === "string" ? "PASS" : "FAIL",
+  `companyA=${companyA}`,
+);
 
-// --- U1: interrupted-then-resumed upload; ONE accepted source -------------------
+const B = await signInFixture(person("b"));
+const companyB = await ownCompany(B, `Budowa D2 B ${RUN}`);
 
-const U1_DRAFT = `d2-resume-${Date.now()}`;
-const prepared1 = await prepareUpload(U1_DRAFT, 3, ["audio", "image"]);
-const u1ok = envelopeOk(prepared1.body);
+// --- U1: the full chain AS THE REAL OWNER (interrupted-then-resumed) -----------
+
+const U1_DRAFT = `d2-resume-${RUN}`;
+const prepared1 = await prepareUpload(A.token, U1_DRAFT, 3, ["audio", "image"]);
+const u1aOk = prepared1.body._tag === "ok";
 const upload1 = prepared1.body.value?.uploadId;
 const attachments1 = prepared1.body.value?.attachments ?? [];
 record(
-  "U1a prepare declares draft, mints keys and opens R2 sessions",
-  u1ok && attachments1.length === 2 && attachments1.every((a) => a.r2UploadId && a.objectKey?.startsWith(`companies/${companyA}/uploads/`))
+  "U1a prepare as the signed-in owner declares the draft, mints keys, opens R2 sessions",
+  u1aOk && attachments1.length === 2 && attachments1.every((a) => a.r2UploadId && a.objectKey?.startsWith(`companies/${companyA}/uploads/`))
     ? "PASS"
     : "FAIL",
   `uploadId=${upload1} attachments=${attachments1.length}`,
 );
 
-// Interruption after part 1 of the audio attachment.
 const audio1 = attachments1.find((a) => a.kind === "audio");
 const image1 = attachments1.find((a) => a.kind === "image");
 const part1Buffer = Buffer.from(randomBytes(6 * MIB));
-const part1 = await putPart(upload1, audio1.attachmentId, 1, part1Buffer);
-const interrupted = await sessionOf(upload1);
-const intState = interrupted.body.value;
+const part1 = await putPart(A.token, upload1, audio1.attachmentId, 1, part1Buffer);
+const interrupted = await sessionOf(A.token, upload1);
 record(
   "U1b interruption leaves a resumable session (part 1 recorded, nothing else)",
   part1.body._tag === "ok" &&
-    intState.attachments.find((a) => a.kind === "audio").parts.length === 1 &&
-    intState.attachments.find((a) => a.kind === "image").parts.length === 0
+    interrupted.body.value.attachments.find((a) => a.kind === "audio").parts.length === 1 &&
+    interrupted.body.value.attachments.find((a) => a.kind === "image").parts.length === 0
     ? "PASS"
     : "FAIL",
-  `audioParts=${intState.attachments.find((a) => a.kind === "audio")?.parts?.length}`,
+  `audioParts=${interrupted.body.value.attachments.find((a) => a.kind === "audio")?.parts?.length}`,
 );
 
-// Lost response, identical bytes re-sent: R2 derives part etags from
-// content, so the identical replay is a clean idempotent (or, under a
-// differing etag, a manifest refresh) — never a conflict, never a duplicate.
-const part1Retry = await putPart(upload1, audio1.attachmentId, 1, part1Buffer);
-const retryState = await sessionOf(upload1);
+const part1Retry = await putPart(A.token, upload1, audio1.attachmentId, 1, part1Buffer);
+const retryState = await sessionOf(A.token, upload1);
 record(
   "U1c re-sent identical bytes stay ONE recorded part (idempotent or refreshed, never a conflict)",
   part1Retry.body._tag === "ok" &&
@@ -191,12 +252,11 @@ record(
     retryState.body.value.attachments.find((a) => a.kind === "audio").parts.length === 1
     ? "PASS"
     : "FAIL",
-  `idempotent=${part1Retry.body.value?.idempotent} refreshed=${part1Retry.body.value?.refreshed} parts=${retryState.body.value.attachments.find((a) => a.kind === "audio")?.parts?.length}`,
+  `idempotent=${part1Retry.body.value?.idempotent} parts=${retryState.body.value.attachments.find((a) => a.kind === "audio")?.parts?.length}`,
 );
 
-// Resume continues from the manifest: parts 2-3 only, part 1 NOT re-sent.
-await uploadAttachment(upload1, audio1.attachmentId, [6 * MIB, MIB], (await recordedParts(upload1, audio1.attachmentId)) + 1);
-const resumeState = await sessionOf(upload1);
+await uploadAttachment(A.token, upload1, audio1.attachmentId, [6 * MIB, MIB], (await recordedParts(A.token, upload1, audio1.attachmentId)) + 1);
+const resumeState = await sessionOf(A.token, upload1);
 record(
   "U1d resume continues from the manifest: parts 2-3 recorded without re-sending part 1",
   resumeState.body.value.attachments.find((a) => a.kind === "audio").parts.map((p) => p.partNumber).join(",") === "1,2,3"
@@ -205,19 +265,18 @@ record(
   `parts=[${resumeState.body.value.attachments.find((a) => a.kind === "audio").parts.map((p) => p.partNumber)}]`,
 );
 
-// The image attachment (single part) completes; the manifest stays ascending.
-await uploadAttachment(upload1, image1.attachmentId, [64 * 1024]);
-const imageParts = (await sessionOf(upload1)).body.value.attachments.find((a) => a.kind === "image").parts;
+await uploadAttachment(A.token, upload1, image1.attachmentId, [64 * 1024]);
+const imageParts = (await sessionOf(A.token, upload1)).body.value.attachments.find((a) => a.kind === "image").parts;
 record(
   "U1e the second attachment completes on the same upload (one ledger, two durable attachments)",
   imageParts.map((p) => p.partNumber).join(",") === "1" ? "PASS" : "FAIL",
   `parts=[${imageParts.map((p) => p.partNumber)}]`,
 );
 
-// finalize + accept: ONE source, both attachments bound, event carries both ids.
-const finalized1 = await finalizeUpload(upload1);
+const finalized1 = await finalizeUpload(A.token, upload1);
 const K1 = key();
-const accepted1 = await accept(
+const accepted1 = await acceptAsCaller(
+  A,
   {
     uploadId: upload1,
     authorText: "Wiadomość z nagraniem i zdjęciem faktury (D2 live proof)",
@@ -227,27 +286,24 @@ const accepted1 = await accept(
   },
   K1,
 );
-const ledger1 = await uploadsState();
-const src1 = await acceptanceState();
+const ledger1 = await uploadsStateOf(A);
 const upload1Row = ledger1.value.uploads.find((u) => u.uploadId === upload1);
 const boundAttachments = ledger1.value.attachments.filter((a) => a.uploadId === upload1 && a.sourceId === accepted1.value?.sourceId);
-const event1 = src1.value.events.find((e) => e.dedupKey === `sources.acceptSource:${companyA}:${K1}`);
-const job1 = src1.value.jobs.find((j) => j.dedupKey === `sources.acceptSource:${companyA}:${K1}`);
-const u1final =
-  finalized1.body._tag === "ok" &&
-  accepted1._tag === "ok" &&
-  upload1Row?.acceptedSourceId === accepted1.value.sourceId &&
-  boundAttachments.length === 2 &&
-  src1.value.sources.filter((s) => s.acceptanceKey === K1).length === 1 &&
-  job1?.kind === "processing.extract_fragments";
 record(
-  "U1f attachment-bearing acceptance commits ONE source with BOTH references verified and bound",
-  u1final ? "PASS" : "FAIL",
-  `sourceId=${accepted1.value?.sourceId} bound=${boundAttachments.length}/2 ledgerAccepted=${upload1Row?.acceptedSourceId !== undefined} job=${job1?.kind}`,
+  "U1f attachment-bearing acceptance AS THE OWNER commits ONE source with BOTH references verified and bound",
+  finalized1.body._tag === "ok" &&
+    accepted1._tag === "ok" &&
+    upload1Row?.acceptedSourceId === accepted1.value.sourceId &&
+    boundAttachments.length === 2 &&
+    ledger1.value.sources.filter((s) => s.acceptanceKey === K1).length === 1 &&
+    ledger1.value.jobs.filter((j) => j.dedupKey === `sources.acceptSource:${companyA}:${K1}`).length === 1
+    ? "PASS"
+    : "FAIL",
+  `sourceId=${accepted1.value?.sourceId} bound=${boundAttachments.length}/2 sourceRows=${ledger1.value.sources.filter((s) => s.acceptanceKey === K1).length} jobs=${ledger1.value.jobs.filter((j) => j.dedupKey === `sources.acceptSource:${companyA}:${K1}`).length}`,
 );
 
-// Retry of the same logical key: same source, no duplicates.
-const accepted1again = await accept(
+const accepted1again = await acceptAsCaller(
+  A,
   {
     uploadId: upload1,
     authorText: "Wiadomość z nagraniem i zdjęciem faktury (D2 live proof)",
@@ -257,13 +313,13 @@ const accepted1again = await accept(
   },
   K1,
 );
-const src1b = await acceptanceState();
+const ledger1b = await uploadsStateOf(A);
 record(
   "U1g retry of the logical key returns the SAME source; no second source or job",
   accepted1again._tag === "ok" &&
     accepted1again.value.sourceId === accepted1.value.sourceId &&
-    src1b.value.sources.filter((s) => s.acceptanceKey === K1).length === 1 &&
-    src1b.value.jobs.filter((j) => j.dedupKey === `sources.acceptSource:${companyA}:${K1}`).length === 1
+    ledger1b.value.sources.filter((s) => s.acceptanceKey === K1).length === 1 &&
+    ledger1b.value.jobs.filter((j) => j.dedupKey === `sources.acceptSource:${companyA}:${K1}`).length === 1
     ? "PASS"
     : "FAIL",
   `same=${accepted1again.value?.sourceId === accepted1.value?.sourceId}`,
@@ -271,19 +327,20 @@ record(
 
 // --- U2: R2 completed but acceptance failed -> ledger reconciles safely ---------
 
-const U2_DRAFT = `d2-orphan-retry-${Date.now()}`;
-const prepared2 = await prepareUpload(U2_DRAFT, 2, ["image", "image"]);
+const U2_DRAFT = `d2-orphan-retry-${RUN}`;
+const prepared2 = await prepareUpload(A.token, U2_DRAFT, 2, ["image", "image"]);
 const upload2 = prepared2.body.value.uploadId;
 const att2 = prepared2.body.value.attachments;
-await uploadAttachment(upload2, att2[0].attachmentId, [MIB]);
-await uploadAttachment(upload2, att2[1].attachmentId, [MIB]);
-await finalizeUpload(upload2);
+await uploadAttachment(A.token, upload2, att2[0].attachmentId, [MIB]);
+await uploadAttachment(A.token, upload2, att2[1].attachmentId, [MIB]);
+await finalizeUpload(A.token, upload2);
 
 const K2 = key();
-const beforeCrash = await acceptanceState();
+const beforeCrash = await uploadsStateOf(A);
 let crashed2 = false;
 try {
-  await crashAcceptance(
+  await acceptAsCaller(
+    A,
     {
       uploadId: upload2,
       authorText: "Akceptacja przerwana po rejestracji - R2 gotowe, Convex musi się wycofać",
@@ -291,27 +348,27 @@ try {
       projectHints: [],
     },
     K2,
+    true,
   );
 } catch (error) {
   crashed2 = String(error?.message ?? error).includes("deliberate failure");
 }
-const afterCrash = await acceptanceState();
-const ledger2AfterCrash = await uploadsState();
+const afterCrash = await uploadsStateOf(A);
+const ledger2AfterCrash = afterCrash;
 const upload2Row = ledger2AfterCrash.value.uploads.find((u) => u.uploadId === upload2);
-const rolledBack =
-  crashed2 &&
-  afterCrash.value.sources.length === beforeCrash.value.sources.length &&
-  afterCrash.value.jobs.length === beforeCrash.value.jobs.length &&
-  upload2Row.acceptedSourceId === undefined &&
-  ledger2AfterCrash.value.attachments.filter((a) => a.uploadId === upload2 && a.sourceId !== undefined).length === 0;
 record(
   "U2a crashed acceptance rolls back source+job+bindings; R2 objects and the finalized ledger survive",
-  rolledBack && upload2Row.stage === "finalized" ? "PASS" : "FAIL",
-  `crashed=${crashed2} stage=${upload2Row.stage} accepted=${upload2Row.acceptedSourceId !== undefined} sourcesUnchanged=${afterCrash.value.sources.length === beforeCrash.value.sources.length}`,
+  crashed2 &&
+    afterCrash.value.sources.length === beforeCrash.value.sources.length &&
+    afterCrash.value.jobs.length === beforeCrash.value.jobs.length &&
+    upload2Row.acceptedSourceId === undefined &&
+    ledger2AfterCrash.value.attachments.filter((a) => a.uploadId === upload2 && a.sourceId !== undefined).length === 0
+    ? "PASS"
+    : "FAIL",
+  `crashed=${crashed2} stage=${upload2Row.stage} sourcesUnchanged=${afterCrash.value.sources.length === beforeCrash.value.sources.length}`,
 );
 
-// Reconcile while within grace: recoverable, NOT collected.
-const reconcileEarly = await reconcileUploads();
+const reconcileEarly = await reconcileUploads(A.token);
 const kept2 = reconcileEarly.body.value.kept.find((k) => k.uploadId === upload2);
 record(
   "U2b reconcile within the recovery window keeps the completed-but-unaccepted upload (no lost upload)",
@@ -322,8 +379,8 @@ record(
   `reason=${kept2?.reason}`,
 );
 
-// Delayed retry: acceptance succeeds on the SAME R2 objects; then reconcile keeps it as accepted.
-const accepted2 = await accept(
+const accepted2 = await acceptAsCaller(
+  A,
   {
     uploadId: upload2,
     authorText: "Akceptacja przerwana po rejestracji - R2 gotowe, Convex musi się wycofać",
@@ -332,9 +389,9 @@ const accepted2 = await accept(
   },
   K2,
 );
-const reconcileAfter = await reconcileUploads();
+const reconcileAfter = await reconcileUploads(A.token);
 const kept2b = reconcileAfter.body.value.kept.find((k) => k.uploadId === upload2);
-const ledger2b = await uploadsState();
+const ledger2b = await uploadsStateOf(A);
 record(
   "U2c delayed retry accepts on the SAME durable objects; reconcile then keeps the ACCEPTED upload forever",
   accepted2._tag === "ok" &&
@@ -345,9 +402,8 @@ record(
   `sourceId=${accepted2.value?.sourceId} reconcileReason=${kept2b?.reason}`,
 );
 
-// Even an AGED accepted upload is never collected.
-await ageUpload(upload2, 30 * 24 * 60 * 60 * 1_000);
-const reconcileAged = await reconcileUploads();
+await ageUpload(A, upload2, 30 * 24 * 60 * 60 * 1_000);
+const reconcileAged = await reconcileUploads(A.token);
 record(
   "U2d garbage collection raced with the accepted reference: the aged ACCEPTED upload survives",
   reconcileAged.body.value.kept.find((k) => k.uploadId === upload2)?.reason === "accepted" ? "PASS" : "FAIL",
@@ -356,15 +412,15 @@ record(
 
 // --- U3: abandoned upload becomes safely collected ------------------------------
 
-const U3_DRAFT = `d2-collect-${Date.now()}`;
-const prepared3 = await prepareUpload(U3_DRAFT, 2, ["audio"]);
+const U3_DRAFT = `d2-collect-${RUN}`;
+const prepared3 = await prepareUpload(A.token, U3_DRAFT, 2, ["audio"]);
 const upload3 = prepared3.body.value.uploadId;
 const att3 = prepared3.body.value.attachments[0];
-await putPart(upload3, att3.attachmentId, 1, Buffer.from(randomBytes(6 * MIB)));
-await ageUpload(upload3, 25 * 60 * 60 * 1_000); // past ACTIVE_GRACE (24h)
-const reconcile3 = await reconcileUploads();
+await putPart(A.token, upload3, att3.attachmentId, 1, Buffer.from(randomBytes(6 * MIB)));
+await ageUpload(A, upload3, 25 * 60 * 60 * 1_000);
+const reconcile3 = await reconcileUploads(A.token);
 const collected3 = reconcile3.body.value.collectedUploads.find((c) => c.uploadId === upload3);
-const ledger3 = await uploadsState();
+const ledger3 = await uploadsStateOf(A);
 record(
   "U3a an expired, unaccepted, inactive upload is marked orphaned and its R2 objects collected",
   collected3?.reason === "expired_unaccepted" &&
@@ -375,23 +431,21 @@ record(
   `reason=${collected3?.reason} r2Aborted=${reconcile3.body.value.r2AbortedKeys.length}`,
 );
 
-// The stale draft cannot resurrect its bytes.
-const reprepare3 = await prepareUpload(U3_DRAFT, 2, ["audio"]);
+const reprepare3 = await prepareUpload(A.token, U3_DRAFT, 2, ["audio"]);
 record(
   "U3b re-preparing the collected draft is a typed conflict (restart required), never a byte resurrection",
   reprepare3.body._tag === "error" && reprepare3.body.error.code === "draft_expired_restart_required" ? "PASS" : "FAIL",
   `code=${reprepare3.body.error?.code}`,
 );
 
-// An ACTIVE upload ages but receives activity: survives.
-const U3C_DRAFT = `d2-active-${Date.now()}`;
-const prepared3c = await prepareUpload(U3C_DRAFT, 2, ["audio"]);
+const U3C_DRAFT = `d2-active-${RUN}`;
+const prepared3c = await prepareUpload(A.token, U3C_DRAFT, 2, ["audio"]);
 const upload3c = prepared3c.body.value.uploadId;
 const att3c = prepared3c.body.value.attachments[0];
-await putPart(upload3c, att3c.attachmentId, 1, Buffer.from(randomBytes(6 * MIB)));
-await ageUpload(upload3c, 25 * 60 * 60 * 1_000);
-await putPart(upload3c, att3c.attachmentId, 2, Buffer.from(randomBytes(MIB))); // delayed retry refreshes activity
-const reconcile3c = await reconcileUploads();
+await putPart(A.token, upload3c, att3c.attachmentId, 1, Buffer.from(randomBytes(6 * MIB)));
+await ageUpload(A, upload3c, 25 * 60 * 60 * 1_000);
+await putPart(A.token, upload3c, att3c.attachmentId, 2, Buffer.from(randomBytes(MIB)));
+const reconcile3c = await reconcileUploads(A.token);
 record(
   "U3c a delayed legitimate retry refreshes the grace anchor and survives collection",
   reconcile3c.body.value.kept.find((k) => k.uploadId === upload3c)?.reason === "active" ? "PASS" : "FAIL",
@@ -400,17 +454,17 @@ record(
 
 // --- U4: malformed, duplicate and foreign parts typed-rejected ------------------
 
-const U4_DRAFT = `d2-reject-${Date.now()}`;
-const prepared4 = await prepareUpload(U4_DRAFT, 2, ["audio"]);
+const U4_DRAFT = `d2-reject-${RUN}`;
+const prepared4 = await prepareUpload(A.token, U4_DRAFT, 2, ["audio"]);
 const upload4 = prepared4.body.value.uploadId;
 const att4 = prepared4.body.value.attachments[0];
 
-const outOfBound = await putPart(upload4, att4.attachmentId, 3, Buffer.from(randomBytes(1024)));
-const zeroPart = await gw(`/uploads/${upload4}/attachments/${att4.attachmentId}/parts/0`, {
+const outOfBound = await putPart(A.token, upload4, att4.attachmentId, 3, Buffer.from(randomBytes(1024)));
+const zeroPart = await gw(A.token, `/uploads/${upload4}/attachments/${att4.attachmentId}/parts/0`, {
   method: "POST",
   body: Buffer.from(randomBytes(1024)),
 });
-const foreignAttachment = await putPart(upload4, "k57notanattachment0000000000aaaa", 1, Buffer.from(randomBytes(1024)));
+const foreignAttachment = await putPart(A.token, upload4, "k57notanattachment0000000000aaaa", 1, Buffer.from(randomBytes(1024)));
 record(
   "U4a out-of-bound, zero and foreign attachment parts are typed-rejected before any R2 write",
   outOfBound.body._tag === "error" &&
@@ -420,15 +474,14 @@ record(
     foreignAttachment.body.error.code === "attachment_not_in_upload"
     ? "PASS"
     : "FAIL",
-  `outOfBound=${outOfBound.body.error?.code} zero=${zeroPart.body._tag} foreign=${foreignAttachment.body.error?.code}`,
+  `outOfBound=${outOfBound.body.error?.code} foreign=${foreignAttachment.body.error?.code}`,
 );
 
-// Same part number with DIFFERENT content: typed conflict, manifest unchanged.
 const u4Original = Buffer.from(randomBytes(6 * MIB));
-await putPart(upload4, att4.attachmentId, 1, u4Original);
-const state4a = await sessionOf(upload4);
-const diverging = await putPart(upload4, att4.attachmentId, 1, Buffer.from(randomBytes(6 * MIB)));
-const state4b = await sessionOf(upload4);
+await putPart(A.token, upload4, att4.attachmentId, 1, u4Original);
+const state4a = await sessionOf(A.token, upload4);
+const diverging = await putPart(A.token, upload4, att4.attachmentId, 1, Buffer.from(randomBytes(6 * MIB)));
+const state4b = await sessionOf(A.token, upload4);
 record(
   "U4b duplicate part number with different content => typed part_receipt_conflict; the recorded bytes stand",
   diverging.body._tag === "error" &&
@@ -436,27 +489,23 @@ record(
     JSON.stringify(state4a.body.value.attachments[0].parts) === JSON.stringify(state4b.body.value.attachments[0].parts)
     ? "PASS"
     : "FAIL",
-  `code=${diverging.body.error?.code} manifestStable=${JSON.stringify(state4a.body.value.attachments[0].parts) === JSON.stringify(state4b.body.value.attachments[0].parts)}`,
+  `code=${diverging.body.error?.code}`,
 );
 
-// After the conflict, the LEDGER is the authority: re-sending the RECORDED
-// part-1 bytes restores the manifest etag in R2 (idempotent) and completion
-// succeeds; a diverging upload alone can never complete.
-const restore4 = await putPart(upload4, att4.attachmentId, 1, u4Original);
-const done4 = await completeAttachmentRoute(upload4, att4.attachmentId);
+const restore4 = await putPart(A.token, upload4, att4.attachmentId, 1, u4Original);
+const done4 = await completeAttachmentRoute(A.token, upload4, att4.attachmentId);
 if (done4.body._tag !== "ok") {
   throw new Error(`U4c completion failed: ${JSON.stringify(done4.body)}`);
 }
-// Parts of a completed attachment: stale retry refused.
-const stale4 = await putPart(upload4, att4.attachmentId, 2, Buffer.from(randomBytes(MIB)));
+const stale4 = await putPart(A.token, upload4, att4.attachmentId, 2, Buffer.from(randomBytes(MIB)));
 record(
   "U4c a stale retry against a finalized attachment is refused (finalized bytes immutable)",
   stale4.body._tag === "error" && stale4.body.error.code === "attachment_finalized" ? "PASS" : "FAIL",
   `code=${stale4.body.error?.code}`,
 );
 
-// Acceptance before all attachments durable: typed refusal, nothing written.
-const notFinalized = await accept(
+const notFinalized = await acceptAsCaller(
+  A,
   { uploadId: upload4, authorText: "za wczesna akceptacja", timezoneSnapshot: "Europe/Warsaw", projectHints: [] },
   key(),
 );
@@ -466,104 +515,138 @@ record(
   `code=${notFinalized.error?.code}`,
 );
 
-// --- U5: cross-tenant and revoked identity --------------------------------------
+// --- V1: cross-identity denial (a real stranger cannot touch the owner's upload) -
 
-const iso = await seedIsolation();
-const B = iso.value;
-const crossTenant = await runStep(
-  "finalize",
-  { uploadId: upload1 },
-  B.sessionId,
-);
-const crossTenantPart = await runStep(
-  "part",
-  {
-    uploadId: upload1,
-    attachmentId: ledger1.value.attachments.find((a) => a.uploadId === upload1).attachmentId,
-    partNumber: 1,
-    etag: "e",
-    bytes: 1,
-    sha256Hex: "a".repeat(64),
-  },
-  B.sessionId,
-);
+const bSession = await sessionOf(B.token, upload1);
+const bPart = await putPart(B.token, upload1, audio1.attachmentId, 1, Buffer.from(randomBytes(MIB)));
+const bFinalize = await finalizeUpload(B.token, upload1);
 record(
-  "U5a cross-tenant steps are denied (tenant_scope_mismatch) at every protocol step",
-  crossTenant._tag === "error" &&
-    crossTenant.error.code === "tenant_scope_mismatch" &&
-    crossTenantPart._tag === "error" &&
-    crossTenantPart.error.code === "tenant_scope_mismatch"
+  "V1a a signed-in stranger is refused on EVERY gateway step of the owner's upload (before any R2 write)",
+  bSession.body._tag === "error" && bSession.body.error._tag === "forbidden" &&
+    bPart.body._tag === "error" && bPart.body.error._tag === "forbidden" &&
+    bFinalize.body._tag === "error" && bFinalize.body.error._tag === "forbidden"
     ? "PASS"
     : "FAIL",
-  `finalize=${crossTenant.error?.code} part=${crossTenantPart.error?.code}`,
+  `session=${bSession.body.error?.code ?? bSession.body.error?._tag} part=${bPart.body.error?.code ?? bPart.body.error?._tag} finalize=${bFinalize.body.error?.code ?? bFinalize.body.error?._tag}`,
 );
 
-// B prepares its OWN draft in its own company: allowed, and invisible to A.
-const bDraft = await runStep("prepare", { draftId: `d2-b-${Date.now()}`, parts: 1, mediaKinds: ["image"] }, B.sessionId);
+const bDraft = await prepareUpload(B.token, `d2-b-${RUN}`, 1, ["image"]);
 record(
-  "U5b company B starts its own draft through the same checked path",
-  bDraft._tag === "ok" ? "PASS" : "FAIL",
-  `uploadId=${bDraft.value?.uploadId}`,
+  "V1b the same stranger prepares their OWN upload in their own firm without friction",
+  bDraft.body._tag === "ok" ? "PASS" : "FAIL",
+  `uploadId=${bDraft.body.value?.uploadId}`,
 );
 
-// Revoked B session: no step at all.
-await revokeSession(B.sessionId);
-const revoked = await runStep(
-  "part",
-  {
-    uploadId: bDraft.value.uploadId,
-    attachmentId: "k57none0000000000000000000aaaaa",
-    partNumber: 1,
-    etag: "e",
-    bytes: 1,
-    sha256Hex: "a".repeat(64),
+const bProbeStep = await runStepAsCaller(B, "finalize", { uploadId: upload1 });
+record(
+  "V1c the step envelope path denies the stranger identically (tenant scope)",
+  bProbeStep._tag === "error" && bProbeStep.error.code === "tenant_scope_mismatch" ? "PASS" : "FAIL",
+  `code=${bProbeStep.error?.code}`,
+);
+
+// --- V2: session revocation MID-UPLOAD blocks the next gateway step -------------
+
+const C = await signInFixture(person("c"));
+await ownCompany(C, `Budowa D2 C ${RUN}`);
+const cPrepared = await prepareUpload(C.token, `d2-c-${RUN}`, 2, ["audio"]);
+const cUpload = cPrepared.body.value.uploadId;
+const cAtt = cPrepared.body.value.attachments[0];
+await putPart(C.token, cUpload, cAtt.attachmentId, 1, Buffer.from(randomBytes(6 * MIB)));
+const revoke = await C.client.mutation("access/identity/functions:revokeSession", {
+  sessionId: C.sessionId,
+});
+const cNext = await putPart(C.token, cUpload, cAtt.attachmentId, 2, Buffer.from(randomBytes(MIB)));
+const cSession = await sessionOf(C.token, cUpload);
+record(
+  "V2 a session revoked MID-UPLOAD blocks the next gateway step (unauthenticated, no R2 write)",
+  revoke?._tag === "ok" &&
+    cNext.body._tag === "error" && cNext.body.error._tag === "unauthenticated" &&
+    cSession.body._tag === "error" && cSession.body.error._tag === "unauthenticated"
+    ? "PASS"
+    : "FAIL",
+  `revoke=${revoke?._tag} nextStep=${cNext.body.error?._tag} session=${cSession.body.error?._tag}`,
+);
+
+// --- V3: membership revocation MID-UPLOAD blocks the next gateway step -----------
+
+// D joins A's firm through a REAL invitation (fixture code, B3 pattern).
+const invite = await A.client.action("access/membership/functions:createInvitationCommand", {
+  envelope: {
+    operation: "access.createInvitation",
+    input: { email: person("d"), role: "member" },
+    expectedRevisions: [],
   },
-  B.sessionId,
-);
+});
+if (invite?._tag !== "ok") {
+  throw new Error(`invitation failed: ${JSON.stringify(invite)}`);
+}
+const invitationId = invite.value.invitationId;
+const dCode = fixtureCodeOf(`invite-${invitationId}`);
+const setCode = await anon().action("access/membership/probe:b3ProofSetInvitationCode", {
+  invitationId,
+  code: dCode,
+});
+if (setCode?._tag !== "ok") {
+  throw new Error(`fixture invitation code failed: ${JSON.stringify(setCode)}`);
+}
+const D = await signInFixture(person("d"));
+const dAccepted = await admit(D.client, "access.acceptInvitation", {
+  invitationId,
+  verificationCode: dCode,
+});
+if (dAccepted?._tag !== "ok") {
+  throw new Error(`invitation acceptance failed: ${JSON.stringify(dAccepted)}`);
+}
+const dMembershipId = dAccepted.value.membershipId;
+
+// D uploads inside A's firm; A (admin) revokes D's membership mid-upload.
+const dPrepared = await prepareUpload(D.token, `d2-d-${RUN}`, 2, ["audio"]);
+const dUpload = dPrepared.body.value.uploadId;
+const dAtt = dPrepared.body.value.attachments[0];
+await putPart(D.token, dUpload, dAtt.attachmentId, 1, Buffer.from(randomBytes(6 * MIB)));
+const revokeMembership = await A.client.mutation("access/membership/functions:dispatchMembership", {
+  envelope: {
+    operation: "access.revokeMembership",
+    input: { membershipId: dMembershipId },
+    expectedRevisions: [],
+  },
+});
+const dNext = await putPart(D.token, dUpload, dAtt.attachmentId, 2, Buffer.from(randomBytes(MIB)));
+const dSession = await sessionOf(D.token, dUpload);
 record(
-  "U5c a REVOKED session cannot dispatch any step (unauthenticated)",
-  revoked._tag === "error" && revoked.error._tag === "unauthenticated" ? "PASS" : "FAIL",
-  `tag=${revoked.error?._tag}`,
+  "V3 a membership revoked MID-UPLOAD by the admin blocks the member's next gateway step",
+  revokeMembership?._tag === "ok" &&
+    dNext.body._tag === "error" && dNext.body.error._tag === "unauthenticated" &&
+    dSession.body._tag === "error" && dSession.body.error._tag === "unauthenticated"
+    ? "PASS"
+    : "FAIL",
+  `revoke=${revokeMembership?._tag} nextStep=${dNext.body.error?._tag} session=${dSession.body.error?._tag}`,
 );
 
-// Revoked B membership with a fresh session: still denied.
-const iso2 = await seedIsolation();
-// (Same tenant as iso, fresh session: iso's session was revoked above.)
-await revokeMembership(iso2.value.membershipId);
-const noMembership = await runStep(
-  "prepare",
-  { draftId: `d2-b2-${Date.now()}`, parts: 1, mediaKinds: ["image"] },
-  iso2.value.sessionId,
-);
-record(
-  "U5d a REVOKED membership cannot start an upload even with a live session",
-  noMembership._tag === "error" && noMembership.error._tag === "unauthenticated" ? "PASS" : "FAIL",
-  `tag=${noMembership.error?._tag}`,
-);
+// --- V4: the uploads boundary refuses bad credentials ---------------------------
 
-// Unauthenticated gateway -> Convex bridge: bad service credential refused.
-const badBearer = await fetch(`${GATEWAY.replace(/\/$/, "")}/uploads/reconcile`, {
+const noHeader = await fetch(`${GATEWAY.replace(/\/$/, "")}/uploads/reconcile`, {
   method: "POST",
   headers: { "content-type": "application/json" },
   body: "{}",
 });
-// (The gateway holds its own service credential; this row asserts the Convex
-// boundary directly:)
-const directBridge = await fetch(`https://${DEPLOYMENT}.eu-west-1.convex.site/sources/uploads/bridge`, {
+const garbageHeader = await fetch(`https://${DEPLOYMENT}.eu-west-1.convex.site/sources/uploads/bridge`, {
   method: "POST",
-  headers: { authorization: "Bearer definitely-not-the-token", "content-type": "application/json" },
+  headers: { authorization: "Bearer definitely-not-a-token", "content-type": "application/json" },
   body: JSON.stringify({ step: "reconcile", input: {} }),
 });
 record(
-  "U5e the uploads boundary refuses an invalid service credential (401)",
-  directBridge.status === 401 ? "PASS" : "FAIL",
-  `bridgeStatus=${directBridge.status} gatewayStatus=${badBearer.status}`,
+  "V4 the boundary refuses a missing credential (401) and a garbage credential never resolves",
+  noHeader.status === 401 && (garbageHeader.status === 401 || garbageHeader.status === 400)
+    ? "PASS"
+    : "FAIL",
+  `missing=${noHeader.status} garbage=${garbageHeader.status}`,
 );
 
 // --- U6: large streamed fixture through the real Worker -------------------------
 
 const LARGE_BYTES = 96 * MIB;
-const largePath = `/tmp/kiero-d2-large-${Date.now()}.bin`;
+const largePath = `/tmp/kiero-d2-large-${RUN}.bin`;
 const largeBuffer = Buffer.alloc(LARGE_BYTES);
 const chunk = Buffer.alloc(64 * 1024);
 for (let offset = 0; offset < LARGE_BYTES; offset += chunk.length) {
@@ -572,26 +655,24 @@ for (let offset = 0; offset < LARGE_BYTES; offset += chunk.length) {
 }
 writeFileSync(largePath, largeBuffer);
 const expectedSha = createHash("sha256").update(largeBuffer).digest("hex");
-const U6_DRAFT = `d2-large-${Date.now()}`;
-const prepared6 = await prepareUpload(U6_DRAFT, 1, ["audio"]);
+const U6_DRAFT = `d2-large-${RUN}`;
+const prepared6 = await prepareUpload(A.token, U6_DRAFT, 1, ["audio"]);
 const upload6 = prepared6.body.value.uploadId;
 const att6 = prepared6.body.value.attachments[0];
 const largePut = await fetch(`${GATEWAY.replace(/\/$/, "")}/uploads/${upload6}/attachments/${att6.attachmentId}/parts/1`, {
   method: "POST",
-  headers: { "content-type": "application/octet-stream" },
-  body: (await import("node:fs")).createReadStream(largePath),
+  headers: { "content-type": "application/octet-stream", authorization: `Bearer ${A.token}` },
+  body: createReadStream(largePath),
   duplex: "half",
 });
 const largePutBody = await largePut.json();
-await uploadAttachment(upload6, att6.attachmentId, []);
-const state6 = await sessionOf(upload6);
+await uploadAttachment(A.token, upload6, att6.attachmentId, []);
+const state6 = await sessionOf(A.token, upload6);
 const recordedSha = state6.body.value.attachments[0].parts[0].sha256Hex;
 unlinkSync(largePath);
 record(
-  "U6 a 96 MiB fixture streams through the Worker (tee + DigestStream, no arrayBuffer) with an exact SHA-256 match",
-  largePutBody._tag === "ok" && recordedSha === expectedSha
-    ? "PASS"
-    : "FAIL",
+  "U6 a 96 MiB fixture streams through the Worker as the signed-in owner with an exact SHA-256 match",
+  largePutBody._tag === "ok" && recordedSha === expectedSha ? "PASS" : "FAIL",
   `bytes=${LARGE_BYTES} shaMatch=${recordedSha === expectedSha}`,
 );
 

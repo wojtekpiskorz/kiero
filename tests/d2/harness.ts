@@ -71,6 +71,15 @@ class FakeQuery {
     return this.filtered()[0] ?? null;
   }
 
+  /** The unique() Convex offers for indexes that guarantee at most one row. */
+  async unique(): Promise<Row | null> {
+    const rows = this.filtered();
+    if (rows.length > 1) {
+      throw new Error("unique(): more than one row matched");
+    }
+    return rows[0] ?? null;
+  }
+
   async collect(): Promise<Row[]> {
     return this.filtered();
   }
@@ -161,8 +170,15 @@ export class FakeDb {
 /** The mutation-transaction context shape the ledger and acceptance use. */
 export interface FakeCtx {
   readonly db: FakeDb;
-  /** Convex Auth surface: no verified identity unless a test seeds one. */
-  readonly auth: { getUserIdentity(): Promise<{ subject: string } | null> };
+  /**
+   * Convex Auth surface with a settable caller: tests install the fixture
+   * actor's B1-style subject (`<userId>|<authSessionId>`) or null for
+   * anonymous, exactly what the real ctx.auth reports.
+   */
+  readonly auth: {
+    getUserIdentity(): Promise<{ subject: string } | null>;
+    setSubject(subject: string | null): void;
+  };
   readonly scheduled: { functionPath: string; args: unknown }[];
   readonly scheduler: {
     runAfter(ms: number, fn: unknown, args: unknown): Promise<void>;
@@ -171,9 +187,15 @@ export interface FakeCtx {
 
 export function fakeCtx(tableNames: readonly string[]): FakeCtx {
   const scheduled: { functionPath: string; args: unknown }[] = [];
+  let subject: string | null = null;
   return {
     db: new FakeDb(tableNames),
-    auth: { getUserIdentity: async () => null },
+    auth: {
+      getUserIdentity: async () => (subject === null ? null : { subject }),
+      setSubject: (next: string | null) => {
+        subject = next;
+      },
+    },
     scheduled,
     scheduler: {
       runAfter: async (_ms: number, fn: unknown, args: unknown) => {
@@ -204,6 +226,7 @@ export const LEDGER_TABLES = [
   "companies",
   "users",
   "sessions",
+  "authSessions",
   "memberships",
   "gmAccessGrants",
   "projects",
@@ -255,6 +278,37 @@ export async function seedActor(
     deviceLabel: `${label}-test`,
   });
   return { userId, companyId, sessionId, membershipId };
+}
+
+/**
+ * A REAL-identity fixture: user + Convex Auth session (upstream
+ * authSessions row with a future expiration) + the app session registry
+ * row mirroring it + active membership — the chain B1's resolution walks.
+ * Installing `ctx.auth.setSubject(...)` makes the fake ctx authenticate as
+ * this actor exactly like the browser's forwarded credential would.
+ */
+export interface AuthedFixture extends ActorFixture {
+  /** The B1-style subject for ctx.auth (`<userId>|<authSessionId>`). */
+  readonly authSubject: string;
+}
+
+export async function seedAuthedActor(
+  ctx: FakeCtx,
+  label: string,
+): Promise<AuthedFixture> {
+  const fixture = await seedActor(ctx, label);
+  const nowMs = Date.now();
+  const authSessionId = await ctx.db.insert("authSessions", {
+    userId: fixture.userId,
+    expirationTime: nowMs + 60 * 60 * 1_000,
+  });
+  await ctx.db.patch("sessions", fixture.sessionId, { authSessionId });
+  return { ...fixture, authSubject: `${fixture.userId}|${authSessionId}` };
+}
+
+/** Authenticates the fake ctx as one fixture actor (or nobody, for null). */
+export function authenticateAs(ctx: FakeCtx, fixture: AuthedFixture | null): void {
+  ctx.auth.setSubject(fixture === null ? null : fixture.authSubject);
 }
 
 /** The RequestContext the canonical resolution would produce for a fixture. */

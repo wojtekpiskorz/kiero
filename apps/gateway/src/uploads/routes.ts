@@ -27,6 +27,15 @@
  * atomic transaction extended by D2's attachment gate); the saved receipt is
  * issued there, never here.
  *
+ * IDENTITY (round-2 review): every route carries the END USER's credential.
+ * The browser sends its Convex Auth `Authorization` header; the Worker
+ * forwards it verbatim and Convex resolves the acting user (B1 live session
+ * -> active membership -> company). No route on this lane acts as the
+ * service account — a user-owned ledger must never be touched as the
+ * platform — and because every R2-touching route resolves the user through
+ * Convex FIRST, a dead session or membership refuses the request before any
+ * byte reaches R2 (what D4's revocation-mid-upload tests exercise).
+ *
  * Registration rides the composition contract: this lane supplies a
  * `RouteProvider` whose optional `match` owns the parameterized paths (the
  * captured groups close over structurally-GatewayRoute handlers), so the
@@ -49,6 +58,7 @@ import {
   conflictError,
   decodeInput,
   envelopeHttpStatus,
+  unauthenticatedError,
   unavailableError,
   validationError,
 } from "@kiero/runtime";
@@ -74,6 +84,17 @@ function jsonResponse(status: number, body: unknown): Response {
 
 function respond(result: ResultEnvelope): Response {
   return jsonResponse(envelopeHttpStatus(result), result);
+}
+
+/** The client's credential (forwarded verbatim; Convex verifies it). */
+function clientCredential(
+  request: Request,
+): { ok: true; authorization: string } | { ok: false; response: Response } {
+  const authorization = request.headers.get("authorization");
+  if (authorization === null || authorization === "") {
+    return { ok: false, response: respond(errorResult(unauthenticatedError("client_credential_missing"))) };
+  }
+  return { ok: true, authorization };
 }
 
 async function readJsonBody(
@@ -117,8 +138,9 @@ function asSessionState(value: unknown): SessionState | null {
 async function readSession(
   env: UploadsEnv,
   uploadId: string,
+  authorization: string,
 ): Promise<{ ok: true; state: SessionState } | { ok: false; response: Response }> {
-  const result = await uploadsState(env, uploadId);
+  const result = await uploadsState(env, uploadId, authorization);
   if (result._tag === "error") {
     return { ok: false, response: respond(result) };
   }
@@ -137,6 +159,10 @@ function findAttachment(state: SessionState, attachmentId: string): AttachmentSe
 
 /** POST /uploads/prepare */
 async function prepareRoute(request: Request, env: UploadsEnv): Promise<Response> {
+  const credential = clientCredential(request);
+  if (!credential.ok) {
+    return credential.response;
+  }
   const body = await readJsonBody(request);
   if (!body.ok) {
     return body.response;
@@ -148,13 +174,13 @@ async function prepareRoute(request: Request, env: UploadsEnv): Promise<Response
     return respond(decoded.error);
   }
   const { mediaKinds } = decoded.value;
-  const prepared = await uploadsStep(env, { step: "prepare", input: decoded.value });
+  const prepared = await uploadsStep(env, { step: "prepare", input: decoded.value }, credential.authorization);
   if (prepared._tag === "error") {
     return respond(prepared);
   }
   const preparedView = prepared.value as { uploadId: string };
   const uploadId = preparedView.uploadId;
-  const session = await readSession(env, uploadId);
+  const session = await readSession(env, uploadId, credential.authorization);
   if (!session.ok) {
     return session.response;
   }
@@ -180,10 +206,7 @@ async function prepareRoute(request: Request, env: UploadsEnv): Promise<Response
   } catch {
     return respond(errorResult(unavailableError(true, "media_store_unavailable")));
   }
-  const begun = await uploadsStep(env, {
-    step: "begin",
-    input: { uploadId, attachments: sessions },
-  });
+  const begun = await uploadsStep(env, { step: "begin", input: { uploadId, attachments: sessions } }, credential.authorization);
   if (begun._tag === "error") {
     return respond(begun);
   }
@@ -192,8 +215,12 @@ async function prepareRoute(request: Request, env: UploadsEnv): Promise<Response
 }
 
 /** GET /uploads/<uploadId>/session */
-async function sessionRoute(_request: Request, env: UploadsEnv, uploadId: string): Promise<Response> {
-  return respond(await uploadsState(env, uploadId));
+async function sessionRoute(request: Request, env: UploadsEnv, uploadId: string): Promise<Response> {
+  const credential = clientCredential(request);
+  if (!credential.ok) {
+    return credential.response;
+  }
+  return respond(await uploadsState(env, uploadId, credential.authorization));
 }
 
 /** POST /uploads/<uploadId>/attachments/<attachmentId>/parts/<partNumber> */
@@ -204,7 +231,13 @@ async function partRoute(
   attachmentId: string,
   partNumber: number,
 ): Promise<Response> {
-  const session = await readSession(env, uploadId);
+  const credential = clientCredential(request);
+  if (!credential.ok) {
+    return credential.response;
+  }
+  // The acting user resolves BEFORE any R2 byte is written: a dead session
+  // or membership answers here, closed, without touching the bucket.
+  const session = await readSession(env, uploadId, credential.authorization);
   if (!session.ok) {
     return session.response;
   }
@@ -240,28 +273,36 @@ async function partRoute(
     return respond(errorResult(unavailableError(true, "media_store_unavailable")));
   }
   return respond(
-    await uploadsStep(env, {
-      step: "part",
-      input: {
-        uploadId,
-        attachmentId,
-        partNumber,
-        etag: receipt.etag,
-        bytes: receipt.bytes,
-        sha256Hex: receipt.sha256Hex,
+    await uploadsStep(
+      env,
+      {
+        step: "part",
+        input: {
+          uploadId,
+          attachmentId,
+          partNumber,
+          etag: receipt.etag,
+          bytes: receipt.bytes,
+          sha256Hex: receipt.sha256Hex,
+        },
       },
-    }),
+      credential.authorization,
+    ),
   );
 }
 
 /** POST /uploads/<uploadId>/attachments/<attachmentId>/complete */
 async function completeRoute(
-  _request: Request,
+  request: Request,
   env: UploadsEnv,
   uploadId: string,
   attachmentId: string,
 ): Promise<Response> {
-  const session = await readSession(env, uploadId);
+  const credential = clientCredential(request);
+  if (!credential.ok) {
+    return credential.response;
+  }
+  const session = await readSession(env, uploadId, credential.authorization);
   if (!session.ok) {
     return session.response;
   }
@@ -272,15 +313,19 @@ async function completeRoute(
   if (attachment.completedAtMs !== undefined && attachment.r2ObjectEtag !== undefined) {
     // Idempotent replay: re-run the ledger step with the recorded receipt.
     return respond(
-      await uploadsStep(env, {
-        step: "complete",
-        input: {
-          uploadId,
-          attachmentId,
-          objectEtag: attachment.r2ObjectEtag,
-          totalBytes: attachment.receivedBytes ?? 0,
+      await uploadsStep(
+        env,
+        {
+          step: "complete",
+          input: {
+            uploadId,
+            attachmentId,
+            objectEtag: attachment.r2ObjectEtag,
+            totalBytes: attachment.receivedBytes ?? 0,
+          },
         },
-      }),
+        credential.authorization,
+      ),
     );
   }
   const r2UploadId = attachment.r2UploadId;
@@ -301,15 +346,19 @@ async function completeRoute(
   if (!completion.ok) {
     return respond(errorResult(unavailableError(true, `attachment_completion_${completion.reason}`)));
   }
-  const recorded = await uploadsStep(env, {
-    step: "complete",
-    input: {
-      uploadId,
-      attachmentId,
-      objectEtag: completion.objectEtag,
-      totalBytes: completion.totalBytes,
+  const recorded = await uploadsStep(
+    env,
+    {
+      step: "complete",
+      input: {
+        uploadId,
+        attachmentId,
+        objectEtag: completion.objectEtag,
+        totalBytes: completion.totalBytes,
+      },
     },
-  });
+    credential.authorization,
+  );
   if (recorded._tag === "error") {
     return respond(recorded);
   }
@@ -318,13 +367,21 @@ async function completeRoute(
 }
 
 /** POST /uploads/<uploadId>/finalize */
-async function finalizeRoute(_request: Request, env: UploadsEnv, uploadId: string): Promise<Response> {
-  return respond(await uploadsStep(env, { step: "finalize", input: { uploadId } }));
+async function finalizeRoute(request: Request, env: UploadsEnv, uploadId: string): Promise<Response> {
+  const credential = clientCredential(request);
+  if (!credential.ok) {
+    return credential.response;
+  }
+  return respond(await uploadsStep(env, { step: "finalize", input: { uploadId } }, credential.authorization));
 }
 
 /** POST /uploads/reconcile */
-async function reconcileRoute(_request: Request, env: UploadsEnv): Promise<Response> {
-  const decision = await uploadsStep(env, { step: "reconcile", input: {} });
+async function reconcileRoute(request: Request, env: UploadsEnv): Promise<Response> {
+  const credential = clientCredential(request);
+  if (!credential.ok) {
+    return credential.response;
+  }
+  const decision = await uploadsStep(env, { step: "reconcile", input: {} }, credential.authorization);
   if (decision._tag === "error") {
     return respond(decision);
   }

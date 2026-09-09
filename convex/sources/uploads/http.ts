@@ -1,36 +1,27 @@
 /**
- * The uploads channel HTTP boundary (D2): the Worker's verified entry to the
- * upload ledger, mirroring the A3 platform bridge
- * (`convex/platform/http.ts`).
+ * The uploads channel HTTP boundary (D2): the browser's verified entry to
+ * the upload ledger.
  *
- * `/sources/uploads/bridge` (POST): one gateway protocol step. The bearer
- * credential in `Authorization` is verified against the deployment's
- * `KIERO_SERVICE_TOKEN` (the shared digest-compare check in
- * operations/telemetry/serviceToken.ts — exactly one definition). The
- * verified identity is the service account's session, resolved through the
- * SAME canonical resolution and policy as user calls; the step then runs in
- * ONE mutation transaction (`commands.ts` `stepTransaction`). Malformed
- * bodies fail with sanitized closed errors; no internal detail crosses the
- * boundary.
- *
- * `/sources/uploads/state` (POST): the tenant-scoped upload-session read
- * (`commands.ts` `uploadStateFor`) the gateway's resume route serves. Same
- * credential check, same canonical resolution, same closed errors.
+ * `/sources/uploads/bridge` (POST) and `/sources/uploads/state` (POST)
+ * carry the END USER's Convex Auth credential: the browser sends
+ * `Authorization: Bearer <id token>`, the gateway Worker forwards that
+ * header verbatim, and Convex propagates it into the invoked mutation's /
+ * query's `ctx.auth` — where B1's live-session resolution and A3's
+ * canonical chain resolve the acting user (live session, active
+ * membership, company). The service-bridge identity is NOT used here: a
+ * user-owned ledger row must never be created or touched as the service
+ * account. A missing credential fails sanitized 401 before any dispatch;
+ * malformed bodies fail with closed `validation` errors; no internal
+ * detail crosses the boundary.
  *
  * Routes register in `convex/http.ts` through the composition append
  * pattern (imports only).
  */
 
 import { httpAction, type ActionCtx } from "../../_generated/server";
-import { api, internal } from "../../_generated/api";
+import { internal } from "../../_generated/api";
 import { errorResult, type ResultEnvelope } from "@kiero/contracts";
-import {
-  envelopeHttpStatus,
-  forbiddenError,
-  unauthenticatedError,
-  validationError,
-} from "@kiero/runtime";
-import { verifyServiceBearerToken } from "../../operations/telemetry/serviceToken";
+import { envelopeHttpStatus, unauthenticatedError, validationError } from "@kiero/runtime";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -43,29 +34,20 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-/** Resolves the service account's session id, or a sanitized refusal. */
-async function serviceSession(
-  ctx: ActionCtx,
-): Promise<{ ok: true; sessionId: string } | { ok: false; response: Response }> {
-  const session: unknown = await ctx.runQuery(api.platform.probe.serviceSession, {});
-  if (!isRecord(session) || typeof session.sessionId !== "string") {
-    return {
-      ok: false,
-      response: jsonResponse(403, errorResult(forbiddenError("service_identity_unavailable"))),
-    };
+/** The forwarded user credential; Convex verifies it, this boundary only requires it. */
+function requireAuthorization(request: Request): string | null {
+  const authorization = request.headers.get("authorization");
+  if (authorization === null || authorization === "") {
+    return null;
   }
-  return { ok: true, sessionId: session.sessionId };
+  return authorization;
 }
 
-async function verifyBearer(request: Request): Promise<boolean> {
-  return verifyServiceBearerToken(request.headers.get("authorization"), process.env.KIERO_SERVICE_TOKEN);
-}
-
-/** The verified Worker bridge endpoint for one uploads protocol step. */
-export const uploadsBridgeHandler = httpAction(async (ctx, request) => {
-  const authorized = await verifyBearer(request);
-  if (!authorized) {
-    return jsonResponse(401, errorResult(unauthenticatedError("service_credential_invalid")));
+/** The verified uploads channel endpoint for one gateway protocol step. */
+export const uploadsBridgeHandler = httpAction(async (ctx: ActionCtx, request) => {
+  const authorization = requireAuthorization(request);
+  if (authorization === null) {
+    return jsonResponse(401, errorResult(unauthenticatedError("client_credential_missing")));
   }
   let body: unknown;
   try {
@@ -76,25 +58,22 @@ export const uploadsBridgeHandler = httpAction(async (ctx, request) => {
   if (!isRecord(body) || typeof body.step !== "string") {
     return jsonResponse(400, errorResult(validationError("uploads_step_missing")));
   }
-  const session = await serviceSession(ctx);
-  if (!session.ok) {
-    return session.response;
-  }
+  // The caller's Authorization header propagates into the mutation's
+  // ctx.auth; the step resolves and acts AS THAT USER.
   const result: ResultEnvelope = await ctx.runMutation(
     internal.sources.uploads.commands.stepTransaction,
     {
       envelope: { step: body.step, input: body.input ?? {} },
-      serviceSessionId: session.sessionId,
     },
   );
   return jsonResponse(envelopeHttpStatus(result), result);
 });
 
 /** The verified upload-session state read for the gateway's resume route. */
-export const uploadsStateHandler = httpAction(async (ctx, request) => {
-  const authorized = await verifyBearer(request);
-  if (!authorized) {
-    return jsonResponse(401, errorResult(unauthenticatedError("service_credential_invalid")));
+export const uploadsStateHandler = httpAction(async (ctx: ActionCtx, request) => {
+  const authorization = requireAuthorization(request);
+  if (authorization === null) {
+    return jsonResponse(401, errorResult(unauthenticatedError("client_credential_missing")));
   }
   let body: unknown;
   try {
@@ -105,13 +84,9 @@ export const uploadsStateHandler = httpAction(async (ctx, request) => {
   if (!isRecord(body) || typeof body.uploadId !== "string") {
     return jsonResponse(400, errorResult(validationError("upload_reference_missing")));
   }
-  const session = await serviceSession(ctx);
-  if (!session.ok) {
-    return session.response;
-  }
   const result: ResultEnvelope = await ctx.runQuery(
     internal.sources.uploads.commands.uploadStateFor,
-    { uploadId: body.uploadId, serviceSessionId: session.sessionId },
+    { uploadId: body.uploadId },
   );
   return jsonResponse(envelopeHttpStatus(result), result);
 });

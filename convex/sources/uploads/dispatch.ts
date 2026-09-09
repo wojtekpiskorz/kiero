@@ -1,12 +1,12 @@
 /**
  * Sources uploads dispatch wiring (D2): the SAME checked path A3/D1 proved,
- * for both entry classes of the uploads lane.
+ * with ONE identity source — the END USER's verified Convex Auth session
+ * (B1's live-session resolution feeding A3's canonical chain).
  *
  * 1. The certified client operations (`sources.prepareUpload`,
  *    `sources.resumeUpload`) dispatch through @kiero/runtime's
- *    `dispatchCommand` — Convex Auth identity on the user path, the verified
- *    service session on the Worker path — and keep their certified result
- *    shapes ({uploadId, stage}).
+ *    `dispatchCommand` with `ctx.auth` (the browser's Convex Auth token)
+ * and keep their certified result shapes ({uploadId, stage}).
  *
  * 2. The gateway upload protocol steps (prepare/begin/part/complete/
  *    finalize/reconcile) are NOT certified client operations, but they ride
@@ -14,11 +14,14 @@
  *    `CommandDeps`: this channel maps the wire envelope `{step, input}` to
  *    an operation name and resolves the step's input codec itself
  *    (`sources.prepareUpload` falls through to the composed registry, so
- *    client and Worker see one prepare implementation). From there the
- *    checked order is the certified one, unchanged: envelope decode ->
- *    known operation -> context resolution from a verified identity ->
- *    policy authorization -> input decode -> handler with sanitized
- *    throws. There is no mirrored dispatch here to drift.
+ *    client and Worker see one prepare implementation). The channel's HTTP
+ *    boundary forwards the browser's `Authorization` header, Convex
+ *    propagates it into this mutation's `ctx.auth`, and the SAME user
+ *    identity resolves — the service account is never substituted for a
+ *    user-owned ledger row. The checked order is the certified one,
+ *    unchanged: envelope decode -> known operation -> context resolution
+ *    from a verified identity -> policy authorization -> input decode ->
+ *    handler with sanitized throws.
  */
 
 import { Schema } from "effect";
@@ -33,7 +36,10 @@ import {
   type HandlerRegistry,
   type RequestContext,
 } from "@kiero/runtime";
-import { bridgeIdentity, identityFromConvexAuth, resolveRequestContext } from "../../platform/context";
+import {
+  DEFAULT_DEVICE_LABEL,
+  resolveAccessContextWithProvisioning,
+} from "../../access/identity/resolution";
 import type { MutationCtx } from "../../_generated/server";
 import {
   BeginInput,
@@ -133,22 +139,18 @@ export function uploadsHandlers(): HandlerRegistry<MutationCtx> {
   };
 }
 
+/** The ONE identity source: the caller's verified live session (B1 -> A3). */
+const resolveContext = (tx: MutationCtx): Promise<RequestContext | null> =>
+  resolveAccessContextWithProvisioning(tx.db, tx.auth, Date.now(), DEFAULT_DEVICE_LABEL);
+
 /**
  * Dispatches one certified sources uploads command envelope inside a
- * mutation transaction (the D1 dispatchSourcesCommand pattern).
+ * mutation transaction, as the authenticated user (B1 identity source).
  */
 export async function dispatchUploadsCommand(
   ctx: MutationCtx,
   envelope: unknown,
-  serviceSessionId: string | undefined,
 ): Promise<ResultEnvelope> {
-  const resolveContext = async (tx: MutationCtx): Promise<RequestContext | null> => {
-    const identity =
-      serviceSessionId === undefined
-        ? await identityFromConvexAuth(tx.auth, Date.now())
-        : bridgeIdentity(serviceSessionId, Date.now());
-    return resolveRequestContext(tx.db, identity);
-  };
   const deps: CommandDeps<MutationCtx> = {
     resolveContext,
     policy: membershipPolicy,
@@ -185,15 +187,15 @@ function stepHandlers(): HandlerRegistry<MutationCtx> {
 
 /**
  * Dispatches one gateway protocol step envelope through the SAME checked
- * path: the `{step, input}` wire envelope maps to an operation name, and
- * `dispatchCommand` runs with this channel's `entries` override. The
- * identity sources are exactly the two verified ones (Convex Auth, service
- * bridge); there is no shortcut.
+ * path AS THE AUTHENTICATED USER: the `{step, input}` wire envelope maps to
+ * an operation name, `dispatchCommand` runs with this channel's `entries`
+ * override, and the identity is the caller's verified live session (the
+ * browser's credential the HTTP boundary forwarded). There is no service
+ * substitution and no shortcut.
  */
 export async function dispatchUploadsStep(
   ctx: MutationCtx,
   envelope: unknown,
-  serviceSessionId: string | undefined,
 ): Promise<ResultEnvelope> {
   const decodedEnvelope = decodeInput(UploadStepEnvelope, envelope);
   if (!decodedEnvelope.ok) {
@@ -208,13 +210,6 @@ export async function dispatchUploadsStep(
       error: unsupportedError(`sources.uploads.${step}`, "unknown_step"),
     } as ResultEnvelope;
   }
-  const resolveContext = async (tx: MutationCtx): Promise<RequestContext | null> => {
-    const identity =
-      serviceSessionId === undefined
-        ? await identityFromConvexAuth(tx.auth, Date.now())
-        : bridgeIdentity(serviceSessionId, Date.now());
-    return resolveRequestContext(tx.db, identity);
-  };
   const deps: CommandDeps<MutationCtx> = {
     resolveContext,
     policy: membershipPolicy,

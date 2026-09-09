@@ -4,225 +4,176 @@
  * ../probe_shared.ts).
  *
  * No business work happens here; these entries exist so the D2 evidence can
- * run against the REAL dev deployment and the REAL Worker/R2 path without a
- * development-auth shortcut: every actor is the service account's own
- * session or an explicitly seeded second-company session, resolved through
- * the SAME canonical resolution and authorization seam as production calls.
- * Sessions are created server-side here; no identity is ever accepted from
- * client input.
+ * run against the REAL dev deployment and the REAL Worker/R2 path. Every
+ * entry resolves the CALLER's identity from that caller's own verified
+ * Convex Auth credential (the proof script signs in real fixture persons,
+ * B1's email-code flow with fixture codes — the same pattern as the B3
+ * evidence): the credential propagates from the authenticated action into
+ * the internal mutation/query, and the SAME canonical resolution and
+ * authorization seam decides. No identity is ever accepted from client
+ * input and the service account is never substituted.
  *
- * - `probeRunStep`: dispatches one uploads-channel step envelope through the
- *   checked step path as the service identity (or a seeded session) — used
- *   for typed-rejection, cross-tenant and revocation proofs.
- * - `probeSeedIsolation`: idempotent second-company fixture (user, active
- *   membership, live session) for tenant isolation proofs.
- * - `probeRevokeSession` / `probeSuspendMembership`: server-side state
- *   changes proving revoked sessions/memberships cannot dispatch steps.
+ * - `probeRunStep`: dispatches one uploads-channel step envelope through
+ *   the checked step path AS THE CALLER — used for typed-rejection and
+ *   cross-identity proofs that need the raw step envelope.
+ * - `probeAcceptSourceAsCaller`: runs D1's UNCHANGED acceptance transaction
+ *   with the caller's honestly re-resolved context. This exists because
+ *   D1's public accept entry predates B1's identity source (its dispatch
+ *   still reads the pre-B1 `identityFromConvexAuth` seam, which cannot
+ *   resolve Convex Auth subjects) — the acting principal here is the real
+ *   signed-in user, never the service account. Flagged to the coordinator:
+ *   D1's dispatch adopting `resolveAccessContextWithProvisioning` retires
+ *   this probe in favor of the certified client command.
  * - `probeAgeUpload`: fixture control for the reconciliation grace proofs —
- *   moves one upload's timestamps into the past by an exact offset.
- * - `probeUploadsState`: the tenant-scoped ledger inspection the evidence
- *   script asserts on (uploads, attachments, representations).
+ *   moves one of the caller's company's uploads into the past by an exact
+ *   offset.
+ * - `probeUploadsState`: the caller's tenant-scoped ledger inspection the
+ *   evidence script asserts on (uploads, attachments, representations,
+ *   accepted sources and their durable jobs — D1's own inspection probe
+ *   still resolves the service session, which is NOT the acting user
+ *   here).
+ *
+ * Revocation and tenant-isolation fixtures live in their OWNING lanes'
+ * certified surfaces (B1's `access.revokeSession`, B3's
+ * `access.revokeMembership`, real invitations): the evidence drives them
+ * as real commands, not through server-side state edits here.
  */
 
 import { v } from "convex/values";
+import { Schema } from "effect";
 import { action, internalMutation, internalQuery } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
-import { forbiddenError } from "@kiero/runtime";
-import { bridgeIdentity, resolveRequestContext } from "../../platform/context";
+import { CommandEnvelope, errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
+import { forbiddenError, unauthenticatedError } from "@kiero/runtime";
 import {
-  SERVICE_EMAIL,
-  bridgeContextForEmail,
-  probeDisabled,
-  probeGuardEnabled,
-  resolveProbeSession,
-  serviceIdentityUnavailable,
-} from "../probe_shared";
+  DEFAULT_DEVICE_LABEL,
+  resolveAccessContextFromConvexAuth,
+  resolveAccessContextWithProvisioning,
+} from "../../access/identity/resolution";
+import { performAcceptance, acceptSourceEntry } from "../accept/acceptance";
+import { probeDisabled, probeGuardEnabled } from "../probe_shared";
 
-/** The D2 tenant-isolation fixture identity (seeded server-side below). */
-const D2_ISOLATION_EMAIL = "d2-isolation@kiero.invalid";
-const D2_ISOLATION_COMPANY = "Kiero Dev Proof B (D2 uploads)";
+/** The read surface the caller resolution needs (query and mutation ctx both fit). */
+type CallerDb = Parameters<typeof resolveAccessContextFromConvexAuth>[0];
+/** The auth surface the caller resolution needs (any Convex ctx fits). */
+type CallerAuth = Parameters<typeof resolveAccessContextFromConvexAuth>[1];
 
-/**
- * One isolation tenant per proof run: the revocation proofs (session,
- * membership) permanently disable their fixture, so a fresh suffix keeps
- * later runs independent instead of resurrecting revoked state.
- */
-const isolationEmail = (suffix: string): string =>
-  suffix === "" ? D2_ISOLATION_EMAIL : `d2-isolation-${suffix}@kiero.invalid`;
-const isolationCompany = (suffix: string): string =>
-  suffix === "" ? D2_ISOLATION_COMPANY : `Kiero Dev Proof B (D2 uploads ${suffix})`;
+/** Resolves the caller's read-side context, or the sanitized refusal. */
+async function callerContextOrRefuse(
+  db: CallerDb,
+  auth: CallerAuth,
+): Promise<
+  | { ok: true; context: NonNullable<Awaited<ReturnType<typeof resolveAccessContextFromConvexAuth>>> }
+  | { ok: false; result: ResultEnvelope }
+> {
+  const context = await resolveAccessContextFromConvexAuth(db, auth, Date.now());
+  if (context === null) {
+    return { ok: false, result: errorResult(unauthenticatedError()) };
+  }
+  return { ok: true, context };
+}
 
 // --- step dispatch ---------------------------------------------------------------
 
-/** Dispatches one uploads step envelope as a verified session (guarded). */
+/** Dispatches one uploads step envelope as the CALLER (guarded). */
 export const probeRunStep = action({
-  args: { step: v.string(), input: v.any(), sessionId: v.optional(v.string()) },
+  args: { step: v.string(), input: v.any() },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
     if (!probeGuardEnabled()) {
       return probeDisabled();
-    }
-    const sessionId = await resolveProbeSession(ctx, args.sessionId);
-    if (sessionId === null) {
-      return serviceIdentityUnavailable();
     }
     return ctx.runMutation(internal.sources.uploads.commands.stepTransaction, {
       envelope: { step: args.step, input: args.input ?? {} },
-      serviceSessionId: sessionId,
     });
   },
 });
 
-// --- fixtures --------------------------------------------------------------------
+// --- acceptance as the caller ------------------------------------------------------
 
 /**
- * Ensures the D2 second-company fixture: user, company, active membership
- * and a live session — no upload rows (the isolation proofs prepare their
- * own drafts through the checked step path).
+ * D1's acceptance transaction with the caller's honestly re-resolved
+ * context (see the module docstring for why this exists).
  */
-export const seedIsolation = internalMutation({
-  args: { suffix: v.optional(v.string()) },
-  handler: async (ctx, args) => {
-    const email = isolationEmail(args.suffix ?? "");
-    const companyName = isolationCompany(args.suffix ?? "");
-    const existingUser = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", email))
-      .first();
-    const userId =
-      existingUser?._id ??
-      (await ctx.db.insert("users", {
-        email,
-        displayName: "D2 isolation proof",
-        createdAtMs: Date.now(),
-      }));
-    const existingCompany = await ctx.db
-      .query("companies")
-      .filter((q) => q.eq(q.field("name"), companyName))
-      .first();
-    const companyId =
-      existingCompany?._id ??
-      (await ctx.db.insert("companies", {
-        name: companyName,
-        timezone: "Europe/Warsaw",
-        defaultCurrency: "PLN",
-        createdAtMs: Date.now(),
-      }));
-    const existingMembership = await ctx.db
-      .query("memberships")
-      .withIndex("by_company_user", (q) => q.eq("companyId", companyId).eq("userId", userId))
-      .first();
-    let membershipId = existingMembership === null ? undefined : existingMembership._id;
-    if (existingMembership === null) {
-      membershipId = await ctx.db.insert("memberships", {
-        companyId,
-        userId,
-        role: "admin",
-        state: "active",
-        createdAtMs: Date.now(),
-      });
+export const acceptSourceAsCaller = internalMutation({
+  args: { envelope: v.any() },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    const command = Schema.decodeUnknownSync(CommandEnvelope)(args.envelope);
+    const context = await resolveAccessContextWithProvisioning(
+      ctx.db,
+      ctx.auth,
+      Date.now(),
+      DEFAULT_DEVICE_LABEL,
+    );
+    if (context === null) {
+      return errorResult(unauthenticatedError());
     }
-    const existingSession = await ctx.db
-      .query("sessions")
-      .withIndex("by_user_started", (q) => q.eq("userId", userId))
-      .order("desc")
-      .filter((q) => q.eq(q.field("revokedAtMs"), undefined))
-      .first();
-    const sessionId =
-      existingSession?._id ??
-      (await ctx.db.insert("sessions", {
-        userId,
-        startedAtMs: Date.now(),
-        lastSeenAtMs: Date.now(),
-        deviceLabel: "d2-isolation-bridge",
-      }));
-    return okResult({ companyId, userId, membershipId, sessionId});
+    const input = Schema.decodeUnknownSync(acceptSourceEntry.input)(command.input);
+    return performAcceptance(ctx, context, input, command.idempotencyKey);
   },
 });
 
-export const probeSeedIsolation = action({
-  args: { suffix: v.optional(v.string()) },
+/** Runs the crash-proof acceptance as the CALLER (guarded wrapper). */
+export const probeCrashAcceptSourceAsCaller = internalMutation({
+  args: { envelope: v.any() },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    const command = Schema.decodeUnknownSync(CommandEnvelope)(args.envelope);
+    const context = await resolveAccessContextWithProvisioning(
+      ctx.db,
+      ctx.auth,
+      Date.now(),
+      DEFAULT_DEVICE_LABEL,
+    );
+    if (context === null) {
+      return errorResult(unauthenticatedError());
+    }
+    const input = Schema.decodeUnknownSync(acceptSourceEntry.input)(command.input);
+    const result = await performAcceptance(ctx, context, input, command.idempotencyKey);
+    if (result._tag === "error") {
+      return result;
+    }
+    // Registration happened inside THIS transaction; throwing aborts it all.
+    throw new Error("probe: deliberate failure after acceptance registration");
+  },
+});
+
+export const probeAcceptSourceAsCaller = action({
+  args: { envelope: v.any(), crash: v.optional(v.boolean()) },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
     if (!probeGuardEnabled()) {
       return probeDisabled();
     }
-    return ctx.runMutation(internal.sources.uploads.probe.seedIsolation, {
-      ...(args.suffix === undefined ? {} : { suffix: args.suffix }),
-    });
-  },
-});
-
-/** Revokes one session server-side (proof: revoked sessions cannot dispatch). */
-export const revokeSession = internalMutation({
-  args: { sessionId: v.string() },
-  handler: async (ctx, args) => {
-    const id = ctx.db.normalizeId("sessions", args.sessionId);
-    if (id === null) {
-      return errorResult(forbiddenError("no_verified_identity"));
-    }
-    await ctx.db.patch(id, { revokedAtMs: Date.now() });
-    return okResult({ revoked: true });
-  },
-});
-
-export const probeRevokeSession = action({
-  args: { sessionId: v.string() },
-  handler: async (ctx, args): Promise<ResultEnvelope> => {
-    if (!probeGuardEnabled()) {
-      return probeDisabled();
-    }
-    return ctx.runMutation(internal.sources.uploads.probe.revokeSession, {
-      sessionId: args.sessionId,
-    });
-  },
-});
-
-/** Revokes one membership server-side (proof: no step without active membership). */
-export const revokeMembership = internalMutation({
-  args: { membershipId: v.string() },
-  handler: async (ctx, args) => {
-    const id = ctx.db.normalizeId("memberships", args.membershipId);
-    if (id === null) {
-      return errorResult(forbiddenError("no_verified_identity"));
-    }
-    await ctx.db.patch(id, { state: "revoked" });
-    return okResult({ revoked: true });
-  },
-});
-
-export const probeRevokeMembership = action({
-  args: { membershipId: v.string() },
-  handler: async (ctx, args): Promise<ResultEnvelope> => {
-    if (!probeGuardEnabled()) {
-      return probeDisabled();
-    }
-    return ctx.runMutation(internal.sources.uploads.probe.revokeMembership, {
-      membershipId: args.membershipId,
-    });
+    return ctx.runMutation(
+      args.crash === true
+        ? internal.sources.uploads.probe.probeCrashAcceptSourceAsCaller
+        : internal.sources.uploads.probe.acceptSourceAsCaller,
+      { envelope: args.envelope },
+    );
   },
 });
 
 // --- reconciliation fixture control ------------------------------------------------
 
 /**
- * Ages one service-company upload by an exact offset: createdAtMs,
- * lastActivityAtMs and finalizedAtMs each move back by `ageMs`. This is the
- * ONLY way the grace proofs reach expired states without waiting days; the
- * reconciliation decision itself is pure (protocol.ts) and unit-tested.
+ * Ages one of the caller's company's uploads by an exact offset:
+ * createdAtMs, lastActivityAtMs and finalizedAtMs each move back by
+ * `ageMs`. This is the ONLY way the grace proofs reach expired states
+ * without waiting days; the reconciliation decision itself is pure
+ * (protocol.ts) and unit-tested.
  */
 export const ageUpload = internalMutation({
   args: { uploadId: v.string(), ageMs: v.float64() },
   handler: async (ctx, args) => {
-    const context = await bridgeContextForEmail(ctx.db, SERVICE_EMAIL);
-    if (context === null) {
-      return serviceIdentityUnavailable();
+    const resolved = await callerContextOrRefuse(ctx.db, ctx.auth);
+    if (!resolved.ok) {
+      return resolved.result;
     }
+    const companyId = ctx.db.normalizeId("companies", resolved.context.actor.companyId);
     const uploadId = ctx.db.normalizeId("uploads", args.uploadId);
-    if (uploadId === null) {
+    if (companyId === null || uploadId === null) {
       return errorResult(forbiddenError("upload_reference_not_found"));
     }
     const upload = await ctx.db.get(uploadId);
-    if (upload === null || upload.companyId !== ctx.db.normalizeId("companies", context.actor.companyId)) {
+    if (upload === null || upload.companyId !== companyId) {
       return errorResult(forbiddenError("upload_reference_not_found"));
     }
     const shift = (value: number): number => value - args.ageMs;
@@ -252,15 +203,15 @@ export const probeAgeUpload = action({
 
 // --- inspection --------------------------------------------------------------------
 
-/** Tenant-scoped ledger state for the evidence script (guarded read). */
+/** The caller's tenant-scoped ledger state (guarded read). */
 export const uploadsInspection = internalQuery({
-  args: { serviceSessionId: v.string() },
-  handler: async (ctx, args) => {
-    const context = await resolveRequestContext(ctx.db, bridgeIdentity(args.serviceSessionId, Date.now()));
-    if (context === null) {
-      return errorResult(forbiddenError("no_verified_identity"));
+  args: {},
+  handler: async (ctx) => {
+    const resolved = await callerContextOrRefuse(ctx.db, ctx.auth);
+    if (!resolved.ok) {
+      return resolved.result;
     }
-    const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
+    const companyId = ctx.db.normalizeId("companies", resolved.context.actor.companyId);
     if (companyId === null) {
       return errorResult(forbiddenError("no_verified_identity"));
     }
@@ -295,7 +246,27 @@ export const uploadsInspection = internalQuery({
         });
       }
     }
+    const sources = await ctx.db
+      .query("sources")
+      .withIndex("by_company_order", (q) => q.eq("companyId", companyId))
+      .collect();
+    const jobs = await ctx.db
+      .query("durableJobs")
+      .withIndex("by_company", (q) => q.eq("companyId", companyId))
+      .collect();
     return okResult({
+      sources: sources.map((source) => ({
+        sourceId: source._id,
+        ...(source.acceptanceKey === undefined ? {} : { acceptanceKey: source.acceptanceKey }),
+        fullyAcceptedAtMs: source.fullyAcceptedAtMs,
+        lifecycle: source.lifecycle,
+      })),
+      jobs: jobs.map((job) => ({
+        jobKey: job.jobKey,
+        kind: job.kind,
+        state: job.state,
+        ...(job.dedupKey === undefined ? {} : { dedupKey: job.dedupKey }),
+      })),
       uploads: uploads.map((upload) => ({
         uploadId: upload._id,
         stage: upload.stage,
@@ -313,17 +284,11 @@ export const uploadsInspection = internalQuery({
 });
 
 export const probeUploadsState = action({
-  args: { sessionId: v.optional(v.string()) },
-  handler: async (ctx, args): Promise<ResultEnvelope> => {
+  args: {},
+  handler: async (ctx): Promise<ResultEnvelope> => {
     if (!probeGuardEnabled()) {
       return probeDisabled();
     }
-    const sessionId = await resolveProbeSession(ctx, args.sessionId);
-    if (sessionId === null) {
-      return serviceIdentityUnavailable();
-    }
-    return ctx.runQuery(internal.sources.uploads.probe.uploadsInspection, {
-      serviceSessionId: sessionId,
-    });
+    return ctx.runQuery(internal.sources.uploads.probe.uploadsInspection, {});
   },
 });

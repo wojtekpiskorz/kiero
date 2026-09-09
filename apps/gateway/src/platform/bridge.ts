@@ -12,8 +12,11 @@
  *
  * `postBridge` is the ONE HTTP transport for Convex-bound calls from this
  * Worker (the mirror-is-a-hazard ruling): lane bridges (uploads, later
- * media/export routes) pass their own path and body through it instead of
- * copying the fetch/error-mapping plumbing.
+ * media/export routes) pass their own path, body and Authorization header
+ * value through it instead of copying the fetch/error-mapping plumbing.
+ * The header decides WHO the call acts as: the platform routes pass the
+ * Worker's service credential, user-owned lanes pass the browser's
+ * credential verbatim.
  */
 
 import { Schema } from "effect";
@@ -39,6 +42,7 @@ export async function postBridge(
   env: BridgeEnv,
   path: string,
   body: unknown,
+  authorization: string,
 ): Promise<{ ok: true; body: ResultEnvelope } | { ok: false; error: ResultEnvelope }> {
   const site = env.CONVEX_SITE_URL;
   const token = env.KIERO_SERVICE_TOKEN;
@@ -53,7 +57,7 @@ export async function postBridge(
     response = await fetch(`${site.replace(/\/$/, "")}${path}`, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${token}`,
+        authorization,
         "content-type": "application/json",
       },
       body: JSON.stringify(body),
@@ -90,17 +94,23 @@ export async function postBridge(
   return { ok: true, body: decoded.value };
 }
 
-/** Forwards one command envelope through the verified bridge. */
+/** Forwards one command envelope through the verified service bridge. */
 export async function callPlatform(
   env: BridgeEnv,
   command: BridgeCommand,
 ): Promise<ResultEnvelope> {
-  const result = await postBridge(env, "/platform/bridge", {
-    operation: command.operation,
-    input: command.input ?? {},
-    expectedRevisions: [],
-    ...(command.idempotencyKey === undefined ? {} : { idempotencyKey: command.idempotencyKey }),
-  });
+  const result = await postBridge(
+    env,
+    "/platform/bridge",
+    {
+      operation: command.operation,
+      input: command.input ?? {},
+      expectedRevisions: [],
+      ...(command.idempotencyKey === undefined ? {} : { idempotencyKey: command.idempotencyKey }),
+    },
+    // The platform routes act as the platform: the Worker's own credential.
+    `Bearer ${env.KIERO_SERVICE_TOKEN}`,
+  );
   if (!result.ok) {
     return result.error;
   }
