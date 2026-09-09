@@ -1,0 +1,76 @@
+// apps/gateway/wrangler.jsonc: non-secret skeleton (issue I1 #53).
+//
+// The TOP-LEVEL block is the default environment and targets LOCAL DEV names
+// only (kiero-dev-*). Staging and alpha production exist solely as named
+// environments selected with `--env staging` / `--env alpha-production`; a
+// bare `wrangler deploy` can therefore never touch them.
+//
+// EU placement: the media R2 bucket binding carries "jurisdiction": "eu";
+// the bound bucket must be created with
+// `wrangler r2 bucket create kiero-<env>-media --jurisdiction eu --location weur`.
+// Worker execution is globally routed (not EU-only compute); media bytes and
+// the Containers that process them carry the EU guarantees.
+//
+// No account_id is committed: wrangler resolves the account from the logged-in
+// user (`wrangler whoami`); pin/verify it with KIERO_EXPECTED_CF_ACCOUNT_ID
+// in infra/environments/preflight.mjs.
+//
+// Secrets are injected out-of-band (never here): AXIOM_API_TOKEN via
+// `wrangler secret put`; see infra/bindings/gateway-worker.md.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kiero-dev-gateway",
+  // Entry point provided by the workspace app skeleton (A1, merged db1d6a5);
+  // `wrangler deploy --dry-run` bundles it.
+  "main": "src/index.ts",
+  // Raise together with the wrangler >= 4.130 pin: owner A3, root manifest;
+  // see the PENDING table in docs/evidence/environment/preflight-2026-09.md.
+  "compatibility_date": "2026-09-01",
+  "observability": {
+    "enabled": true
+  },
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "kiero-dev-media",
+      // EU-jurisdiction bucket; see header note before creating the bucket.
+      "jurisdiction": "eu"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "dev",
+    // Non-secret URL of the matching Convex deployment's HTTP actions.
+    // Fill per environment when that deployment exists (empty = not yet set).
+    "CONVEX_SITE_URL": ""
+  },
+  "env": {
+    "staging": {
+      "name": "kiero-staging-gateway",
+      "r2_buckets": [
+        {
+          "binding": "MEDIA_BUCKET",
+          "bucket_name": "kiero-staging-media",
+          "jurisdiction": "eu"
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "CONVEX_SITE_URL": ""
+      }
+    },
+    "alpha-production": {
+      "name": "kiero-alpha-gateway",
+      "r2_buckets": [
+        {
+          "binding": "MEDIA_BUCKET",
+          "bucket_name": "kiero-alpha-media",
+          "jurisdiction": "eu"
+        }
+      ],
+      "vars": {
+        "ENVIRONMENT": "alpha-production",
+        "CONVEX_SITE_URL": ""
+      }
+    }
+  }
+}
