@@ -17,6 +17,21 @@
  * - Definitions are bounded data, never executable schema code.
  *
  * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
+ *
+ * C3 amendments (the owning lane completes the candidate surface, additive
+ * and flagged on the B3/C2 precedent):
+ * - `ExtensionFieldShape.kind` narrows to `DefinitionFieldKind`: a definition
+ *   FIELD may be one of the seven scalar kinds or a bounded `list` with a
+ *   scalar `itemKind`. `object` stays a legal VALUE kind (the A2 value
+ *   vocabulary is untouched) but is not a legal FIELD kind: a multi-field
+ *   definition version IS the object type, so an object field would demand
+ *   the nesting this contract forbids.
+ * - `unit` (quantity fields) and `itemKind` (list fields) make meaning
+ *   machine-checkable: a version that changes a field's unit is an
+ *   incompatible change, and near-duplicate names with incompatible units
+ *   can be told apart mechanically (issue #26 focused verification).
+ * - The bounded-array helper and its bounds are exported so the definition
+ *   operation inputs share the exact value-contract bounds.
  */
 
 import { Schema } from "effect";
@@ -53,16 +68,19 @@ export const ScalarExtensionValue = Schema.TaggedUnion({
 });
 export type ScalarExtensionValue = Schema.Schema.Type<typeof ScalarExtensionValue>;
 
-const MAX_OBJECT_FIELDS = 32;
-const MAX_LIST_ITEMS = 64;
+export const MAX_OBJECT_FIELDS = 32;
+export const MAX_LIST_ITEMS = 64;
 
 /**
  * Bounded mutable array: the encoded wire form must use mutable arrays to
  * match the Convex value model. WARNING (single-sourced here): the length
  * check is piped AFTER `Schema.mutable` because piping checks before
  * `Schema.mutable` rebuilds the schema WITHOUT them on effect 4.0.0-rc.112.
+ *
+ * C3: exported (additive) so definition operation inputs reuse the exact
+ * value-contract bounds instead of restating them.
  */
-const boundedMutableArray = <S extends Schema.Codec<unknown, unknown, never, never>>(
+export const boundedMutableArray = <S extends Schema.Codec<unknown, unknown, never, never>>(
   element: S,
   maxLength: number,
 ) => Schema.mutable(Schema.Array(element)).pipe(Schema.check(Schema.isMaxLength(maxLength)));
@@ -90,7 +108,7 @@ export const ExtensionValue = Schema.Union([
 ]);
 export type ExtensionValue = Schema.Schema.Type<typeof ExtensionValue>;
 
-/** Field kind declared by a definition version. */
+/** Field kind declared by a definition version (the A2 value vocabulary). */
 export const ExtensionFieldKind = Schema.Literals([
   "text",
   "quantity",
@@ -105,14 +123,57 @@ export const ExtensionFieldKind = Schema.Literals([
 export type ExtensionFieldKind = Schema.Schema.Type<typeof ExtensionFieldKind>;
 
 /**
+ * The scalar subset of the value vocabulary: the kinds a definition FIELD or
+ * a list item may take (C3). Everything bounded ends here — objects and
+ * lists are containers, never members.
+ */
+export const ScalarFieldKind = Schema.Literals([
+  "text",
+  "quantity",
+  "boolean",
+  "enum",
+  "financial",
+  "temporal",
+  "entity_ref",
+]);
+export type ScalarFieldKind = Schema.Schema.Type<typeof ScalarFieldKind>;
+
+/**
+ * The kinds a definition FIELD may take (C3): the seven scalar kinds plus a
+ * bounded `list` of one scalar kind. `object` is deliberately absent — a
+ * multi-field definition version IS the object type; an object field would
+ * demand the recursive nesting the value contract forbids.
+ */
+export const DefinitionFieldKind = Schema.Literals([
+  "text",
+  "quantity",
+  "boolean",
+  "enum",
+  "financial",
+  "temporal",
+  "entity_ref",
+  "list",
+]);
+export type DefinitionFieldKind = Schema.Schema.Type<typeof DefinitionFieldKind>;
+
+/**
  * The immutable shape snapshot of one definition version. Version records are
  * append-only: a version never rewrites its snapshot, and a meaning/kind
  * change requires a new version (or a new definition plus migration).
+ *
+ * C3: `unit` is required for quantity fields and `itemKind` for list fields
+ * (enforced by the domain rule layer, kept optional on the wire shape so the
+ * stored snapshot decodes without a migration); enum fields declare their
+ * closed option set in `options`.
  */
 export const ExtensionFieldShape = Schema.Struct({
   fieldId: ExtensionFieldId,
   label: Schema.NonEmptyString,
-  kind: ExtensionFieldKind,
+  kind: DefinitionFieldKind,
+  /** Declared unit of a quantity field; a version changing it is incompatible. */
+  unit: Schema.optionalKey(Schema.NonEmptyString),
+  /** Declared item kind of a list field; scalar kinds only (bounded). */
+  itemKind: Schema.optionalKey(ScalarFieldKind),
   options: Schema.optionalKey(
     boundedMutableArray(
       Schema.Struct({ optionId: ExtensionFieldId, label: Schema.NonEmptyString }),

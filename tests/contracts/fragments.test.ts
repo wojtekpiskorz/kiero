@@ -19,11 +19,11 @@ import {
   ChecklistItemState,
   ContactKind,
   ContactRole,
+  DefinitionFieldKind,
   DurableJobKind,
   DurableJobState,
   EventOccurrenceState,
   ExportState,
-  ExtensionFieldKind,
   MediaKind,
   MediaRepresentationRole,
   MembershipRole,
@@ -384,6 +384,9 @@ describe("fragment vocabulary pins equal the contracts vocabularies", () => {
     }
 
     // The nested extension field-kind pin travels through the array element.
+    // (C3 amendment: definition FIELD kinds pin to DefinitionFieldKind — the
+    // seven scalar kinds plus bounded lists; the value kind "object" stays in
+    // ExtensionFieldKind but is not a legal field kind.)
     const fieldsField = fieldOf(
       objectFields(extensionsTables.extensionVersions.validator, "extensionVersions"),
       "extensionVersions",
@@ -398,7 +401,7 @@ describe("fragment vocabulary pins equal the contracts vocabularies", () => {
       "kind",
     );
     expect(memberLiterals(kindField, "extensionVersions.fields.kind").sort()).toEqual(
-      schemaLiterals(ExtensionFieldKind, "ExtensionFieldKind"),
+      schemaLiterals(DefinitionFieldKind, "DefinitionFieldKind"),
     );
   });
 });
