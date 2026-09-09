@@ -17,12 +17,15 @@ Thumbs.db
 *.sublime-project
 
 # Environment & Secrets
+# Names are documented in .env.example; values never enter the repository.
 .env
 .env.local
 .env.*.local
 *.env
 *.pem
 *.key
+.env.*
+!.env.example
 
 # Logs & Temporary Files
 *.log
@@ -39,6 +42,13 @@ dist/
 build/
 out/
 .cache/
+*.tsbuildinfo
+
+# Convex local artifacts
+.convex/
+
+# Cloudflare Wrangler local state
+.wrangler/
 
 # Python
 __pycache__/

@@ -1,0 +1,2573 @@
+{
+  "version": 1,
+  "status": "chartered; implementation not started",
+  "planningMap": "https://github.com/wojtekpiskorz/kiero/issues/1",
+  "readinessTicket": "https://github.com/wojtekpiskorz/kiero/issues/13",
+  "prototypeCommit": "5e3dd7e40642a4bf3221f04abea575b8cd411aff",
+  "architectureCommit": "efc03fecbc361d04260cf034d11aa3c3707bbda5",
+  "roots": [
+    "A0"
+  ],
+  "entries": [
+    {
+      "key": "A0",
+      "title": "[A0] Set up advisory PR review with thermo-nuclear and unslop",
+      "blockedBy": [],
+      "declaredPrerequisites": [],
+      "ownedPaths": [
+        ".github/workflows/ai-review.yml",
+        ".agents/skills/thermo-nuclear-code-quality-review/**",
+        ".agents/skills/unslop/**",
+        ".agents/skills/README.md",
+        "AGENTS.md",
+        "CONTEXT.md",
+        "docs/operations/pr-review.md",
+        "docs/evidence/pr-review/**"
+      ],
+      "proofs": [],
+      "sources": [
+        "architecture"
+      ],
+      "problem": "Every core implementation PR needs the same advisory engineering and prose review used in Astroix from the start. Kiero main currently has no application workspace or review workflow, so setup must work before application bootstrap and before the independent corpus and environment PRs.",
+      "solution": "Install a Kiero-specific version of Astroix AI review: the vendored thermo-nuclear-code-quality-review and unslop skills, local repository rules and accepted glossary, and a standalone GitHub Actions workflow using the Z.AI Coding Plan through Claude Code Action. Review each eligible PR in its code and discussion context, then publish advisory comments. The owner requested this addition after the original charter. Establish this setup before A1, E1 and I1; those three remain independent after A0 closes. The source reference is the verified Astroix commit d4f1bc218261cf6c76984ca2c384df7f7b5bd80e.",
+      "acceptance": [
+        "Preserve the Astroix PR flow: pull_request opened, synchronize, reopened and ready_for_review; skip draft and fork PRs; cancel superseded runs through a per-PR concurrency group; use a 30-minute job timeout. Record the reviewed PR head SHA. Use pull_request, not a privileged pull_request_target job that executes PR code.",
+        "Use the repository Actions secret ZAI_API_KEY for https://api.z.ai/api/anthropic, with ANTHROPIC_AUTH_TOKEN and the action anthropic_api_key input. Match the reference configuration: glm-5.3 as reviewer and Opus/Sonnet mapping, glm-5.3-flash as Haiku mapping, max effort and API_TIMEOUT_MS=3000000. Verify the configured route during the actual smoke run and record failures rather than inventing a working model.",
+        "Start from anthropics/claude-code-action@62529b7c89dbb8cfaa838f2c87f2f8459b46fe68, the SHA pinned in the reference. Pass github.token explicitly so posting uses github-actions[bot] and does not require installing the Claude GitHub App. Keep contents: read, pull-requests: write, include_fix_links: false and an explicit inspection/comment tool allowlist. Record any necessary action-version change and its reason.",
+        "Vendor both skill directories including their LICENSE files, with upstream version/provenance in .agents/skills/README.md. Preserve the imported skill text; put Kiero-specific adaptation in the review prompt and repository instructions. Commit the accepted Kiero CONTEXT.md from the handoff snapshot without changing domain meanings. Create concise Kiero AGENTS.md rules compatible with the execution charter, including rtk, one issue per PR and independent parallel lanes.",
+        "The prompt applies thermo-nuclear review to engineering choices and unslop to changed prose and reviewer output, reads Kiero AGENTS.md and CONTEXT.md, and inspects the full diff plus relevant surrounding files. Recover prior rounds from PR comments, verify fixes wherever they landed, keep explicitly rejected or overruled findings closed, and avoid repeating deterministic check findings.",
+        "Post one advisory summary per PR and edit it across pushes using the reference gh pr comment --edit-last --create-if-none --body-file flow, with inline comments only for high-conviction actionable findings. Publish at the end of the run; a canceled or superseded run must not replace the current review. The reviewer does not edit code, push commits, merge, approve or request changes as a merge gate.",
+        "AI review is advisory and is not added to required status checks. Findings do not fail deterministic CI. Authentication, provider or runner failures remain visible as operational failures and cannot be reported as completed reviews. Missing ZAI_API_KEY yields a clear setup diagnosis without printing its value.",
+        "The A0 workflow runs in the pre-application repository with no dependency on A1 package.json, lockfile, build, fixtures or CRAP tooling. Use a suitable standalone Node runtime for the pinned action, matching Node 24 in the reference where supported. Omit Astroix-specific npm installs, e2e/fixture, crap:ci, thresholds and legacy product paths. A1 later owns deterministic checks.yml independently.",
+        "Treat same-repository PR contributors as trusted for the credential-bearing review job; draft/fork skipping and read/comment limits must remain explicit. Scope the Z.AI secret to the review invocation, keep checkout credentials from becoming persisted write credentials, and keep secret values out of files, prompts, comments and evidence.",
+        "After the owner adds ZAI_API_KEY, prove the workflow on a real Kiero PR and a subsequent push before closure. Integrate the setup into main through its own PR. Attach run and comment links, exact commit/configuration, observed outcomes and any remaining setup blocker. File presence or a skipped job is not successful activation."
+      ],
+      "tests": [
+        "Validate workflow syntax and pinned action inputs, all referenced skill/instruction paths and licenses in a fresh pre-A1 checkout. Confirm no application install, package script or Astroix-only path is required.",
+        "Exercise draft-to-ready, opened/synchronize and reopened handling; verify the current head is reviewed. Test rapid pushes and inspect canceled runs and comment timestamps to ensure old output cannot replace the latest summary.",
+        "Use a controlled real PR with a clear engineering defect and slopped prose to verify both skills are applied. Push the fix and verify the same summary comment is updated, corrected findings disappear and new high-conviction findings remain reportable. Verify owner rulings from the thread are respected.",
+        "Check draft and fork event conditions without supplying real secrets to an untrusted fork. Check missing-secret behavior in an isolated no-secret validation. Redact all authentication data from logs and evidence.",
+        "Inspect live required checks and workflow permissions. Confirm advisory review is not required for merge and cannot write repository code. Document any GitHub Actions permission restriction as a concrete setup blocker.",
+        "After integration, record main containing the workflow and the successful run/comment evidence. A1, E1 and I1 must start their PRs from a base that includes this setup."
+      ],
+      "integration": [
+        "Producer: standalone .github/workflows/ai-review.yml plus vendored review skills and Kiero instructions. Consumers: every later implementation PR, beginning with A1, E1 and I1.",
+        "A1 owns .github/workflows/checks.yml and future application dependency setup. Preserve A0 review files and accepted glossary when importing the handoff documents. This separation avoids an A0/A1 dependency cycle.",
+        "The owner supplies ZAI_API_KEY through the repository secret store. Provisioning this secret is separate from OPENROUTER_API_KEY, which remains the application model credential. Verify names and access without reading secret values.",
+        "Reference workflow: [Astroix AI review](https://github.com/wojtekpiskorz/astroix/blob/d4f1bc218261cf6c76984ca2c384df7f7b5bd80e/.github/workflows/ai-review.yml). Reference skills: [thermo-nuclear](https://github.com/wojtekpiskorz/astroix/blob/d4f1bc218261cf6c76984ca2c384df7f7b5bd80e/.agents/skills/thermo-nuclear-code-quality-review/SKILL.md), [unslop](https://github.com/wojtekpiskorz/astroix/blob/d4f1bc218261cf6c76984ca2c384df7f7b5bd80e/.agents/skills/unslop/SKILL.md), and [vendoring provenance](https://github.com/wojtekpiskorz/astroix/blob/d4f1bc218261cf6c76984ca2c384df7f7b5bd80e/.agents/skills/README.md). Local source: /Users/woji/Dev/playground/Astroix. Recheck any later upstream change before adapting it."
+      ],
+      "nonGoals": [
+        "Application implementation, Convex/Cloudflare provisioning, OpenRouter calls, deployment or final UX/UI.",
+        "Adding AI review to branch protection as a required merge gate, automatic fixes or merges, or importing Astroix product-specific tests and CRAP metrics.",
+        "Changing any existing accepted domain decision or editing the Astroix repository."
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/65",
+      "issueNumber": 65
+    },
+    {
+      "key": "A1",
+      "title": "[A1] Bootstrap the pinned core workspace and test commands",
+      "blockedBy": [
+        "A0"
+      ],
+      "ownedPaths": [
+        "package.json",
+        "package-lock.json",
+        "tsconfig*.json",
+        ".github/workflows/checks.yml",
+        ".gitignore",
+        ".env.example",
+        "apps/*/package.json",
+        "apps/*/tsconfig.json",
+        "packages/*/package.json",
+        "packages/*/tsconfig.json",
+        "apps/web/vite.config.ts",
+        "apps/web/src/bootstrap-placeholder.ts",
+        "apps/web/index.html",
+        "docs/handoffs/README.md",
+        "docs/handoffs/ux-ui/README.md",
+        "docs/handoffs/ux-ui/agent-start-prompt.md",
+        "docs/handoffs/ux-ui/feature-and-flow-inventory.md",
+        "docs/handoffs/ux-ui/product-brief.md",
+        "docs/handoffs/ux-ui/story-and-design-workflow.md",
+        "docs/implementation/README.md",
+        "docs/implementation/coordinator-start-prompt.md",
+        "docs/implementation/dependency-graph.md",
+        "docs/implementation/execution-charter.md",
+        "docs/implementation/issues.json",
+        "docs/implementation/proof-ownership.md",
+        "docs/implementation/ux-coverage.md",
+        "docs/mvp/ai-evaluation-plan.md",
+        "docs/mvp/alpha-readiness.md",
+        "docs/mvp/architecture-design.md",
+        "docs/mvp/architecture-proof-matrix.md",
+        "docs/mvp/decisions.md",
+        "docs/research/ai-training-consent-facts.md",
+        "docs/research/alpha-audio-cost-facts.md",
+        "docs/research/alpha-operations-facts.md",
+        "docs/research/alpha-services-runtime-facts.md",
+        "docs/research/architecture-backend-facts.md",
+        "docs/research/architecture-evidence-index.md",
+        "docs/research/architecture-typed-foundations.md",
+        "docs/research/auth-identity-facts.md",
+        "docs/research/backup-recovery-facts.md",
+        "docs/research/cloudflare-postgres-execution-facts.md",
+        "docs/research/convex-auth-integration-facts.md",
+        "docs/research/convex-cloudflare-fit.md",
+        "docs/research/effect-workflow-facts.md",
+        "docs/research/google-calendar-event-mapping-facts.md",
+        "docs/research/google-calendar-integration-facts.md",
+        "docs/research/google-calendar-reconnect-facts.md",
+        "docs/research/media-delivery-recovery-facts.md",
+        "docs/research/media-normalization-facts.md",
+        "docs/research/openrouter-integration-facts.md",
+        "docs/research/openrouter-model-routing-facts.md",
+        "docs/research/stt-embedding-release-facts.md"
+      ],
+      "proofs": [
+        "P01"
+      ],
+      "sources": [
+        "architecture"
+      ],
+      "problem": "The main branch has no production application or pinned toolchain. Parallel agents need one reproducible workspace and checks before they can safely implement modules.",
+      "solution": "Preserve the A0 review setup and glossary while importing the published handoff contracts into the application mainline without importing the throwaway UI implementation. Bootstrap npm workspaces for the declared deployment/module layout, strict TypeScript, React/Vite, Convex, Effect 4 RC and the selected TanStack packages. Pin published compatible packages and establish focused test/build commands.",
+      "acceptance": [
+        "Inspect the real checkout and package/runtime documentation; preserve unrelated untracked docs and local secrets. Record the selected versions and rationale. Effect 4 RC remains the selected major; a failed compatibility probe cannot silently substitute Effect 3.",
+        "Create the app, gateway, executor and package skeletons named by the charter with stable exports. Provide workspace scripts for typecheck, focused tests and build, and environment-example names with no values.",
+        "Prove clean install from the lockfile, strict compile and an executable empty app. CI uses the same pinned dependency graph. Server-only environment access cannot enter the client build.",
+        "Bootstrap is responsible for root dependencies and reusable fixture/test helpers. Later features own their declared paths. Ignore local env files and generated/deployment artifacts intentionally.",
+        "Start from integrated A0 so this issue PR receives the configured thermo-nuclear and unslop review. Preserve its workflow, vendored skills and accepted repository instructions.",
+        "Import only the named published contract files listed in ownedPaths, preserving accepted contents and provenance. Reconcile any newer accepted amendments and preserve unrelated local edits. This is bootstrap publication ownership, not authority to rewrite product decisions; docs/evidence, the A0 glossary/instructions, worker outputs and future domain-contract directories remain with their existing owners."
+      ],
+      "tests": [
+        "Fresh temporary checkout: npm ci, typecheck, initial test/build commands.",
+        "Compile a small Effect Schema value and Convex/React import against the actual pinned versions; distinguish this smoke from the deeper A3 proof.",
+        "Inspect built client assets and tracked files for accidental environment-value embedding using redacted checks."
+      ],
+      "nonGoals": [
+        "No business modules, provider calls, final UI design or migration of prototype heuristics."
+      ],
+      "integration": [
+        "A2 consumes the workspace exports and owns the schema/command baseline. A4 consumes the app host. After A0, I1 and E1 can run independently because they own environment evidence and static corpus assets."
+      ],
+      "declaredPrerequisites": [
+        "A0"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/16",
+      "issueNumber": 16
+    },
+    {
+      "key": "A2",
+      "title": "[A2] Define candidate typed contracts and modular schema ownership",
+      "blockedBy": [
+        "A1"
+      ],
+      "ownedPaths": [
+        "packages/contracts/**",
+        "convex/schema.ts",
+        "convex/schema/shared.ts",
+        "docs/implementation/contracts/**",
+        "convex/access/identity/schema.ts",
+        "convex/access/membership/schema.ts",
+        "convex/access/gm/schema.ts",
+        "convex/projects/schema.ts",
+        "convex/memory/findings/schema.ts",
+        "convex/memory/extensions/schema.ts",
+        "convex/work/schema.ts",
+        "convex/sources/accept/schema.ts",
+        "convex/sources/uploads/schema.ts",
+        "convex/platform/schema.ts",
+        "convex/search/schema.ts",
+        "convex/attention/read-state/schema.ts",
+        "convex/attention/preferences/schema.ts",
+        "convex/attention/delivery/schema.ts",
+        "convex/calendar/connection/schema.ts",
+        "convex/calendar/projection/schema.ts",
+        "convex/operations/exports/schema.ts",
+        "convex/operations/deletion/schema.ts",
+        "convex/operations/backups/schema.ts",
+        "convex/operations/telemetry/schema.ts"
+      ],
+      "proofs": [
+        "P01",
+        "P06"
+      ],
+      "sources": [
+        "architecture",
+        "memory",
+        "lifecycle"
+      ],
+      "problem": "Parallel domain and integration lanes cannot invent incompatible source, finding, access, event and job representations.",
+      "solution": "Define candidate shared command/result and event interfaces covering the accepted modules. Compose modular Convex table validators from checked shared definitions where supported, with one explicitly proved conversion path and generated IDs. Establish semantic values and stable feature/executor registration entries before consumers begin.",
+      "acceptance": [
+        "Represent companies, people/memberships/sessions, contacts/projects/aliases, sources/attachments/anchors, findings/revisions/provenance, extension definitions, tasks/checklists/events, clarifications/read states, notifications/Calendar, exports/deletion/backup manifests and durable jobs from the accepted architecture. Record exact table ownership and indexes in domain-specific schema fragments.",
+        "Separate missing/unknown/conflicted knowledge from business progress and extraction confidence. Dates preserve original sentAt/timezone, precision/ranges and proposed/internal/agreed/actual meaning. Money supports exact values and unspecified tax basis without VAT inference.",
+        "Define authenticated actor context, expected revisions, idempotency keys, staged media/publication states, event/outbox envelopes and sanitized closed errors. Table and operation names are English; no any/cast bypass at external boundaries.",
+        "Initialize schema composition, feature entry signatures and executor/event registration contracts. Name each producer and consumer, including access-revocation cleanup, reanalysis, deletion and Calendar outcomes. Shared manifests have an owner; unsupported entries fail honestly until implemented.",
+        "Document checked domain operations usable by both agent and UI. A schema entry is not business implementation or proof of access safety.",
+        "Place table/index fragments under each owning domain path, with only shared value definitions in convex/schema/shared.ts and imports in convex/schema.ts. Publish an exact ownership manifest for those initial fragments; later domain lanes edit their own fragment, not a shared mega-schema.",
+        "These are candidate interfaces until A3 proves the actual validation/runtime conversion. A3 owns the sequential post-proof freeze; production consumers start only behind that gate."
+      ],
+      "tests": [
+        "Valid/invalid semantic values, date-only versus timed data, exact money with unknown tax basis, extension definition versions, immutable source correction, independent parent/checklist.",
+        "Round-trip schema conversion through the actual pinned validators with unknown/malformed input rejection.",
+        "Compile each placeholder consumer against the interface without unchecked type assertions."
+      ],
+      "nonGoals": [
+        "No domain mutations, speculative framework layer or user-editable model selector."
+      ],
+      "integration": [
+        "A3 proves these interfaces on the real runtime. Each later module fills its owned schema/function/feature fragment; joins wire the declared consumers. Missing shared signatures become explicit prerequisite changes."
+      ],
+      "declaredPrerequisites": [
+        "A1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/17",
+      "issueNumber": 17
+    },
+    {
+      "key": "A3",
+      "title": "[A3] Prove Convex, Effect and durable executor composition",
+      "blockedBy": [
+        "A2",
+        "I1"
+      ],
+      "ownedPaths": [
+        "convex/platform/**",
+        "apps/gateway/src/platform/**",
+        "packages/runtime/**",
+        "packages/contracts/**",
+        "convex/schema.ts",
+        "convex/schema/shared.ts",
+        "package.json",
+        "package-lock.json",
+        "apps/gateway/src/index.ts",
+        "apps/gateway/src/composition/registry.ts",
+        "convex/access/identity/schema.ts",
+        "convex/access/membership/schema.ts",
+        "convex/access/gm/schema.ts",
+        "convex/projects/schema.ts",
+        "convex/memory/findings/schema.ts",
+        "convex/memory/extensions/schema.ts",
+        "convex/work/schema.ts",
+        "convex/sources/accept/schema.ts",
+        "convex/sources/uploads/schema.ts",
+        "convex/platform/schema.ts",
+        "convex/search/schema.ts",
+        "convex/attention/read-state/schema.ts",
+        "convex/attention/preferences/schema.ts",
+        "convex/attention/delivery/schema.ts",
+        "convex/calendar/connection/schema.ts",
+        "convex/calendar/projection/schema.ts",
+        "convex/operations/exports/schema.ts",
+        "convex/operations/deletion/schema.ts",
+        "convex/operations/backups/schema.ts",
+        "convex/operations/telemetry/schema.ts"
+      ],
+      "proofs": [
+        "P01",
+        "P03",
+        "P06"
+      ],
+      "sources": [
+        "architecture"
+      ],
+      "problem": "Naming Convex, Effect and TanStack does not prove that validated operations, subscriptions and durable processing compose or survive interruption.",
+      "solution": "Implement and prove the platform interfaces on the isolated development resources: checked Convex functions/subscriptions, Effect execution, the selected tool/schema adapter, Worker-to-Convex calls and durable stage registration. Supply a common idempotent job/outbox execution mechanism with explicit registration and retries.",
+      "acceptance": [
+        "Exercise actual Effect Schema to Convex/TanStack validators and codegen with the pinned package set. Invalid input reaches no domain effect; errors are sanitized and subscriptions use the chosen Convex Query integration.",
+        "A transaction can publish a canonical record and register its durable work without an accepted orphan. Separate external calls from committed domain changes, record uncertain outcomes and replay stages without duplicate effects.",
+        "Provide checked actor/session/tenant request context and an authorization hook consumed by B1/B3; no development-auth shortcut can claim the later identity proof.",
+        "Worker calls propagate verified identity to the canonical access check. Durable executors and scheduler consumers register through the A2 interface and expose health/version information to later diagnostics.",
+        "Record a real failure/restart proof and package lock evidence under P01/P03/P06 before closing.",
+        "Certify and freeze the A2 interface/schema baseline after the real proof. Own any necessary sequential contract/package/lock correction before dependent consumers start; record the exact certified revision.",
+        "Establish the proved Convex generated-file policy: never hand-edit convex/_generated. Regenerate against the integrated schema during merge/CI, with one coordinated writer if outputs are committed. Initialize gateway routes/executor entry imports so parallel providers register under owned files."
+      ],
+      "tests": [
+        "Real Convex deployment: valid and malformed calls/subscriptions, actual schema/tool adapter forwarding.",
+        "Kill/fail before and after transaction/job registration and external completion; replay same logical operation.",
+        "Worker bridge forwarding, unavailable backend, sanitized error and denied unsupported operation."
+      ],
+      "nonGoals": [
+        "No complete source pipeline, auth product or business-memory heuristics."
+      ],
+      "integration": [
+        "B1/B3 supply authoritative access rules; D1 supplies durable source publication; E2 supplies providers. A3 owns the common runtime and fixed composition entries, not their domain implementations."
+      ],
+      "declaredPrerequisites": [
+        "A2",
+        "I1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/18",
+      "issueNumber": 18
+    },
+    {
+      "key": "A4",
+      "title": "[A4] Build the unstyled application host and feature registration",
+      "blockedBy": [
+        "A3"
+      ],
+      "ownedPaths": [
+        "apps/web/src/app/**",
+        "apps/web/src/main.tsx",
+        "apps/web/index.html"
+      ],
+      "proofs": [
+        "P01"
+      ],
+      "sources": [
+        "capture",
+        "prototype",
+        "architecture"
+      ],
+      "problem": "Core behavior needs an immediately usable host without coupling the domain to the later full UI design.",
+      "solution": "Build the React/Vite PWA host with TanStack Router/Query and fixed feature registration interfaces. Provide a plain Polish application shell, protected-route hooks, current-state/error handling and a default company conversation entry.",
+      "acceptance": [
+        "Use semantic, keyboard-operable controls and responsive layout sufficient for phone capture. Final styling/design-system work is excluded.",
+        "Feature slots and module entry files are established up front so independent lanes do not all rewrite one App/router file. UI features consume A2 commands/read models instead of private database shapes.",
+        "Treat authentication, permission loss, loading, empty, unavailable-feature and error states explicitly. Pending modules are visibly unavailable, never fake successes.",
+        "Prepare manifest/service-worker entry composition with separate owned push and update modules for F3/I7. Service workers cannot cache protected data in a way that bypasses access checks.",
+        "Current company conversation is the authenticated default. Project context and Co teraz are reachable through module entries, without making a dashboard mandatory before capture."
+      ],
+      "tests": [
+        "Browser smoke on desktop and narrow viewport: default route, keyboard navigation, missing-feature and error states.",
+        "Typecheck a feature registration and query adapter using the fixed contract.",
+        "Build inspection confirms no provider credentials or backend-only modules in the client."
+      ],
+      "nonGoals": [
+        "No final branding, UX redesign, fake backend, real auth implementation or provider requests."
+      ],
+      "integration": [
+        "Feature lanes B/D/F/G/H fill their own registered entries. J1 owns text composition; J2 owns complete composition. I7 owns update behavior; F3 owns push handling."
+      ],
+      "declaredPrerequisites": [
+        "A3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/19",
+      "issueNumber": 19
+    },
+    {
+      "key": "B1",
+      "title": "[B1] Implement Google and email-code sign-in with live sessions",
+      "blockedBy": [
+        "A3"
+      ],
+      "ownedPaths": [
+        "convex/access/identity/**",
+        "apps/web/src/features/sign-in/**",
+        "convex/integrations/email/**"
+      ],
+      "proofs": [
+        "P02"
+      ],
+      "sources": [
+        "access",
+        "architecture"
+      ],
+      "problem": "Kiero needs real Google and email-code sign-in before any protected company data can be exercised. Identity, session and company membership are separate records: a valid provider token identifies a person but must never grant company access by itself.",
+      "solution": "Integrate the pinned Convex Auth candidate with Google and Resend-backed Polish one-time email codes. Persist app-owned live-session metadata, activity and revocation state, enforce the accepted 30-day inactivity rule, and resolve every protected request through current session plus membership checks. Keep the codebase and schemas in English and the barebones sign-in states in Polish. Decode provider callbacks and callable inputs with pinned Effect 4 RC schemas and Convex validators; no unchecked cast or `any` may bridge an external boundary.",
+      "acceptance": [
+        "Google and email-code flows create or resume the correct person identity without creating a company membership.",
+        "The session registry exposes current device sessions, trusted activity time and explicit revocation state for downstream access checks.",
+        "A session expires after 30 days of inactivity and current protected reads reject revoked or expired sessions even when an upstream token remains cryptographically valid.",
+        "Sign-in errors, expired codes and resend states have usable Polish UI copy without visual-system work.",
+        "Pinned package versions and the exact Convex Auth integration route are recorded with repeatable P02 evidence; candidate status is not described as proven before the checks run.",
+        "Own the reusable Resend application-email adapter used by OTP and B3 invitations. Configure real server-side development bindings and prove delivery, expiry, retry identity and safe failure without logging codes or secrets."
+      ],
+      "tests": [
+        "Integration-test both providers against their real adapters, including wrong, reused and expired email codes and Google callback failure.",
+        "Keep an existing valid token, revoke its app session, and prove a fresh protected query and subscription are denied immediately.",
+        "Advance inactivity beyond and just inside 30 days and assert deterministic expiry behavior.",
+        "Send malformed callback and session payloads through Effect Schema and Convex validators and assert typed failures."
+      ],
+      "nonGoals": [
+        "Account-method linking, invitations, company creation, GM access, production visual design and password authentication."
+      ],
+      "integration": [
+        "Produce the identity and live-session resolution operation consumed by B2, B3 and every protected Convex or gateway boundary; register it through A3's typed operation/runtime composition seam rather than exposing auth package tables directly."
+      ],
+      "declaredPrerequisites": [
+        "A3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/20",
+      "issueNumber": 20
+    },
+    {
+      "key": "B2",
+      "title": "[B2] Implement verified account linking and session recovery",
+      "blockedBy": [
+        "B1"
+      ],
+      "ownedPaths": [
+        "convex/access/linking/**",
+        "apps/web/src/features/account/**"
+      ],
+      "proofs": [
+        "P02"
+      ],
+      "sources": [
+        "access"
+      ],
+      "problem": "A boss may sign in through Google or an email code, but matching email text is not proof that two identities belong to one person. Recovery must preserve membership and authorship while preventing a takeover through automatic account merging.",
+      "solution": "Implement an explicit linking ceremony that starts from a live B1 session and proves control of both methods before attaching them to one account. Serialize concurrent attempts, preserve a canonical account identity, and reject link operations that would merge two established accounts without a supported resolution. Add barebones Polish account controls for adding a method, changing email after reauthentication and listing or revoking sessions. Define the checked manual-recovery command here, but leave its invoker unavailable until B4 supplies explicit GM authority. Recovery records the verification basis, invalidates old sessions and requires fresh method setup while keeping historical actor IDs stable.",
+      "acceptance": [
+        "Both Google-to-email and email-to-Google linking require fresh proof from each method and end at one account, membership history and author identity.",
+        "Same-email sign-in without the linking ceremony never merges accounts.",
+        "Email change requires recent authentication plus a code sent to the new address.",
+        "Session controls revoke one device or all other devices through B1's live-session operation.",
+        "Recovery preserves company membership and historic authorship, records the GM actor and verification basis, and revokes every pre-recovery session."
+      ],
+      "tests": [
+        "Race two link attempts in opposite directions and prove one canonical result without duplicate identities or memberships.",
+        "Attempt linking with one stale proof, one mismatched address and two already-established accounts; assert typed rejection and no partial writes.",
+        "Recover an account while an old token and subscription remain open, then prove new protected requests fail.",
+        "Verify a failed new-email confirmation leaves the old method and sessions unchanged."
+      ],
+      "nonGoals": [
+        "Changing company membership, implementing an automated public recovery desk, building the GM recovery UI, passwords or email-address-based implicit merging."
+      ],
+      "integration": [
+        "Consume B1 identity/session operations and register linked-method and recovery commands as A3 typed operations. B4 supplies the only alpha GM invoker for manual recovery; B3 and audit consumers continue to reference the stable account ID rather than provider identities."
+      ],
+      "declaredPrerequisites": [
+        "B1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/21",
+      "issueNumber": 21
+    },
+    {
+      "key": "B3",
+      "title": "[B3] Implement company membership, invitations and administrator transfer",
+      "blockedBy": [
+        "B1"
+      ],
+      "ownedPaths": [
+        "convex/access/membership/**",
+        "apps/web/src/features/membership/**"
+      ],
+      "proofs": [
+        "P02"
+      ],
+      "sources": [
+        "access"
+      ],
+      "problem": "Company access must be invitation-only and tenant-safe. Ordinary v1 users may have one active company, while the data model must permit future multiple memberships and must never leave a company without an administrator.",
+      "solution": "Implement company, membership and targeted invitation operations around B1 identities. An invitation is bound to one email address, expires after seven days, is single-use and revocable, and requires verified control of that address. The first invited owner becomes administrator; later bosses do not. Administrators can invite, revoke access and transfer administration. Leaving company A before joining B preserves A's data and authorship. Membership revocation must fan out through a durable app-owned event/registration seam so sessions, subscriptions, file access, notifications and jobs can recheck current authority rather than trusting cached role data.",
+      "acceptance": [
+        "Every company-owned query and command resolves company scope from current membership; ordinary v1 UI exposes no multi-company switch.",
+        "Invitation acceptance atomically validates target address, expiry, revocation, use count and the one-active-company rule.",
+        "The final administrator cannot leave, revoke self or lose administration until another current boss receives it.",
+        "Removing a boss immediately blocks new company reads and preserves their authored messages and audit history.",
+        "The membership schema supports multiple historical and future memberships without weakening the v1 constraint.",
+        "Own the revocation transaction and durable MembershipRevoked intent: current access ends immediately, while a typed event carries the chosen successor or unassignment policy. Every consumer checks current authorization independently of eventual cleanup completion."
+      ],
+      "tests": [
+        "Try cross-tenant IDs in every public operation and assert no record existence or content leaks.",
+        "Race invitation acceptance with revocation, expiry and a second acceptance; exactly one valid outcome may commit.",
+        "Race two last-admin transfers and prove the company retains at least one administrator.",
+        "Revoke a member while tokens, reactive reads and a media authorization request exist; fresh access checks must deny all of them."
+      ],
+      "nonGoals": [
+        "Granular worker roles, ordinary multi-company switching, public self-service company creation, notification implementation and GM authority."
+      ],
+      "integration": [
+        "Consume B1 current identity/session resolution. Produce the single current-access operation and membership-change registration event consumed by all domain modules, B4, D2/D3 and later notification or external-delivery workers.",
+        "Consume the B1 Resend email adapter for targeted seven-day, single-use, revocable invitations; account creation alone grants no company access."
+      ],
+      "declaredPrerequisites": [
+        "B1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/22",
+      "issueNumber": 22
+    },
+    {
+      "key": "B4",
+      "title": "[B4] Implement explicit audited GM access and operations authority",
+      "blockedBy": [
+        "B3",
+        "B2"
+      ],
+      "ownedPaths": [
+        "convex/access/gm/**",
+        "apps/web/src/features/gm/access/**"
+      ],
+      "proofs": [
+        "P02"
+      ],
+      "sources": [
+        "access",
+        "architecture"
+      ],
+      "problem": "During alpha Wojtek needs global operational access, but a hidden superuser shortcut would corrupt authorship, read metrics and tenant guarantees. GM authority must be explicit, current, auditable and tied to active alpha participation.",
+      "solution": "Add a separate GM grant and explicit enter/exit mode on top of B3 access resolution. Each GM request states the target company and purpose, records the real GM actor, and checks that both the grant and the company's alpha participation remain active. Build a spare Polish GM panel for inspection and allowed domain commands. GM may inspect sources, runs and company UI, retry failed stages or request linked reanalysis under the app-owned model configuration. It cannot impersonate a boss, edit immutable source content, bypass domain validators, select arbitrary models or perform direct database repair.",
+      "acceptance": [
+        "GM access works without adding an ordinary company membership and is visually unmistakable in the barebones UI.",
+        "Every GM read and command produces a protected audit record with GM actor, target company, operation, reason and outcome.",
+        "Opening conversations in GM mode does not change boss read states, unread counts or autonomous alpha-use metrics.",
+        "Ending company alpha participation removes grant-derived access immediately; time elapsed alone does not end it.",
+        "Retries and reanalysis use the same checked domain operations as ordinary processing and preserve the original source plus linked run history.",
+        "Provide explicit GM company activation/first-admin invitation, verified manual account recovery through B2, administrator restoration and ending alpha participation. Preserve membership/history while revoking old recovered sessions. This completes the operator control path rather than depending on direct database edits."
+      ],
+      "tests": [
+        "Attempt GM access without a grant, after grant revocation and after alpha participation ends; assert denial with no target data leak.",
+        "Open and mutate allowed records in GM mode and prove ordinary read and usage counters remain unchanged.",
+        "Submit an arbitrary model ID, immutable-source edit and raw database patch through GM endpoints; all must fail validation.",
+        "Race grant revocation with a command and require current authority at commit."
+      ],
+      "nonGoals": [
+        "A production support-role hierarchy, silent impersonation, unrestricted database consoles or model experimentation."
+      ],
+      "integration": [
+        "Extend B3 current-access resolution with an explicit GM branch. Register audit writes and approved retry/reanalysis commands through A3; E3/E4 and operations consumers resolve GM authority again when work commits."
+      ],
+      "declaredPrerequisites": [
+        "B3",
+        "B2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/23",
+      "issueNumber": 23
+    },
+    {
+      "key": "C1",
+      "title": "[C1] Implement projects, contacts, aliases and project lifecycle",
+      "blockedBy": [
+        "B3"
+      ],
+      "ownedPaths": [
+        "convex/projects/**",
+        "packages/domain/projects/**",
+        "apps/web/src/features/project-catalog/**"
+      ],
+      "proofs": [
+        "P06"
+      ],
+      "sources": [
+        "lifecycle",
+        "memory"
+      ],
+      "problem": "Projects and people need stable identities before sources can be classified or work can be tracked. Display names collide, contacts are not authenticated users, and project closure must not erase history or remaining obligations.",
+      "solution": "Implement firm-scoped contacts, contact roles, projects and project aliases with typed lifecycle transitions. A contact may act as client, supplier or external executor without becoming a membership. Projects hold client, location, scope, stage and optional pause data. Stages are Inquiry, Quote preparation, Awaiting decision, Agreed, In progress, Completed and Cancelled, rendered in Polish. Clear source-backed statements may create or advance a project; silence, elapsed dates and absence of open tasks do not. Similar projects prompt for firm-unique codenames, which stay reserved across rename and closure.",
+      "acceptance": [
+        "Every record is scoped to a B3 company and cross-company contact, project or alias references fail.",
+        "Ordinary names may collide, while an assigned codename is unique across retained company history and cannot be reused.",
+        "Pause state records a reason and optional proposed resume date without changing the project stage or moving deadlines.",
+        "Completed and cancelled projects leave active lists but remain searchable with sources and history intact.",
+        "Reopening requires explicit evidence, preserves old history and does not reopen all prior tasks."
+      ],
+      "tests": [
+        "Race two projects claiming the same codename, including one closed project; only one may succeed.",
+        "Attempt cross-tenant role links and project reads with valid membership in another company; assert typed denial.",
+        "Feed silence, an elapsed date and no open tasks into transition commands and prove they cannot close a project.",
+        "Cancel and reopen a project and verify contacts, aliases, source links and history retain stable IDs."
+      ],
+      "nonGoals": [
+        "Project merging, workforce scheduling, profitability ranking, full project dashboard styling or AI classification itself."
+      ],
+      "integration": [
+        "Consume B3 current access. Produce stable project/contact resolution and lifecycle commands for D1 source links, E3 planning, C4 work records and later notification/calendar views; register projections through A3 typed operations."
+      ],
+      "declaredPrerequisites": [
+        "B3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/24",
+      "issueNumber": 24
+    },
+    {
+      "key": "C2",
+      "title": "[C2] Implement atomic findings, revisions, provenance and corrections",
+      "blockedBy": [
+        "B3"
+      ],
+      "ownedPaths": [
+        "convex/memory/findings/**",
+        "packages/domain/findings/**"
+      ],
+      "proofs": [
+        "P06"
+      ],
+      "sources": [
+        "memory",
+        "architecture"
+      ],
+      "problem": "Kiero needs current structured memory without replaying chat, while preserving exactly why each value exists. Concurrent AI runs, later corrections and partial multi-project analysis must not let the last writer erase newer truth.",
+      "solution": "Implement stable findings, immutable revisions, evidence links, acyclic dependencies, supersession and atomic current projections in Convex. Model knowledge as known, unknown with reason, conflicted or not applicable, separate from extraction confidence and business progress. Use typed financial and temporal values: decimal-safe amounts and ranges, currency origin, net and gross coexistence, `not_specified` tax basis, local/zoned/ranged dates, original expression, precision, role and source-timezone anchor. A checked publication command receives expected relevant revisions and writes the current revision, provenance and dependent projection atomically.",
+      "acceptance": [
+        "Current reads require no conversation replay and every value links to immutable source fragments or whole-source evidence.",
+        "Explicit correction supersedes current value with history retained; arrival or completion time alone never decides precedence.",
+        "Independent corroboration differs from derivation, and dependency links cannot form cycles.",
+        "Omitted patch fields mean no change; clear, withdraw and conflict are explicit operations, so model null cannot erase data.",
+        "A publication group either commits revisions, provenance and all authoritative projections together or writes none."
+      ],
+      "tests": [
+        "Pause an old plan, commit a newer correction, then resume the old plan and prove its expected-revision check prevents rollback.",
+        "Publish a money value without net/gross and assert visible `not_specified`; later add basis as a new revision without changing the amount history.",
+        "Resolve `tomorrow` from stored `sentAt` and timezone, retry days later, and prove the concrete date and original precision stay stable.",
+        "Attempt cyclic derivation, cross-tenant evidence and a transaction failure between revision and projection writes."
+      ],
+      "nonGoals": [
+        "Provider prompting, source ingestion, extension definition creation, search ranking or full UX."
+      ],
+      "integration": [
+        "Consume B3 current access and immutable source/fragment IDs from D1. Produce checked prepare/read/publish contracts used by C3-C5 and E3-E6; register Convex mutations through A3 with Effect Schema decoding at untrusted plan boundaries."
+      ],
+      "declaredPrerequisites": [
+        "B3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/25",
+      "issueNumber": 25
+    },
+    {
+      "key": "C3",
+      "title": "[C3] Implement versioned typed extensions and catalog reuse",
+      "blockedBy": [
+        "C2"
+      ],
+      "ownedPaths": [
+        "convex/memory/extensions/**",
+        "packages/domain/extensions/**"
+      ],
+      "proofs": [
+        "P06"
+      ],
+      "sources": [
+        "memory"
+      ],
+      "problem": "Firm-specific facts cannot all fit a fixed core, but a free-form JSON or prose bucket would create duplicate meanings and untraceable schema drift. Historical values must remain interpretable after labels or shapes change.",
+      "solution": "Implement versioned extension definitions as bounded data. Support text, quantity with unit, boolean, enum, financial, temporal, approved entity references, objects and bounded lists. Use stable definition and field IDs, shared product-owned definitions, firm-owned definitions, immutable versions and usage counters derived from persisted values. Before creating a definition, expose catalog search and similarity candidates to the agent, while requiring meaning and type compatibility rather than a name match. Adding an optional firm field creates a new version; incompatible meaning or type requires a new definition or explicit migration.",
+      "acceptance": [
+        "Every extension value validates against the exact stored definition version and keeps C2 revision/provenance history.",
+        "Historic values render under their original version after labels, optional fields or newer versions appear.",
+        "Firm definitions never change another tenant's catalog; only product code can publish shared definitions.",
+        "Usage counts come from committed records and support reuse statistics without model estimates.",
+        "Definition payloads remain non-executable and cannot introduce TypeScript keys, functions, queries or unbounded recursive shapes."
+      ],
+      "tests": [
+        "Create equivalent names with incompatible units or meanings and prove the catalog does not silently reuse them.",
+        "Version millimetres to an incompatible centimetre meaning and require a new definition or explicit migration.",
+        "Submit recursive, oversized, executable-looking and cross-tenant schemas through Effect and Convex validators.",
+        "Race duplicate-definition proposals and verify one reusable result plus correct atomic usage counts."
+      ],
+      "nonGoals": [
+        "Letting AI change the fixed core, executable user schemas, automatic promotion to shared definitions or a rich schema-builder UI."
+      ],
+      "integration": [
+        "Consume C2 finding/revision publication. Produce catalog lookup, validate-value and version-registration operations for E6 tools and GM statistics; register bounded schemas through A3 rather than bypassing validators with dynamic casts."
+      ],
+      "declaredPrerequisites": [
+        "C2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/26",
+      "issueNumber": 26
+    },
+    {
+      "key": "C4",
+      "title": "[C4] Implement tasks, independent checklists and dated events",
+      "blockedBy": [
+        "C1",
+        "C2"
+      ],
+      "ownedPaths": [
+        "convex/work/**",
+        "packages/domain/work/**"
+      ],
+      "proofs": [
+        "P06"
+      ],
+      "sources": [
+        "lifecycle",
+        "memory"
+      ],
+      "problem": "Tasks, checklist steps and events encode different claims. Treating a date as a task, deriving parent completion from checklist ticks or assuming an elapsed event occurred would create false obligations and false history.",
+      "solution": "Implement typed task, one-level checklist and event records tied to C1 projects and C2 findings. Tasks use To do, In progress, Waiting, Done and Cancelled; Waiting requires a concrete reason. Events use Planned, Occurred and Cancelled. Separate external executor contacts from coordinator memberships. A task may share a temporal finding with an event only when evidence explicitly links them. Parent completion is an independent sourced command: 3/3 checklist items cannot complete it, and Done with 2/3 is valid. Project closure preserves open administrative work in the company queue.",
+      "acceptance": [
+        "Task, item and event changes create immutable history with actor, time and evidence basis.",
+        "Checklist items inherit task coordinator and reminders; an item needing its own owner or date converts to a linked task.",
+        "Removing a coordinator membership unassigns open tasks or assigns an explicit successor, while done/cancelled tasks stay closed.",
+        "Elapsed planned events remain planned and overdue until explicit occurrence or cancellation evidence arrives.",
+        "Closing or cancelling a project changes only obligations clearly covered by the source and keeps unresolved work visible."
+      ],
+      "tests": [
+        "Complete every checklist item and assert parent remains open; complete parent with an unchecked item and preserve item state.",
+        "Pass a delivery date without an obligation and prove only an event is created; add an explicit receiver obligation and prove a linked task appears.",
+        "Revoke the coordinator and verify open assignment, history and downstream registration while external executor contact stays unchanged.",
+        "Race a stale AI completion plan with a newer direct correction and require C2 revision checks."
+      ],
+      "nonGoals": [
+        "Nested subtasks, team-capacity scheduling, payroll, automatic completion from time passage or polished work-management UI."
+      ],
+      "integration": [
+        "Consume C1 stable entities and C2 findings/publication groups. Produce typed task/event/checklist commands and durable change registrations for E6, notifications and Calendar; dependent event/task creation commits atomically when they share one agreement.",
+        "Consume MembershipRevoked to move open-task coordination to the explicit successor or unassigned state, preserving completed/cancelled tasks and historic authorship; publish task changes for reminder recalculation."
+      ],
+      "declaredPrerequisites": [
+        "C1",
+        "C2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/27",
+      "issueNumber": 27
+    },
+    {
+      "key": "C5",
+      "title": "[C5] Implement source withdrawal and dependency-aware recomputation",
+      "blockedBy": [
+        "E3"
+      ],
+      "ownedPaths": [
+        "convex/memory/recompute/**",
+        "packages/domain/provenance/**"
+      ],
+      "proofs": [
+        "P06"
+      ],
+      "sources": [
+        "memory",
+        "architecture"
+      ],
+      "problem": "Withdrawing one source must stop it from supporting current memory without deleting history or destroying independent confirmation. Dependent inferences and actions need recomputation, while unrelated facts must remain available.",
+      "solution": "Implement explicit source withdrawal and a dependency traversal over C2 evidence links. Withdrawal records actor, time and reason on the same immutable D1 source, then schedules bounded recomputation groups. Recompute each affected finding against surviving support, independent corroboration, supersession and newer corrections. Mark derived findings as updating before reassessment and block them from authorizing automation. Preserve direct facts that still have valid independent evidence. A correction to one fragment or project assignment narrows the affected graph and does not withdraw a mixed source wholesale.",
+      "acceptance": [
+        "A withdrawn source disappears as active support but remains inspectable with authorship and operation history.",
+        "Dependency traversal is tenant-scoped, cycle-safe and resumable, with durable checkpoints and a visible incomplete state.",
+        "Current findings atomically move to a supported value, conflicted/unknown state or removal according to surviving evidence.",
+        "Later independent confirmation and explicit direct correction keep their authority after an older basis is withdrawn.",
+        "Every recomputation commit rechecks current source lifecycle and relevant revisions, so stale work cannot restore removed support."
+      ],
+      "tests": [
+        "Withdraw one of two independent sources and preserve the current finding; withdraw the last support and assert a typed unknown or cleared result with history.",
+        "Withdraw a basis for a derived reminder while recomputation is paused and prove the stale derived value cannot trigger delivery.",
+        "Correct one project fragment of a mixed source and verify unrelated project findings remain current.",
+        "Retry after crashes at traversal, mark-updating and commit boundaries without duplicate revisions or missed dependents."
+      ],
+      "nonGoals": [
+        "Permanent byte deletion, source text editing, global full-database replay or deciding ambiguous replacement facts without clarification."
+      ],
+      "integration": [
+        "Consume D1 source lifecycle plus C2 evidence/dependency and atomic publication operations. Register recomputation jobs through the A3 workflow seam; notifications, Calendar and E6 consume only revalidated current findings."
+      ],
+      "declaredPrerequisites": [
+        "C2",
+        "D1",
+        "E3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/28",
+      "issueNumber": 28
+    },
+    {
+      "key": "D1",
+      "title": "[D1] Accept durable text sources and publish company/project views",
+      "blockedBy": [
+        "B3"
+      ],
+      "ownedPaths": [
+        "convex/sources/accept/**",
+        "convex/sources/read/**"
+      ],
+      "proofs": [
+        "P03",
+        "P06"
+      ],
+      "sources": [
+        "capture",
+        "memory"
+      ],
+      "problem": "A source must have one canonical identity across company and project conversations. Text needs a real durable acceptance boundary before AI begins, and accepted sources cannot become unprocessed orphans if workflow registration fails.",
+      "solution": "Implement text-source acceptance and reads in Convex. `acceptSource` resolves B3 access, validates immutable author text, `sentAt`, company timezone snapshot, optional reply target and optional project hint, then creates the source and durable processing registration in one atomic mutation. Only that commit returns the saved receipt. Company history is canonical; project conversations are ordered projections through source-project links and never editable copies. Replies are new sources with scoped context. Source content is immutable in v1; users correct it with a new message or a separate audited C2 field correction.",
+      "acceptance": [
+        "Retrying one client-generated logical-source key returns the same source and preserved first send intention without duplicate workflow work.",
+        "A source becomes visible only when immutable source data and durable workflow registration both commit.",
+        "Company and project views resolve the same source ID, author, read identity and reply linkage; a general source may have no project.",
+        "Project hints are context, not authority to force every clause into that project.",
+        "Paginated reads enforce current company membership and expose accepted, processing, partial and failed states honestly."
+      ],
+      "tests": [
+        "Crash or force a mutation error between source write and workflow registration and prove neither becomes accepted.",
+        "Retry concurrently with the same logical key and differing payload; return the original result or a typed idempotency conflict, never two sources.",
+        "Attempt source editing, cross-tenant reply IDs and cross-tenant project links; assert denial.",
+        "Create one source linked to two projects and prove both views lead to the same immutable original."
+      ],
+      "nonGoals": [
+        "Media upload, AI interpretation, project classification, message editing, full-text search, read notifications or final conversation styling."
+      ],
+      "integration": [
+        "Consume A3 workflow registration and B3 current access. Produce canonical source/read contracts for D2-D6, C2/C5 and E3-E6; downstream processors receive source IDs only after the atomic accepted event exists."
+      ],
+      "declaredPrerequisites": [
+        "A3",
+        "B3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/29",
+      "issueNumber": 29
+    },
+    {
+      "key": "D2",
+      "title": "[D2] Implement resumable media uploads and atomic source acceptance",
+      "blockedBy": [
+        "D1"
+      ],
+      "ownedPaths": [
+        "apps/gateway/src/uploads/**",
+        "convex/sources/uploads/**"
+      ],
+      "proofs": [
+        "P03",
+        "P04"
+      ],
+      "sources": [
+        "capture",
+        "architecture"
+      ],
+      "problem": "R2 multipart completion and Convex source acceptance cannot share one transaction. Interrupted uploads can leave orphan objects, and a source must never appear saved while any required attachment is missing or unverified.",
+      "solution": "Implement Worker-mediated resumable uploads with server-owned EU R2 keys and a Convex upload ledger. Authorize create, each part, resume, finalize and acceptance against current B3 session and membership. Stream parts without whole-file buffering, record hashes and manifests, and separate browser chunks, R2 parts and later media segments. After every attachment finalizes durably, call D1 acceptance with verified attachment references; source plus durable workflow registration commit together. Reconciliation may collect expired abandoned objects only after checking delayed retries and accepted references.",
+      "acceptance": [
+        "The client can resume an interrupted multipart upload by stable draft and attachment IDs without duplicating bytes or sources.",
+        "Only server-issued object keys and upload IDs are accepted, scoped to the current company and draft.",
+        "The saved receipt occurs only after all declared attachments are finalized, readable and bound to the atomic D1 acceptance.",
+        "Completed-but-unaccepted objects remain recoverable through the ledger and later become accepted or safely collected.",
+        "Revoked sessions or memberships cannot start, add parts, resume, complete or accept a source."
+      ],
+      "tests": [
+        "Interrupt before and after R2 completion and before/after Convex acceptance; retry and prove one accepted source with all attachments.",
+        "Send missing, duplicate, reordered, mismatched-hash and foreign-company parts and assert typed rejection.",
+        "Race garbage collection with a delayed legitimate retry and prove accepted or active objects survive.",
+        "Upload a large fixture through the actual Worker stream and assert bounded memory rather than `arrayBuffer` buffering."
+      ],
+      "nonGoals": [
+        "Image normalization, transcription, playback, direct reusable client R2 credentials or full offline capture."
+      ],
+      "integration": [
+        "Consume I1 private R2 binding and D1 atomic source acceptance. Produce verified attachment and upload-progress contracts for D4-D6; register final source processing only through D1's accepted-source seam."
+      ],
+      "declaredPrerequisites": [
+        "D1",
+        "I1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/30",
+      "issueNumber": 30
+    },
+    {
+      "key": "D3",
+      "title": "[D3] Implement authorized retained-media streaming and range reads",
+      "blockedBy": [
+        "D2",
+        "B2"
+      ],
+      "ownedPaths": [
+        "apps/gateway/src/media/**",
+        "convex/sources/media-access/**"
+      ],
+      "proofs": [
+        "P02",
+        "P05"
+      ],
+      "sources": [
+        "access",
+        "architecture"
+      ],
+      "problem": "Retained photos and alpha audio must be inspectable without public bucket URLs or bearer links that outlive access. Every new byte-range request must honor current session, membership and source rights.",
+      "solution": "Build authenticated Worker media routes backed by the private EU R2 bucket. For each full or Range request, forward current identity to the B3/D2 authorization operation, resolve the exact retained representation from the source attachment, then stream `R2ObjectBody` without buffering. Support browser audio seeking, image display and download metadata. Disable shared caching that could bypass checks and use representation IDs rather than caller-supplied object keys. Alpha audio stays playable; photo reads target the retained normalized version or the recorded original exception.",
+      "acceptance": [
+        "Full and valid range responses return correct status, content range, length and media type from the authorized representation.",
+        "Every new request rechecks live session, membership, company scope, source lifecycle and attachment relationship.",
+        "Object keys, missing objects and foreign source IDs do not reveal tenant data or storage layout.",
+        "Revocation denies the next range request and any new playback/download request; already delivered bytes are the explicit physical limit.",
+        "Large audio streams stay within measured Worker memory and do not create public or reusable download capabilities."
+      ],
+      "tests": [
+        "Exercise first, middle, suffix, invalid and unsatisfiable byte ranges against a multi-part audio fixture.",
+        "Revoke a session and membership between consecutive range requests and prove immediate denial of the fresh request.",
+        "Attempt cross-company source, attachment and raw object identifiers and compare errors for non-disclosure.",
+        "Inspect response/cache headers and replay through any configured cache to prove authorization cannot be skipped."
+      ],
+      "nonGoals": [
+        "Public sharing, CDN bearer URLs, transcoding, upload, media deletion or production media-player styling."
+      ],
+      "integration": [
+        "Consume D2 attachment/representation resolution, B1/B3 current access and I1 R2 binding. Produce the protected media URL/command contract used by company/project source views, search results and exports."
+      ],
+      "declaredPrerequisites": [
+        "D2",
+        "B2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/31",
+      "issueNumber": 31
+    },
+    {
+      "key": "D4",
+      "title": "[D4] Implement mobile voice, photo and text capture with recoverable drafts",
+      "blockedBy": [
+        "A4",
+        "D2"
+      ],
+      "ownedPaths": [
+        "apps/web/src/features/capture/**",
+        "apps/web/src/storage/drafts/**"
+      ],
+      "proofs": [
+        "P04"
+      ],
+      "sources": [
+        "capture",
+        "alpha"
+      ],
+      "problem": "The mobile PWA must let a boss open Kiero and immediately send text, photos or a WhatsApp-style voice note. Browser interruption, offline periods and updates must expose an honest recoverable draft state instead of claiming unsaved material is on the server.",
+      "solution": "Implement the Polish barebones company composer with Auto or optional project pill, text, multiple photos and tap-to-start/tap-to-stop recording. Keep one stable local draft with incremental recording chunks and D2 upload progress. Explicit Send begins upload; the main company pill resets to Auto after success while a project view retains its project context. After interruption, show the recoverable fragment and allow listen, discard, retry or replace. Preserve the draft before a safe PWA update. Do not impose a product voice-duration limit or promise recovery beyond actual browser storage.",
+      "acceptance": [
+        "A signed-in user reaches the composer directly and starts recording in one tap after browser permission.",
+        "One logical message can combine text, one recording and several photos, with attachments removable before Send.",
+        "The UI distinguishes local draft, uploading, saved/accepted, processing, partial and processing-failed states.",
+        "Manual and automatic retry use stable source/upload IDs and never create duplicate messages.",
+        "Storage eviction, permission loss or unrecoverable chunks produce explicit Polish errors and no false saved state."
+      ],
+      "tests": [
+        "On real iOS and Android browsers/PWA, record, stop, listen, discard and send short and long recordings.",
+        "Interrupt recording, network, tab/process and upload at chunk/part boundaries; reopen and verify the exact recoverable state.",
+        "Exhaust local storage and revoke membership while a draft or upload exists; preserve local honesty and block server continuation.",
+        "Trigger a PWA update during recording and upload and prove no forced reload or lost recoverable draft."
+      ],
+      "nonGoals": [
+        "Live voice conversation, background continuous listening, full offline application, guaranteed recovery after OS eviction or final visual design."
+      ],
+      "integration": [
+        "Consume A4 PWA shell/update hooks and D2 draft/upload/acceptance operations. Produce a stable composer state contract for source views; AI progress begins only after the D1 saved receipt."
+      ],
+      "declaredPrerequisites": [
+        "A4",
+        "D2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/32",
+      "issueNumber": 32
+    },
+    {
+      "key": "D5",
+      "title": "[D5] Normalize photos and preserve readable source representations",
+      "blockedBy": [
+        "D2"
+      ],
+      "ownedPaths": [
+        "apps/gateway/src/images/**",
+        "convex/processing/images/**"
+      ],
+      "proofs": [
+        "P05"
+      ],
+      "sources": [
+        "architecture",
+        "memory"
+      ],
+      "problem": "Phone photos are often large or awkwardly encoded, yet handwritten amounts, measurements and orientation must remain readable evidence. Deleting received bytes before a verified durable replacement would break provenance and exports.",
+      "solution": "Implement post-acceptance normalization through the selected Cloudflare Images binding and private R2. Inputs beyond the binding's proved limit must retain the received original or use the scoped media Container after its exact conversion profile passes P05. Record received, normalized archival and thumbnail representations with hashes, dimensions, transform version and status. WebP is only the first candidate; choose settings from real handwriting and dimension proofs. Verify the normalized object is durable and readable before marking it retained. Remove temporary received bytes only when reference, recovery and quality checks pass. Unsupported input, failed conversion or uncertain quality keeps the received original as the inspectable exception.",
+      "acceptance": [
+        "Normalization never changes the D1 logical source and every vision/evidence reference targets an immutable representation version.",
+        "Rotation, dimensions, amounts and handwriting remain readable in the retained archival output for accepted fixtures.",
+        "The retained original exception is explicit and exported when normalization cannot safely replace it.",
+        "Retries cannot overwrite a representation already referenced by a historical extraction or finding.",
+        "Decoder/encoder memory, disk, duration and provider input limits are measured through P05 rather than assumed."
+      ],
+      "tests": [
+        "Run real received phone formats, EXIF rotation, handwriting, tiny measurements, oversized files and unsupported/corrupt inputs.",
+        "Crash after normalized upload but before verification, and after verification but before received-byte cleanup; reconcile without losing all readable copies.",
+        "Race two transform versions and prove immutable IDs plus deterministic retained selection.",
+        "Force uncertain quality and assert original retention, pending vision status and correct export/media resolution."
+      ],
+      "nonGoals": [
+        "Claiming byte-identical camera retention after successful normalization, visual extraction, public image delivery or permanent source deletion."
+      ],
+      "integration": [
+        "Consume D2 accepted attachment ledger and I1 scoped Images/R2 executors. Produce immutable retained-representation registration for D3, E4 and exports; processing registration remains owned by the canonical Convex workflow."
+      ],
+      "declaredPrerequisites": [
+        "D2",
+        "I1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/33",
+      "issueNumber": 33
+    },
+    {
+      "key": "D6",
+      "title": "[D6] Transcribe long retained audio with resumable segment processing",
+      "blockedBy": [
+        "D2",
+        "E2"
+      ],
+      "ownedPaths": [
+        "apps/media-worker/**",
+        "convex/processing/audio/**"
+      ],
+      "proofs": [
+        "P04",
+        "P07"
+      ],
+      "sources": [
+        "architecture",
+        "alpha"
+      ],
+      "problem": "Kiero has no product voice-duration cap, while transcription providers and decoders have request limits. Long audio must remain one playable source, survive partial failures and keep transcript intervals anchored to original audio time.",
+      "solution": "Implement a resumable Convex-owned transcription workflow with the scoped EU media Container for required conversion and segmentation. Keep recorder chunks, upload parts and decodable STT segments distinct. Store immutable segment manifests, original-time offsets, provider attempts and transcript versions. Route STT through E2 using `microsoft/mai-transcribe-2` first and `openai/whisper-large-v3` backup only after verifying the live OpenRouter transcription routes and parameters. Missing or failed segments leave the transcript incomplete; retained alpha audio remains playable and is never discarded after STT.",
+      "acceptance": [
+        "Arbitrary product-level duration is handled as bounded resumable segments without creating new source messages.",
+        "A complete transcript requires every required segment and maps words or spans back to original audio timing.",
+        "Workflow checkpoints resume after process/container/provider failure without duplicating completed segment results.",
+        "The actual model, route, attempt, schema/pipeline version, latency and cost are recorded for every segment.",
+        "Provider failure preserves playable audio and a visible pending or partial state for E4."
+      ],
+      "tests": [
+        "Transcribe Polish names, dates and amounts across segment boundaries with both candidates and compare against E1 expected text.",
+        "Interrupt conversion, upload, provider response and assembly; retry and prove stable offsets plus one transcript version.",
+        "Remove a middle segment and assert incomplete status rather than a misleading complete transcript.",
+        "Submit malformed provider output and unsupported route parameters through E2 decoding and assert checked failure without publication."
+      ],
+      "nonGoals": [
+        "A numeric voice-note limit, live conversation, deleting alpha audio, choosing a model from catalog claims or publishing memory findings."
+      ],
+      "integration": [
+        "Consume D2 retained audio, E2 typed STT adapter and I1 media executor. Register immutable extraction versions/source fragments for E4; Convex remains the workflow owner and Container receives no backup credentials."
+      ],
+      "declaredPrerequisites": [
+        "D2",
+        "E2",
+        "I1",
+        "E1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/34",
+      "issueNumber": 34
+    },
+    {
+      "key": "E1",
+      "title": "[E1] Build the independent Polish evaluation corpus and expected outcomes",
+      "blockedBy": [
+        "A0"
+      ],
+      "ownedPaths": [
+        "evals/corpus/**",
+        "evals/expected/**",
+        "docs/evidence/corpus/**"
+      ],
+      "proofs": [
+        "P07"
+      ],
+      "sources": [
+        "alpha",
+        "architecture",
+        "memory"
+      ],
+      "problem": "Model quality cannot be judged from demos or answers generated by the model under test. Kiero needs a fixed independent Polish corpus that catches dangerous mistakes in amounts, dates, commitments, project identity and source basis.",
+      "solution": "Create about 50 synthetic or deliberately approved cases with independent answer keys: exactly 14 text, 16 voice, 12 image and 8 mixed follow-up cases. Each fixture records starting company/project state, source assets and anchors, expected facts and changes, required clarifications, prohibited interpretations and any later correction. Cover noise, names, self-corrections, relative dates, date precision and role, unknown net/gross, estimates versus agreements, handwriting, dimensions, similar project names/codenames, mixed projects, in-flight stale plans, withdrawal/deletion and independent corroboration. Keep fixtures isolated and version corpus changes.",
+      "acceptance": [
+        "All 50 cases have human-authored expected outcomes independent of tested model output and explicit provenance/approval for assets.",
+        "Expected results separate STT text, vision extraction, retrieval evidence, durable memory changes, clarifications and prohibited writes.",
+        "A repeatable runner contract resets starting state per case and can report provider/model/prompt/schema versions, latency, attempts and cost.",
+        "Pre-alpha acceptance is at least 48 of 50 correct in each of three complete runs with zero critical wrong amount, date, commitment, project attribution or source basis.",
+        "A correct required clarification counts as success; needless clarification on clear evidence fails that expected outcome.",
+        "Start from integrated A0 so this issue PR receives the configured thermo-nuclear and unslop review. Preserve its workflow, vendored skills and accepted repository instructions."
+      ],
+      "tests": [
+        "Validate modality counts, unique IDs, asset availability, tenant isolation and complete expected/prohibited fields in CI.",
+        "Deliberately feed a known wrong amount, wrong project and guessed tax basis to the scorer and prove each is critical regardless of aggregate score.",
+        "Run the corpus twice with reset state and verify no case can inherit findings, aliases or corrections from another.",
+        "Check that corpus edits require an explicit version and preserve prior result interpretation."
+      ],
+      "nonGoals": [
+        "Calling paid models in this ticket, claiming benchmark results, using real company data without approval or replacing the four-week live alpha."
+      ],
+      "integration": [
+        "Produce versioned fixtures, expected-outcome schemas and scorer inputs consumed by D6 and E2-E6 P07 proofs; keep expected data outside provider implementation paths so tested adapters cannot rewrite the answer key."
+      ],
+      "declaredPrerequisites": [
+        "A0"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/35",
+      "issueNumber": 35
+    },
+    {
+      "key": "E2",
+      "title": "[E2] Implement server-owned OpenRouter routing and typed provider adapters",
+      "blockedBy": [
+        "A3",
+        "E1"
+      ],
+      "ownedPaths": [
+        "packages/providers/**",
+        "convex/integrations/ai/**"
+      ],
+      "proofs": [
+        "P01",
+        "P07"
+      ],
+      "sources": [
+        "architecture"
+      ],
+      "problem": "Kiero's models are application-owned, but candidate names and advertised speed do not prove that OpenRouter routes accept the required tools, schemas, image inputs or transcription parameters. Provider output is untrusted data and cannot become a database command.",
+      "solution": "Implement server-only OpenRouter adapters behind Effect 4 RC services and schemas, using the secret from runtime configuration without exposing it to clients or logs. Chat order is exactly `z-ai/glm-5.3-flash`, `google/gemini-3.8-flash`, `deepseek/deepseek-v4-flash-0731`. Images use GLM then Gemini; DeepSeek receives completed extraction text only. STT uses `microsoft/mai-transcribe-2` then `openai/whisper-large-v3`; embeddings use `qwen/qwen3-embedding-8b` with a versioned 4096-dimension initial candidate. Verify actual current routes during implementation. Record route, model and failure, use bounded deadlines/retries, and expose typed decoded results only.",
+      "acceptance": [
+        "No user or GM model selector exists and all roles follow the fixed application configuration.",
+        "Every provider response and tool argument passes Effect Schema before a checked domain operation can consume it.",
+        "Fallback happens only on classified eligible failure and records the actual route; incompatible output fails closed.",
+        "TanStack AI OpenRouter Chat Completions forwarding is proven on pinned packages for the required schema/tool options.",
+        "Secrets, prompts, source bodies, media, transcripts and tokens stay out of general diagnostics."
+      ],
+      "tests": [
+        "Use controlled real integration probes for every candidate route and record unsupported parameters rather than masking them with mocks.",
+        "Return malformed JSON, tool names, enum values, image claims and vector dimensions and assert typed rejection.",
+        "Stall and fail each route to verify bounded fallback order, no duplicate domain effect and preserved pending state.",
+        "Inspect client bundles and diagnostics for key or payload leakage."
+      ],
+      "nonGoals": [
+        "Running the full 50-case benchmark, choosing routes from speed marketing, arbitrary model overrides, prompt-owned database writes or changing accepted model order."
+      ],
+      "integration": [
+        "Register typed provider services through A3 composition. Produce chat, vision, STT and embedding adapters for D6 and E3-E6; consumers must translate decoded output into their own checked commands before persistence."
+      ],
+      "declaredPrerequisites": [
+        "A3",
+        "E1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/36",
+      "issueNumber": 36
+    },
+    {
+      "key": "E3",
+      "title": "[E3] Process text into checked durable memory change plans",
+      "blockedBy": [
+        "C1",
+        "C2",
+        "D1",
+        "E2"
+      ],
+      "ownedPaths": [
+        "convex/processing/text/**",
+        "packages/agent/planning/**"
+      ],
+      "proofs": [
+        "P06",
+        "P07"
+      ],
+      "sources": [
+        "memory",
+        "architecture"
+      ],
+      "problem": "A model may propose useful memory changes, but its plan is stale and untrusted as soon as newer sources or corrections arrive. Text processing must publish safe current memory without turning model completion order into truth.",
+      "solution": "Build the durable text-analysis workflow from accepted D1 sources. Read C1 project/contact candidates and C2 current findings, ask E2 for bounded structured proposals, then translate every output into typed application commands. Record source fragments, expected relevant revisions, interpretation confidence and logically dependent publication groups. Recheck current actor rights, source lifecycle, project identity and revisions at commit. Clear updates publish autonomously; ambiguous contradictions create a source-backed clarification. Independent project groups may commit separately, while each group's current fields, revisions, provenance and durable downstream intents commit atomically.",
+      "acceptance": [
+        "Every run records workflow, prompt, schema, model/route and input-revision versions with resumable stage status.",
+        "Separate processing outcomes from unresolved business questions: committed, awaiting clarification, pending and failed groups remain explicit against one source. A correctly raised clarification is not a stuck AI job and does not trigger endless analysis retries.",
+        "Explicit later corrections supersede old values and stale plans reconsider current context rather than overwriting them.",
+        "Relative dates use source `sentAt` and timezone; amount basis remains `not_specified` unless stated.",
+        "No provider payload directly invokes Convex writes or bypasses C1/C2 checked commands."
+      ],
+      "tests": [
+        "Pause a Wednesday plan, accept a clear Friday correction, then resume the old plan and prove Friday remains current with history.",
+        "Process a mixed source for two projects plus a firm fact and fail one group; independent groups commit once and failed work stays pending.",
+        "Feed conflicting, malformed and unauthorized proposals and assert clarification or typed denial with no partial group writes.",
+        "Crash after provider response and during publication; retry without duplicate revisions, tasks or intents."
+      ],
+      "nonGoals": [
+        "Media extraction, source acceptance, semantic search, rich chat answers, provider selection UI or direct access-management changes."
+      ],
+      "integration": [
+        "Consume D1 accepted text, C1 entity resolution, C2 checked publication and E2 chat adapter. Register run/group state through A3 workflows; produce plans and clarifications for E4/E6 and downstream intent consumers."
+      ],
+      "declaredPrerequisites": [
+        "C1",
+        "C2",
+        "D1",
+        "E2",
+        "E1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/37",
+      "issueNumber": 37
+    },
+    {
+      "key": "E4",
+      "title": "[E4] Join image and speech extraction into partial-safe analysis",
+      "blockedBy": [
+        "D5",
+        "D6",
+        "E3"
+      ],
+      "ownedPaths": [
+        "convex/processing/multimodal/**",
+        "packages/agent/extraction/**"
+      ],
+      "proofs": [
+        "P05",
+        "P06",
+        "P07"
+      ],
+      "sources": [
+        "architecture",
+        "memory"
+      ],
+      "problem": "A source may combine text, audio and several photos whose extraction stages finish at different times. Kiero must use available independent evidence without claiming it inspected missing segments or failed images.",
+      "solution": "Join immutable D5 vision representations and D6 transcript versions with E3 text planning into source-linked multimodal analysis groups. Resolve text offsets, original-audio intervals, image regions or honest whole-source references. Track each required input as complete, pending, failed or replaced by a newer extraction version. GLM then Gemini may inspect images through E2. DeepSeek may reason only over completed extraction text and must never emit a claim of direct image inspection. Publish independently supported groups while leaving groups that depend on missing media pending.",
+      "acceptance": [
+        "The aggregate status names every required input and never marks the source fully processed while a required segment or image remains unresolved.",
+        "Historical evidence links keep the exact extraction and retained-representation version used at publication.",
+        "Independent text facts may publish during image failure, but image-dependent amounts or dimensions cannot.",
+        "A newer extraction creates linked reanalysis and cannot silently move coordinates beneath historical findings.",
+        "All provider outputs become checked extraction/planning commands before C2 persistence."
+      ],
+      "tests": [
+        "Process text plus two images plus segmented audio with one image and one segment failing; assert only independently supported groups publish.",
+        "Retry failed media with a new extraction version and preserve old evidence coordinates and run history.",
+        "Route DeepSeek after image-provider failure and prove it receives completed text only and cannot mark vision complete.",
+        "Inject invalid regions, offsets, representation IDs and cross-tenant references and assert typed failure."
+      ],
+      "nonGoals": [
+        "Media normalization/transcription implementation, source duplication per project, hiding partial states or accepting AI prose as provenance."
+      ],
+      "integration": [
+        "Consume D5 retained image versions, D6 transcript fragments, E2 capable adapters and E3 publication planning. Register immutable extraction/source-fragment outputs for C2 and E6; current source status comes from all registered groups."
+      ],
+      "declaredPrerequisites": [
+        "D5",
+        "D6",
+        "E3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/38",
+      "issueNumber": 38
+    },
+    {
+      "key": "E5",
+      "title": "[E5] Index searchable evidence with tenant-safe versioned retrieval",
+      "blockedBy": [
+        "C2",
+        "D1",
+        "E2"
+      ],
+      "ownedPaths": [
+        "convex/search/**",
+        "packages/retrieval/**"
+      ],
+      "proofs": [
+        "P06",
+        "P07"
+      ],
+      "sources": [
+        "capture",
+        "memory",
+        "architecture"
+      ],
+      "problem": "Users need history search and agents need evidence discovery, but vector similarity is neither tenant authorization nor proof of a fact. Old embeddings can point at withdrawn, deleted or superseded material.",
+      "solution": "Implement company-filtered text and vector indexes over accepted sources, immutable fragments and selected finding revisions. Version document preparation, query preparation, provider implementation, dimensions and index generation. Use E2's Qwen candidate at the initial 4096 dimensions only after the live route proves it. Search first applies company and lifecycle scope, then hydrates canonical D1/C2 records and rechecks current access, source validity and revisions. During embedding outage or generation cutover, retain typed/current and full-text retrieval and disclose the semantic coverage gap.",
+      "acceptance": [
+        "Barebones Polish search covers message text, transcript and OCR with project, author and date filters and links to the canonical source.",
+        "No vector or text result crosses company scope, including stale derived index rows.",
+        "Results hydrate current canonical records before use; deleted/withdrawn evidence and obsolete revisions cannot authorize an answer.",
+        "Two index generations can coexist for a verified cutover, and incompatible vectors are never mixed.",
+        "Absence of a semantic hit is reported as retrieval coverage, not proof that the fact does not exist."
+      ],
+      "tests": [
+        "Seed identical text in two tenants and prove all query paths, pagination and filters return only the caller's company.",
+        "Withdraw, revise and delete indexed evidence, then query stale rows and prove hydration filters or refreshes them.",
+        "Return wrong-dimension or malformed embeddings through E2 and fail the index write.",
+        "Interrupt generation cutover and embedding service, proving full-text/current structured reads remain available without silent semantic claims."
+      ],
+      "nonGoals": [
+        "Treating similarity as truth, making the vector store authoritative, implementing final search design or answering user questions."
+      ],
+      "integration": [
+        "Consume B3 access, D1 sources/fragments, C2 current revisions and E2 embedding adapter. Produce tenant-safe discovery plus hydrated evidence contracts for E6; register derived index jobs through A3 and keep them rebuildable."
+      ],
+      "declaredPrerequisites": [
+        "C2",
+        "D1",
+        "E2",
+        "E1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/39",
+      "issueNumber": 39
+    },
+    {
+      "key": "E6",
+      "title": "[E6] Implement source-backed answers, clarification and domain tools",
+      "blockedBy": [
+        "C3",
+        "C4",
+        "C5"
+      ],
+      "ownedPaths": [
+        "convex/agent/**",
+        "packages/agent/tools/**"
+      ],
+      "proofs": [
+        "P06",
+        "P07"
+      ],
+      "sources": [
+        "memory",
+        "lifecycle",
+        "architecture"
+      ],
+      "problem": "The agent must answer from current evidence and update the domain through the same rules as the UI. A conversational model with arbitrary tools could invent facts, bypass permissions or act on stale memory.",
+      "solution": "Implement a small typed tool set over C1-C4 and E3 contracts: read current project/company state, retrieve exact evidence, prepare a domain change, answer, create a clarification and resolve one with a new source-backed response. Tools accept bounded Effect schemas and call checked Convex operations with actor, company and expected revisions. Normal clear updates yield a short expandable Polish change summary. Questions receive a source-backed answer; a human-directed question remains for that person. Ambiguous conflicts cite concrete sources and ask which value applies. Relevant newer sources still processing are disclosed, while independently confirmed facts may be returned.",
+      "acceptance": [
+        "Every factual answer links to current inspectable source evidence and distinguishes direct support, corroboration and AI inference.",
+        "All state changes use registered domain commands; the model cannot call raw database, access-management or arbitrary provider tools.",
+        "A stale in-flight answer or change rechecks current revisions and either refreshes, narrows the answer or asks a clarification.",
+        "Financial, temporal, project and task semantics preserve C2/C4 unknown and independent-state rules.",
+        "Model routes remain E2 application-owned with no user or GM selector."
+      ],
+      "tests": [
+        "Ask for an amount with unknown tax basis and require the exact amount, visible `not_specified` basis and source link rather than guessed VAT.",
+        "Start an answer, accept a newer correction and complete the old run; prove the response refreshes or reports changed context.",
+        "Request a raw write, cross-tenant source, access grant and unsupported tool argument; assert checked denial.",
+        "Run focused source-backed fixtures for stale correction, required clarification, independent confirmation and malformed tool output; leave the three complete 50-case qualification runs to J3."
+      ],
+      "nonGoals": [
+        "A general autonomous assistant, arbitrary web tools, access administration, full final chat UX or claiming the evaluation has passed before real runs."
+      ],
+      "integration": [
+        "Consume C1-C4 domain operations, E3 checked plans/clarifications and later E5 hydrated retrieval without making E5 a hard blocker for structured answers. Register answers and tool attempts as source/run-linked records for company conversation views and P07 evidence.",
+        "Before E5 is joined, production evidence lookup uses real checked structured-source queries. In-memory adapters are test fixtures only; J2 supplies the actual semantic retrieval adapter and qualifies both paths."
+      ],
+      "declaredPrerequisites": [
+        "C3",
+        "C4",
+        "E3",
+        "C5"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/40",
+      "issueNumber": 40
+    },
+    {
+      "key": "F1",
+      "title": "[F1] Implement per-person source read state and notification preferences",
+      "blockedBy": [
+        "D1"
+      ],
+      "ownedPaths": [
+        "convex/attention/read-state/**",
+        "convex/attention/preferences/**"
+      ],
+      "proofs": [
+        "P08"
+      ],
+      "sources": [
+        "notifications"
+      ],
+      "problem": "A logical source can appear in the company conversation and several project views, but read state belongs to that one source and one person. Treating projections as copies would create inconsistent unread counts, duplicate notification eligibility, and false alpha usage when GM inspects a company. Conversation mute, task-reminder mute, and snooze are separate controls and need separate durable representations.",
+      "solution": "Implement company-scoped read-state and personal notification-preference operations behind typed A2 contracts. Store one read record per user and logical source, updated only when the user actually sees the source in Kiero or explicitly marks it read. Delivery, dismissal, or notification clicks do not mark it read. Store project conversation mute, company-entry mute, task-reminder mute, preview-content preference, and company-timezone quiet hours as distinct fields. GM reads use the GM actor context but never write boss read state or alpha activity. Provide query functions for unread projections and delivery eligibility; leave rendering to later tickets.",
+      "acceptance": [
+        "Seeing one mixed-project source marks that source read for the boss in every company/project projection and on every device, without affecting another boss.",
+        "GM inspection leaves boss read state and ordinary activity counters unchanged.",
+        "Conversation mute, company-entry mute, task-reminder mute, snooze, and quiet hours can be changed independently.",
+        "Every mutation resolves current company membership server-side and rejects cross-company identifiers."
+      ],
+      "tests": [
+        "Integration test two bosses, two projects, one shared source, multiple subscriptions, and GM reads against real Convex mutations/subscriptions.",
+        "Failure tests cover revoked membership, forged source/company IDs, concurrent mark-read calls, and a projection that disappears while being viewed.",
+        "Contract tests prove notification eligibility consumes the same source/user identity returned by D1."
+      ],
+      "nonGoals": [
+        "Web Push delivery, batching, reminder scheduling, final unread UX, and visual styling.",
+        "Inferring read state from operating-system notification events."
+      ],
+      "integration": [
+        "Consume B3 actor/membership checks and D1 logical source IDs; export typed read/preference queries for F2, F4, H1, H2, I3, and J integration tickets.",
+        "Own only convex/attention/read-state/** and convex/attention/preferences/**. Register exported modules through A4/A2 seams in a small integration change; leave shared full composition to J1/J2/J5."
+      ],
+      "declaredPrerequisites": [
+        "B3",
+        "D1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/41",
+      "issueNumber": 41
+    },
+    {
+      "key": "F2",
+      "title": "[F2] Implement durable notification intents, batching and quiet hours",
+      "blockedBy": [
+        "F1",
+        "E3"
+      ],
+      "ownedPaths": [
+        "convex/attention/delivery/**"
+      ],
+      "proofs": [
+        "P08"
+      ],
+      "sources": [
+        "notifications",
+        "architecture"
+      ],
+      "problem": "Source acceptance and agent questions need reliable notification decisions after the database transaction, while analysis may finish later and recipients may change. A 60-second grouping window, quiet hours, project mutes, read state, access revocation, and semantic duplicate suppression cannot be implemented safely as direct best-effort sends from feature mutations.",
+      "solution": "Create durable notification intents and an idempotent evaluator in Convex. The source intent starts at durable all-attachment acceptance and keeps that first timestamp while waiting for E3 assignment. Batch once per recipient and project (or company entries) for 60 seconds from acceptance; a mixed-project source remains one notification per person. While assignment is still pending, wait even after the original 60 seconds. Apply company-entry rules only after terminal unassigned classification or terminal analysis failure; later assignment does not send a second source notification. Represent agent clarification and answer intents separately from ordinary source updates so the author may receive a question about their own source. At due time re-read F1 read/preferences, current B3 rights, source validity, recipient rules, and quiet hours. Deferred quiet-hour work collapses into one current summary instead of replaying stale items. Record semantic identity, attempt state, and known/unknown outcomes for F3.",
+      "acceptance": [
+        "Multiple qualifying sources batch deterministically without duplicating one mixed-project source, and read sources are removed before delivery.",
+        "The author is excluded from their ordinary source notification but may receive an addressed agent clarification.",
+        "Quiet hours default to 20:00-06:00 in the company timezone and emit one current post-quiet summary.",
+        "Rights, mute state, read state, and business validity are rechecked immediately before handing an intent to a delivery adapter.",
+        "Consume the generic assignment/agent-message state contract, independent of media implementation. E4 later emits the same terminal states; pending analysis is never treated as an unassigned company source to bypass a project mute."
+      ],
+      "tests": [
+        "Use real scheduled functions/fake clock boundaries for 60 seconds, Europe/Warsaw DST, overnight quiet hours, delayed analysis, and source read just before due time.",
+        "Inject worker retries, duplicate scheduling, revoked membership, failed assignment, and unknown downstream result; prove one semantic intent and no stale replay.",
+        "Verify ordinary agent confirmations produce no push intent."
+      ],
+      "nonGoals": [
+        "Browser subscription registration or provider delivery.",
+        "Task reminder cadence, which belongs to F4."
+      ],
+      "integration": [
+        "Consume F1 eligibility and E3 source assignment/agent-message events; export due delivery intents for F3 and diagnostic status for H4/I2.",
+        "Own convex/attention/delivery/**; use A2 event contracts and A3 durable executor APIs without editing feature producers or shared composition."
+      ],
+      "declaredPrerequisites": [
+        "F1",
+        "E3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/42",
+      "issueNumber": 42
+    },
+    {
+      "key": "F3",
+      "title": "[F3] Deliver web push with device registration and access checks",
+      "blockedBy": [
+        "F2",
+        "A4",
+        "B2"
+      ],
+      "ownedPaths": [
+        "convex/attention/push/**",
+        "apps/web/src/features/notifications/**",
+        "apps/web/src/pwa/push.ts"
+      ],
+      "proofs": [
+        "P08"
+      ],
+      "sources": [
+        "notifications",
+        "access"
+      ],
+      "problem": "A durable notification intent is not a delivered Web Push message. Each boss may enable several devices, browser permission can be denied or revoked, subscriptions expire, and old notification links must never bypass current authentication or company access. Provider timeout also makes delivery outcome uncertain.",
+      "solution": "Implement subscription registration in the PWA and an authenticated server delivery adapter. Bind each push subscription to the current user, device/session, and company context; never accept a user ID supplied by the client as authority. The Polish barebones settings screen shows permission/subscription state, allows enabling or removing this device, and explains recovery without blocking normal use. Deliver every eligible F2 intent to active subscriptions, using semantic intent plus subscription as the idempotency key. Preview contains project or Firma, author, and a short fragment, or Głosówka/photo count before processing; honor hide-preview. Notification clicks open the current source/task route through normal login and access checks and do not mark it read. Disable subscriptions on terminal provider responses, session revocation, or membership loss.",
+      "acceptance": [
+        "A boss can enable push independently on supported devices and continue using Kiero after denial or revocation.",
+        "One eligible intent reaches all active subscriptions once per device while inactive/revoked subscriptions receive nothing.",
+        "Opening a stale notification resolves current data and denies lost access; it never restores an old assignee, due date, or membership.",
+        "All visible UI strings are Polish and usable without final visual styling."
+      ],
+      "tests": [
+        "Real-device smoke tests cover installed PWA and browser behavior on target iPhone/Android plus denial, re-enable, click-through, and multiple devices.",
+        "Integration tests inject provider timeout-after-acceptance, expired subscription, concurrent retry, session revocation, and membership revocation.",
+        "Verify payloads omit hidden content and all links require live authentication."
+      ],
+      "nonGoals": [
+        "Guaranteed operating-system delivery time, native apps, or final notification settings design.",
+        "Creating notification intent business rules already owned by F2/F4."
+      ],
+      "integration": [
+        "Consume F2 due intents, B3/B2 live access/session checks, and A4 route registration; export delivery outcomes to F2 and redacted events to I2.",
+        "Own listed push and notification feature paths. Add only a narrow A4 feature registration; defer the complete app composition to J1/J2/J5.",
+        "Consume revocation for subscription cleanup and always deny delivery for current revoked session/membership, even before cleanup finishes."
+      ],
+      "declaredPrerequisites": [
+        "F2",
+        "A4",
+        "I1",
+        "B2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/43",
+      "issueNumber": 43
+    },
+    {
+      "key": "F4",
+      "title": "[F4] Implement task reminder scheduling and personal snooze",
+      "blockedBy": [
+        "C4",
+        "F2"
+      ],
+      "ownedPaths": [
+        "convex/attention/reminders/**"
+      ],
+      "proofs": [
+        "P08"
+      ],
+      "sources": [
+        "notifications",
+        "lifecycle"
+      ],
+      "problem": "Task reminders have different meaning from conversation notifications. Reading a source does not complete a task; project conversation mute does not mute reminders; and a personal snooze must not change the shared due date or another boss's reminders. Assignment and due-date changes can invalidate already scheduled work.",
+      "solution": "Implement durable reminder evaluation from C4 task state and F1 personal preferences. For a dated time schedule one hour before; for a date-only task schedule 07:00 in the company timezone; for overdue work send one current daily summary at 07:00; undated tasks remain only in Co teraz. The coordinator receives the reminder, while unassigned tasks target all bosses. A newly created or assigned task whose reminder time passed gets one prompt as soon as quiet hours permit, without replaying every missed alert. Store snooze per user/task until a chosen instant. Due-date or coordinator changes clear prior snoozes and recompute semantic intents; completion or cancellation removes future reminders. Keep date-only 07:00 as delivery metadata, never as an invented task time.",
+      "acceptance": [
+        "Reminder, conversation mute, quiet hours, and per-task snooze remain independent personal controls.",
+        "Changing date or coordinator invalidates obsolete intents and snoozes; the former coordinator receives no later reminder.",
+        "Completed/cancelled tasks produce no future reminder, while reading their source alone changes nothing.",
+        "Date-only overdue status begins after that company-local day and first daily overdue summary is next day at 07:00."
+      ],
+      "tests": [
+        "Deterministic clock tests cover timed/date-only/undated/overdue work, DST, create-after-07:00, reassignment, unassignment, snooze expiry, quiet hours, completion, and cancellation.",
+        "Race tests change assignee or state while a reminder is due and prove the final recipient/state is rechecked before F2 delivery.",
+        "Integration test boss-created own task still creates a reminder."
+      ],
+      "nonGoals": [
+        "Editing shared task due dates from snooze, checklist-item reminders, or final Co teraz design.",
+        "Web Push transport, owned by F3."
+      ],
+      "integration": [
+        "Consume C4 current task/event contracts and F1 preferences; emit typed reminder intents through F2 and task/reminder projections for H2.",
+        "Own convex/attention/reminders/** only; cross-feature composition remains a later J ticket."
+      ],
+      "declaredPrerequisites": [
+        "F1",
+        "C4",
+        "F2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/44",
+      "issueNumber": 44
+    },
+    {
+      "key": "G1",
+      "title": "[G1] Implement optional Calendar authorization and connection lifecycle",
+      "blockedBy": [
+        "B3"
+      ],
+      "ownedPaths": [
+        "convex/calendar/connection/**",
+        "apps/gateway/src/calendar-oauth/**"
+      ],
+      "proofs": [
+        "P02",
+        "P08"
+      ],
+      "sources": [
+        "calendar",
+        "access"
+      ],
+      "problem": "Google Calendar is an optional personal integration, independent from Kiero sign-in. A boss logging in by email code may connect a different Google address, and disconnecting Calendar must never alter identity or membership. OAuth state, tokens, account switches, revoked grants, and deleted dedicated calendars need an explicit lifecycle before projection logic can be safe.",
+      "solution": "Implement one Google Calendar connection per user/company with server-owned OAuth state, least required scopes, encrypted credentials, and checked callback correlation. Keep Google identity distinct from B1/B2 login methods. On first confirmed connection create or recover a dedicated calendar named for the company; never create another calendar while creation/existence outcome is unknown. Store connection state, Google account identity, dedicated calendar ID, consent/scopes, last successful contact, and reconnect/cleanup status. Disconnect stops future publishing immediately and attempts to remove Kiero-managed copies while preserving the calendar and user-created events. Membership loss follows the same stop/cleanup path. A Polish unstyled entry point exposes connect, reconnect, switch account, and explicit recreate-after-confirmed-deletion operations.",
+      "acceptance": [
+        "Email-code and Google-login users can connect a different Google account without linking or changing Kiero identity.",
+        "OAuth callbacks are bound to initiating user/company and reject replay, wrong company, missing scopes, and revoked membership.",
+        "Unknown create/read outcomes never cause blind duplicate calendar creation; confirmed deletion offers explicit Odtwórz.",
+        "Disconnect or membership loss stops new company data immediately and records unconfirmed cleanup for the user."
+      ],
+      "tests": [
+        "Use two real Google accounts in isolated development/staging to connect, revoke consent, reconnect after more than a week, switch account, delete the calendar, and disconnect.",
+        "Failure injection covers callback replay, state mismatch, token refresh failure, timeout after calendar creation, ambiguous 404, and cleanup without Google permission.",
+        "Verify Calendar disconnect leaves every Kiero login method and session usable."
+      ],
+      "nonGoals": [
+        "Importing private calendars, Google Tasks, two-way Kiero edits, or paid/production OAuth rollout.",
+        "Event eligibility and field mapping, owned by G2."
+      ],
+      "integration": [
+        "Consume B3 current user/company authority and I1 environment bindings; export typed connection state and credential capability to G2/G3/G4.",
+        "Own only connection/OAuth paths. Register the barebones screen via A4 without changing shared app composition."
+      ],
+      "declaredPrerequisites": [
+        "B3",
+        "I1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/45",
+      "issueNumber": 45
+    },
+    {
+      "key": "G2",
+      "title": "[G2] Implement deterministic Calendar projection and personal scope",
+      "blockedBy": [
+        "C4",
+        "G1"
+      ],
+      "ownedPaths": [
+        "packages/domain/calendar/**",
+        "convex/calendar/projection/**"
+      ],
+      "proofs": [
+        "P08"
+      ],
+      "sources": [
+        "calendar",
+        "lifecycle"
+      ],
+      "problem": "Kiero must project its current plan to each boss's dedicated Google calendar without turning Google into authority. Eligibility is personal: selected projects, coordinator assignment, unassigned tasks, personal hides, and retained obligations in closed projects all matter. Date-only values, true intervals, and hour-without-duration values require deterministic mapping.",
+      "solution": "Build a pure, typed projection module plus Convex projection state. Select planned events and open tasks (Do zrobienia, W toku, Czeka) coordinated by the connected boss or unassigned, filtered by that boss's selected projects. Include past unresolved obligations and all known future dates; exclude proposals, approximate values, and unresolved conflicts. Map a date to all-day, a known start/end to an interval, and a lone time to a five-minute Google marker whose title/description says it is a time marker, never a five-minute duration fact. Preserve Europe/Warsaw semantics and describe company time. Generate short Polish titles, project, state/meaning, relevant location, and an authenticated Kiero link; exclude conversations, media, and financial notes. Maintain personal hide and selected-project state independently from notification preferences.",
+      "acceptance": [
+        "Each qualifying Kiero task/event has one stable projection identity per user/company and Google account; task and related event stay separate.",
+        "Kiero owns title, date/time, and description while remembered personal color, reminders, and free/busy survive managed updates.",
+        "User deletion/move becomes a personal hide that survives corrections, reopen, requalification, and reconnect until explicit restore.",
+        "Completion/cancellation or unresolved/removed date withdraws the copy; elapsed time or project closure alone does not."
+      ],
+      "tests": [
+        "Table-driven domain tests cover all-day, interval, five-minute marker, DST transitions, past unresolved work, coordinator changes, unassigned tasks, selected projects, closed projects, and separate task/event identities.",
+        "Property tests prove deterministic semantic IDs and no private source/media/financial content in payloads.",
+        "Integration fixtures preserve personal settings and distinguish Kiero deletion from user hide."
+      ],
+      "nonGoals": [
+        "Calling Google APIs, OAuth lifecycle, Calendar UI, or importing changes into Kiero.",
+        "Final calendar information architecture or visual design."
+      ],
+      "integration": [
+        "Consume C4 canonical task/event/date contracts and G1 connection identity; export desired projection records and diff inputs to G3 plus settings projections to G4/I3.",
+        "Own packages/domain/calendar/** and convex/calendar/projection/**; do not edit C4 records or global composition."
+      ],
+      "declaredPrerequisites": [
+        "C4",
+        "G1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/46",
+      "issueNumber": 46
+    },
+    {
+      "key": "G3",
+      "title": "[G3] Reconcile Calendar writes, unknown outcomes and reconnects",
+      "blockedBy": [
+        "G2"
+      ],
+      "ownedPaths": [
+        "convex/calendar/sync/**"
+      ],
+      "proofs": [
+        "P08"
+      ],
+      "sources": [
+        "calendar",
+        "architecture"
+      ],
+      "problem": "Google writes happen outside Convex transactions. A timeout may follow a successful create, change signals may be lost, copies may be manually edited/deleted/moved, and stale jobs can arrive after a newer Kiero correction. Blind retry can duplicate calendars or events and delayed work can republish superseded facts.",
+      "solution": "Implement durable reconciliation from G2 desired state to the dedicated calendar supplied by G1. Store semantic identity, remote ID, desired revision, observed fields, attempt/outcome state, and whether deletion was Kiero-owned or a detected personal hide. Use idempotent create/update/delete logic, bounded retry, and read-after-unknown reconciliation. Recheck connection, membership, desired revision, scope, and hide state before each external call and before accepting its result. Restore Kiero-owned fields after manual Google edits while preserving captured personal settings. Treat move outside the dedicated calendar as hide. On reconnect, recover the same calendar when possible and reconcile current state; after confirmed calendar deletion wait for explicit recreate. Measure save-to-Google acceptance and expose last success, pending, failed, reconnect-needed, and possible-cleanup-remains states.",
+      "acceptance": [
+        "Retries and concurrent changes converge to current G2 projections without duplicate managed events or calendars.",
+        "Unknown create/update/delete outcomes remain explicit until reconciled and never become assumed success or blind recreation.",
+        "A stale job cannot overwrite a newer due date, restore an ineligible item, or publish after disconnect/membership revocation.",
+        "The system records enough timing to evaluate the 95% within 60 seconds target without claiming it before J4."
+      ],
+      "tests": [
+        "Real Google integration tests use two accounts for edits, deletes, moves, hide/restore, completion/reopen, account reconnect after more than a week, and project/assignee changes.",
+        "Fault tests inject timeout after remote success, 404 ambiguity, stale revision, lost change signal, token expiry, parallel retries, and revoked membership.",
+        "Prove reconnect converges without duplicates and does not replay superseded Kiero state."
+      ],
+      "nonGoals": [
+        "Two-way mutation of Kiero facts, copying private calendars, or guaranteeing Google availability.",
+        "Final settings UI, owned by G4."
+      ],
+      "integration": [
+        "Consume G1 credential/connection capability, G2 desired projections, A3 durable executor, and B3 live access; export status/diagnostics to G4, H4, I2, I4, and I6.",
+        "Own convex/calendar/sync/**. Cross-feature end-to-end wiring waits for J1/J2/J5.",
+        "Consume membership/connection revocation to stop new transfer and attempt managed-copy cleanup only while Google authorization permits. Preserve unknown/leftover status without retaining Kiero access."
+      ],
+      "declaredPrerequisites": [
+        "G2",
+        "A3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/47",
+      "issueNumber": 47
+    },
+    {
+      "key": "G4",
+      "title": "[G4] Expose unstyled Calendar settings and sync diagnostics",
+      "blockedBy": [
+        "G3",
+        "A4"
+      ],
+      "ownedPaths": [
+        "apps/web/src/features/calendar/**"
+      ],
+      "proofs": [
+        "P08"
+      ],
+      "sources": [
+        "calendar",
+        "prototype"
+      ],
+      "problem": "Bosses need to operate and diagnose the optional Calendar integration without reading logs or confusing it with Kiero sign-in. The application must expose personal project scope, hidden-copy recovery, pending/failed sync, reconnection, and explicit calendar recreation in a usable Polish barebones screen.",
+      "solution": "Build an unstyled responsive Calendar settings feature using only G1-G3 typed queries and commands. Show connected Google account, dedicated calendar, selected projects, last successful synchronization, pending count, actionable error/reconnect state, and unconfirmed cleanup residue. Allow connect/reconnect/disconnect, account switch, project selection, restore of personally hidden copies, and explicit Odtwórz only after G1 confirms calendar deletion. Explain that Kiero remains authoritative, synchronization is one-way, Google reminders/personal fields may remain personal, and disconnect does not affect login. Link a managed event back to the current Kiero task/event route. Keep controls keyboard accessible and Polish; use simple semantic HTML and existing A4 shell, with no final component library or styling system.",
+      "acceptance": [
+        "Every state in G1/G3 has a distinct Polish status and a next action where recovery is possible.",
+        "Project scope and hidden items are personal and editable without changing company facts or notification mutes.",
+        "The UI cannot offer blind recreate for unknown existence, cannot imply two-way sync, and cannot show success while work is pending/failed.",
+        "Mobile and desktop flows remain functional with keyboard/screen-reader labels despite barebones presentation."
+      ],
+      "tests": [
+        "Component/integration tests exercise disconnected, connecting, healthy, pending, partial failure, reconnect-needed, confirmed deleted, unknown, hidden-copy, and cleanup-residue states.",
+        "Browser test against development services performs connect, project toggle, hide restore, disconnect, and deep link from a Calendar fixture.",
+        "Failure test proves stale UI commands are rejected when membership or connection revision changed."
+      ],
+      "nonGoals": [
+        "Final UX/UI, design tokens, Calendar provider logic, or editing Kiero dates from Google.",
+        "Qualifying the week-long/two-account contract, owned by J4."
+      ],
+      "integration": [
+        "Consume G1-G3 feature exports and A4 host registration. Expose stable route/action contracts for future UX replacement without requiring domain rewrites.",
+        "Own apps/web/src/features/calendar/** only. A narrow feature registration may touch A4's registry; shared full composition remains J work."
+      ],
+      "declaredPrerequisites": [
+        "G3",
+        "A4"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/48",
+      "issueNumber": 48
+    },
+    {
+      "key": "H1",
+      "title": "[H1] Expose conversation, project memory and source correction flows",
+      "blockedBy": [
+        "F1",
+        "J1"
+      ],
+      "ownedPaths": [
+        "apps/web/src/features/conversation/**",
+        "apps/web/src/features/memory/**"
+      ],
+      "proofs": [
+        "P03",
+        "P06"
+      ],
+      "sources": [
+        "capture",
+        "memory",
+        "prototype"
+      ],
+      "problem": "The backend source and memory contracts need a real usable surface before final UX design. Bosses must see one company conversation, switch project context, inspect source-backed findings, answer clarifications, and correct prior information without editing immutable messages or hiding provenance.",
+      "solution": "Implement Polish, unstyled conversation and memory routes in the A4 host. Render paged D1 logical sources once in company order with project associations, actual author, processing state, agent questions/answers, and links to retained evidence. Project filters show fragments that still point to the same source ID. Show C2 current findings with known/unknown/conflicted/not-applicable state, revisions, provenance, and update status. A source correction is a new reply/message referencing the old source; a direct structured-field correction uses C2's separate audited command. Clear updates may be applied autonomously, while ambiguous contradictions display E3's sourced clarification and block affected automation. Integrate F1 read operations but keep visual treatment deliberately simple and replaceable.",
+      "acceptance": [
+        "One mixed source appears consistently in company and project views with a single source URL, actual author, and no divergent editable copies.",
+        "Users can submit a new correcting source, answer a clarification, and inspect old/current revisions and provenance.",
+        "Conflicted or updating findings are visibly distinct and cannot be presented as settled facts.",
+        "All routes enforce B3 access through backend operations; Polish UI works on narrow mobile and desktop without final styling.",
+        "Consume the already-proved J1 commands. Replace its minimal capture/read controls through the declared feature entry without duplicating backend state or making a second conversation store."
+      ],
+      "tests": [
+        "Browser integration covers company feed, project filter, mixed source, agent question/reply, correction, concurrent revision conflict, unread transition, and revoked membership.",
+        "Use real Convex fixtures and E3 outputs; verify pagination and reactive updates rather than local mock state.",
+        "Failure fixtures show accepted-but-processing, partial media analysis, failed analysis, stale correction, and missing evidence without losing the source."
+      ],
+      "nonGoals": [
+        "Final bubbles, typography, design system, voice capture, search, or direct database repair.",
+        "Inventing memory rules outside C2/E3 contracts."
+      ],
+      "integration": [
+        "Consume A4 shell, C1/C2 queries and commands, D1 source projections, E3 plans/questions, and F1 read API; export stable routes/deep links to F3, G2/G4, and future UX work.",
+        "Own conversation/memory feature paths; use A4/A2 exports and build on J1 and defer full joins to J2/J5."
+      ],
+      "declaredPrerequisites": [
+        "A4",
+        "C1",
+        "C2",
+        "D1",
+        "E3",
+        "F1",
+        "J1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/49",
+      "issueNumber": 49
+    },
+    {
+      "key": "H2",
+      "title": "[H2] Expose tasks, events, extensions and Co teraz",
+      "blockedBy": [
+        "A4",
+        "C3",
+        "F4"
+      ],
+      "ownedPaths": [
+        "apps/web/src/features/work/**",
+        "apps/web/src/features/extensions/**",
+        "apps/web/src/features/now/**"
+      ],
+      "proofs": [
+        "P06",
+        "P08"
+      ],
+      "sources": [
+        "lifecycle",
+        "notifications",
+        "memory"
+      ],
+      "problem": "Tasks, events, typed extensions, and Co teraz must be exercised against the real domain model before final UX work. The surface must preserve non-obvious rules: a parent task completes independently from checklist items, elapsed time does not complete an event, and closed projects can retain open obligations.",
+      "solution": "Build unstyled Polish routes for project work, typed extension fields, and a per-user Co teraz list. Use C4 commands for task states Do zrobienia, W toku, Czeka, Wykonane, Anulowane and event states Planowane, Odbyło się, Anulowane. Display one-level checklists inside tasks but require an explicit parent state change; checklist completion never derives parent completion. Keep coordinator membership separate from external executor contact. Support exact/date-only/unknown dates and display unknown money tax basis without guessing. Render C3 extension definitions by supported primitive/object/list types and stable field IDs. Co teraz includes assigned and unassigned open work, questions needing response, and remaining obligations from closed projects, with current F4 reminder/snooze state.",
+      "acceptance": [
+        "Bosses can create/update tasks, checklists, events, coordinator/executor, dates, states, and supported extension values through checked commands.",
+        "Completing every checklist item leaves the parent unchanged; completing/cancelling the parent is explicit.",
+        "A past planned event stays Planowane until explicitly marked Odbyło się or Anulowane.",
+        "Co teraz exposes actionable work and questions across active/closed projects and links to authoritative records."
+      ],
+      "tests": [
+        "Browser integration uses real C3/C4/F4 data for create/edit/state transitions, checklist independence, closed-project obligation, overdue date-only work, snooze, reassignment, and unassigned work.",
+        "Failure tests cover stale revisions, revoked membership, invalid extension version/value, removed coordinator, and concurrent checklist/parent changes.",
+        "Accessibility smoke verifies forms and state labels in Polish on mobile and desktop widths."
+      ],
+      "nonGoals": [
+        "Final task/calendar UX, nested checklist trees, derived parent completion, or Google Calendar synchronization.",
+        "Creating new domain primitives outside C3/C4."
+      ],
+      "integration": [
+        "Consume A4, C3, C4, and F4 exports; expose record routes consumed by F3 notification clicks, G2 links, H3 search, and future UX integration.",
+        "Own work/extensions/now feature paths. Keep shared full composition changes for J1/J2/J5."
+      ],
+      "declaredPrerequisites": [
+        "A4",
+        "C3",
+        "C4",
+        "F4"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/50",
+      "issueNumber": 50
+    },
+    {
+      "key": "H3",
+      "title": "[H3] Expose search, media anchors and source history",
+      "blockedBy": [
+        "A4",
+        "E5",
+        "D3",
+        "C5"
+      ],
+      "ownedPaths": [
+        "apps/web/src/features/search/**",
+        "apps/web/src/features/source-detail/**"
+      ],
+      "proofs": [
+        "P05",
+        "P06",
+        "P07"
+      ],
+      "sources": [
+        "capture",
+        "memory"
+      ],
+      "problem": "Users need to find evidence across authored text, speech transcripts, image OCR, current findings, and history, then inspect the exact retained representation and correction chain. Search results that omit tenant checks, hydrate stale revisions, or point at obsolete media coordinates would undermine the source-backed memory contract.",
+      "solution": "Implement unstyled Polish search and source-detail routes over E5 retrieval, D3 authorized media access, C2 revisions, and C5 withdrawal/recomputation state. Search text/transcript/OCR with project, author, and date filters; label semantic/full-text coverage and disclose degraded semantic retrieval rather than interpreting no hit as no fact. Hydrate every result against current company access, source state, and index generation. Source detail shows immutable authored content, all retained representations, transcript/OCR segments and time/coordinate anchors, project fragments, findings/provenance, corrections, withdrawals, and dependent recomputation status. Audio playback uses authenticated range streaming; image highlights resolve against the actual retained normalized/original-exception representation. Paginate history rather than loading one growing object.",
+      "acceptance": [
+        "Search finds representative Polish text, transcript, and OCR evidence with filters and opens the authoritative source/revision.",
+        "Withdrawn/deleted/revised evidence cannot appear as current through a stale vector result; degraded retrieval is visible.",
+        "Media anchors resolve to D3's current retained representation and require live access for every request/range.",
+        "History and correction dependencies are inspectable in Polish barebones UI on mobile and desktop.",
+        "Expose source withdrawal and reassignment controls through C5, with impact/history and the original source identity/read state preserved. Do not represent withdrawal as permanent deletion.",
+        "Recheck current company access for source metadata, transcript/OCR, revisions and history as well as media. Revocation while source detail is open must discard protected subscriptions/views and deny fresh reads."
+      ],
+      "tests": [
+        "Real integration fixtures cover text, long-audio segments, normalized-image OCR coordinates, revised finding, withdrawn source, index generation cutover, and company isolation.",
+        "Failure tests revoke membership during playback, delete/replace a representation, return a stale vector ID, fail embeddings, and interrupt pagination.",
+        "Browser tests verify filters, deep links, range seek, evidence highlight, correction history, and recomputation status."
+      ],
+      "nonGoals": [
+        "Final search relevance tuning or visual design, editing sources, public media URLs, or building E5 indexes.",
+        "Cross-feature polished navigation beyond stable routes."
+      ],
+      "integration": [
+        "Consume A4, E5 retrieval results, D3 streams, C2 revisions, and C5 dependency state; export stable source URLs used by H1, E6 answers, exports, and future UX.",
+        "Own search/source-detail feature paths and register narrowly via A4; defer complete composition to J tickets."
+      ],
+      "declaredPrerequisites": [
+        "A4",
+        "E5",
+        "D3",
+        "C5"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/51",
+      "issueNumber": 51
+    },
+    {
+      "key": "H4",
+      "title": "[H4] Expose audited processing inspection and GM retry controls",
+      "blockedBy": [
+        "A4",
+        "B4",
+        "E3",
+        "I2"
+      ],
+      "ownedPaths": [
+        "apps/web/src/features/gm/processing/**",
+        "convex/operations/processing/**"
+      ],
+      "proofs": [
+        "P02",
+        "P06"
+      ],
+      "sources": [
+        "access",
+        "architecture"
+      ],
+      "problem": "During alpha, explicit GM access must make failed processing diagnosable and recoverable without silent impersonation, immutable-source edits, arbitrary database repair, or contamination of boss read and success metrics. Retry and deliberate reanalysis also have different provenance and version semantics.",
+      "solution": "Implement an audited GM processing inspector and checked operations API. Require B4's explicit GM mode and current alpha-company scope for every query/command. Show protected source/run detail, stage states, attempts, approved model route, pipeline/prompt/schema versions, redacted provider diagnostics, derived changes, and current blockers. Allow retry only for a failed/stuck compatible stage and preserve semantic run identity; allow deliberate reanalysis as a new linked run using the server-approved E3/E2 configuration. Record real GM actor, reason, command, target revision, result, and timestamps in canonical audit records. UI is Polish, visibly identifies GM mode, and does not mark sources read or increment autonomous alpha metrics.",
+      "acceptance": [
+        "Ordinary members cannot open or invoke GM operations, and GM scope ends when alpha access is revoked.",
+        "Retry resumes approved compatible work without editing the source; reanalysis creates a linked run and cannot select an arbitrary model.",
+        "Every inspection-changing action is attributable to the GM and preserves boss authorship/read state/activity metrics.",
+        "Stale revision, already-running stage, and unsupported workflow version are rejected with actionable Polish messages.",
+        "The initial panel consumes generic canonical stage/attempt/audit records plus I2 redacted diagnostics. J2 later registers all media/retrieval stages; H4 does not falsely claim those unimplemented executors work."
+      ],
+      "tests": [
+        "Integration tests use real B4 authority and E3 processing records for inspect, failed-stage retry, duplicate retry, linked reanalysis, completion race, and revoked GM/company access.",
+        "Verify audit records are canonical, diagnostics are redacted, and immutable source bytes/text never change.",
+        "Browser smoke checks clear GM banner, reason entry, status progression, and no boss unread/usage mutation."
+      ],
+      "nonGoals": [
+        "General admin SQL/database repair, model selection, source editing, production support tooling, or final GM UX.",
+        "Implementing provider routing or processing stages."
+      ],
+      "integration": [
+        "Consume A4, B4 authority, E3 run contracts, A3 executor, and I2 redacted diagnostics; export retry/reanalysis audit events to I2 and recovery evidence to J2/J5.",
+        "Own GM processing and processing-operation paths. Shared application composition stays with J integration tickets."
+      ],
+      "declaredPrerequisites": [
+        "A4",
+        "B4",
+        "E3",
+        "I2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/52",
+      "issueNumber": 52
+    },
+    {
+      "key": "I1",
+      "title": "[I1] Verify CLI access and prepare isolated EU development resources",
+      "blockedBy": [
+        "A0"
+      ],
+      "ownedPaths": [
+        "infra/environments/**",
+        "docs/evidence/environment/**",
+        "apps/*/wrangler.jsonc",
+        "convex.json",
+        "infra/bindings/**"
+      ],
+      "proofs": [
+        "P01",
+        "P12"
+      ],
+      "sources": [
+        "architecture"
+      ],
+      "problem": "The architecture depends on real isolated Convex, Cloudflare, R2, Container, OAuth, email, push, observability, and backup capabilities, but current environment facts are incomplete. The user reports Convex CLI access, plain `convex` is not currently verified on PATH/authenticated, Wrangler exists at /opt/homebrew/bin/wrangler, and secret presence has been verified only by name. Implementation tickets need stable environment bindings without exposing credentials or accidentally creating paid production services.",
+      "solution": "Perform a read-first CLI/account preflight and prepare checked-in environment descriptors for local development and synthetic staging. Resolve the repository-supported Convex invocation and verify authentication/project access without printing tokens. Verify Wrangler identity/capabilities, existing account/resource visibility, required EU jurisdiction options, and feasibility of distinct media/export versus backup permissions. Confirm OPENROUTER_API_KEY is available locally and as the named GitHub secret by presence only; document how runtime bindings consume it. Define environment names, non-secret variable schema, secret-name inventory, resource naming, and evidence commands. Create only free/reversible development resources already authorized by the project; record commands for any paid, production, domain, OAuth verification, or irreversible resource as pending rather than executing it.",
+      "acceptance": [
+        "A fresh agent can run one documented preflight that reports each required capability as verified, unavailable, or pending without revealing secret values.",
+        "Local, synthetic staging, and future alpha production identities/bindings cannot be confused by default commands.",
+        "Convex/Cloudflare region and plan facts are measured from actual accessible tooling where possible and unverified claims remain explicit.",
+        "No provider plan is changed and no paid or production service is created by this ticket.",
+        "A3 must have usable isolated Convex development project access and Cloudflare gateway/R2 bindings or a precise prerequisite before it can pass. Record each additional resource as reused, provisioned within already-authorized development scope, or explicitly pending; a descriptor alone is not a deployment proof.",
+        "Start from integrated A0 so this issue PR receives the configured thermo-nuclear and unslop review. Preserve its workflow, vendored skills and accepted repository instructions."
+      ],
+      "tests": [
+        "Run the preflight in a clean shell and CI-safe no-secret mode; prove missing CLI, missing auth, missing binding, wrong account, and unavailable capability yield actionable failures.",
+        "Validate descriptors with a local non-secret shape check; A3 later checks them against A2 configuration schemas and check repository scans contain secret names but no values.",
+        "Capture dated CLI versions and sanitized command outputs in docs/evidence/environment."
+      ],
+      "nonGoals": [
+        "Deploying the application, purchasing/upgrading plans, creating production OAuth consent, or proving workload performance.",
+        "Changing accepted providers or architecture."
+      ],
+      "integration": [
+        "Produce environment binding contracts consumed by A3, D2/D5/D6, F3, G1, I2, I5, and I7; own the non-secret binding skeletons listed below; A3 consumes and validates them without a second writer.",
+        "Own infra/environments/**, docs/evidence/environment/**, apps/*/wrangler.jsonc, convex.json and infra/bindings/**; report missing prerequisites to the map owner instead of silently changing downstream scope.",
+        "After A0, this ticket owns environment discovery/descriptors independently of A2. A3 reconciles the descriptor and chosen CLI/package versions with the certified runtime contracts. Resource-owning feature tickets provision their actual development bindings as part of their real integration proof; a missing credential or resource remains blocked, not a mock pass."
+      ],
+      "declaredPrerequisites": [
+        "A0"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/53",
+      "issueNumber": 53
+    },
+    {
+      "key": "I2",
+      "title": "[I2] Implement redacted diagnostics, health checks and cost alerts",
+      "blockedBy": [
+        "A3"
+      ],
+      "ownedPaths": [
+        "convex/operations/telemetry/**",
+        "apps/gateway/src/telemetry/**",
+        "infra/observability/**"
+      ],
+      "proofs": [
+        "P12"
+      ],
+      "sources": [
+        "architecture",
+        "alpha"
+      ],
+      "problem": "Convex Free does not provide the promised native platform-log stream. Alpha operations still need redacted application events, Cloudflare diagnostics, independent silence detection, processing/save/recovery alerts, and all-in cost visibility without leaking sources, transcripts, media, prompts, tokens, or credentials.",
+      "solution": "Implement a typed diagnostic event boundary in Convex/gateway code and Axiom Personal configuration for the accepted retention window. Emit allowed IDs, status, error class, latency, usage, provider route, and cost metadata from A3 workflows and gateway integrations; resolve protected content only through domain access. Treat telemetry delivery as best effort and canonical audit/domain records as authority. Configure three monitor groups: source-save plus failed/stuck processing; backup freshness/health including an external heartbeat that detects total backend silence; and aggregate costs/limits with owner-visible 400 PLN warning and 500 PLN stronger alert. Track Convex/Cloudflare/R2/Containers/Images/AI/email/observability/backup estimates and provider hard caps. Explicitly label native Convex log history unavailable on Free instead of simulating it.",
+      "acceptance": [
+        "Structured diagnostics cover required operations with trace/run IDs and no source body, transcript, media, prompt, token, secret, or raw provider payload.",
+        "Three monitor groups produce useful owner notifications for save/processing, health/recovery, and cost/limit conditions.",
+        "A missing-heartbeat test detects backend silence independently of application event delivery.",
+        "Dashboards state retention and blind spots accurately; application events do not claim full native Convex logging."
+      ],
+      "tests": [
+        "Trigger synthetic save failure, stuck processing, stale backup heartbeat, missing application events, and 400/500 PLN threshold crossings in isolated staging.",
+        "Snapshot/redaction tests feed adversarial source text, filenames, prompts, auth headers, URLs, and provider errors and assert no sensitive fields reach the sink.",
+        "Fault tests drop/duplicate/out-of-order telemetry and prove domain workflows remain correct."
+      ],
+      "nonGoals": [
+        "Building a custom logging platform, upgrading to Convex Pro, storing content in logs, or treating telemetry as audit history.",
+        "Implementing backup/export/AI business workflows."
+      ],
+      "integration": [
+        "Consume A3 runtime events and I1 bindings; export a small diagnostic API for every feature plus health/cost status used by H4, I5, I7, and J qualification.",
+        "Own telemetry/observability paths; feature tickets add event calls through the exported boundary, while J tickets verify cross-system coverage."
+      ],
+      "declaredPrerequisites": [
+        "A3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/54",
+      "issueNumber": 54
+    },
+    {
+      "key": "I3",
+      "title": "[I3] Export consistent company snapshots with protected downloads",
+      "blockedBy": [
+        "C3",
+        "C4",
+        "D3"
+      ],
+      "ownedPaths": [
+        "convex/operations/exports/**",
+        "apps/export-worker/**",
+        "apps/web/src/features/exports/**"
+      ],
+      "proofs": [
+        "P09"
+      ],
+      "sources": [
+        "memory",
+        "architecture",
+        "access"
+      ],
+      "problem": "A company administrator needs a portable, readable export while the company remains active. Reading tables and media at different times would produce an internally inconsistent archive; static bearer downloads could survive admin revocation or permanent source deletion and expose another tenant's data.",
+      "solution": "Implement an asynchronous export operation anchored to one consistent company snapshot/revision. Assemble a bounded archive in the selected export worker containing a readable escaped HTML index, versioned JSON, source/finding/task/event/extension/history data, and every retained media representation referenced by that snapshot. Export the accepted shared business records, their authorship and history. Personal read/notification settings and Calendar connection/hide/cursor state are account or integration state, not part of the business archive; shared tasks/events remain included. Exclude authentication secrets, platform backups, diagnostics content, provider tokens and other tenants. Store export-source links for invalidation. Downloads use an authenticated gateway check for current company administrator rights on every request, expire 24 hours after completion, support bounded streaming, and become inaccessible immediately if a later permanent source deletion affects the archive.",
+      "acceptance": [
+        "Concurrent company writes do not create mixed-revision JSON, HTML, history, or media; the archive declares its snapshot time/schema version.",
+        "HTML and archive paths safely escape hostile user content, and no record/media from another company can enter the result.",
+        "Only a current administrator can start or download an export; revocation, expiry, or linked permanent deletion invalidates access immediately.",
+        "Completed bytes are cleaned after the 24-hour window or invalidation and status remains auditable."
+      ],
+      "tests": [
+        "Run a real export while continuously writing tasks/sources and compare every JSON/HTML/media reference to the declared snapshot.",
+        "Adversarial tests cover HTML/script content, path traversal filenames, huge media, missing object, cross-tenant IDs, admin transfer/revocation during assembly/download, range requests, and deletion after completion.",
+        "Verify partial archives never become downloadable and retry does not create divergent published snapshots."
+      ],
+      "nonGoals": [
+        "Platform backup, public share links, import/restore, final export UX, or exporting authentication/provider secrets.",
+        "Changing source retention policy."
+      ],
+      "integration": [
+        "Consume C3/C4 domain snapshots, D3 retained-media streams and B3 current admin checks; publish export-source links for I4 invalidation and diagnostics to I2.",
+        "Own export worker/backend/feature paths. Register a simple Polish status/download screen through A4; defer shared full composition to J."
+      ],
+      "declaredPrerequisites": [
+        "C3",
+        "C4",
+        "D3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/55",
+      "issueNumber": 55
+    },
+    {
+      "key": "I4",
+      "title": "[I4] Purge deleted sources and invalidate all derived access",
+      "blockedBy": [
+        "C5",
+        "E5",
+        "F3",
+        "G3",
+        "I3",
+        "E4",
+        "I2"
+      ],
+      "ownedPaths": [
+        "convex/operations/deletion/**",
+        "apps/gateway/src/purge/**",
+        "apps/web/src/features/data-deletion/**"
+      ],
+      "proofs": [
+        "P06",
+        "P09",
+        "P10"
+      ],
+      "sources": [
+        "memory",
+        "architecture"
+      ],
+      "problem": "Permanent deletion must remove access immediately and prevent reconstruction through derivatives, search, notifications, Calendar, exports, retries, or later recovery. Database deletion alone is insufficient because media, indexes, remote effects, active streams, and old backup snapshots can outlive the canonical row.",
+      "solution": "Implement a deletion coordinator that first tombstones the logical source and revokes all application reads atomically, then enumerates provenance/dependency records and durable purge intents for active media, normalized representations, transcripts/OCR, findings/recomputations, vectors/full-text records, notification/push work, Calendar copies, and linked exports. Write a content-free deletion/revocation ledger entry outside application database rollback authority using stable opaque identities and monotonic ordering. Recheck tombstones in every worker before publishing derived output. Invalidate affected I3 archives immediately and purge active/reconstructing content within 24 hours; isolated backup bytes may survive only until reference-aware expiry within 30 days. Record external outcomes as known/unknown and reconcile without making deleted content readable.",
+      "acceptance": [
+        "After the initiating operation commits, source/media/search/export access fails immediately across existing sessions and new requests.",
+        "All active and reconstructing derivatives are either verified purged within 24 hours or remain visibly failed/unknown with retry state and alerting.",
+        "The external ledger contains no user content yet can prevent resurrection after an old database restore.",
+        "Late AI, upload, push, Calendar, export, or index results cannot republish or expose the deleted source.",
+        "Expose an administrator-only unstyled impact preview and explicit permanent-delete confirmation, with pending/complete/failed external-cleanup state. This is a real registered feature, distinct from ordinary withdrawal.",
+        "Permission checks deny new reads/range requests after the committed tombstone. Bytes already delivered cannot be retracted; active-stream tests report that boundary rather than promise physical erasure of a recipient copy."
+      ],
+      "tests": [
+        "End-to-end deletion races active media streaming, image/STT/AI completion, vector indexing, push delivery, Calendar write, export assembly/download, and repeated delete requests.",
+        "Fault tests lose acknowledgements and interrupt each purge stage; prove idempotent retry, unknown-outcome reconciliation, 24-hour tracking, and I2 alerts.",
+        "Restore an older fixture in quarantine and prove the external ledger suppresses deleted content before access."
+      ],
+      "nonGoals": [
+        "Ordinary correction/withdrawal semantics, immediate erasure from isolated backup sets, or legal-policy claims deferred in Q195.",
+        "Deleting unrelated user-created Google events."
+      ],
+      "integration": [
+        "Consume C5 dependency graph, D3 media authority, E5 search deletion, F3/G3 external intents, and I3 archive links; export ledger/reconciliation contracts to I5/I6 and diagnostics to I2.",
+        "Own deletion/purge paths. Producers integrate via typed tombstone checks; global race qualification belongs to J2/J5."
+      ],
+      "declaredPrerequisites": [
+        "C5",
+        "D3",
+        "E5",
+        "F3",
+        "G3",
+        "I3",
+        "E4",
+        "I2",
+        "B2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/56",
+      "issueNumber": 56
+    },
+    {
+      "key": "I5",
+      "title": "[I5] Create complete scheduled EU backups and retention manifests",
+      "blockedBy": [
+        "D3",
+        "I2"
+      ],
+      "ownedPaths": [
+        "apps/backup-worker/**",
+        "convex/operations/backups/**",
+        "infra/backups/**"
+      ],
+      "proofs": [
+        "P10",
+        "P12"
+      ],
+      "sources": [
+        "architecture"
+      ],
+      "problem": "A database snapshot is not a complete Kiero recovery set when retained media lives in R2. Backups every 15 minutes can overlap, fail midway, exceed Free/Starter limits, or delete shared media prematurely. A green scheduler invocation must not be confused with verified recoverability.",
+      "solution": "Implement the separate EU backup Container and Convex-owned schedule using the pinned documented export mechanism. Every 15 minutes acquire a single-run lease, export a database snapshot, copy/verify every retained media object referenced at that snapshot, and publish an immutable manifest only after hashes/sizes and reference closure succeed. Store complete sets in a private EU R2 backup bucket with permissions isolated from media/export workers. Measure freshness from database snapshot time, not completion time, and emit I2 health/cost events before one-hour age. Retain frequent complete sets for 48 hours and daily complete sets through day 14; perform reference-aware media collection across surviving manifests. Carry I4's content-free deletion/revocation ledger separately and enforce backup-content expiry within 30 days.",
+      "acceptance": [
+        "The schedule runs every 15 minutes without overlapping writers and never labels partial database/media output complete.",
+        "Each complete manifest verifies the database snapshot and all referenced retained media with EU storage and isolated credentials.",
+        "Retention keeps frequent sets for 48 hours and daily sets through day 14 without deleting media referenced by any surviving manifest.",
+        "Observed export/snapshot/storage/egress costs and Free/Starter hard limits are measured; frequency is never silently reduced to fit a plan."
+      ],
+      "tests": [
+        "Run the actual accessible service plan and interrupt export, media copy, manifest publish, cleanup, and overlapping scheduler attempts; verify resumable/idempotent recovery.",
+        "Corrupt or omit an object and prove completeness fails and freshness alerting continues.",
+        "Advance retention fixtures through 48 hours, 14 days, and deleted-source 30-day expiry; verify reference-aware cleanup and sanitized evidence."
+      ],
+      "nonGoals": [
+        "Opening restored data to users, application exports, changing provider plans automatically, or claiming RPO/RTO before I6 measurement.",
+        "Protecting against every account-wide provider incident."
+      ],
+      "integration": [
+        "Consume A3 scheduling/runtime, D3 retained-media inventory, I1 EU bindings, I2 health/cost events, and I4 external ledger contract; export immutable recovery manifests to I6.",
+        "Own backup worker/backend/infra paths. Keep deployment/release composition in I7 and full qualification in J5."
+      ],
+      "declaredPrerequisites": [
+        "A3",
+        "D3",
+        "I2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/57",
+      "issueNumber": 57
+    },
+    {
+      "key": "I6",
+      "title": "[I6] Prove quarantine restore with deletion and revocation replay",
+      "blockedBy": [
+        "I4",
+        "I5"
+      ],
+      "ownedPaths": [
+        "tools/recovery/**",
+        "docs/evidence/recovery/**"
+      ],
+      "proofs": [
+        "P10"
+      ],
+      "sources": [
+        "architecture",
+        "access",
+        "memory"
+      ],
+      "problem": "Backup creation alone does not prove the accepted one-hour recovery point and eight-hour recovery time. Restoring an old snapshot can revive deleted content, revoked sessions, stale memberships, obsolete workflow state, or uncertain Google/push effects unless recovery happens in quarantine and current external constraints are replayed before anything runs.",
+      "solution": "Build a recovery tool and runbook that selects a verified I5 manifest, restores database plus referenced media into an isolated quarantine environment, and keeps users, AI, schedulers, push, email, Calendar, and exports disabled. Apply I4's content-free deletion/revocation ledger in strict order; invalidate restored sessions/method changes as required by B2, purge forbidden content, reconcile retained representations, and classify unknown G3/external outcomes without replaying them blindly. Restore compatible application code, component/auth/workflow versions, configuration schema, and scheduler definitions before validation. Rebuild disposable search projections only after canonical data is safe. Emit a versioned evidence record with snapshot age, elapsed restore time, reconciled counts, unresolved items, and explicit go/no-go; opening access is a separate checked final action.",
+      "acceptance": [
+        "A measured drill restores a complete set with snapshot age at most one hour and reaches validated service readiness within eight hours, or records the target as failed.",
+        "No user, worker, AI, or external integration can access/act on quarantine data before ledger replay and validation finish.",
+        "Deleted content and revoked access from after the snapshot remain deleted/revoked after restore.",
+        "Unknown Calendar/push outcomes are reconciled or safely held, never blindly replayed."
+      ],
+      "tests": [
+        "Perform a real isolated drill with post-snapshot source deletion, session/membership revocation, Google unknown outcome, pending workflow, missing derived index, and scheduler configuration.",
+        "Fault injection interrupts restore, ledger replay, media reconciliation, and validation; rerun proves monotonic idempotent progress.",
+        "Negative drills use incomplete/corrupt manifests and unavailable dependencies and prove access cannot open."
+      ],
+      "nonGoals": [
+        "Automatic production failover, normal release rollback via database restore, or claiming cross-provider disaster independence.",
+        "Changing retention/RPO/RTO policy."
+      ],
+      "integration": [
+        "Consume I5 manifests, I4 external ledger, B2 revocation state, G3 reconciliation contracts, and A3 workflow version registry; produce evidence for J5/readiness.",
+        "Own recovery tools/evidence only. Any environment opening command must call existing checked authorities rather than patching feature data directly."
+      ],
+      "declaredPrerequisites": [
+        "I4",
+        "I5",
+        "B2",
+        "G3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/58",
+      "issueNumber": 58
+    },
+    {
+      "key": "I7",
+      "title": "[I7] Implement compatible release, migration and safe PWA update flows",
+      "blockedBy": [
+        "D4",
+        "F3",
+        "I2"
+      ],
+      "ownedPaths": [
+        ".github/workflows/release.yml",
+        "tools/migrations/**",
+        "apps/web/src/pwa/update/**",
+        "infra/release/**"
+      ],
+      "proofs": [
+        "P11"
+      ],
+      "sources": [
+        "architecture",
+        "capture"
+      ],
+      "problem": "Schema, workflow, gateway, and PWA releases can overlap old tabs, in-flight durable work, recordings, uploads, and local drafts. Replacing all layers atomically is unrealistic; forced reload or database rollback could lose user input or discard newer data. Production also needs an explicit human trigger after synthetic staging.",
+      "solution": "Implement pinned GitHub Actions checks and release workflow that deploys an isolated synthetic staging environment, records immutable versions/evidence, and exposes an explicit production trigger. Define expand-migrate-contract releases: add backward-compatible schema/API support, run resumable idempotent migrations in bounded batches with progress, release workers/client while retaining executable support for old workflow versions, then remove compatibility only after measured absence. Provide compatible code rollback/forward repair; never automate old database restoration as release rollback. In the PWA, detect a new version, persist/migrate the local draft first, and show a Polish update prompt only at a safe point. Recording, editing, and upload defer reload; unsupported old clients receive a clear update requirement while their recoverable draft remains available. Security/session revocation stays immediate regardless of client age.",
+      "acceptance": [
+        "A schema expansion, resumable migration, mixed old/new clients/workers, and later support removal complete without corrupting canonical data.",
+        "Production deployment cannot happen as an implicit consequence of checks/staging and uses environment-scoped secrets.",
+        "PWA update never force-reloads during recording/edit/upload and preserves a draft across client schema migration.",
+        "Rollback/forward repair does not restore an old database or resurrect revoked access."
+      ],
+      "tests": [
+        "Release rehearsal deploys expansion, interrupts/resumes migration, runs old in-flight workflow and old tab, updates the client, verifies compatibility, then removes old support.",
+        "Browser/device tests update during recording, text editing, resumable upload, offline draft, draft-schema change, and unsupported-client recovery.",
+        "CI tests wrong-environment secrets, failed staging checks, concurrent release attempt, migration retry, and immediate revocation on an old client."
+      ],
+      "nonGoals": [
+        "Automatic production promotion, final update-modal design, blue-green perfection, or using backup restore for routine release recovery.",
+        "Changing accepted service plans or feature behavior."
+      ],
+      "integration": [
+        "Consume A3 workflow version registry, A4 app host, D4 draft/upload states, F3 service worker/push registration, I1 bindings, and I2 release diagnostics; export release/version evidence to J4/J5.",
+        "Own release/migration/PWA-update/infra paths. Feature packages expose compatibility adapters; J tickets perform full cross-feature release qualification."
+      ],
+      "declaredPrerequisites": [
+        "A4",
+        "A3",
+        "D4",
+        "F3",
+        "I2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/59",
+      "issueNumber": 59
+    },
+    {
+      "key": "J1",
+      "title": "[J1] Prove the first real text-to-memory loop in the barebones app",
+      "blockedBy": [
+        "A4",
+        "E3"
+      ],
+      "ownedPaths": [
+        "e2e/core-text/**",
+        "docs/evidence/core-text/**",
+        "apps/web/src/composition/text.ts",
+        "apps/web/src/features/core-text/**"
+      ],
+      "proofs": [
+        "P01",
+        "P03",
+        "P06",
+        "P07"
+      ],
+      "sources": [
+        "capture",
+        "memory",
+        "architecture"
+      ],
+      "problem": "Isolated modules cannot show whether a real boss can send a source and get useful, correct current project memory.",
+      "solution": "Create the plain core-text feature and compose a narrow real path: authenticate two bosses in one test company, create/select a project, send text, persist one source, call the configured OpenRouter route, publish checked memory and read/correct it with source history.",
+      "acceptance": [
+        "Run against real development Convex and server-owned OpenRouter, using synthetic Polish material. Show distinct sending/saved/processing/result states and actual provider/configuration metadata in protected evidence.",
+        "A mixed text source can produce company/project information while preserving one original and real author. Both bosses see the same canonical result through the app.",
+        "Send a clear correction as a new source and verify the new current value plus previous history. The early path may use direct structured queries and does not pretend semantic retrieval or all domain tools are already available.",
+        "AI failure leaves the accepted source and permits later retry. Lost response/retry does not create another source or duplicate domain mutation. Every committed change has valid provenance.",
+        "Record a repeatable smoke and immutable evidence. Missing runtime registration is fixed here or tracked as a prerequisite; a mock-only route cannot close this checkpoint."
+      ],
+      "tests": [
+        "Browser plus real backend: one project, two bosses, send/read/correct and refresh/reconnect persistence.",
+        "Provider failure, duplicate submit/unknown response, newer correction against delayed old plan.",
+        "Inspect DB/current query, revision history and original source identity against independent expectations."
+      ],
+      "nonGoals": [
+        "No dependency on audio, photos, Calendar, final UX or complete alpha qualification."
+      ],
+      "integration": [
+        "Own the registered core-text feature and text composition using A4 plus the B/C/D/E interfaces. H1 later replaces/enriches these controls, consuming the same commands; J2 completes the full-flow join.",
+        "Prove explicit new-source correction of one current finding here. Full withdrawal/reassignment, dependent tasks, semantic retrieval and clarification tool coverage are later J2 obligations and are visibly unavailable until integrated."
+      ],
+      "declaredPrerequisites": [
+        "A4",
+        "C1",
+        "C2",
+        "D1",
+        "E3"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/60",
+      "issueNumber": 60
+    },
+    {
+      "key": "J2",
+      "title": "[J2] Join all capture modes, search and agent tools under failure",
+      "blockedBy": [
+        "D4",
+        "E4",
+        "E6",
+        "H2",
+        "H3",
+        "H4",
+        "H1"
+      ],
+      "ownedPaths": [
+        "e2e/core-flow/**",
+        "docs/evidence/core-flow/**",
+        "apps/web/src/composition/full.ts",
+        "convex/composition/core.ts",
+        "apps/gateway/src/composition/full.ts"
+      ],
+      "proofs": [
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07"
+      ],
+      "sources": [
+        "capture",
+        "memory",
+        "lifecycle",
+        "architecture"
+      ],
+      "problem": "Full capture, tools and retrieval can exist separately while the application still has incomplete or divergent state transitions.",
+      "solution": "Join the real voice/photo/text capture, extraction, core and extension/task tools, source-backed answers, retrieval, project views, read-state operations and GM processing controls. Exercise the accepted scenarios through the barebones app and canonical persistence.",
+      "acceptance": [
+        "One mixed source survives complete attachment acceptance and partial extraction; missing images/segments remain explicit and the text-only fallback never claims vision work.",
+        "Agent routing consumes typed extension/catalog and task/event operations. Retrieval hydrates current authorized revisions and enriches answers without making obsolete evidence current. Register indexing of transcript/OCR and subsequent corrections.",
+        "Clarification replies resolve the correct question and publish checked results; explicit clear corrections apply autonomously. Delayed plans cannot defeat a later correction.",
+        "Wire complete source detail/playback, source anchors/history, project aliases, work/Co teraz and personal read states. GM retry/reanalysis is audited and cannot alter boss read/activity metrics.",
+        "Task/checklist independence, closed-project obligations, firm data and source withdrawal are reachable through real controls. Record the entire twelve-scenario prototype behavior as actual backend evidence where applicable; remaining external integration proofs stay with J4."
+      ],
+      "tests": [
+        "Real multimodal end-to-end flow with text, retained audio, phone image and mixed multi-project source.",
+        "Failures at extraction/planning/commit; revocation while work is queued; repeated stage delivery; source withdrawal and independent corroboration.",
+        "Browser tests for source-backed answer, clarification, direct correction, checklist and Co teraz using current persisted state."
+      ],
+      "nonGoals": [
+        "No approval of final UI design, live-alpha success claim or replacement of physical device/Calendar proofs."
+      ],
+      "integration": [
+        "Own final core composition entries. Explicitly connect E5 retrieval to E6 tools, E4 extraction to E5 indexing, F1 reads to conversation/source views and C5 recomputation to source correction. J3/J4/J5 consume this joined app.",
+        "Wire B3 revocation to C4 open-task successor/unassignment and F4 recalculation, D2 upload checks, B2 sessions and F1 attention state. Prove core denial without waiting for delayed cleanup."
+      ],
+      "declaredPrerequisites": [
+        "J1",
+        "D4",
+        "D3",
+        "E4",
+        "E5",
+        "E6",
+        "H2",
+        "H3",
+        "H4",
+        "C5",
+        "H1"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/61",
+      "issueNumber": 61
+    },
+    {
+      "key": "J3",
+      "title": "[J3] Qualify AI quality, fallback behavior and processing latency",
+      "blockedBy": [
+        "J2"
+      ],
+      "ownedPaths": [
+        "evals/runner/**",
+        "docs/evidence/ai/**"
+      ],
+      "proofs": [
+        "P07"
+      ],
+      "sources": [
+        "architecture",
+        "alpha"
+      ],
+      "problem": "Working model calls do not establish Polish extraction, memory correctness, fallback behavior or accepted latency.",
+      "solution": "Run the independently grounded corpus through the actual integrated candidate, report every modality and stage, then qualify the chosen provider/model/prompt/schema configuration under the accepted readiness thresholds.",
+      "acceptance": [
+        "Each of three full runs achieves at least 48/50 case outcomes with zero critical errors of project, amount, date, commitment or source basis. Required clarification is correct; avoidable clarification on clear evidence lowers quality.",
+        "Report STT, image extraction, retrieval and final persisted effects separately. Check prohibited mutations, omitted segments, stale corrections, tenant leakage and incomplete-source handling, not just response text.",
+        "Prove the application-owned route order, image capability restriction, unsupported schema/tool responses, stalls and provider failures. User UI has no model selector. Record actual routes and metered costs.",
+        "Measure ordinary-source 95% within 60 seconds from full durable acceptance; long audio is measured separately without imposing a duration cap. Preserve useful slower routes according to the accepted throughput policy.",
+        "Version inputs and independent expectations. Attach all failures/remediation and candidate evidence; no averaging across runs to conceal a failing run or critical case."
+      ],
+      "tests": [
+        "Three actual end-to-end corpus executions and separate component diagnostics for failures.",
+        "Forced fallback/error/timeout and missing-segment scenarios on the application integration.",
+        "Retrieval deletion/revision/cutover, similar aliases, relative dates, unknown tax and approximate/agreed money."
+      ],
+      "nonGoals": [
+        "No fabricated benchmark from provider catalog speeds or substitution for four-week live-alpha metrics."
+      ],
+      "integration": [
+        "Consumes E1 independent corpus and J2 assembled app; I2 supplies safe metrics. Reports return concrete repairs to owning feature issues and updates the P07 evidence register."
+      ],
+      "declaredPrerequisites": [
+        "J2",
+        "E1",
+        "I2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/62",
+      "issueNumber": 62
+    },
+    {
+      "key": "J4",
+      "title": "[J4] Qualify devices, push and Calendar over the required interval",
+      "blockedBy": [
+        "J2",
+        "G4",
+        "I7"
+      ],
+      "ownedPaths": [
+        "e2e/devices/**",
+        "e2e/integrations/**",
+        "docs/evidence/devices/**",
+        "docs/evidence/integrations/**",
+        "convex/composition/integrations.ts",
+        "apps/web/src/composition/integrations.ts"
+      ],
+      "proofs": [
+        "P02",
+        "P04",
+        "P08",
+        "P11"
+      ],
+      "sources": [
+        "calendar",
+        "notifications",
+        "capture",
+        "access"
+      ],
+      "problem": "Browser emulation and local state machines cannot certify phone recording, actual push delivery or persistent Google authorization.",
+      "solution": "Qualify the integrated candidate on the required physical devices and two real Google accounts, with recorded versions and the accepted observation interval. Exercise current permissions, notification rules, Calendar reconciliation and safe client updates.",
+      "acceptance": [
+        "Record actual tester phones plus physical iPhone/Android coverage, browser and installed PWA modes, and desktop Chrome/Edge/Safari. Unknown/untested versions remain unqualified.",
+        "Prove long recording, interruption, storage pressure, draft recovery, upload resume, media readability, playback and current access denial. Distinguish best-effort browser recovery from full offline or background guarantees.",
+        "Use two bosses/devices for source read synchronization, mute/snooze/quiet-time, changed deadline/recipient before send, permission withdrawal and old-push navigation to current data. A sent push is not a read receipt.",
+        "Use two Google accounts for date-only/DST/5-minute markers, task/event copies, personal hide/move, reconnect, unknown writes and duplicate suppression. Record operation beyond one week and measure the independent 95%/60-second sync target.",
+        "Exercise actual compatible release/PWA update while recording/uploading and validate session/account revocation without restoring old authority."
+      ],
+      "tests": [
+        "Versioned physical-device procedure with screenshots/redacted traces and actual outcomes.",
+        "Calendar lifecycle after the required elapsed interval plus concurrent changes and lost response/change signals.",
+        "Push and release failure matrix across both users and devices, with current permission checks."
+      ],
+      "nonGoals": [
+        "No emulator-only pass, accelerated-clock substitute for credential lifetime, automatic alpha activation or final styling."
+      ],
+      "integration": [
+        "J2 supplies joined core, F/G supply actual integrations and I7 release/update. Findings return to owning modules; J5 consumes these device/external proofs.",
+        "Own external-consumer composition for MembershipRevoked: F3 delivery denial/device cleanup and G1/G3 transfer stop/managed-copy cleanup. Together with J2 core consumers, prove the entire revocation flow while uploads, tasks and external calls are active."
+      ],
+      "declaredPrerequisites": [
+        "J2",
+        "F3",
+        "F4",
+        "G4",
+        "I7",
+        "B2"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/63",
+      "issueNumber": 63
+    },
+    {
+      "key": "J5",
+      "title": "[J5] Qualify complete core and hand off to UX integration and alpha rehearsal",
+      "blockedBy": [
+        "J3",
+        "J4",
+        "I6"
+      ],
+      "ownedPaths": [
+        "e2e/qualification/**",
+        "docs/evidence/core-qualification/**",
+        "docs/handoffs/core-delivery/**",
+        "convex/composition/qualification.ts",
+        "apps/web/src/composition/qualification.ts"
+      ],
+      "proofs": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08",
+        "P09",
+        "P10",
+        "P11",
+        "P12"
+      ],
+      "sources": [
+        "architecture",
+        "alpha"
+      ],
+      "problem": "Completed feature issues do not yet establish a complete, recoverable core or give designers and the alpha operator a truthful handoff.",
+      "solution": "Join all core and operational evidence on an identified integrated candidate. Exercise complete barebones paths, recovery, export/delete, authorization, telemetry and release behavior; publish a core delivery dossier for subsequent UX integration and alpha rehearsal.",
+      "acceptance": [
+        "Every accepted core feature maps to an integrated operation, reachable barebones control where relevant, owner and proof. All applicable P01–P12 cases have real results and links; no accepted requirement disappears as not applicable.",
+        "Re-run impacted integration tests after final merges. Confirm consistent tenant snapshot export, deletion invalidation/purge, complete backups and measured RPO/RTO quarantine restore on the selected plans.",
+        "Verify critical failure paths and actual owner alerts with redacted logs. Record all-in costs, free-plan constraints and the current supported-device matrix.",
+        "Hand UX agents a stable operation/state catalogue, runnable core instructions and exact outstanding presentation integration. Hand the alpha operator the readiness register, rehearsal/onboarding procedures and four-week assessment instructions.",
+        "Core qualification is not live alpha or final UI acceptance. Any outstanding design integration or required evidence remains explicitly pending; do not claim readiness merely because the issue series is nearing completion."
+      ],
+      "tests": [
+        "Full integrated regression through real modules plus independent recovery/export/deletion/access probes.",
+        "Evidence audit maps each accepted contract and P01–P12 case to current-revision output.",
+        "Operator reproduction from clean setup and fault-triggered alert inspection without secrets."
+      ],
+      "nonGoals": [
+        "No final visual-design implementation, production activation without its scope, or automatic four-week alpha success."
+      ],
+      "integration": [
+        "Own the last cross-module join including I3/I4/I6/I7 UI/commands, Calendar and push alongside the core. If a missing seam prevents proof, add/resolve its concrete prerequisite instead of waiving the requirement."
+      ],
+      "declaredPrerequisites": [
+        "J3",
+        "J4",
+        "I6",
+        "I7",
+        "I3",
+        "I4"
+      ],
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/64",
+      "issueNumber": 64
+    }
+  ],
+  "reviewSetupReference": {
+    "repository": "wojtekpiskorz/astroix",
+    "commit": "d4f1bc218261cf6c76984ca2c384df7f7b5bd80e",
+    "workflow": ".github/workflows/ai-review.yml",
+    "secretName": "ZAI_API_KEY"
+  },
+  "implementationMap": "https://github.com/wojtekpiskorz/kiero/issues/15",
+  "nativeCoreEdges": 103
+}
