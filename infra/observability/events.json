@@ -1,0 +1,145 @@
+{
+  "redactionVersion": "i2.redact.1",
+  "redactedPlaceholder": "<redacted>",
+  "limits": {
+    "maxMetadataEntries": 16,
+    "maxValueLength": 64
+  },
+  "kinds": [
+    "ops.processing.completed",
+    "ops.processing.failed",
+    "ops.processing.stuck",
+    "ops.save.failed",
+    "ops.job.attempts_exhausted",
+    "ops.outbox.delivery_failed",
+    "ops.health.heartbeat",
+    "ops.health.silence_detected",
+    "ops.cost.entry",
+    "ops.cost.threshold_warning",
+    "ops.cost.threshold_alert",
+    "ops.gateway.request",
+    "ops.provider.call"
+  ],
+  "keys": {
+    "traceId": "^[a-z0-9_-]{8,64}$",
+    "runId": "^[a-z0-9]{20,64}$",
+    "sourceId": "^[a-z0-9]{20,64}$",
+    "eventId": "^[a-f0-9-]{10,64}$",
+    "jobKey": "^job_[a-f0-9-]{10,64}$",
+    "errorKind": "^[a-z][a-z0-9_]{1,63}$",
+    "state": "^[a-z][a-z0-9_]{1,31}$",
+    "outcome": "^[a-z][a-z0-9_]{1,31}$",
+    "status": "^[a-z][a-z0-9_]{1,31}$",
+    "jobKind": "^[a-z][a-z0-9_.]{2,63}$",
+    "eventName": "^[a-z][a-z0-9_.]{2,63}$",
+    "latencyMs": "^\\d{1,10}$",
+    "ageMs": "^\\d{1,12}$",
+    "attempts": "^\\d{1,3}$",
+    "maxAttempts": "^\\d{1,3}$",
+    "count": "^\\d{1,9}$",
+    "usageIn": "^\\d{1,12}$",
+    "usageOut": "^\\d{1,12}$",
+    "usageTotal": "^\\d{1,12}$",
+    "costMinor": "^\\d{1,10}$",
+    "totalMinor": "^\\d{1,10}$",
+    "thresholdMinor": "^\\d{1,10}$",
+    "period": "^\\d{4}-(0[1-9]|1[0-2])$",
+    "pipelineVersion": "^[a-z0-9][a-z0-9.-]{0,31}$",
+    "provider": "^[a-z][a-z0-9_]{1,31}$",
+    "providerRoute": "^[a-z0-9][a-z0-9./:-]{0,63}$",
+    "model": "^[a-z0-9][a-z0-9./-]{0,63}$",
+    "category": "^[a-z][a-z0-9_]{1,31}$",
+    "basis": "^(observed|estimate)$",
+    "level": "^(warning_400|alert_500)$",
+    "serviceName": "^[a-z][a-z0-9_.-]{2,63}$",
+    "environment": "^(dev|staging|alpha-production)$",
+    "route": "^\\/[a-z0-9/_-]{1,120}$",
+    "httpStatus": "^\\d{3}$"
+  },
+  "allowlist": {
+    "ops.processing.completed": [
+      "runId",
+      "traceId",
+      "pipelineVersion",
+      "latencyMs",
+      "providerRoute",
+      "state"
+    ],
+    "ops.processing.failed": [
+      "runId",
+      "traceId",
+      "errorKind",
+      "attempts",
+      "state"
+    ],
+    "ops.processing.stuck": [
+      "runId",
+      "traceId",
+      "ageMs",
+      "state"
+    ],
+    "ops.save.failed": [
+      "sourceId",
+      "traceId",
+      "errorKind",
+      "count"
+    ],
+    "ops.job.attempts_exhausted": [
+      "jobKey",
+      "jobKind",
+      "errorKind",
+      "attempts",
+      "maxAttempts"
+    ],
+    "ops.outbox.delivery_failed": [
+      "eventId",
+      "eventName",
+      "errorKind",
+      "attempts"
+    ],
+    "ops.health.heartbeat": [
+      "serviceName",
+      "status"
+    ],
+    "ops.health.silence_detected": [
+      "serviceName",
+      "ageMs",
+      "count"
+    ],
+    "ops.cost.entry": [
+      "provider",
+      "category",
+      "costMinor",
+      "period",
+      "basis"
+    ],
+    "ops.cost.threshold_warning": [
+      "period",
+      "totalMinor",
+      "thresholdMinor",
+      "level"
+    ],
+    "ops.cost.threshold_alert": [
+      "period",
+      "totalMinor",
+      "thresholdMinor",
+      "level"
+    ],
+    "ops.gateway.request": [
+      "route",
+      "httpStatus",
+      "latencyMs",
+      "environment"
+    ],
+    "ops.provider.call": [
+      "providerRoute",
+      "model",
+      "latencyMs",
+      "usageIn",
+      "usageOut",
+      "usageTotal",
+      "costMinor",
+      "outcome"
+    ]
+  }
+}

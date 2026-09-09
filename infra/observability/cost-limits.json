@@ -1,0 +1,20 @@
+{
+  "description": "All-in cost tracking configuration (I2): providers tracked, the 400/500 PLN owner thresholds and provider-native caps/limits. Caps are DATED EVIDENCE from docs/research/alpha-services-runtime-facts.md (checked 2026-09-08), not lifetime prices. Provider caps keep their native units; they are never silently converted to PLN - the PLN thresholds apply to the owner-visible all-in budget only.",
+  "budget": {
+    "currency": "PLN",
+    "thresholds": { "warning": { "minor": 40000, "label": "400 PLN" }, "alert": { "minor": 50000, "label": "500 PLN" } },
+    "alertCooldownHours": 24,
+    "behavior": "observational alerts only; no automatic product shutdown at 500 PLN"
+  },
+  "providers": [
+    { "provider": "convex", "tracks": "database/function usage on the current plan", "limit": "Free-plan hard resource caps (S16 class); Starter allows metered overage, Professional adds log streaming + S256", "limitSource": "convex pricing/limits, dated 2026-09-08" },
+    { "provider": "workers", "tracks": "Cloudflare Workers Paid baseline + metered usage", "limit": "$5/month baseline with included usage", "limitSource": "workers pricing, dated 2026-09-08" },
+    { "provider": "r2", "tracks": "storage + Class A/B operations", "limit": "free-tier allowances; backup traffic counts", "limitSource": "r2 pricing, dated 2026-09-08" },
+    { "provider": "containers", "tracks": "metered CPU, provisioned memory/disk, network", "limit": "after allowances; sleeping behavior affects charges", "limitSource": "containers pricing, dated 2026-09-08" },
+    { "provider": "images", "tracks": "unique transformations", "limit": "5,000 unique transformations/month included, then $0.50 per 1,000", "limitSource": "images pricing, dated 2026-09-08" },
+    { "provider": "ai_openrouter", "tracks": "chat/vision/STT/embedding spend", "limit": "no provider cap; bounded by the PLN thresholds", "limitSource": "openrouter usage terms" },
+    { "provider": "email_resend", "tracks": "OTP/invite email send volume", "limit": "100 emails/day on Free", "limitSource": "resend pricing, dated 2026-09-08" },
+    { "provider": "observability_axiom", "tracks": "ingest/storage usage", "limit": "Personal: 1 user, 3 datasets, 3 monitors, 30d retention, usage limits", "limitSource": "axiom limits, dated 2026-09-08" },
+    { "provider": "backup", "tracks": "backup generation/transfer counted against Convex + R2 limits", "limit": "~2,880 full snapshots/month at the 15-minute schedule; Free/Starter allow at most 2 stored native backups", "limitSource": "convex backup docs, dated 2026-09-08" }
+  ]
+}

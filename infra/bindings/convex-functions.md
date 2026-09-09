@@ -12,6 +12,9 @@ configuration, per the accepted architecture.
 | `OPENROUTER_API_KEY` | OpenRouter API authentication for all model calls from server actions | `npx --yes convex@1.45.0 env set OPENROUTER_API_KEY` per deployment (dev: locally; staging/alpha: CI from GitHub secret), or dashboard Settings > Environment Variables | name VERIFIED in local `.env` and GitHub secrets; Convex env injection PENDING (E2 first real call) |
 | `AUTH_RESEND_KEY` | Resend credential for the Convex Auth custom Email provider (Polish OTP/invites) | same as above | PENDING (B1) |
 | `CONVEX_BACKUP_ADMIN_KEY` | credential the backup executor uses for the documented export step (candidate name; I5 finalizes) | Convex dashboard-issued key stored in the backup runtime, not in Convex env | PENDING (I5) |
+| `AXIOM_API_TOKEN` | Axiom ingest credential for the telemetry sink forwarder (redacted diagnostic events) | `npx --yes convex@1.45.0 env set AXIOM_API_TOKEN` per deployment | PENDING owner account provisioning (I2 consumer implemented) |
+| `AXIOM_DATASET` | Non-secret dataset name (`kiero-observability`) the forwarder ingests into | same as above | PENDING (I2) |
+| `KIERO_ENVIRONMENT` | Non-secret environment tag (`dev` / `staging` / `alpha-production`) stamped on forwarded events | same as above | PENDING rollout with staging/alpha deployments |
 
 ## Generated local variables (not secrets, not committed)
 

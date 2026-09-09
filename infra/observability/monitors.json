@@ -1,0 +1,35 @@
+{
+  "description": "The three Axiom monitor groups (I2), matching the accepted architecture: processing/save incidents, recovery/health including external backend-silence detection, and costs/limits with the 400/500 PLN alerts. Axiom Personal permits at most three monitors - these are all three. PROVISIONING IS PENDING (see README.md): no Axiom account exists yet; the APL queries and notification channels below are the exact definitions to create once the owner provisions the account.",
+  "monitors": [
+    {
+      "id": "kiero-processing-save-incidents",
+      "group": "processing/save incidents",
+      "apl": "['kiero-observability'] | where kind in ['ops.processing.failed', 'ops.processing.stuck', 'ops.save.failed', 'ops.job.attempts_exhausted', 'ops.outbox.delivery_failed'] | summarize count() by kind",
+      "trigger": { "operator": ">", "threshold": 0, "window": "15m", "interval": "5m" },
+      "notifications": [
+        { "channel": "email", "target": "OWNER_PLACEHOLDER", "status": "PENDING owner configures the destination" }
+      ],
+      "covers": "Failed and stuck processing runs, source save incidents, durable jobs that exhausted maxAttempts across every replay, and failed outbox deliveries (incl. the loud consumer_projection_missing failure kind)."
+    },
+    {
+      "id": "kiero-backend-silence",
+      "group": "recovery/health",
+      "apl": "['kiero-observability'] | where kind == 'ops.health.heartbeat' | summarize latest = max(_time)",
+      "trigger": { "operator": "older_than", "threshold": "15m", "window": "15m", "interval": "5m" },
+      "notifications": [
+        { "channel": "email", "target": "OWNER_PLACEHOLDER", "status": "PENDING owner configures the destination" }
+      ],
+      "covers": "Total backend silence detected OUTSIDE Convex: the gateway cron (external prober) emits heartbeat events to the sink; when they stop arriving, the backend (or the whole delivery path) is silent even though no application event can report it. Convex-side staleness (healthHeartbeats table + telemetry state) is the in-app second layer; backup freshness for I5 rides ops.health.heartbeat of backup.job plus the recovery manifest state."
+    },
+    {
+      "id": "kiero-cost-thresholds",
+      "group": "costs/limits",
+      "apl": "['kiero-observability'] | where kind in ['ops.cost.threshold_warning', 'ops.cost.threshold_alert'] | summarize count() by level",
+      "trigger": { "operator": ">", "threshold": 0, "window": "1h", "interval": "15m" },
+      "notifications": [
+        { "channel": "email", "target": "OWNER_PLACEHOLDER", "status": "PENDING owner configures the destination" }
+      ],
+      "covers": "All-in monthly infrastructure + AI spend crossing 400 PLN (warning) and 500 PLN (stronger alert). Threshold evaluation and per-level 24h cooldown run Convex-side (costs.ts, evaluateCostAlerts); this monitor only notifies on the emitted alert events. No automatic product shutdown at 500 PLN (accepted alpha contract)."
+    }
+  ]
+}

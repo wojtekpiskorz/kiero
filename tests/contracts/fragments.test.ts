@@ -90,12 +90,13 @@ function memberLiterals(validator: GenericValidator, table: string): string[] {
 }
 
 describe("schema composition", () => {
-  it("composes exactly the closed table inventory (52 tables)", () => {
+  it("composes exactly the closed table inventory (55 tables)", () => {
     const composed = Object.keys(tables).sort();
     const inventory = [...TABLE_ID_NAMES].sort();
     expect(composed).toEqual(inventory);
-    // 52 since the A3 certification amendment added externalEffects.
-    expect(composed).toHaveLength(52);
+    // 52 since the A3 certification amendment added externalEffects;
+    // 55 since I2 added healthHeartbeats, costEntries, costAlertStates.
+    expect(composed).toHaveLength(55);
   });
 
   it("gives the domain event envelope a durable outbox home", () => {

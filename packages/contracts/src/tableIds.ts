@@ -27,8 +27,7 @@ import { Schema } from "effect";
 export const TABLE_ID_NAMES = [
   // access/identity
   "users",
-  "sessions",
-  // access/membership
+  "sessions",  // access/membership
   "companies",
   "memberships",
   "invitations",
@@ -96,6 +95,11 @@ export const TABLE_ID_NAMES = [
   // operations/telemetry
   "auditRecords",
   "diagnosticEvents",
+  // I2 amendments: heartbeat ledger (backend-silence detection) and the
+  // all-in cost accounting behind the 400/500 PLN alerts.
+  "healthHeartbeats",
+  "costEntries",
+  "costAlertStates",
   // search
   "searchEntries",
   "searchIndexGenerations",
