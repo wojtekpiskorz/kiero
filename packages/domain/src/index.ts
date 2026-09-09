@@ -7,3 +7,9 @@
  */
 export const DOMAIN_NOT_IMPLEMENTED: "bootstrap-placeholder" =
   "bootstrap-placeholder";
+
+// C2 coordinated addition (flagged): the findings domain owns its rules in
+// packages/domain/findings/**; the package surface re-exports them here the
+// same way convex/schema.ts gains an import spread per fragment. Later
+// domains (projects, work, calendar) repeat this one-line pattern.
+export * from "../findings/index";
