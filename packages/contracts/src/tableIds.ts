@@ -35,7 +35,8 @@ export const TABLE_ID_NAMES = [
   "authRefreshTokens",
   "authVerificationCodes",
   "authVerifiers",
-  "authRateLimits",  // access/membership
+  "authRateLimits",
+  // access/membership
   "companies",
   "memberships",
   "invitations",

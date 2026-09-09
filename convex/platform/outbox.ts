@@ -70,6 +70,34 @@ export function projectEventToJobInput(
       },
     };
   }
+  // B3 registration (issue #22 owns the declared consumer proof): the two
+  // access-revocation edges project onto `access.cleanup_revocation`. The
+  // membership payload carries its revocation instant and the successor
+  // policy; the session payload (B1's shape) leaves the instant to the
+  // executor. The row's dedup identity is also the job's, so a publisher
+  // that already registered the cleanup atomically (revocation transaction,
+  // convex/access/membership/operations.ts) collapses onto that row here.
+  if (edge.jobKind === "access.cleanup_revocation") {
+    if (eventName === "access.membershipRevoked") {
+      return {
+        kind: "job",
+        jobKind: edge.jobKind,
+        input: {
+          kind: "membership",
+          membershipId: payload.membershipId,
+          sessionId: null,
+          revokedAtMs: payload.revokedAtMs,
+        },
+        dedupKey: rowDedupKey,
+      };
+    }
+    return {
+      kind: "job",
+      jobKind: edge.jobKind,
+      input: { kind: "session", membershipId: null, sessionId: payload.sessionId },
+      dedupKey: rowDedupKey,
+    };
+  }
   if (edge.jobKind === "platform.echo_delivery") {
     // The outbox row's dedup identity anchors the delivery job; the payload
     // itself carries only the message.

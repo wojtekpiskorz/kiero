@@ -18,6 +18,13 @@ import type * as access_identity_proofDomain from "../access/identity/proofDomai
 import type * as access_identity_providerAvailability from "../access/identity/providerAvailability.js";
 import type * as access_identity_resolution from "../access/identity/resolution.js";
 import type * as access_identity_userPolicy from "../access/identity/userPolicy.js";
+import type * as access_membership_cleanup from "../access/membership/cleanup.js";
+import type * as access_membership_cores from "../access/membership/cores.js";
+import type * as access_membership_dispatch from "../access/membership/dispatch.js";
+import type * as access_membership_functions from "../access/membership/functions.js";
+import type * as access_membership_operations from "../access/membership/operations.js";
+import type * as access_membership_policy from "../access/membership/policy.js";
+import type * as access_membership_probe from "../access/membership/probe.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
@@ -77,6 +84,13 @@ declare const fullApi: ApiFromModules<{
   "access/identity/providerAvailability": typeof access_identity_providerAvailability;
   "access/identity/resolution": typeof access_identity_resolution;
   "access/identity/userPolicy": typeof access_identity_userPolicy;
+  "access/membership/cleanup": typeof access_membership_cleanup;
+  "access/membership/cores": typeof access_membership_cores;
+  "access/membership/dispatch": typeof access_membership_dispatch;
+  "access/membership/functions": typeof access_membership_functions;
+  "access/membership/operations": typeof access_membership_operations;
+  "access/membership/policy": typeof access_membership_policy;
+  "access/membership/probe": typeof access_membership_probe;
   auth: typeof auth;
   crons: typeof crons;
   http: typeof http;
