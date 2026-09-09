@@ -21,6 +21,8 @@ import type * as access_identity_userPolicy from "../access/identity/userPolicy.
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
+import type * as integrations_ai_dispatch from "../integrations/ai/dispatch.js";
+import type * as integrations_ai_record from "../integrations/ai/record.js";
 import type * as integrations_email_copy from "../integrations/email/copy.js";
 import type * as integrations_email_resend from "../integrations/email/resend.js";
 import type * as integrations_email_send from "../integrations/email/send.js";
@@ -78,6 +80,8 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   crons: typeof crons;
   http: typeof http;
+  "integrations/ai/dispatch": typeof integrations_ai_dispatch;
+  "integrations/ai/record": typeof integrations_ai_record;
   "integrations/email/copy": typeof integrations_email_copy;
   "integrations/email/resend": typeof integrations_email_resend;
   "integrations/email/send": typeof integrations_email_send;
