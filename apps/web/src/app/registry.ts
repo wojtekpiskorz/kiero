@@ -11,7 +11,7 @@
  *   registry validates against;
  * - `consumedOperations` must name operations that exist in the composed
  *   contracts registry (`@kiero/contracts` `operations`), so a UI entry can
- *   never claim an operation no module surface declared — the same
+ *   never claim an operation no module surface declared; the same
  *   loud-drift rule the backend registry applies at construction time.
  *
  * The entry is discriminated on `implementation`: a pending entry carries

@@ -6,7 +6,7 @@
  * React-Query adapter: the canonical `convexQuery` key, hashed and fetched
  * by the QueryClient defaults wired in `connections.ts`. Without a
  * configured backend nothing subscribes and the status stays "nie
- * połączono". Connection failures render fixed Polish copy — never
+ * połączono". Connection failures render fixed Polish copy and never
  * the raw transport error.
  */
 

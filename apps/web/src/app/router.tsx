@@ -5,7 +5,7 @@
  * root-level route per entry, the first entry ("/", the company
  * conversation) being the default. Unknown paths and render failures get
  * explicit Polish screens with a working control back to the default
- * route — no raw error text crosses the boundary.
+ * route; no raw error text crosses the boundary.
  */
 
 import {
