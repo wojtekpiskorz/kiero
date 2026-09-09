@@ -40,11 +40,12 @@ import {
 import { resolveRequestContext } from "../../platform/context";
 import {
   decideGmEntryEligibility,
+  openGrantOfUser,
   parseGmOperatorAllowList,
 } from "./cores";
 import { performEnterGmMode } from "./operations";
 import { dispatchGmCommand, dispatchGmOnboard } from "./dispatch";
-import { gmTx } from "./storeAdapter";
+import { gmStore, gmTx } from "./storeAdapter";
 
 /** The sanitized denial every protected read fails with. */
 function denialError(reason: string): never {
@@ -207,7 +208,8 @@ export type GmOverview =
   | {
       readonly state: "gm";
       readonly email: string;
-      readonly grantId: Id<"gmAccessGrants">;
+      /** The open grant's id (plain string: the store views speak plain ids). */
+      readonly grantId: string;
       readonly reason: string;
       readonly enteredAtMs: number;
       readonly membershipContext: { readonly companyId: Id<"companies">; readonly role: "admin" | "member" } | null;
@@ -236,12 +238,8 @@ export const gmOverview = query({
     if (user === null) {
       denialError("registry_missing");
     }
-    const grants = await ctx.db
-      .query("gmAccessGrants")
-      .withIndex("by_user_open", (q) => q.eq("userId", live.session.userId))
-      .collect();
-    const open = grants.find((grant) => grant.closedAtMs === undefined);
-    if (open === undefined) {
+    const open = openGrantOfUser(await gmStore(ctx.db).grantsOfUser(live.session.userId));
+    if (open === null) {
       return { state: "not_gm", email: user.email };
     }
 
@@ -288,7 +286,7 @@ export const gmOverview = query({
     return {
       state: "gm",
       email: user.email,
-      grantId: open._id,
+      grantId: open.id,
       reason: open.reason,
       enteredAtMs: open.enteredAtMs,
       membershipContext,

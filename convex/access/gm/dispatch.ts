@@ -7,12 +7,13 @@
  * carries companyId + membershipRole), which a GM WITHOUT membership can
  * never honestly have. Exactly like B3's admission surface, GM operations
  * enter one seam earlier: envelope decode -> operation allowlist (this
- * lane's) -> B1 identity resolution (provision-or-refresh) -> OPEN GRANT
- * resolution -> contract input decode -> handler. The check order mirrors
- * `dispatchCommand` (packages/runtime/src/command.ts) so the closed-error
- * discipline is identical; the authority object carries {userId, grantId}
- * and every handler re-decides per-company authority inside the
- * transaction (current authority at commit, OCC-serialized).
+ * lane's) -> B1 identity resolution (provision-or-refresh) -> the policy
+ * gate `decideGmRequest` over an OPEN GRANT (./policy.ts) -> contract
+ * input decode -> handler. The check order mirrors `dispatchCommand`
+ * (packages/runtime/src/command.ts) so the closed-error discipline is
+ * identical; the authority object carries {userId, grantId} and every
+ * handler re-decides per-company authority inside the transaction
+ * (current authority at commit, OCC-serialized).
  *
  * The GM authority NEVER confers membership: member operations are absent
  * from this registry by construction, and the membership dispatches
@@ -41,7 +42,8 @@ import {
   provisionOrRefreshLiveSession,
 } from "../identity/resolution";
 import { recoverAccountCommand } from "../linking/operations";
-import { gmTx } from "./storeAdapter";
+import { openGrantOfUser } from "./cores";
+import { gmStore, gmTx } from "./storeAdapter";
 import {
   performExitGmMode,
   performGmActivateCompany,
@@ -52,8 +54,16 @@ import {
   performGmRestoreAdministrator,
   type GmAuthority,
 } from "./operations";
-import { gmActivateCompanyEntry, gmInspectCompanyEntry, gmOnboardCompanyEntry, gmRestoreAdministratorEntry, gmEndCompanyAlphaEntry, exitGmModeEntry, recoverAccountEntry } from "./operations";
-import { GM_OPERATIONS, GM_POLICY_ID } from "./policy";
+import {
+  exitGmModeEntry,
+  gmActivateCompanyEntry,
+  gmEndCompanyAlphaEntry,
+  gmInspectCompanyEntry,
+  gmOnboardCompanyEntry,
+  recoverAccountEntry,
+  gmRestoreAdministratorEntry,
+} from "./operations";
+import { GM_OPERATIONS, decideGmRequest } from "./policy";
 import type { GmTx } from "./store";
 
 /** The onboarding outcome the action wrapper delivers (internal only). */
@@ -80,73 +90,76 @@ export interface GmHandler {
   ) => Promise<ResultEnvelope>;
 }
 
+/**
+ * Builds one handler from its contract entry. The dispatch has ALREADY
+ * decoded the input against the same entry's schema (its check order:
+ * authority, then input decode, then handler — invalid input never reaches
+ * a handler); this decode is the single typing seam that narrows the
+ * already-validated value to its contract type, in one place instead of
+ * seven hand-rolled copies.
+ */
+function gmHandlerOf<Input>(
+  entry: { readonly input: Schema.Codec<Input, unknown, never, never> },
+  run: (
+    ctx: MutationCtx,
+    tx: GmTx,
+    authority: GmAuthority,
+    input: Input,
+  ) => Promise<ResultEnvelope>,
+): GmHandler {
+  return {
+    run: (ctx, tx, authority, input) =>
+      run(ctx, tx, authority, Schema.decodeUnknownSync(entry.input)(input)),
+  };
+}
+
 /** The GM handler table (exported for tests: exact keys are pinned). */
 export function gmHandlers(onboardCapture?: {
   capture: (issued: IssuedOnboarding["issued"]) => void;
 }): Record<string, GmHandler> {
   return {
-    "access.exitGmMode": {
-      run: async (_ctx, tx, authority, input) => {
-        const decoded = Schema.decodeUnknownSync(exitGmModeEntry.input)(input);
-        return performExitGmMode(tx, { userId: authority.userId, grantId: decoded.grantId });
-      },
-    },
-    "access.recoverAccount": {
-      run: async (ctx, tx, authority, input) => {
-        const decoded = Schema.decodeUnknownSync(recoverAccountEntry.input)(input);
-        // The production recovery runner: B2's checked command with the
-        // RESOLVED GM actor as the performer, in this transaction.
-        return performGmRecoverAccount(tx, authority, decoded, (recoveryInput, performedBy) =>
-          recoverAccountCommand.run(ctx, recoveryInput, performedBy),
-        );
-      },
-    },
-    "access.gmInspectCompany": {
-      run: async (_ctx, tx, authority, input) => {
-        const decoded = Schema.decodeUnknownSync(gmInspectCompanyEntry.input)(input);
-        return performGmInspectCompany(tx, authority, decoded);
-      },
-    },
-    "access.gmOnboardCompany": {
-      run: async (_ctx, tx, authority, input) => {
-        const decoded = Schema.decodeUnknownSync(gmOnboardCompanyEntry.input)(input);
-        const outcome = await performGmOnboardCompany(tx, authority, decoded);
-        if (!outcome.ok) {
-          return outcome.result;
-        }
-        onboardCapture?.capture({
-          companyId: outcome.companyId,
-          activationId: outcome.activationId,
-          invitationId: outcome.invitationId,
-          expiresAtMs: outcome.expiresAtMs,
-          email: outcome.email,
-          companyName: outcome.companyName,
-          code: outcome.code,
-        });
-        // The action wrapper composes the honest delivery state into the
-        // client envelope; this transport value never leaves the server
-        // (same shape as B3's issuance leg).
-        return okResult({ pendingDelivery: true });
-      },
-    },
-    "access.gmActivateCompany": {
-      run: async (_ctx, tx, authority, input) => {
-        const decoded = Schema.decodeUnknownSync(gmActivateCompanyEntry.input)(input);
-        return performGmActivateCompany(tx, authority, decoded);
-      },
-    },
-    "access.gmRestoreAdministrator": {
-      run: async (_ctx, tx, authority, input) => {
-        const decoded = Schema.decodeUnknownSync(gmRestoreAdministratorEntry.input)(input);
-        return performGmRestoreAdministrator(tx, authority, decoded);
-      },
-    },
-    "access.gmEndCompanyAlpha": {
-      run: async (_ctx, tx, authority, input) => {
-        const decoded = Schema.decodeUnknownSync(gmEndCompanyAlphaEntry.input)(input);
-        return performGmEndCompanyAlpha(tx, authority, decoded);
-      },
-    },
+    "access.exitGmMode": gmHandlerOf(exitGmModeEntry, (_ctx, tx, authority, input) =>
+      performExitGmMode(tx, { userId: authority.userId, grantId: input.grantId }),
+    ),
+    "access.recoverAccount": gmHandlerOf(recoverAccountEntry, (ctx, tx, authority, input) =>
+      // The production recovery runner: B2's checked command with the
+      // RESOLVED GM actor as the performer, in this transaction.
+      performGmRecoverAccount(tx, authority, input, (recoveryInput, performedBy) =>
+        recoverAccountCommand.run(ctx, recoveryInput, performedBy),
+      ),
+    ),
+    "access.gmInspectCompany": gmHandlerOf(gmInspectCompanyEntry, (_ctx, tx, authority, input) =>
+      performGmInspectCompany(tx, authority, input),
+    ),
+    "access.gmOnboardCompany": gmHandlerOf(gmOnboardCompanyEntry, async (_ctx, tx, authority, input) => {
+      const outcome = await performGmOnboardCompany(tx, authority, input);
+      if (!outcome.ok) {
+        return outcome.result;
+      }
+      onboardCapture?.capture({
+        companyId: outcome.companyId,
+        activationId: outcome.activationId,
+        invitationId: outcome.invitationId,
+        expiresAtMs: outcome.expiresAtMs,
+        email: outcome.email,
+        companyName: outcome.companyName,
+        code: outcome.code,
+      });
+      // The action wrapper composes the honest delivery state into the
+      // client envelope; this transport value never leaves the server
+      // (same shape as B3's issuance leg).
+      return okResult({ pendingDelivery: true });
+    }),
+    "access.gmActivateCompany": gmHandlerOf(gmActivateCompanyEntry, (_ctx, tx, authority, input) =>
+      performGmActivateCompany(tx, authority, input),
+    ),
+    "access.gmRestoreAdministrator": gmHandlerOf(
+      gmRestoreAdministratorEntry,
+      (_ctx, tx, authority, input) => performGmRestoreAdministrator(tx, authority, input),
+    ),
+    "access.gmEndCompanyAlpha": gmHandlerOf(gmEndCompanyAlphaEntry, (_ctx, tx, authority, input) =>
+      performGmEndCompanyAlpha(tx, authority, input),
+    ),
   };
 }
 
@@ -157,13 +170,20 @@ export type AuthorityResolution =
 
 /** What a GM dispatch needs (injectable so tests run the REAL path). */
 export interface GmDispatchDeps {
-  readonly policyId: string;
   readonly allowlist: readonly string[];
   readonly resolveAuthority: (ctx: MutationCtx) => Promise<AuthorityResolution>;
   readonly handlers: Record<string, GmHandler>;
 }
 
-/** The production authority resolution: live session -> open grant. */
+/**
+ * The production authority resolution: live session -> the policy gate.
+ * Session liveness is decided by the composed B1 resolution (upstream of
+ * the policy — see ./policy.ts); with a live session, `decideGmRequest`
+ * decides over resolved facts: an open grant, membership deliberately not
+ * consulted. The open-grant predicate is the cores' one spelling
+ * (`openGrantOfUser`), read through the same store adapter the handlers
+ * use.
+ */
 export async function resolveGmAuthority(ctx: MutationCtx): Promise<AuthorityResolution> {
   const live = await provisionOrRefreshLiveSession(
     liveSessionTx(ctx.db),
@@ -174,26 +194,25 @@ export async function resolveGmAuthority(ctx: MutationCtx): Promise<AuthorityRes
   if (live.tag === "denied") {
     return { ok: false, result: errorResult(unauthenticatedError(`no_live_session_${live.reason}`)) };
   }
-  const grants = await ctx.db
-    .query("gmAccessGrants")
-    .withIndex("by_user_open", (q) => q.eq("userId", live.session.userId))
-    .collect();
-  const open = grants.find((grant) => grant.closedAtMs === undefined);
-  if (open === undefined) {
-    return {
-      ok: false,
-      result: errorResult(forbiddenError("gm_mode_not_active", "gm")),
-    };
+  const open = openGrantOfUser(await gmStore(ctx.db).grantsOfUser(live.session.userId));
+  const decision = decideGmRequest({ hasLiveSession: true, hasOpenGrant: open !== null });
+  if (!decision.allowed && decision.kind === "forbidden") {
+    return { ok: false, result: errorResult(forbiddenError(decision.code, "gm")) };
   }
-  return { ok: true, authority: { userId: live.session.userId, grantId: open._id } };
+  if (open === null) {
+    // decideGmRequest's unauthenticated branch is unreachable here (session
+    // liveness decided above); an open grant is the only allowed shape, so
+    // this is kept fail-closed rather than reachable.
+    return { ok: false, result: errorResult(unauthenticatedError("no_live_session_no_identity")) };
+  }
+  return { ok: true, authority: { userId: live.session.userId, grantId: open.id } };
 }
 
-/** The production deps (the policy id is pinned by tests and evidence). */
+/** The production deps. */
 export function gmCommandDeps(onboardCapture?: {
   capture: (issued: IssuedOnboarding["issued"]) => void;
 }): GmDispatchDeps {
   return {
-    policyId: GM_POLICY_ID,
     allowlist: GM_OPERATIONS,
     resolveAuthority: resolveGmAuthority,
     handlers: gmHandlers(onboardCapture),
@@ -215,7 +234,8 @@ export async function dispatchGmCommandWith(
   }
   const command = decodedEnvelope.value;
 
-  if (composedOperations[command.operation] === undefined) {
+  const entry = composedOperations[command.operation];
+  if (entry === undefined) {
     return errorResult(unsupportedError(command.operation, "unknown_operation"));
   }
   if (!deps.allowlist.includes(command.operation)) {
@@ -234,10 +254,6 @@ export async function dispatchGmCommandWith(
     return resolution.result;
   }
 
-  const entry = composedOperations[command.operation];
-  if (entry === undefined) {
-    return errorResult(unsupportedError(command.operation, "unknown_operation"));
-  }
   const decodedInput = decodeInput(entry.input, command.input);
   if (!decodedInput.ok) {
     return decodedInput.error;

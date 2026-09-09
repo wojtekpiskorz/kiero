@@ -12,10 +12,12 @@
  *   it, and TIME ELAPSED ALONE NEVER ENDS IT (there is deliberately no
  *   expiry decision here — an idle GM session stays open until it is
  *   explicitly exited or the actor signs out and the session dies).
- * - GM authority is SEPARATE from company membership ("GM", CONTEXT.md):
- *   `decideAuthoritySurfaces` is the one place that states the layering.
+ * - GM authority is SEPARATE from company membership ("GM", CONTEXT.md).
  *   A GM without membership acts through the grant; a member without a
  *   grant gains nothing; holding both yields both surfaces, never a blend.
+ *   The layering is structural — the dispatch registries contain no
+ *   foreign names (fail-closed both ways) — and pinned as such by the
+ *   focused verification, not restated here as a second copy.
  * - Company data is reachable in GM mode only while the target company's
  *   alpha participation is ACTIVE (an open `gmCompanyActivations` row).
  *   Ending participation removes grant-derived access to that firm
@@ -104,6 +106,29 @@ export function decideGmExit(
   return { ok: true, grant };
 }
 
+/** The denial half of the per-company authority decision (shared spellings). */
+export type GmCompanyAccessDenial =
+  | {
+      readonly ok: false;
+      readonly kind: "forbidden";
+      readonly code: "gm_mode_not_active" | "company_alpha_not_active";
+    }
+  | { readonly ok: false; readonly kind: "not_found"; readonly code: "company_not_found" };
+
+/** No open grant: not GM right now — the denial every GM operation shares. */
+export const GM_MODE_NOT_ACTIVE: GmCompanyAccessDenial = {
+  ok: false,
+  kind: "forbidden",
+  code: "gm_mode_not_active",
+};
+
+/** The target company does not exist (denials carry no target data). */
+export const COMPANY_NOT_FOUND: GmCompanyAccessDenial = {
+  ok: false,
+  kind: "not_found",
+  code: "company_not_found",
+};
+
 /**
  * The per-operation GM authority decision over one target company. Every
  * GM operation runs this INSIDE its transaction, so a grant closed or an
@@ -114,17 +139,14 @@ export function decideGmCompanyAccess(args: {
   readonly grantOpen: boolean;
   readonly companyExists: boolean;
   readonly activation: GmActivationView | null;
-}):
-  | { readonly ok: true }
-  | { readonly ok: false; readonly kind: "forbidden"; readonly code: "gm_mode_not_active" | "company_alpha_not_active" }
-  | { readonly ok: false; readonly kind: "not_found"; readonly code: "company_not_found" } {
+}): { readonly ok: true } | GmCompanyAccessDenial {
   if (!args.grantOpen) {
     // No open grant: not GM right now (a member without a grant, or an
     // exited/never-entered operator). Denial carries no target data.
-    return { ok: false, kind: "forbidden", code: "gm_mode_not_active" };
+    return GM_MODE_NOT_ACTIVE;
   }
   if (!args.companyExists) {
-    return { ok: false, kind: "not_found", code: "company_not_found" };
+    return COMPANY_NOT_FOUND;
   }
   if (args.activation === null || !gmActivationOpen(args.activation)) {
     // Grant-derived access ends with alpha participation, immediately and
@@ -132,27 +154,6 @@ export function decideGmCompanyAccess(args: {
     return { ok: false, kind: "forbidden", code: "company_alpha_not_active" };
   }
   return { ok: true };
-}
-
-/**
- * THE membership/GM layering matrix (one place, pure, pinned by tests).
- * Which dispatch surfaces resolve for an actor:
- *
- * - `gmSurface` (this lane's dispatch): requires an open grant. Membership
- *   is deliberately not consulted — the GM without membership acts through
- *   the grant alone.
- * - `memberSurface` (B1/B3 dispatches over the canonical chain): requires
- *   an active membership. The grant is deliberately not consulted — a
- *   member never gains GM powers, and isGm never widens member intents.
- */
-export function decideAuthoritySurfaces(args: {
-  readonly hasOpenGrant: boolean;
-  readonly hasActiveMembership: boolean;
-}): { readonly gmSurface: boolean; readonly memberSurface: boolean } {
-  return {
-    gmSurface: args.hasOpenGrant,
-    memberSurface: args.hasActiveMembership,
-  };
 }
 
 /**

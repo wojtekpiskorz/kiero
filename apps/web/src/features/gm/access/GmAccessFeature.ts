@@ -60,6 +60,9 @@ function describe(result: ResultEnvelope, okText: string): Notice {
 const inspectResult = accessOperations["access.gmInspectCompany"].result;
 const recoverResult = accessOperations["access.recoverAccount"].result;
 
+/** The decoded inspection result the active surface renders. */
+type InspectionResult = Schema.Schema.Type<typeof inspectResult>;
+
 function NoticeArea({ notice }: { notice: Notice | null }): ReactNode {
   if (notice === null) {
     return null;
@@ -200,7 +203,7 @@ function ActiveGmSurface({ overview }: { readonly overview: Extract<GmOverview, 
   const onboard = useAction(api.access.gm.functions.gmOnboardCommand);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState(false);
-  const [inspection, setInspection] = useState<unknown>(null);
+  const [inspection, setInspection] = useState<InspectionResult | null>(null);
 
   // Inspect form state.
   const [inspectCompanyId, setInspectCompanyId] = useState("");
@@ -225,16 +228,28 @@ function ActiveGmSurface({ overview }: { readonly overview: Extract<GmOverview, 
   const [endAlphaCompanyId, setEndAlphaCompanyId] = useState("");
   const [endAlphaBasis, setEndAlphaBasis] = useState("");
 
-  async function runDispatch(operation: string, input: unknown, okText: string): Promise<void> {
+  /**
+   * Runs one dispatch call under the shared busy/notice ceremony, returning
+   * the envelope (null means the call threw and the network notice is
+   * already shown).
+   */
+  async function runCommand(call: () => Promise<ResultEnvelope>): Promise<ResultEnvelope | null> {
     setBusy(true);
     setNotice(null);
     try {
-      const result = await dispatch({ envelope: envelopeOf(operation, input) });
-      setNotice(describe(result, okText));
+      return await call();
     } catch {
       setNotice({ kind: "error", text: signInCopy.failures.network });
+      return null;
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function runDispatch(operation: string, input: unknown, okText: string): Promise<void> {
+    const result = await runCommand(() => dispatch({ envelope: envelopeOf(operation, input) }));
+    if (result !== null) {
+      setNotice(describe(result, okText));
     }
   }
 
@@ -247,62 +262,54 @@ function ActiveGmSurface({ overview }: { readonly overview: Extract<GmOverview, 
 
   async function inspect(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    setBusy(true);
-    setNotice(null);
     setInspection(null);
-    try {
-      const result = await dispatch({
+    const result = await runCommand(() =>
+      dispatch({
         envelope: envelopeOf("access.gmInspectCompany", {
           companyId: inspectCompanyId,
           basis: inspectBasis,
         }),
-      });
-      if (result._tag === "ok") {
-        setInspection(Schema.decodeUnknownSync(inspectResult)(result.value));
-        setNotice({ kind: "ok", text: gmCopy.enteredNotice });
-      } else {
-        setNotice(describe(result, ""));
-      }
-    } catch {
-      setNotice({ kind: "error", text: signInCopy.failures.network });
-    } finally {
-      setBusy(false);
+      }),
+    );
+    if (result === null) {
+      return;
+    }
+    if (result._tag === "ok") {
+      setInspection(Schema.decodeUnknownSync(inspectResult)(result.value));
+      setNotice({ kind: "ok", text: gmCopy.enteredNotice });
+    } else {
+      setNotice(describe(result, ""));
     }
   }
 
   async function recover(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    setBusy(true);
-    setNotice(null);
-    try {
-      const result = await dispatch({
+    const result = await runCommand(() =>
+      dispatch({
         envelope: envelopeOf("access.recoverAccount", {
           userId: recoverUserId,
           verificationBasis: recoverBasis,
         }),
+      }),
+    );
+    if (result === null) {
+      return;
+    }
+    if (result._tag === "ok") {
+      const receipt = Schema.decodeUnknownSync(recoverResult)(result.value);
+      setNotice({
+        kind: "ok",
+        text: gmCopy.recoveredNotice(receipt.revokedSessions, receipt.clearedAccounts),
       });
-      if (result._tag === "ok") {
-        const receipt = Schema.decodeUnknownSync(recoverResult)(result.value);
-        setNotice({
-          kind: "ok",
-          text: gmCopy.recoveredNotice(receipt.revokedSessions, receipt.clearedAccounts),
-        });
-      } else {
-        setNotice(describe(result, ""));
-      }
-    } catch {
-      setNotice({ kind: "error", text: signInCopy.failures.network });
-    } finally {
-      setBusy(false);
+    } else {
+      setNotice(describe(result, ""));
     }
   }
 
   async function runOnboard(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    setBusy(true);
-    setNotice(null);
-    try {
-      const result = await onboard({
+    const result = await runCommand(() =>
+      onboard({
         envelope: envelopeOf("access.gmOnboardCompany", {
           name: onboardName,
           timezone: onboardTimezone,
@@ -310,34 +317,29 @@ function ActiveGmSurface({ overview }: { readonly overview: Extract<GmOverview, 
           adminEmail: onboardEmail,
           basis: onboardBasis,
         }),
-      });
+      }),
+    );
+    if (result !== null) {
       setNotice(describe(result, gmCopy.onboardedNotice));
-    } catch {
-      setNotice({ kind: "error", text: signInCopy.failures.network });
-    } finally {
-      setBusy(false);
     }
   }
-
-  type Inspection = Schema.Schema.Type<typeof inspectResult>;
 
   function inspectionResult(): ReactNode {
     if (inspection === null) {
       return null;
     }
-    const data = inspection as Inspection;
     return createElement(
       "section",
       null,
-      createElement("h3", null, gmCopy.inspectResultHeading(data.company.name)),
-      createElement("p", null, gmCopy.inspectAdmins(data.activeAdminCount)),
+      createElement("h3", null, gmCopy.inspectResultHeading(inspection.company.name)),
+      createElement("p", null, gmCopy.inspectAdmins(inspection.activeAdminCount)),
       createElement("h4", null, gmCopy.inspectRunsHeading),
-      data.processingRuns.length === 0
+      inspection.processingRuns.length === 0
         ? createElement("p", null, gmCopy.inspectRunsEmpty)
         : createElement(
             "ul",
             null,
-            ...data.processingRuns.map((run) =>
+            ...inspection.processingRuns.map((run) =>
               createElement(
                 "li",
                 { key: run.runId },
@@ -346,12 +348,12 @@ function ActiveGmSurface({ overview }: { readonly overview: Extract<GmOverview, 
             ),
           ),
       createElement("h4", null, gmCopy.inspectJobsHeading),
-      data.durableJobs.length === 0
+      inspection.durableJobs.length === 0
         ? createElement("p", null, gmCopy.inspectJobsEmpty)
         : createElement(
             "ul",
             null,
-            ...data.durableJobs.map((job) =>
+            ...inspection.durableJobs.map((job) =>
               createElement(
                 "li",
                 { key: job.jobId },

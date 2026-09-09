@@ -18,13 +18,7 @@ import { dispatchCommand, forbiddenError, membershipPolicy } from "@kiero/runtim
 import { membershipHandlers } from "../../convex/access/membership/dispatch";
 import { membershipLanePolicy } from "../../convex/access/membership/policy";
 import { ActorContext } from "@kiero/contracts";
-import {
-  GM_OPERATIONS,
-  GM_POLICY_ID,
-  MEMBER_OPERATIONS,
-  decideGmRequest,
-  decideOperationSurface,
-} from "../../convex/access/gm/policy";
+import { GM_OPERATIONS, decideGmRequest } from "../../convex/access/gm/policy";
 import {
   dispatchGmCommandWith,
   gmHandlers,
@@ -64,7 +58,6 @@ function depsWithAuthority(
   handlerSpy?: ReturnType<typeof vi.fn>,
 ): GmDispatchDeps {
   return {
-    policyId: GM_POLICY_ID,
     allowlist: GM_OPERATIONS,
     resolveAuthority: async () => resolution,
     handlers:
@@ -102,17 +95,17 @@ describe("the GM handler registration", () => {
 });
 
 describe("the operation-surface routing (membership/GM layering)", () => {
-  it("routes member operations to the member surface, GM operations to the GM surface", () => {
-    for (const name of MEMBER_OPERATIONS) {
-      expect(decideOperationSurface(name)).toBe("member");
-    }
-    for (const name of GM_OPERATIONS) {
-      expect(decideOperationSurface(name)).toBe("gm");
-    }
+  // The REAL member registry (B3's handler table) — never a second,
+  // hand-maintained copy of its names.
+  const memberOperations = Object.keys(membershipHandlers());
+
+  it("the registries are disjoint: no GM operation is a member operation", () => {
+    expect(GM_OPERATIONS.filter((name) => memberOperations.includes(name))).toEqual([]);
+    expect(memberOperations.length).toBeGreaterThan(0);
   });
 
   it("member operations fail closed over the GM dispatch (GM authority is not membership)", async () => {
-    for (const name of MEMBER_OPERATIONS) {
+    for (const name of memberOperations) {
       const result = await dispatchGmCommandWith(
         depsWithAuthority(granted),
         noCtx,
@@ -228,7 +221,6 @@ describe("the dispatch check order (closed errors, sanitized)", () => {
   it("denies without an open grant before the handler runs (no target data leak)", async () => {
     const spy = vi.fn(async () => okResult({}));
     const deps = {
-      policyId: GM_POLICY_ID,
       allowlist: GM_OPERATIONS,
       resolveAuthority: async () => deniedNoGrant,
       handlers: { "access.gmInspectCompany": { run: spy } },
@@ -249,7 +241,6 @@ describe("the dispatch check order (closed errors, sanitized)", () => {
   it("fails invalid input with validation and never invokes the handler", async () => {
     const spy = vi.fn(async () => okResult({}));
     const deps = {
-      policyId: GM_POLICY_ID,
       allowlist: GM_OPERATIONS,
       resolveAuthority: async () => granted,
       handlers: { "access.gmInspectCompany": { run: spy } },
@@ -267,11 +258,7 @@ describe("the dispatch check order (closed errors, sanitized)", () => {
   });
 });
 
-describe("the pure GM request gate (policy registration)", () => {
-  it("is the B4 registration id", () => {
-    expect(GM_POLICY_ID).toBe("access.b4-gm-v1");
-  });
-
+describe("the pure GM request gate (the dispatch's authority decision)", () => {
   it("decides unauthenticated without a live session, forbidden without a grant, allowed with both", () => {
     expect(decideGmRequest({ hasLiveSession: false, hasOpenGrant: false })).toEqual({
       allowed: false,

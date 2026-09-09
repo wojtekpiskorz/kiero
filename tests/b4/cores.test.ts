@@ -1,13 +1,13 @@
 /**
  * B4 focused verification (1/3): the pure GM decision cores — the grant
- * lifecycle decisions, the membership/GM layering matrix, the per-company
- * authority decision and the deployment eligibility parsing.
+ * lifecycle decisions, the per-company authority decision and the
+ * deployment eligibility parsing. (The membership/GM layering itself is
+ * pinned structurally in dispatch.test.ts, against the real registries.)
  */
 
 import { describe, expect, it } from "vitest";
 import {
   MAX_GM_REASON_LENGTH,
-  decideAuthoritySurfaces,
   decideGmCompanyAccess,
   decideGmEntry,
   decideGmEntryEligibility,
@@ -140,36 +140,6 @@ describe("the per-company authority decision", () => {
     expect(
       decideGmCompanyAccess({ grantOpen: true, companyExists: true, activation: null }),
     ).toEqual({ ok: false, kind: "forbidden", code: "company_alpha_not_active" });
-  });
-});
-
-describe("the membership/GM layering matrix", () => {
-  it("GM without membership: GM surface yes, member surface no", () => {
-    expect(decideAuthoritySurfaces({ hasOpenGrant: true, hasActiveMembership: false })).toEqual({
-      gmSurface: true,
-      memberSurface: false,
-    });
-  });
-
-  it("member without GM: member surface yes, GM surface no", () => {
-    expect(decideAuthoritySurfaces({ hasOpenGrant: false, hasActiveMembership: true })).toEqual({
-      gmSurface: false,
-      memberSurface: true,
-    });
-  });
-
-  it("both: both surfaces, independently derived (no blend)", () => {
-    expect(decideAuthoritySurfaces({ hasOpenGrant: true, hasActiveMembership: true })).toEqual({
-      gmSurface: true,
-      memberSurface: true,
-    });
-  });
-
-  it("neither: nothing resolves", () => {
-    expect(decideAuthoritySurfaces({ hasOpenGrant: false, hasActiveMembership: false })).toEqual({
-      gmSurface: false,
-      memberSurface: false,
-    });
   });
 });
 

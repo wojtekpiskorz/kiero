@@ -41,12 +41,17 @@ import {
   validateTimezone,
 } from "../membership/cores";
 import {
+  COMPANY_NOT_FOUND,
+  GM_MODE_NOT_ACTIVE,
   decideGmCompanyAccess,
   decideGmEntry,
   decideGmExit,
+  gmGrantOpen,
   normalizeGmStatement,
+  type GmCompanyAccessDenial,
+  type GmGrantView,
 } from "./cores";
-import type { GmTx } from "./store";
+import type { GmCompanyView, GmTx } from "./store";
 
 // The contract entries these transactions implement (decode authority).
 export const enterGmModeEntry = accessOperations["access.enterGmMode"];
@@ -90,6 +95,51 @@ async function audit(
     outcome: args.outcome,
     atMs: args.atMs,
   });
+}
+
+/**
+ * Reads the acting grant in-transaction — the authority every GM operation
+ * re-derives at commit: the authority's own row by id, current authority
+ * only while it is still OPEN. A closed, foreign or missing grant is no
+ * authority at all (OCC serializes the read, so a racing exit denies here).
+ */
+async function actingGrant(tx: GmTx, authority: GmAuthority): Promise<GmGrantView | null> {
+  const grant = await tx.grantById(authority.grantId);
+  if (grant === null || grant.userId !== authority.userId || !gmGrantOpen(grant)) {
+    return null;
+  }
+  return grant;
+}
+
+/**
+ * The audited refusal every denied GM operation returns: the trail records
+ * the attempt under the acting grant with the closed outcome code (denials
+ * under a VALID authority still audit), and the envelope maps the denial
+ * without leaking target data — the company id rides the trail only when
+ * the company was actually found.
+ */
+async function refuseGmAccess(
+  tx: GmTx,
+  authority: GmAuthority,
+  operationName: string,
+  basis: string,
+  company: GmCompanyView | null,
+  denial: GmCompanyAccessDenial,
+): Promise<ResultEnvelope> {
+  await audit(tx, {
+    authority,
+    companyId: company === null ? null : company.id,
+    operationName,
+    basis,
+    outcome: denial.code,
+    atMs: Date.now(),
+  });
+  if (denial.kind === "not_found") {
+    return errorResult(notFoundError("companies", denial.code));
+  }
+  return errorResult(
+    forbiddenError(denial.code, denial.code === "gm_mode_not_active" ? "gm" : "company"),
+  );
 }
 
 /**
@@ -178,30 +228,18 @@ export async function performGmInspectCompany(
   if (!basis.ok) {
     return errorResult(validationError("gm_basis_invalid"));
   }
+  const grant = await actingGrant(tx, authority);
   const company = await tx.companyById(input.companyId);
   const activation = await tx.openActivationOf(input.companyId);
-  const grants = await tx.grantsOfUser(authority.userId);
-  const open = grants.find((grant) => grant.id === authority.grantId);
   const access = decideGmCompanyAccess({
-    grantOpen: open !== undefined && open.closedAtMs === null,
+    grantOpen: grant !== null,
     companyExists: company !== null,
     activation,
   });
   if (!access.ok) {
     // Audited refusal: the trail records the denied attempt under the
     // acting grant with the closed outcome code.
-    await audit(tx, {
-      authority,
-      companyId: company === null ? null : input.companyId,
-      operationName: "access.gmInspectCompany",
-      basis: basis.value,
-      outcome: access.code,
-      atMs: nowMs,
-    });
-    if (access.kind === "not_found") {
-      return errorResult(notFoundError("companies", access.code));
-    }
-    return errorResult(forbiddenError(access.code, access.code === "gm_mode_not_active" ? "gm" : "company"));
+    return await refuseGmAccess(tx, authority, "access.gmInspectCompany", basis.value, company, access);
   }
 
   const memberships = await tx.membershipsOfCompany(input.companyId);
@@ -265,18 +303,11 @@ export async function performGmOnboardCompany(
   if (!basis.ok) {
     return { ok: false, result: errorResult(validationError("gm_basis_invalid")) };
   }
-  const grants = await tx.grantsOfUser(authority.userId);
-  const open = grants.find((grant) => grant.id === authority.grantId);
-  if (open === undefined || open.closedAtMs !== null) {
-    await audit(tx, {
-      authority,
-      companyId: null,
-      operationName: "access.gmOnboardCompany",
-      basis: basis.value,
-      outcome: "gm_mode_not_active",
-      atMs: nowMs,
-    });
-    return { ok: false, result: errorResult(forbiddenError("gm_mode_not_active", "gm")) };
+  if ((await actingGrant(tx, authority)) === null) {
+    return {
+      ok: false,
+      result: await refuseGmAccess(tx, authority, "access.gmOnboardCompany", basis.value, null, GM_MODE_NOT_ACTIVE),
+    };
   }
   const name = validateCompanyName(input.name);
   if (!name.ok) {
@@ -349,31 +380,12 @@ export async function performGmActivateCompany(
   if (!basis.ok) {
     return errorResult(validationError("gm_basis_invalid"));
   }
-  const company = await tx.companyById(input.companyId);
-  const grants = await tx.grantsOfUser(authority.userId);
-  const open = grants.find((grant) => grant.id === authority.grantId);
-  const grantOpen = open !== undefined && open.closedAtMs === null;
-  if (!grantOpen) {
-    await audit(tx, {
-      authority,
-      companyId: null,
-      operationName: "access.gmActivateCompany",
-      basis: basis.value,
-      outcome: "gm_mode_not_active",
-      atMs: nowMs,
-    });
-    return errorResult(forbiddenError("gm_mode_not_active", "gm"));
+  if ((await actingGrant(tx, authority)) === null) {
+    return await refuseGmAccess(tx, authority, "access.gmActivateCompany", basis.value, null, GM_MODE_NOT_ACTIVE);
   }
+  const company = await tx.companyById(input.companyId);
   if (company === null) {
-    await audit(tx, {
-      authority,
-      companyId: null,
-      operationName: "access.gmActivateCompany",
-      basis: basis.value,
-      outcome: "company_not_found",
-      atMs: nowMs,
-    });
-    return errorResult(notFoundError("companies", "company_not_found"));
+    return await refuseGmAccess(tx, authority, "access.gmActivateCompany", basis.value, null, COMPANY_NOT_FOUND);
   }
   const existing = await tx.latestActivationOf(input.companyId);
   if (existing !== null && existing.endedAtMs === null) {
@@ -420,30 +432,16 @@ export async function performGmRestoreAdministrator(
   if (!basis.ok) {
     return errorResult(validationError("gm_basis_invalid"));
   }
+  const grant = await actingGrant(tx, authority);
   const company = await tx.companyById(input.companyId);
   const activation = await tx.openActivationOf(input.companyId);
-  const grants = await tx.grantsOfUser(authority.userId);
-  const open = grants.find((grant) => grant.id === authority.grantId);
   const access = decideGmCompanyAccess({
-    grantOpen: open !== undefined && open.closedAtMs === null,
+    grantOpen: grant !== null,
     companyExists: company !== null,
     activation,
   });
   if (!access.ok) {
-    await audit(tx, {
-      authority,
-      companyId: company === null ? null : input.companyId,
-      operationName: "access.gmRestoreAdministrator",
-      basis: basis.value,
-      outcome: access.code,
-      atMs: nowMs,
-    });
-    if (access.kind === "not_found") {
-      return errorResult(notFoundError("companies", access.code));
-    }
-    return errorResult(
-      forbiddenError(access.code, access.code === "gm_mode_not_active" ? "gm" : "company"),
-    );
+    return await refuseGmAccess(tx, authority, "access.gmRestoreAdministrator", basis.value, company, access);
   }
   const memberships = await tx.membershipsOfCompany(input.companyId);
   const target = memberships.find(
@@ -494,30 +492,16 @@ export async function performGmEndCompanyAlpha(
   if (!basis.ok) {
     return errorResult(validationError("gm_basis_invalid"));
   }
+  const grant = await actingGrant(tx, authority);
   const company = await tx.companyById(input.companyId);
   const activation = await tx.openActivationOf(input.companyId);
-  const grants = await tx.grantsOfUser(authority.userId);
-  const open = grants.find((grant) => grant.id === authority.grantId);
   const access = decideGmCompanyAccess({
-    grantOpen: open !== undefined && open.closedAtMs === null,
+    grantOpen: grant !== null,
     companyExists: company !== null,
     activation,
   });
   if (!access.ok) {
-    await audit(tx, {
-      authority,
-      companyId: company === null ? null : input.companyId,
-      operationName: "access.gmEndCompanyAlpha",
-      basis: basis.value,
-      outcome: access.code,
-      atMs: nowMs,
-    });
-    if (access.kind === "not_found") {
-      return errorResult(notFoundError("companies", access.code));
-    }
-    return errorResult(
-      forbiddenError(access.code, access.code === "gm_mode_not_active" ? "gm" : "company"),
-    );
+    return await refuseGmAccess(tx, authority, "access.gmEndCompanyAlpha", basis.value, company, access);
   }
   await tx.endActivation(activation!.id, nowMs, authority.userId);
   await audit(tx, {
@@ -561,18 +545,8 @@ export async function performGmRecoverAccount(
   if (!basis.ok) {
     return errorResult(validationError("gm_basis_invalid"));
   }
-  const grants = await tx.grantsOfUser(authority.userId);
-  const open = grants.find((grant) => grant.id === authority.grantId);
-  if (open === undefined || open.closedAtMs !== null) {
-    await audit(tx, {
-      authority,
-      companyId: null,
-      operationName: "access.recoverAccount",
-      basis: basis.value,
-      outcome: "gm_mode_not_active",
-      atMs: nowMs,
-    });
-    return errorResult(forbiddenError("gm_mode_not_active", "gm"));
+  if ((await actingGrant(tx, authority)) === null) {
+    return await refuseGmAccess(tx, authority, "access.recoverAccount", basis.value, null, GM_MODE_NOT_ACTIVE);
   }
   const user = await tx.userById(input.userId);
   if (user === null) {
