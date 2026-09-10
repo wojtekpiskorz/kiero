@@ -427,126 +427,126 @@ export async function performCompleteCopyAttempt(
   ctx: MutationCtx,
   args: CompleteCopyAttemptArgs,
 ): Promise<CompletionRecord | null> {
-    const attempt = await ctx.db
-      .query("calendarSyncAttempts")
-      .withIndex("by_dedup", (q) => q.eq("dedupKey", args.attemptDedupKey))
-      .first();
-    if (attempt === null) {
-      return null;
-    }
-    const copy = await ctx.db.get(attempt.copyId);
-    if (copy === null) {
-      await ctx.db.patch(attempt._id, {
-        outcome: args.outcome,
-        completedAtMs: Date.now(),
-        ...(args.errorKind === undefined ? {} : { errorKind: args.errorKind }),
-      });
-      return null;
-    }
-    const result: LegResult = args.result;
-    const nowMs = Date.now();
-    const view = copySyncView(copy);
-    const facts = await attemptFactsOf(ctx.db, copy);
-    const stale = !attemptStillWanted(attemptBasisOfRow(attempt), completionViewOfRow(copy));
+  const attempt = await ctx.db
+    .query("calendarSyncAttempts")
+    .withIndex("by_dedup", (q) => q.eq("dedupKey", args.attemptDedupKey))
+    .first();
+  if (attempt === null) {
+    return null;
+  }
+  const copy = await ctx.db.get(attempt.copyId);
+  if (copy === null) {
+    await ctx.db.patch(attempt._id, {
+      outcome: args.outcome,
+      completedAtMs: Date.now(),
+      ...(args.errorKind === undefined ? {} : { errorKind: args.errorKind }),
+    });
+    return null;
+  }
+  const result: LegResult = args.result;
+  const nowMs = Date.now();
+  const view = copySyncView(copy);
+  const facts = await attemptFactsOf(ctx.db, copy);
+  const stale = !attemptStillWanted(attemptBasisOfRow(attempt), completionViewOfRow(copy));
 
-    let googleEventId: string | null = copy.googleEventId ?? null;
-    let remoteOutcome: RemoteOutcome = copy.remoteOutcome;
-    let detectedHide: HideOrigin | null = null;
-    let accessLost = false;
-    let observedJson: string | undefined;
+  let googleEventId: string | null = copy.googleEventId ?? null;
+  let remoteOutcome: RemoteOutcome = copy.remoteOutcome;
+  let detectedHide: HideOrigin | null = null;
+  let accessLost = false;
+  let observedJson: string | undefined;
 
-    if (result.kind === "observation") {
-      const transition = decideObservationTransition(
-        result.observation,
-        view,
-        nowMs,
-        facts.absence,
-      );
-      googleEventId = transition.googleEventId;
-      remoteOutcome = transition.remoteOutcome;
-      detectedHide = transition.detectedHide;
-      if (transition.observation !== null) {
-        observedJson = observedJsonOf(transition.observation);
-      }
-      accessLost = result.observation.kind === "calendar_gone";
-    } else {
-      const transition = decideMutationTransition(
-        attempt.legKind as "create" | "update" | "delete",
-        result.report,
-        view,
-      );
-      googleEventId = transition.googleEventId;
-      remoteOutcome = transition.remoteOutcome;
-      accessLost = transition.accessLost;
-      if (result.report.kind === "applied" && attempt.legKind !== "delete") {
-        const eventId =
-          attempt.legKind === "create" ? (result.eventId ?? null) : (copy.googleEventId ?? null);
-        if (eventId !== null) {
-          const implied = observationFromMutation(view, eventId, nowMs);
-          if (implied !== null) {
-            observedJson = observedJsonOf(implied);
-          }
+  if (result.kind === "observation") {
+    const transition = decideObservationTransition(
+      result.observation,
+      view,
+      nowMs,
+      facts.absence,
+    );
+    googleEventId = transition.googleEventId;
+    remoteOutcome = transition.remoteOutcome;
+    detectedHide = transition.detectedHide;
+    if (transition.observation !== null) {
+      observedJson = observedJsonOf(transition.observation);
+    }
+    accessLost = result.observation.kind === "calendar_gone";
+  } else {
+    const transition = decideMutationTransition(
+      attempt.legKind as "create" | "update" | "delete",
+      result.report,
+      view,
+    );
+    googleEventId = transition.googleEventId;
+    remoteOutcome = transition.remoteOutcome;
+    accessLost = transition.accessLost;
+    if (result.report.kind === "applied" && attempt.legKind !== "delete") {
+      const eventId =
+        attempt.legKind === "create" ? (result.eventId ?? null) : (copy.googleEventId ?? null);
+      if (eventId !== null) {
+        const implied = observationFromMutation(view, eventId, nowMs);
+        if (implied !== null) {
+          observedJson = observedJsonOf(implied);
         }
       }
     }
+  }
 
-    const outcomeChanged = remoteOutcome !== copy.remoteOutcome;
-    // The certified consumer edge trigger: every CHANGED outcome
-    // accelerates one durable observation, and so does an UNCERTAIN
-    // MUTATION (an unknown/timeout after a possible success — the timeout
-    // word names a bounded-deadline hit) even when the ledger word stays
-    // `unknown` — G2 initializes new copies as unknown, so the uncertain
-    // signal itself is the reconcile trigger. An uncertain OBSERVATION
-    // deliberately publishes nothing: nothing was written, the mutation
-    // gate already blocks on it, and publishing would let a flaky network
-    // loop events and jobs (the cron safety net owns the retry cadence
-    // there).
-    const uncertainMutation =
-      (attempt.legKind === "create" ||
-        attempt.legKind === "update" ||
-        attempt.legKind === "delete") &&
-      (args.outcome === "unknown" || args.outcome === "timeout");
-    // LEDGER FACTS always record (facts about Google, not about desire); the
-    // personal-hide detection is desire-derived and only applies to a
-    // still-wanted attempt. A ledger-only completion never touches
-    // `updatedAtMs`: that column is the desire revision's clock and the next
-    // attempt's `desiredAtMs` basis, so only desire changes (a hide detection
-    // included) may move it.
-    await ctx.db.patch(copy._id, {
-      ...(googleEventId === null ? { googleEventId: undefined } : { googleEventId }),
-      remoteOutcome,
-      ...(!stale && detectedHide !== null
-        ? { hidden: true, hiddenOrigin: detectedHide, hiddenAtMs: nowMs, updatedAtMs: nowMs }
-        : {}),
-    });
-    await ctx.db.patch(attempt._id, {
-      outcome: args.outcome,
-      completedAtMs: nowMs,
-      ...(googleEventId === null ? {} : { googleEventId }),
-      ...(observedJson === undefined ? {} : { observedJson }),
-      ...(args.errorKind === undefined ? {} : { errorKind: args.errorKind }),
-    });
+  const outcomeChanged = remoteOutcome !== copy.remoteOutcome;
+  // The certified consumer edge trigger: every CHANGED outcome
+  // accelerates one durable observation, and so does an UNCERTAIN
+  // MUTATION (an unknown/timeout after a possible success — the timeout
+  // word names a bounded-deadline hit) even when the ledger word stays
+  // `unknown` — G2 initializes new copies as unknown, so the uncertain
+  // signal itself is the reconcile trigger. An uncertain OBSERVATION
+  // deliberately publishes nothing: nothing was written, the mutation
+  // gate already blocks on it, and publishing would let a flaky network
+  // loop events and jobs (the cron safety net owns the retry cadence
+  // there).
+  const uncertainMutation =
+    (attempt.legKind === "create" ||
+      attempt.legKind === "update" ||
+      attempt.legKind === "delete") &&
+    (args.outcome === "unknown" || args.outcome === "timeout");
+  // LEDGER FACTS always record (facts about Google, not about desire); the
+  // personal-hide detection is desire-derived and only applies to a
+  // still-wanted attempt. A ledger-only completion never touches
+  // `updatedAtMs`: that column is the desire revision's clock and the next
+  // attempt's `desiredAtMs` basis, so only desire changes (a hide detection
+  // included) may move it.
+  await ctx.db.patch(copy._id, {
+    ...(googleEventId === null ? { googleEventId: undefined } : { googleEventId }),
+    remoteOutcome,
+    ...(!stale && detectedHide !== null
+      ? { hidden: true, hiddenOrigin: detectedHide, hiddenAtMs: nowMs, updatedAtMs: nowMs }
+      : {}),
+  });
+  await ctx.db.patch(attempt._id, {
+    outcome: args.outcome,
+    completedAtMs: nowMs,
+    ...(googleEventId === null ? {} : { googleEventId }),
+    ...(observedJson === undefined ? {} : { observedJson }),
+    ...(args.errorKind === undefined ? {} : { errorKind: args.errorKind }),
+  });
 
-    if (accessLost) {
-      await markConnectionAccessLost(ctx, copy.connectionId);
-    }
-    const connection = await ctx.db.get(copy.connectionId);
-    if ((outcomeChanged || uncertainMutation) && connection !== null) {
-      await publishEvent(ctx, {
-        companyId: connection.companyId,
-        eventName: "calendar.copyOutcomeRecorded",
-        payload: { copyId: copy._id, outcome: remoteOutcome },
-        dedupKey: `calendar.copy-outcome-recorded:${copy._id}:${nowMs}`,
-      });
-    }
-    const sync = await ctx.db
-      .query("calendarSyncState")
-      .withIndex("by_connection", (q) => q.eq("connectionId", copy.connectionId))
-      .first();
-    if (sync !== null && args.outcome === "succeeded") {
-      await ctx.db.patch(sync._id, { lastSyncedAtMs: nowMs, updatedAtMs: nowMs });
-    }
-    return { remoteOutcome, accessLost, wanted: !stale, detectedHide: stale ? null : detectedHide };
+  if (accessLost) {
+    await markConnectionAccessLost(ctx, copy.connectionId);
+  }
+  const connection = await ctx.db.get(copy.connectionId);
+  if ((outcomeChanged || uncertainMutation) && connection !== null) {
+    await publishEvent(ctx, {
+      companyId: connection.companyId,
+      eventName: "calendar.copyOutcomeRecorded",
+      payload: { copyId: copy._id, outcome: remoteOutcome },
+      dedupKey: `calendar.copy-outcome-recorded:${copy._id}:${nowMs}`,
+    });
+  }
+  const sync = await ctx.db
+    .query("calendarSyncState")
+    .withIndex("by_connection", (q) => q.eq("connectionId", copy.connectionId))
+    .first();
+  if (sync !== null && args.outcome === "succeeded") {
+    await ctx.db.patch(sync._id, { lastSyncedAtMs: nowMs, updatedAtMs: nowMs });
+  }
+  return { remoteOutcome, accessLost, wanted: !stale, detectedHide: stale ? null : detectedHide };
 }
 
 export const completeCopyAttempt = internalMutation({

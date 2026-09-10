@@ -178,9 +178,9 @@ async function runOneAttempt(
   copyId: Id<"calendarCopies">,
   forceObservation = false,
 ): Promise<OneAttemptOutcome> {
-  // The four early answers share one shape; the variants' reason types
-  // differ (SyncSuspensionReason vs string), so the returns stay explicit
-  // rather than behind a helper the union cannot type.
+  // The four early answers spell their returns out: each names its own
+  // kind and reason at the return site, which reads as the decision
+  // table it mirrors.
   const connectionOfCopy = await ctx.runQuery(internal.calendar.sync.functions.copyConnectionOf, {
     copyId,
   });
