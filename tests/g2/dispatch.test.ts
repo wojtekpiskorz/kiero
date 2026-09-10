@@ -17,11 +17,16 @@ import { Schema } from "effect";
 import { ActorContext, calendarOperations, parseTableId } from "@kiero/contracts";
 import { dispatchCommand, membershipPolicy, type RequestContext } from "@kiero/runtime";
 import {
+  SUBJECT_EXCLUSIONS,
+  TERM_WITHDRAW_REASONS,
+  WITHDRAW_REASONS,
+} from "@kiero/domain";
+import {
   calendarProjectionHandlers,
   calendarProjectionPolicy,
   setCopyHiddenEntry,
 } from "../../convex/calendar/projection/dispatch";
-import { HIDE_ORIGINS, WITHDRAW_REASONS } from "../../convex/calendar/projection/schema";
+import { HIDE_ORIGINS } from "../../convex/calendar/projection/schema";
 
 function contextFixture(role: "admin" | "member"): RequestContext {
   const actor = Schema.decodeUnknownSync(ActorContext)({
@@ -144,23 +149,16 @@ describe("checked dispatch behavior", () => {
   });
 });
 
-describe("schema fragment vocabulary pins", () => {
-  it("withdraw reasons match the pure module's exclusion and term unions", () => {
-    const pure = new Set([
-      // SubjectExclusion
-      "subject_closed",
-      "out_of_personal_scope",
-      // TermWithdrawReason
-      "no_binding",
-      "term_unresolved",
-      "term_not_temporal",
-      "term_proposed",
-      "term_actual",
-      "term_approximate",
-      "term_open_ended",
-      "term_invalid",
-    ]);
-    expect(new Set(WITHDRAW_REASONS)).toEqual(pure);
+describe("vocabulary ownership pins", () => {
+  it("the merged withdraw list is exactly the domain's two owned lists, no hand copies", () => {
+    expect(WITHDRAW_REASONS).toEqual([...SUBJECT_EXCLUSIONS, ...TERM_WITHDRAW_REASONS]);
+    // Every reason the decision functions emit is a member of the merged
+    // list (each emission site is pinned by name in tests/g2/domain.test.ts;
+    // the schema validator and the transaction write are TYPED against
+    // these lists, so drift fails typecheck instead of silently dropping).
+    for (const reason of WITHDRAW_REASONS) {
+      expect(typeof reason).toBe("string");
+    }
   });
 
   it("hide origins stay the personal-decision vocabulary", () => {

@@ -12,14 +12,20 @@
  * or written.
  */
 
-/** The typed refresh outcomes G1's credential capability reports. */
-export type RefreshOutcome =
-  | "refreshed"
-  | "definitely_lost"
-  | "unknown"
-  | "membership_lost"
-  | "no_connection"
-  | "no_credential";
+/**
+ * The typed refresh outcomes G1's credential capability reports. One
+ * runtime list owns the vocabulary (the transaction's argument validator
+ * is typed against the derived union, so drift fails typecheck).
+ */
+export const REFRESH_OUTCOMES = [
+  "refreshed",
+  "definitely_lost",
+  "unknown",
+  "membership_lost",
+  "no_connection",
+  "no_credential",
+] as const;
+export type RefreshOutcome = (typeof REFRESH_OUTCOMES)[number];
 
 /** The connection facts one pass rechecks (server-resolved only). */
 export interface ConnectionRecheck {

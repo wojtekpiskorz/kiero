@@ -16,13 +16,11 @@ import {
   companyTime,
   copySemanticId,
   copyTitle,
-  decideHideAfterDerivation,
   decideProjectionMode,
   decideSubjectEligibility,
   decideTerm,
   desiredCopyForSubject,
   desiredEvent,
-  hiddenCopyMustBeAbsent,
   taskStateLabel,
   type DerivationContext,
   type EventSubjectView,
@@ -148,30 +146,29 @@ describe("personal eligibility", () => {
 
 describe("term qualification and mapping", () => {
   it("maps a concrete date to all-day, a day range to an interval, a lone time to the marker", () => {
-    expect(decideTerm(binding(temporal({ _tag: "day", day: "2026-10-15" })))).toEqual({
-      ok: true,
-      term: { _tag: "all_day", day: "2026-10-15" },
-    });
-    expect(
-      decideTerm(
-        binding(
-          temporal({
-            _tag: "range",
-            start: { _tag: "day", day: "2026-10-15" },
-            end: { _tag: "day", day: "2026-10-20" },
-          }),
-        ),
+    const day = decideTerm(binding(temporal({ _tag: "day", day: "2026-10-15" })));
+    expect(day.ok && day.term).toEqual({ _tag: "all_day", day: "2026-10-15" });
+    expect(day.ok && day.binding?.revisionId).toBe("rev1");
+    const range = decideTerm(
+      binding(
+        temporal({
+          _tag: "range",
+          start: { _tag: "day", day: "2026-10-15" },
+          end: { _tag: "day", day: "2026-10-20" },
+        }),
       ),
-    ).toEqual({
-      ok: true,
-      term: { _tag: "all_day_range", startDay: "2026-10-15", endDay: "2026-10-20" },
+    );
+    expect(range.ok && range.term).toEqual({
+      _tag: "all_day_range",
+      startDay: "2026-10-15",
+      endDay: "2026-10-20",
     });
     const marker = decideTerm(
       binding(temporal({ _tag: "date_time", value: "2026-10-15T08:30:00.000+02:00[Europe/Warsaw]" })),
     );
-    expect(marker).toEqual({
-      ok: true,
-      term: { _tag: "marker", epochMs: Date.parse("2026-10-15T08:30:00.000+02:00") },
+    expect(marker.ok && marker.term).toEqual({
+      _tag: "marker",
+      epochMs: Date.parse("2026-10-15T08:30:00.000+02:00"),
     });
   });
 
@@ -221,10 +218,8 @@ describe("term qualification and mapping", () => {
 
   it("keeps internal plans and agreed terms, the two exporting roles", () => {
     for (const role of ["internal", "agreed"] as const) {
-      expect(decideTerm(binding(temporal({ _tag: "day", day: "2026-10-15" }, role)))).toEqual({
-        ok: true,
-        term: { _tag: "all_day", day: "2026-10-15" },
-      });
+      const decision = decideTerm(binding(temporal({ _tag: "day", day: "2026-10-15" }, role)));
+      expect(decision.ok && decision.term).toEqual({ _tag: "all_day", day: "2026-10-15" });
     }
   });
 });
@@ -344,10 +339,11 @@ describe("copy identity", () => {
 describe("desiredCopyForSubject", () => {
   it("derives a projected copy with payload, semantic id and the current revision basis", () => {
     const want = desiredCopyForSubject(task(), ALL_PROJECTS, CONTEXT);
-    expect(want.desired).toEqual({
-      state: "projected",
-      payload: expect.objectContaining({ summary: "Zadanie: Odebrać dostawę" }),
-    });
+    expect(want.desired.state).toBe("projected");
+    if (want.desired.state === "projected") {
+      expect(want.desired.payload.summary).toBe("Zadanie: Odebrać dostawę");
+      expect(want.desired.derivationRevisionId).toBe("rev1");
+    }
     expect(want.semanticId).toBe(
       copySemanticId({
         companyId: "c1",
@@ -357,57 +353,25 @@ describe("desiredCopyForSubject", () => {
         subjectId: "t1",
       }),
     );
-    expect(want.derivationRevisionId).toBe("rev1");
   });
 
   it("withdraws with a machine reason when the subject or term leaves the scope", () => {
-    expect(desiredCopyForSubject(task({ state: "done" }), ALL_PROJECTS, CONTEXT).desired).toEqual({
-      state: "withdrawn",
-      reason: "subject_closed",
-    });
-    expect(
-      desiredCopyForSubject(task({ coordinatorMembershipId: "mB" }), ALL_PROJECTS, CONTEXT).desired,
-    ).toEqual({ state: "withdrawn", reason: "out_of_personal_scope" });
-    expect(
-      desiredCopyForSubject(
-        task({ deadline: binding(temporal({ _tag: "month", month: "2026-10" })) }),
-        ALL_PROJECTS,
-        CONTEXT,
-      ).desired,
-    ).toEqual({ state: "withdrawn", reason: "term_approximate" });
-    expect(desiredCopyForSubject(task({ deadline: null }), ALL_PROJECTS, CONTEXT).desired).toEqual({
-      state: "withdrawn",
-      reason: "no_binding",
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Hide persistence
-// ---------------------------------------------------------------------------
-
-describe("hide persistence", () => {
-  it("survives every re-derivation until an explicit restore", () => {
-    const hidden = { hidden: true, origin: "user_request" as const };
-    expect(decideHideAfterDerivation(hidden, undefined)).toEqual({
-      next: hidden,
-      changed: false,
-    });
-    // A correction, a state change, a disqualification: none of them is a
-    // restore request.
-    expect(decideHideAfterDerivation(hidden, {})).toEqual({ next: hidden, changed: false });
-    expect(decideHideAfterDerivation(hidden, { restore: false })).toEqual({
-      next: hidden,
-      changed: false,
-    });
-    const restored = decideHideAfterDerivation(hidden, { restore: true });
-    expect(restored.next).toEqual({ hidden: false, origin: null });
-    expect(restored.changed).toBe(true);
-  });
-
-  it("keeps a hidden copy absent from Google without withdrawing the subject", () => {
-    expect(hiddenCopyMustBeAbsent(true)).toBe(true);
-    expect(hiddenCopyMustBeAbsent(false)).toBe(false);
+    const done = desiredCopyForSubject(task({ state: "done" }), ALL_PROJECTS, CONTEXT).desired;
+    expect(done).toMatchObject({ state: "withdrawn", reason: "subject_closed" });
+    const foreign = desiredCopyForSubject(
+      task({ coordinatorMembershipId: "mB" }),
+      ALL_PROJECTS,
+      CONTEXT,
+    ).desired;
+    expect(foreign).toMatchObject({ state: "withdrawn", reason: "out_of_personal_scope" });
+    const approximate = desiredCopyForSubject(
+      task({ deadline: binding(temporal({ _tag: "month", month: "2026-10" })) }),
+      ALL_PROJECTS,
+      CONTEXT,
+    ).desired;
+    expect(approximate).toMatchObject({ state: "withdrawn", reason: "term_approximate" });
+    const noBinding = desiredCopyForSubject(task({ deadline: null }), ALL_PROJECTS, CONTEXT).desired;
+    expect(noBinding).toMatchObject({ state: "withdrawn", reason: "no_binding" });
   });
 });
 

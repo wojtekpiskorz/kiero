@@ -102,11 +102,13 @@ export function projectSelected(selection: ProjectSelection, projectId: string):
 // osobisty").
 // ---------------------------------------------------------------------------
 
-/** Why a subject is out of one boss's personal scope. */
-export type SubjectExclusion =
-  | "subject_closed"
-  | "out_of_personal_scope"
-  | "not_planned";
+/**
+ * Why a subject is out of one boss's personal scope. The runtime list owns
+ * the vocabulary (the schema fragment's validator and the transaction's
+ * writer are typed against the derived union, so drift fails typecheck).
+ */
+export const SUBJECT_EXCLUSIONS = ["subject_closed", "out_of_personal_scope"] as const;
+export type SubjectExclusion = (typeof SUBJECT_EXCLUSIONS)[number];
 
 /**
  * The personal eligibility decision for one subject. Tasks are personal
@@ -156,16 +158,31 @@ export type QualifiedTerm =
   | { readonly _tag: "all_day_range"; readonly startDay: string; readonly endDay: string }
   | { readonly _tag: "marker"; readonly epochMs: number };
 
-/** Why the current term does not earn (or no longer earns) a copy. */
-export type TermWithdrawReason =
-  | "no_binding"
-  | "term_unresolved"
-  | "term_not_temporal"
-  | "term_proposed"
-  | "term_actual"
-  | "term_approximate"
-  | "term_open_ended"
-  | "term_invalid";
+/**
+ * Why the current term does not earn (or no longer earns) a copy. One
+ * runtime list (same ownership rule as SUBJECT_EXCLUSIONS); a withdrawn
+ * copy names its reason from exactly this vocabulary.
+ */
+export const TERM_WITHDRAW_REASONS = [
+  "no_binding",
+  "term_unresolved",
+  "term_not_temporal",
+  "term_proposed",
+  "term_actual",
+  "term_approximate",
+  "term_open_ended",
+  "term_invalid",
+] as const;
+export type TermWithdrawReason = (typeof TERM_WITHDRAW_REASONS)[number];
+
+/** The full machine vocabulary a withdrawn copy can record. */
+export type WithdrawReason = SubjectExclusion | TermWithdrawReason;
+
+/** The runtime list behind `WithdrawReason` (order: subject, then term). */
+export const WITHDRAW_REASONS: readonly WithdrawReason[] = [
+  ...SUBJECT_EXCLUSIONS,
+  ...TERM_WITHDRAW_REASONS,
+];
 
 /**
  * The term decision over one binding's CURRENT revision. Proposals,
@@ -174,7 +191,7 @@ export type TermWithdrawReason =
  * "Znacznik terminu".
  */
 export type TermDecision =
-  | { readonly ok: true; readonly term: QualifiedTerm }
+  | { readonly ok: true; readonly term: QualifiedTerm; readonly binding: TermBindingView }
   | { readonly ok: false; readonly reason: TermWithdrawReason };
 
 export function decideTerm(binding: TermBindingView | null): TermDecision {
@@ -199,7 +216,7 @@ export function decideTerm(binding: TermBindingView | null): TermDecision {
   const shape = binding.temporal.shape;
   switch (shape._tag) {
     case "day":
-      return { ok: true, term: { _tag: "all_day", day: shape.day } };
+      return { ok: true, term: { _tag: "all_day", day: shape.day }, binding };
     case "month":
     case "year":
       return { ok: false, reason: "term_approximate" };
@@ -213,6 +230,7 @@ export function decideTerm(binding: TermBindingView | null): TermDecision {
       return {
         ok: true,
         term: { _tag: "all_day_range", startDay: shape.start.day, endDay: shape.end.day },
+        binding,
       };
     }
     case "date_time": {
@@ -223,7 +241,7 @@ export function decideTerm(binding: TermBindingView | null): TermDecision {
       if (Number.isNaN(epochMs)) {
         return { ok: false, reason: "term_invalid" };
       }
-      return { ok: true, term: { _tag: "marker", epochMs } };
+      return { ok: true, term: { _tag: "marker", epochMs }, binding };
     }
   }
 }
@@ -343,16 +361,19 @@ export interface CopyContext {
 export interface DesiredGoogleEvent {
   readonly summary: string;
   readonly description: string;
-  readonly start: { readonly date?: string; readonly dateTime?: string };
-  readonly end: { readonly date?: string; readonly dateTime?: string };
+  readonly start: { readonly date?: string | undefined; readonly dateTime?: string | undefined };
+  readonly end: { readonly date?: string | undefined; readonly dateTime?: string | undefined };
   /** Wolny czas: the company plan never blocks availability by default. */
   readonly transparency: "transparent";
   /**
    * New copies start without Google event reminders (Kiero's own reminder
    * system owns them); a managed UPDATE never re-sends this field, so
    * personally added reminders survive (G3's reconciliation contract).
+   * The list is ALWAYS empty by construction (both construction sites below
+   * pass the literal `[]`); typed `string[]` so the schema validator and
+   * this interface pin against each other exactly.
    */
-  readonly reminders: { readonly useDefault: false; readonly overrides: never[] };
+  readonly reminders: { readonly useDefault: false; readonly overrides: string[] };
 }
 
 /** The ISO instant form Google consumes (offset, no bracketed zone). */
@@ -527,45 +548,43 @@ export function desiredCopyForSubject(
     subjectId: subject.kind === "task" ? subject.taskId : subject.eventId,
   };
   const semanticId = copySemanticId(identity);
-  const revisionId = termRevisionId(binding);
   const eligibility = decideSubjectEligibility(subject, scope);
   if (!eligibility.eligible) {
     return {
       subjectKind: subject.kind,
       subjectId: identity.subjectId,
       semanticId,
-      derivationRevisionId: revisionId,
-      desired: { state: "withdrawn", reason: eligibility.reason },
+      desired: {
+        state: "withdrawn",
+        reason: eligibility.reason,
+        derivationRevisionId: termRevisionId(binding),
+      },
     };
   }
+  // The ok-arm carries the NARROWED binding: no null re-check and no cast
+  // below, and the payload builder reads the same revision the decision
+  // derived from.
   const term = decideTerm(binding);
   if (!term.ok) {
     return {
       subjectKind: subject.kind,
       subjectId: identity.subjectId,
       semanticId,
-      derivationRevisionId: revisionId,
-      desired: { state: "withdrawn", reason: term.reason },
-    };
-  }
-  if (revisionId === null) {
-    // Unreachable: a qualifying term always has a revision; kept honest.
-    return {
-      subjectKind: subject.kind,
-      subjectId: identity.subjectId,
-      semanticId,
-      derivationRevisionId: null,
-      desired: { state: "withdrawn", reason: "no_binding" },
+      desired: {
+        state: "withdrawn",
+        reason: term.reason,
+        derivationRevisionId: termRevisionId(binding),
+      },
     };
   }
   return {
     subjectKind: subject.kind,
     subjectId: identity.subjectId,
     semanticId,
-    derivationRevisionId: revisionId,
     desired: {
       state: "projected",
-      payload: desiredEvent(subject, binding as TermBindingView, term.term, context),
+      payload: desiredEvent(subject, term.binding, term.term, context),
+      derivationRevisionId: term.binding.revisionId,
     },
   };
 }

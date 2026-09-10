@@ -27,12 +27,12 @@ import {
   decideSyncStateTransition,
   desiredCopyForSubject,
   diffDesiredCopies,
-  payloadFingerprint,
   type CopyAction,
   type DesiredGoogleEvent,
   type ExistingCopy,
   type PersonalScope,
   type ProjectSelection,
+  type RefreshOutcome,
   type TermBindingView,
   type WorkSubjectView,
 } from "@kiero/domain";
@@ -41,11 +41,15 @@ import { internalMutation } from "../../_generated/server";
 import type { MutationCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { publishEvent } from "../../platform/publish";
+import { type ValueValidator } from "../../schema/shared";
 import { earliestActiveCompanyId } from "../connection/operations";
-import { WITHDRAW_REASONS } from "./schema";
 
-/** The refresh outcome literals G1's credential capability reports. */
-const refreshOutcomeValue = v.union(
+/**
+ * The refresh-outcome argument validator, PINNED to the domain's runtime
+ * list (packages/domain/calendar/pass.ts owns the vocabulary; the same pin
+ * style as the schema fragment's other validators).
+ */
+const refreshOutcomeValue: ValueValidator<RefreshOutcome> = v.union(
   v.literal("refreshed"),
   v.literal("definitely_lost"),
   v.literal("unknown"),
@@ -177,14 +181,24 @@ async function eventSubjectsOf(
   return subjects;
 }
 
-/** The app base URL the authenticated copy link points at (name only). */
+/**
+ * The app base URL the authenticated copy link points at (names only).
+ * Absent configuration fails LOUDLY: an empty base would bake relative
+ * links into copy text silently, so the pass throws before any copy row
+ * is read (the whole transaction aborts; nothing partial is written).
+ */
 function appBaseUrl(env: { KIERO_CALENDAR_APP_BASE_URL?: string; CONVEX_SITE_URL?: string }): string {
   const explicit = env.KIERO_CALENDAR_APP_BASE_URL;
   if (typeof explicit === "string" && explicit.length > 0) {
     return explicit;
   }
   const site = env.CONVEX_SITE_URL;
-  return typeof site === "string" && site.length > 0 ? site : "";
+  if (typeof site === "string" && site.length > 0) {
+    return site;
+  }
+  throw new Error(
+    "calendar projection: no app base URL configured (KIERO_CALENDAR_APP_BASE_URL or CONVEX_SITE_URL)",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -336,11 +350,6 @@ export const applyProjectionPassTransaction = internalMutation({
   },
 });
 
-/** Narrows a diff withdraw reason to the schema vocabulary (no blind cast). */
-function isWithdrawReason(reason: string): reason is (typeof WITHDRAW_REASONS)[number] {
-  return (WITHDRAW_REASONS as readonly string[]).includes(reason);
-}
-
 /** Applies one diff action; returns which counter it moved. */
 async function applyCopyAction(
   ctx: MutationCtx,
@@ -358,11 +367,9 @@ async function applyCopyAction(
   const isTask = action.desired.subjectKind === "task";
 
   if (action.action === "create" && action.desired.desired.state === "projected") {
-    const payload = action.desired.desired.payload;
-    if (action.desired.derivationRevisionId === null) {
-      // Unreachable (a projected desire always has a revision); fail-closed.
-      return "unchanged";
-    }
+    // The projected variant carries a non-null derivation basis BY TYPE:
+    // no unreachable guard is needed here.
+    const { payload, derivationRevisionId } = action.desired.desired;
     const copyId = await ctx.db.insert("calendarCopies", {
       connectionId,
       userId,
@@ -373,8 +380,7 @@ async function applyCopyAction(
       semanticId: action.desired.semanticId,
       desiredState: "projected",
       payload,
-      payloadFingerprint: payloadFingerprint(payload),
-      desiredRevisionId: action.desired.derivationRevisionId as Id<"findingRevisions">,
+      desiredRevisionId: derivationRevisionId as Id<"findingRevisions">,
       hidden: false,
       remoteOutcome: "unknown",
       updatedAtMs: nowMs,
@@ -387,7 +393,7 @@ async function applyCopyAction(
         subject: isTask
           ? { _tag: "task", taskId: action.desired.subjectId }
           : { _tag: "event", eventId: action.desired.subjectId },
-        desiredRevisionId: action.desired.derivationRevisionId,
+        desiredRevisionId: derivationRevisionId,
       },
       dedupKey: `calendar.copy-projected:${copyId}:${nowMs}`,
     });
@@ -401,20 +407,29 @@ async function applyCopyAction(
     }
     const desired = action.desired.desired;
     const semanticRebound = row.semanticId !== action.desired.semanticId;
+    // The POST-patch derivation basis: the fresh revision on a correction
+    // or account switch, the row's last known one when a binding vanished
+    // entirely (the no-binding withdrawal keeps what it had). Publishing
+    // the pre-patch row value instead would name the revision the copy
+    // just STOPPED deriving from.
+    const basisRevisionId = desired.derivationRevisionId ?? row.desiredRevisionId;
     await ctx.db.patch(row._id, {
       semanticId: action.desired.semanticId,
       desiredState: desired.state,
-      withdrawReason:
-        desired.state === "withdrawn" && isWithdrawReason(desired.reason) ? desired.reason : undefined,
+      // The domain's WithdrawReason union IS the schema validator's type
+      // (the pin); Convex validates the literal at write time, so an
+      // out-of-vocabulary reason fails loudly instead of dropping away.
+      withdrawReason: desired.state === "withdrawn" ? desired.reason : undefined,
       payload: desired.state === "projected" ? desired.payload : undefined,
-      payloadFingerprint:
-        desired.state === "projected" ? payloadFingerprint(desired.payload) : undefined,
-      ...(action.desired.derivationRevisionId !== null
-        ? { desiredRevisionId: action.desired.derivationRevisionId as Id<"findingRevisions"> }
+      ...(desired.derivationRevisionId !== null
+        ? { desiredRevisionId: desired.derivationRevisionId as Id<"findingRevisions"> }
         : {}),
       // An account switch re-mints the semantic id: the old calendar's
       // linkage honestly stops being knowable (G3 reconciles the new one).
       ...(semanticRebound ? { googleEventId: undefined, remoteOutcome: "unknown" as const } : {}),
+      // NOTE: `hidden`/`hiddenOrigin`/`hiddenAtMs` are deliberately never
+      // patched here — a personal hide survives every re-derivation
+      // (see performSetCopyHidden).
       updatedAtMs: nowMs,
     });
     await publishEvent(ctx, {
@@ -425,7 +440,7 @@ async function applyCopyAction(
         subject: isTask
           ? { _tag: "task", taskId: action.desired.subjectId }
           : { _tag: "event", eventId: action.desired.subjectId },
-        desiredRevisionId: row.desiredRevisionId,
+        desiredRevisionId: basisRevisionId,
       },
       dedupKey: `calendar.copy-projected:${row._id}:${nowMs}`,
     });
@@ -441,9 +456,27 @@ async function applyCopyAction(
 /**
  * `calendar.setCopyHidden`: the actor's OWN personal decision about ONE
  * copy — hide (with origin) or explicit restore. Ownership is the actor's
- * own connection; a foreign copy is not_found, no existence leak. The
- * underlying subject, its desired state and other bosses' copies are
- * untouched ("Ukrycie kopii kalendarzowej", CONTEXT.md).
+ * own connection; a foreign copy is not_found, no existence leak.
+ *
+ * The hide rules ("Ukrycie kopii kalendarzowej", CONTEXT.md) live HERE and
+ * in the projection pass, by construction — there is deliberately no pure
+ * decision module for them:
+ *
+ * - A hide is one boss's decision about one copy of one subject: it never
+ *   cancels the task or event and never hides another boss's copy (the
+ *   subject rows and every other connection's rows are untouched).
+ * - It SURVIVES corrections, date changes, losing and regaining
+ *   qualification, reopening and reconnecting, because this writer is the
+ *   ONLY writer of `hidden`/`hiddenOrigin`/`hiddenAtMs`: the projection
+ *   pass re-derives desired state and payload but never touches the hide
+ *   fields (see the NOTE in applyCopyAction).
+ * - Only an explicit restore through this operation clears it. A NEW,
+ *   different subject starts unhidden (rows are created with hidden:false
+ *   and never inherit anything).
+ * - A copy the user deleted or moved in Google becomes a hide once G3's
+ *   reconciliation observes it; it will be recorded here with
+ *   `hiddenOrigin: "deleted_in_google" | "moved_in_google"` — a hide is a
+ *   hide however it was learned.
  */
 export async function performSetCopyHidden(
   ctx: MutationCtx,

@@ -17,7 +17,6 @@ import {
   copySemanticId,
   desiredCopyForSubject,
   diffDesiredCopies,
-  payloadFingerprint,
   type DesiredCopy,
   type DesiredGoogleEvent,
   type ExistingCopy,
@@ -101,7 +100,7 @@ function applyActions(
         subjectId: action.desired.subjectId,
         semanticId: action.desired.semanticId,
         hidden: false,
-        derivationRevisionId: action.desired.derivationRevisionId,
+        derivationRevisionId: action.desired.desired.derivationRevisionId,
         desiredState: action.desired.desired.state,
         payload: action.desired.desired.payload,
       });
@@ -109,7 +108,7 @@ function applyActions(
       const row = next.find((candidate) => candidate.copyId === action.copyId);
       if (row !== undefined) {
         row.semanticId = action.desired.semanticId;
-        row.derivationRevisionId = action.desired.derivationRevisionId;
+        row.derivationRevisionId = action.desired.desired.derivationRevisionId;
         row.desiredState = action.desired.desired.state;
         row.payload =
           action.desired.desired.state === "projected" ? action.desired.desired.payload : null;
@@ -176,6 +175,15 @@ describe("desired-state diff idempotence", () => {
     expect(state).toHaveLength(1);
     expect(state[0]?.semanticId).toBe(after.semanticId);
     expect(diffDesiredCopies(state, [after]).map((a) => a.action)).toEqual(["none"]);
+  });
+
+  it("carries the fresh derivation basis on update actions (the event's source)", () => {
+    const corrected = wantOf(task(), "rev2");
+    const created = applyActions([], diffDesiredCopies([], [wantOf(task(), "rev1")]));
+    const update = diffDesiredCopies(created, [corrected]);
+    expect(
+      update.map((a) => (a.action === "update" ? a.desired.desired.derivationRevisionId : null)),
+    ).toEqual(["rev2"]);
   });
 
   it("withdraws an orphaned row honestly instead of keeping it", () => {
@@ -273,13 +281,12 @@ describe("property: no private source, media or financial content in payloads", 
   });
 });
 
-describe("payload fingerprint", () => {
+describe("canonical payload comparison", () => {
   it("is stable for equal payloads in any key order and differs for changed payloads", () => {
     const a = { summary: "T", description: "D", start: { date: "2026-10-15" } };
     const b = { start: { date: "2026-10-15" }, description: "D", summary: "T" };
-    expect(payloadFingerprint(a)).toBe(payloadFingerprint(b));
     expect(canonicalJson(a)).toBe(canonicalJson(b));
     const c = { ...a, start: { date: "2026-10-16" } };
-    expect(payloadFingerprint(c)).not.toBe(payloadFingerprint(a));
+    expect(canonicalJson(c)).not.toBe(canonicalJson(a));
   });
 });

@@ -22,6 +22,8 @@ import { v } from "convex/values";
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
 import { unsupportedError } from "@kiero/runtime";
 import { action, internalQuery } from "../../_generated/server";
+import type { QueryCtx } from "../../_generated/server";
+import type { Id } from "../../_generated/dataModel";
 import { internal } from "../../_generated/api";
 
 function guardEnabled(): boolean {
@@ -45,6 +47,7 @@ export const projectionStateInternal = internalQuery({
       .query("calendarConnections")
       .withIndex("by_company", (q) => q.eq("companyId", args.companyId))
       .collect();
+    const copyEvents = await copyProjectedEvents(ctx.db, args.companyId);
     const out = [];
     for (const connection of connections) {
       const copies = await ctx.db
@@ -72,7 +75,6 @@ export const projectionStateInternal = internalQuery({
           start: copy.payload?.start ?? null,
           end: copy.payload?.end ?? null,
           description: copy.payload?.description ?? null,
-          payloadFingerprint: copy.payloadFingerprint ?? null,
           hidden: copy.hidden,
           hiddenOrigin: copy.hiddenOrigin ?? null,
           remoteOutcome: copy.remoteOutcome,
@@ -91,9 +93,45 @@ export const projectionStateInternal = internalQuery({
               },
       });
     }
-    return okResult(out);
+    return okResult({ connections: out, copyProjectedEvents: copyEvents });
   },
 });
+
+/**
+ * The company's `calendar.copyProjected` outbox rows (internal read): the
+ * exact canonical events G3 consumes, so the live evidence can pin the
+ * DERIVATION BASIS each publish carried (create vs update paths).
+ */
+async function copyProjectedEvents(db: QueryCtx["db"], companyId: Id<"companies">) {
+  const rows = await db
+    .query("outboxEvents")
+    .withIndex("by_company", (q) => q.eq("companyId", companyId))
+    .collect();
+  const events = [];
+  for (const row of rows) {
+    if (row.eventName !== "calendar.copyProjected") {
+      continue;
+    }
+    let payload: { copyId?: unknown; desiredRevisionId?: unknown } | null = null;
+    try {
+      const envelope = JSON.parse(row.envelopeJson) as { payload?: unknown };
+      if (typeof envelope.payload === "object" && envelope.payload !== null) {
+        payload = envelope.payload as { copyId?: unknown; desiredRevisionId?: unknown };
+      }
+    } catch {
+      payload = null;
+    }
+    events.push({
+      eventId: row.eventId,
+      copyId: typeof payload?.copyId === "string" ? payload.copyId : null,
+      desiredRevisionId:
+        typeof payload?.desiredRevisionId === "string" ? payload.desiredRevisionId : null,
+      createdAtMs: row.createdAtMs,
+    });
+  }
+  events.sort((a, b) => a.createdAtMs - b.createdAtMs);
+  return events;
+}
 
 /** The guarded inspection read for the live evidence (proof domain only). */
 export const g2ProofProjectionState = action({

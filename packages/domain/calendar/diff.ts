@@ -12,17 +12,32 @@
 
 import type { DesiredGoogleEvent, SubjectExclusion, TermWithdrawReason } from "./projection";
 
-/** The desired state of one subject's copy after a pass. */
+/**
+ * The desired state of one subject's copy after a pass. The derivation
+ * basis lives INSIDE the variants: a `projected` desire always carries the
+ * revision its payload was derived from (never null), while a `withdrawn`
+ * desire keeps the last known revision when the binding is gone entirely.
+ */
 export interface DesiredCopy {
   readonly subjectKind: "task" | "event";
   readonly subjectId: string;
   readonly semanticId: string;
-  /** The finding revision the decision derived from (null before any). */
-  readonly derivationRevisionId: string | null;
-  readonly desired:
-    | { readonly state: "projected"; readonly payload: DesiredGoogleEvent }
-    | { readonly state: "withdrawn"; readonly reason: SubjectExclusion | TermWithdrawReason };
+  readonly desired: DesiredOutcome;
 }
+
+/** One outcome variant of a desired copy (see DesiredCopy). */
+export type DesiredOutcome =
+  | {
+      readonly state: "projected";
+      readonly payload: DesiredGoogleEvent;
+      readonly derivationRevisionId: string;
+    }
+  | {
+      readonly state: "withdrawn";
+      readonly reason: SubjectExclusion | TermWithdrawReason;
+      /** Null only when the binding disappeared without a current revision. */
+      readonly derivationRevisionId: string | null;
+    };
 
 /** The stored state of one existing copy row (what the pass reads back). */
 export interface ExistingCopy {
@@ -69,21 +84,6 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** A stable 16-hex-character change fingerprint of any JSON value. */
-export function payloadFingerprint(value: unknown): string {
-  const text = canonicalJson(value);
-  // Two independent FNV-1a 32-bit passes (different seeds) form one
-  // deterministic fingerprint; this is change detection, not cryptography.
-  let a = 0x811c9dc5;
-  let b = 0x89abc1f3;
-  for (let i = 0; i < text.length; i += 1) {
-    const code = text.charCodeAt(i);
-    a = ((a ^ code) * 0x01000193) >>> 0;
-    b = ((b + code * (i + 7)) * 0x85ebca6b) >>> 0;
-  }
-  return a.toString(16).padStart(8, "0") + b.toString(16).padStart(8, "0");
-}
-
 /**
  * Diffs existing copies against desired copies for ONE connection.
  * Subjects are matched by (kind, id) — the row identity, not the semantic
@@ -122,7 +122,7 @@ export function diffDesiredCopies(
     if (have.semanticId !== want.semanticId) {
       changes.push("semantic_id");
     }
-    if (have.derivationRevisionId !== want.derivationRevisionId) {
+    if (have.derivationRevisionId !== want.desired.derivationRevisionId) {
       changes.push("derivation");
     }
     if (
@@ -154,8 +154,11 @@ export function diffDesiredCopies(
           subjectKind: have.subjectKind,
           subjectId: have.subjectId,
           semanticId: have.semanticId,
-          derivationRevisionId: have.derivationRevisionId,
-          desired: { state: "withdrawn", reason: "out_of_personal_scope" },
+          desired: {
+            state: "withdrawn",
+            reason: "out_of_personal_scope",
+            derivationRevisionId: have.derivationRevisionId,
+          },
         },
         changes: ["payload"],
       });

@@ -30,6 +30,7 @@ import { defineTable } from "convex/server";
 import { v } from "convex/values";
 import { shared, type Encoded, type ValueValidator } from "../../schema/shared";
 import { CalendarRemoteOutcome } from "@kiero/contracts";
+import type { DesiredGoogleEvent, WithdrawReason } from "@kiero/domain";
 
 // Vocabulary pin: the copy's remote outcome must equal the contracts-side
 // CalendarRemoteOutcome literals exactly (unknown stays first-class), or this
@@ -41,7 +42,20 @@ const calendarRemoteOutcome: ValueValidator<Encoded<typeof CalendarRemoteOutcome
     v.literal("unknown"),
   );
 
-/** The withdraw-reason validator pinned to the runtime list above. */
+/** The hide-origin validator pinned to the runtime list above. */
+const hideOrigin: ValueValidator<HideOrigin> = v.union(
+  v.literal("user_request"),
+  v.literal("deleted_in_google"),
+  v.literal("moved_in_google"),
+);
+
+/**
+ * The withdraw-reason validator PINNED to the domain's runtime list
+ * (packages/domain/calendar/projection.ts owns the vocabulary; the same
+ * pin style as `calendarRemoteOutcome` below — a reason added to the
+ * domain without its literal here fails typecheck instead of silently
+ * dropping out of a patch).
+ */
 const withdrawReason: ValueValidator<WithdrawReason> = v.union(
   v.literal("subject_closed"),
   v.literal("out_of_personal_scope"),
@@ -55,39 +69,16 @@ const withdrawReason: ValueValidator<WithdrawReason> = v.union(
   v.literal("term_invalid"),
 );
 
-/** The hide-origin validator pinned to the runtime list above. */
-const hideOrigin: ValueValidator<HideOrigin> = v.union(
-  v.literal("user_request"),
-  v.literal("deleted_in_google"),
-  v.literal("moved_in_google"),
-);
-
-/**
- * Why the projection withdrew (or never made) one copy. The runtime list
- * the transaction checks against; keep it aligned with the pure module's
- * SubjectExclusion and TermWithdrawReason unions (G1's RECONNECT_REASONS
- * pattern).
- */
-export const WITHDRAW_REASONS = [
-  "subject_closed",
-  "out_of_personal_scope",
-  "no_binding",
-  "term_unresolved",
-  "term_not_temporal",
-  "term_proposed",
-  "term_actual",
-  "term_approximate",
-  "term_open_ended",
-  "term_invalid",
-] as const;
-export type WithdrawReason = (typeof WITHDRAW_REASONS)[number];
-
 /** How a personal hide came about ("Ukrycie kopii kalendarzowej"). */
 export const HIDE_ORIGINS = ["user_request", "deleted_in_google", "moved_in_google"] as const;
 export type HideOrigin = (typeof HIDE_ORIGINS)[number];
 
-/** The managed Google-event payload one desired copy carries (canonical JSON). */
-const desiredPayload = v.object({
+/**
+ * The managed Google-event payload validator, PINNED to the domain's
+ * DesiredGoogleEvent type (packages/domain/calendar/projection.ts owns the
+ * shape; drift here fails typecheck).
+ */
+const desiredPayload: ValueValidator<DesiredGoogleEvent> = v.object({
   summary: v.string(),
   description: v.string(),
   start: v.object({ date: v.optional(v.string()), dateTime: v.optional(v.string()) }),
@@ -114,8 +105,6 @@ export const calendarProjectionTables = {
     withdrawReason: v.optional(withdrawReason),
     /** Managed-fields payload while `desiredState === "projected"`. */
     payload: v.optional(desiredPayload),
-    /** Change fingerprint of the payload (idempotent pass detection). */
-    payloadFingerprint: v.optional(v.string()),
     /** Remote id once known; absent while the first POST is unresolved. */
     googleEventId: v.optional(v.string()),
     /** Desired state follows this finding revision; drift triggers sync. */

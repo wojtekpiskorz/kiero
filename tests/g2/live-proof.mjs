@@ -220,9 +220,15 @@ async function publishFinding(sessionId, sourceId, scope, semanticKey, findingVa
   return found;
 }
 
-const connectionsOf = (state) => value(state) ?? [];
+const connectionsOf = (state) => value(state)?.connections ?? [];
 const connectionBySubject = (state, googleSubject) =>
   connectionsOf(state).find((c) => c.googleAccountSubject === googleSubject) ?? null;
+/** The canonical copyProjected events, newest last (the G3 consumption pin). */
+const copyEventsOf = (state) => value(state)?.copyProjectedEvents ?? [];
+const latestEventFor = (state, copyId) => {
+  const own = copyEventsOf(state).filter((e) => e.copyId === copyId);
+  return own.length === 0 ? null : own[own.length - 1];
+};
 const copiesOf = (connection, subjectId) =>
   (connection?.copies ?? []).filter((copy) => copy.subjectId === subjectId);
 
@@ -460,9 +466,9 @@ let connC = null;
 
 {
   const snapshot = async () =>
-    JSON.stringify((value(await projectionState(companyId)) ?? []).map((c) => [
+    JSON.stringify((value(await projectionState(companyId))?.connections ?? []).map((c) => [
       c.connectionId,
-      c.copies.map((p) => [p.copyId, p.desiredState, p.payloadFingerprint, p.updatedAtMs]),
+      c.copies.map((p) => [p.copyId, p.desiredState, JSON.stringify(p.payload), p.updatedAtMs]),
     ]));
   const before = await snapshot();
   const pass = await runPass(connA.connectionId);
@@ -486,12 +492,16 @@ let connC = null;
 
   await runPass(connA.connectionId);
   state = await projectionState(companyId);
-  const conn = (value(state) ?? []).find((c) => c.connectionId === connA.connectionId);
+  const conn = connectionsOf(state).find((c) => c.connectionId === connA.connectionId);
   const t1 = copiesOf(conn, taskT1);
   check("3b the SAME copy row is updated to the corrected date (no duplicate)",
     t1.length === 1 && t1[0]?.start?.date === "2026-10-20" && t1[0]?.end?.date === "2026-10-21" &&
-      t1[0]?.desiredRevisionId !== findingDay.currentRevisionId,
-    JSON.stringify({ start: t1[0]?.start, copies: t1.length, basisMoved: t1[0]?.desiredRevisionId !== findingDay.currentRevisionId }));
+      t1[0]?.desiredRevisionId === value(corrected)?.revisionId,
+    JSON.stringify({ start: t1[0]?.start, copies: t1.length }));
+  const event3 = latestEventFor(state, t1[0]?.copyId);
+  check("3c the canonical copyProjected event carries the FRESH derivation basis (not the pre-patch one)",
+    event3 !== null && event3.desiredRevisionId === value(corrected)?.revisionId,
+    JSON.stringify({ eventRevision: event3?.desiredRevisionId, rowRevision: t1[0]?.desiredRevisionId }));
 }
 
 // --- Phase 4: completion withdraws; reopen requalifies; hide survives ---------
@@ -499,7 +509,7 @@ let connC = null;
 let hiddenCopyId = null;
 {
   // Hide A's E1 copy FIRST (personal decision), then withdraw T1 by state.
-  const e1a = copiesOf((value(await projectionState(companyId)) ?? []).find((c) => c.connectionId === connA.connectionId), eventE1);
+  const e1a = copiesOf(connectionsOf(await projectionState(companyId)).find((c) => c.connectionId === connA.connectionId), eventE1);
   hiddenCopyId = e1a[0]?.copyId ?? null;
   const hid = await setCopyHidden(A.client, hiddenCopyId, true);
   check("4a A hides the E1 copy through the certified dispatch", isOk(hid), errCode(hid));
@@ -514,7 +524,7 @@ let hiddenCopyId = null;
 
   await runPass(connA.connectionId);
   state = await projectionState(companyId);
-  const conn = (value(state) ?? []).find((c) => c.connectionId === connA.connectionId);
+  const conn = connectionsOf(state).find((c) => c.connectionId === connA.connectionId);
   const t1 = copiesOf(conn, taskT1);
   check("4c completion withdraws the copy desired state (payload cleared, row retained)",
     t1.length === 1 && t1[0]?.desiredState === "withdrawn" &&
@@ -528,7 +538,7 @@ let hiddenCopyId = null;
     JSON.stringify(e1.map((c) => [c.hidden, c.hiddenOrigin, c.desiredState])));
 
   // B's E1 copy is untouched by A's hide.
-  const connB2 = (value(state) ?? []).find((c) => c.connectionId === connB.connectionId);
+  const connB2 = connectionsOf(state).find((c) => c.connectionId === connB.connectionId);
   const e1b = copiesOf(connB2, eventE1);
   check("4e A's hide does not affect B's copy of the same event",
     e1b.length === 1 && e1b[0]?.hidden === false,
@@ -542,7 +552,7 @@ let hiddenCopyId = null;
   check("4f T1 reopened", isOk(reopened), errCode(reopened));
   await runPass(connA.connectionId);
   state = await projectionState(companyId);
-  const conn2 = (value(state) ?? []).find((c) => c.connectionId === connA.connectionId);
+  const conn2 = connectionsOf(state).find((c) => c.connectionId === connA.connectionId);
   const t1r = copiesOf(conn2, taskT1);
   check("4g reopen requalifies the SAME copy row (no new row, still hidden-independent)",
     t1r.length === 1 && t1r[0]?.desiredState === "projected" &&
@@ -552,7 +562,7 @@ let hiddenCopyId = null;
   const restored = await setCopyHidden(A.client, hiddenCopyId, false);
   check("4h explicit restore clears the hide (only this path does)", isOk(restored), errCode(restored));
   state = await projectionState(companyId);
-  const conn3 = (value(state) ?? []).find((c) => c.connectionId === connA.connectionId);
+  const conn3 = connectionsOf(state).find((c) => c.connectionId === connA.connectionId);
   check("4i the restored copy is unhidden with origin cleared",
     copiesOf(conn3, eventE1)[0]?.hidden === false &&
       copiesOf(conn3, eventE1)[0]?.hiddenOrigin === null,
@@ -581,7 +591,7 @@ let hiddenCopyId = null;
   check("6a event time marked conflicted (unresolved)", isOk(unresolved), errCode(unresolved));
   await runPass(connA.connectionId);
   state = await projectionState(companyId);
-  const conn = (value(state) ?? []).find((c) => c.connectionId === connA.connectionId);
+  const conn = connectionsOf(state).find((c) => c.connectionId === connA.connectionId);
   const e1 = copiesOf(conn, eventE1);
   check("6b an unresolved term withdraws its copy with the machine reason",
     e1.length === 1 && e1[0]?.desiredState === "withdrawn" &&
@@ -596,7 +606,7 @@ let hiddenCopyId = null;
   check("7a A switched to a different Google account", switched.ok, JSON.stringify(switched));
   await runPass(connA.connectionId);
   state = await projectionState(companyId);
-  const conn = (value(state) ?? []).find((c) => c.connectionId === connA.connectionId);
+  const conn = connectionsOf(state).find((c) => c.connectionId === connA.connectionId);
   check("7b the switch re-mints semantic ids under the new account and resets the remote ledger",
     conn?.googleAccountSubject === "proof-google-subject-4" &&
       (conn?.copies ?? []).length > 0 &&
