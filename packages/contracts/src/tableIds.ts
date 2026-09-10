@@ -93,6 +93,10 @@ export const TABLE_ID_NAMES = [
   "processingRuns",
   "processingSteps",
   "processingAttempts",
+  // processing/multimodal (E4 amendment, flagged coordinated change, the
+  // D6 precedent): the vision-extraction order rows over retained image
+  // representations (issue #38).
+  "visionOrders",
   "durableJobs",
   "outboxEvents",
   // A3 certification amendment: observable external-effect ledger used by the

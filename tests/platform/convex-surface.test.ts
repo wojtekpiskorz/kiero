@@ -11,7 +11,7 @@ import { jobExecutors } from "../../convex/platform/executors";
 import { echoExecutor } from "../../convex/platform/echo";
 
 describe("convex executor composition", () => {
-  it("registers exactly the implemented executors (platform + B3 + C5 + D6 + E3 lanes)", () => {
+  it("registers exactly the implemented executors (platform + B3 + C5 + D6 + E3/E4 lanes)", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
       [
         "platform.echo_delivery",
@@ -40,6 +40,9 @@ describe("convex executor composition", () => {
         // G3's sanctioned append (issue #47 owns the declared consumer
         // proof for the calendar.copyOutcomeRecorded edge).
         "calendar.reconcile_outcome",
+        // E4's sanctioned append (issue #38 owns the multimodal join; the
+        // contracts amendment registering the kind is flagged there).
+        "processing.join_multimodal",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");
@@ -47,7 +50,10 @@ describe("convex executor composition", () => {
 
   it("every registered kind exists in the A2/A3 registry executor table", () => {
     for (const kind of Object.keys(jobExecutors)) {
-      expect(executors.some((entry) => entry.jobKind === kind), kind).toBe(true);
+      expect(
+        executors.some((entry) => entry.jobKind === kind),
+        kind,
+      ).toBe(true);
     }
   });
 
@@ -70,7 +76,11 @@ describe("temporal cross-precision bound ordering (A2 deferral resolved by A3)",
 
   it("accepts equal period starts (a bound and the period containing it)", () => {
     expect(() =>
-      decode({ _tag: "range", start: { _tag: "month", month: "2026-05" }, end: { _tag: "month", month: "2026-05" } }),
+      decode({
+        _tag: "range",
+        start: { _tag: "month", month: "2026-05" },
+        end: { _tag: "month", month: "2026-05" },
+      }),
     ).not.toThrow();
   });
 

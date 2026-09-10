@@ -144,6 +144,38 @@ function projectOneEdge(
       dedupKey: rowDedupKey,
     };
   }
+  // E4 registration (issue #38 owns these edges' projections): the accepted
+  // source projects onto the multimodal join (STT ordering + the joined
+  // partial-safe analysis; the executor resolves the source's initial
+  // analysis run from `null`, the way D6's orders anchor), and a requested
+  // reanalysis projects onto the kicker's NEW run so a mixed source re-joins
+  // its extraction outcomes. Dedup keys derive from the payload's source
+  // identity, never the row's, so the acceptance publisher and this edge
+  // can never collide across kinds.
+  if (jobKind === "processing.join_multimodal") {
+    if (eventName === "operations.reanalysisRequested") {
+      return {
+        kind: "job",
+        jobKind,
+        input: {
+          sourceId: payload.sourceId,
+          processingRunId: payload.newRunId ?? null,
+          reanalysisOfRunId: payload.reanalysisOfRunId ?? null,
+        },
+        dedupKey: `processing.join_multimodal:${String(payload.sourceId)}:reanalysis:${String(payload.newRunId ?? "")}`,
+      };
+    }
+    return {
+      kind: "job",
+      jobKind,
+      input: {
+        sourceId: payload.sourceId,
+        processingRunId: null,
+        reanalysisOfRunId: null,
+      },
+      dedupKey: `processing.join_multimodal:${String(payload.sourceId)}`,
+    };
+  }
   // C5 registration (issue #28 owns these edges' projections): withdrawal
   // and every finding revision drain into `memory.recompute_dependents`.
   // The withdrawal payload carries its reason; the publisher (the withdrawal

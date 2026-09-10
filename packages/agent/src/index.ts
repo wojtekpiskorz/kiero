@@ -8,3 +8,6 @@
  */
 
 export * from "../planning/index.js";
+// E4 amendment: the pure multimodal-join surface composed over the planning
+// package (extraction owns it; planning stays E3's unchanged shape).
+export * from "../extraction/index.js";

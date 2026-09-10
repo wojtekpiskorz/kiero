@@ -164,17 +164,33 @@ export interface OneAttemptOutcome {
 }
 
 /**
- * Runs ONE copy's reconciliation: prepare (decide + durably open the
- * attempt), the ONE bounded external leg, complete (record + transition +
- * publish). A token barrier suspends honestly — the attempt row keeps its
- * uncertain `unknown` outcome so nothing is assumed and nothing retries
- * blindly.
+ * Runs ONE copy's reconciliation: the credential check, prepare (decide +
+ * durably open the attempt), the ONE bounded external leg, complete (record +
+ * transition + publish). A token barrier suspends honestly and is discovered
+ * BEFORE the attempt opens: a barrier means the leg provably never leaves the
+ * machine, so no attempt row is minted for it and no never-run leg is
+ * completed through the observation-unknown transition (which would demote a
+ * CONFIRMED copy and mint a row on every 5-minute pass of a lasting token
+ * outage).
  */
 async function runOneAttempt(
   ctx: ActionCtx,
   copyId: Id<"calendarCopies">,
   forceObservation = false,
 ): Promise<OneAttemptOutcome> {
+  // The four early answers spell their returns out: each names its own
+  // kind and reason at the return site, which reads as the decision
+  // table it mirrors.
+  const connectionId = await ctx.runQuery(internal.calendar.sync.functions.copyConnectionOf, {
+    copyId,
+  });
+  if (connectionId === null) {
+    return { kind: "copy_missing", reason: null, accessLost: false, remoteOutcome: null, attemptOutcome: null };
+  }
+  const credential = await freshAccessToken(ctx, connectionId);
+  if ("barrier" in credential) {
+    return { kind: "barrier", reason: credential.barrier, accessLost: false, remoteOutcome: null, attemptOutcome: null };
+  }
   const prepared = await ctx.runMutation(internal.calendar.sync.operations.prepareCopyAttempt, {
     copyId,
     forceObservation,
@@ -187,16 +203,6 @@ async function runOneAttempt(
   }
   if (prepared.kind === "copy_missing") {
     return { kind: "copy_missing", reason: null, accessLost: false, remoteOutcome: null, attemptOutcome: null };
-  }
-  const credential = await freshAccessToken(ctx, prepared.connectionId);
-  if ("barrier" in credential) {
-    await ctx.runMutation(internal.calendar.sync.operations.completeCopyAttempt, {
-      attemptDedupKey: prepared.attemptDedupKey,
-      outcome: "failed",
-      errorKind: `credential_${credential.barrier}`,
-      result: { kind: "observation", observation: { kind: "unknown" } },
-    });
-    return { kind: "barrier", reason: credential.barrier, accessLost: false, remoteOutcome: null, attemptOutcome: "failed" };
   }
   const leg = prepared.leg;
   const base = {
@@ -315,6 +321,19 @@ export const copyIdsOfConnection = internalQuery({
       .withIndex("by_connection", (q) => q.eq("connectionId", args.connectionId))
       .collect();
     return rows.map((row) => row._id);
+  },
+});
+
+/**
+ * One copy's connection: the pre-prepare credential check's input. The
+ * barrier must be discoverable WITHOUT opening an attempt row, and the
+ * connection id is the credential lookup's key.
+ */
+export const copyConnectionOf = internalQuery({
+  args: { copyId: v.id("calendarCopies") },
+  handler: async (ctx, args): Promise<Id<"calendarConnections"> | null> => {
+    const copy = await ctx.db.get(args.copyId);
+    return copy === null ? null : copy.connectionId;
   },
 });
 
