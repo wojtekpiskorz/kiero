@@ -35,6 +35,9 @@
  * - `processing.normalize_photo` (../processing/images/executor.ts, D5):
  *   the accepted-photo normalization executor (architecture protocol step
  *   4) with the echo-template uncertain-outcome semantics.
+ * - `calendar.reconcile_outcome` (../calendar/sync/executor.ts, G3): the
+ *   per-copy Calendar reconciliation executor (observe before any retry,
+ *   one bounded leg per attempt, uncertain outcomes block blind retries).
  */
 
 import type { FunctionReference } from "convex/server";
@@ -48,6 +51,11 @@ import { cleanupRevocationExecutor } from "../access/membership/cleanup";
 import { recomputeDependentsExecutor } from "../memory/recompute/executor";
 import { transcribeSegmentExecutor } from "../processing/audio/executor";
 import { normalizePhotoExecutor } from "../processing/images/executor";
+
+// G3 append (flagged shared-file change, the D5/D6 precedent): the
+// calendar.reconcile_outcome executor implementation lives in G3's owned
+// path; this registry entry is its composition point.
+import { reconcileOutcomeExecutor } from "../calendar/sync/executor";
 
 /** One durable job row (the executable counterpart of an outbox event). */
 export type DurableJobDoc = Doc<"durableJobs">;
@@ -78,4 +86,6 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [recomputeDependentsExecutor.jobKind]: recomputeDependentsExecutor,
   [transcribeSegmentExecutor.jobKind]: transcribeSegmentExecutor,
   [normalizePhotoExecutor.jobKind]: normalizePhotoExecutor,
+
+  [reconcileOutcomeExecutor.jobKind]: reconcileOutcomeExecutor,
 };

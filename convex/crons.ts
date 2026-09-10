@@ -19,6 +19,18 @@ const crons = cronJobs();
 // The outbox drain safety net (A3 handoff note: cron-table drain upgrade).
 crons.cron("outbox-drain-safety-net", "*/5 * * * *", internal.platform.outbox.drainOutbox);
 
+// G3 append (flagged shared-file change, the drain safety net's shape):
+// the Calendar reconciliation safety net. Event-driven observation (the
+// copyOutcomeRecorded consumer edge) is the fast path; this pass converges
+// stragglers — reconnect rebuilds, drift re-checks and copies whose events
+// were never delivered. Suspended connections contribute zero Google legs.
+crons.cron(
+  "calendar-sync-safety-net",
+  "*/5 * * * *",
+  internal.calendar.sync.functions.runCalendarSyncPass,
+  {},
+);
+
 // Incident scan + cost thresholds + retention + best-effort sink forward.
 crons.interval("telemetry-tick", { minutes: 1 }, internal.operations.telemetry.cron.cronTick);
 

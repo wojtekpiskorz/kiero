@@ -42,6 +42,9 @@ import { preferencesTables } from "./attention/preferences/schema";
 import { deliveryTables } from "./attention/delivery/schema";
 import { calendarConnectionTables } from "./calendar/connection/schema";
 import { calendarProjectionTables } from "./calendar/projection/schema";
+// G3 append (flagged shared-file change, the G1/G2 precedent): the sync
+// attempt ledger and the proof-only fake-event store.
+import { calendarSyncTables } from "./calendar/sync/schema";
 import { exportsTables } from "./operations/exports/schema";
 import { deletionTables } from "./operations/deletion/schema";
 import { backupsTables } from "./operations/backups/schema";
@@ -66,6 +69,7 @@ const fragments: ReadonlyArray<Record<string, TableDefinition>> = [
   deliveryTables,
   calendarConnectionTables,
   calendarProjectionTables,
+  calendarSyncTables,
   exportsTables,
   deletionTables,
   backupsTables,
@@ -123,6 +127,7 @@ export default defineSchema({
   ...deliveryTables,
   ...calendarConnectionTables,
   ...calendarProjectionTables,
+  ...calendarSyncTables,
   ...exportsTables,
   ...deletionTables,
   ...backupsTables,

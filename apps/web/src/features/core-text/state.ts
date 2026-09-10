@@ -259,6 +259,8 @@ export function knowledgeStateLabel(state: unknown): string {
       return `nieustalone (${decoded.reason})`;
     case "conflicted":
       return "sprzeczne — wymaga rozstrzygnięcia";
+    case "updating":
+      return `w trakcie ponownej oceny (${decoded.reason})`;
     case "not_applicable":
       return "nie dotyczy";
   }
