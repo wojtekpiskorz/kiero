@@ -9,3 +9,4 @@ export * from "./temporal";
 export * from "./provenance";
 export * from "./plan";
 export * from "./knowledge";
+export * from "./labels";

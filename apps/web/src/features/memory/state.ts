@@ -27,13 +27,15 @@ import { BigDecimal, Schema } from "effect";
 import {
   FindingValue,
   KnowledgeState,
-  MoneyCertainty,
-  MoneyRole,
-  TaxBasis,
-  TemporalRole,
   type DateOnly,
   type TemporalValue,
 } from "@kiero/contracts";
+import {
+  MONEY_CERTAINTY_LABELS,
+  MONEY_ROLE_LABELS,
+  TAX_BASIS_LABELS,
+  TEMPORAL_ROLE_LABELS,
+} from "../../../../../packages/domain/findings/labels";
 import { signInCopy } from "../sign-in/state";
 import { sessionFailureHints } from "../conversation/state";
 
@@ -126,7 +128,10 @@ const failureHints: Partial<Record<string, string>> = {
 };
 
 /** The notice text for one closed error code (hint or server message). */
-export function failureHint(code: string, serverMessage: string): string {
+export function failureHint(code: string | undefined, serverMessage: string): string {
+  if (code === undefined) {
+    return serverMessage;
+  }
   return failureHints[code] ?? serverMessage;
 }
 
@@ -134,33 +139,10 @@ export function failureHint(code: string, serverMessage: string): string {
 // Wire-value renderers (contract-decoded -> plain Polish)
 // ---------------------------------------------------------------------------
 
-/** Polish role names for temporal values (the contract's closed vocabulary). */
-const temporalRoleLabels: Record<TemporalRole, string> = {
-  proposed: "propozycja",
-  internal: "plan wewnętrzny",
-  agreed: "uzgodnione",
-  actual: "stan faktyczny",
-};
-
-/** Polish role names for money values (the contract's closed vocabulary). */
-const moneyRoleLabels: Record<MoneyRole, string> = {
-  price_proposal: "wycena",
-  agreed_price: "uzgodniona cena",
-  material_cost: "koszt materiałów",
-  deposit_received: "otrzymana zaliczka",
-  estimated_labor: "szacunek robocizny",
-};
-
-const taxBasisLabels: Record<TaxBasis, string> = {
-  net: "netto",
-  gross: "brutto",
-  not_specified: "podatek nieokreślony",
-};
-
-const certaintyLabels: Record<MoneyCertainty, string> = {
-  exact: "kwota dokładna",
-  estimate: "kwota szacunkowa",
-};
+// The temporal-role, money-role, tax-basis and certainty renderings come
+// from the findings domain's one label module
+// (packages/domain/findings/labels.ts): the same Polish strings the work
+// surface and the extension value editor render, from one source.
 
 /** Renders one decoded date-only bound; no component is invented. */
 function dateOnlyLabel(bound: DateOnly): string {
@@ -195,7 +177,7 @@ function temporalValueLabel(temporal: TemporalValue): string {
       break;
     }
   }
-  return `${when} (${temporalRoleLabels[temporal.role]}; powiedziano: „${temporal.originalExpression}”)`;
+  return `${when} (${TEMPORAL_ROLE_LABELS[temporal.role]}; powiedziano: „${temporal.originalExpression}”)`;
 }
 
 /** Renders one decoded money value; estimates and tax basis stay visible. */
@@ -209,7 +191,7 @@ function moneyValueLabel(
       : `od ${money.amount.min === null ? "…" : BigDecimal.format(money.amount.min)} do ${
           money.amount.max === null ? "…" : BigDecimal.format(money.amount.max)
         } ${money.currency}`;
-  return `${moneyRoleLabels[money.role]}: ${amount}, ${taxBasisLabels[money.taxBasis]}, ${certaintyLabels[money.certainty]}`;
+  return `${MONEY_ROLE_LABELS[money.role]}: ${amount}, ${TAX_BASIS_LABELS[money.taxBasis]}, ${MONEY_CERTAINTY_LABELS[money.certainty]}`;
 }
 
 /**

@@ -29,10 +29,11 @@
  *   button prefills a NEW message that references the old one; the earlier
  *   message is never rewritten.
  *
- * The send path is J1's proved loop verbatim: `sources.prepareUpload` (the
- * text-only source's durable upload row) then `sources.acceptSource` with
- * one idempotency key per logical message (a lost response retried with the
- * same key cannot create a second source).
+ * The send path is J1's proved loop, graduated into the shared
+ * statement-to-source helper (`../company/statement-source`): one
+ * idempotency key per logical message, held by the hook and rotated only
+ * after a confirmed acceptance, so a lost response retried with the same
+ * key cannot create a second source.
  *
  * No styling, semantic controls only (the UX/UI track owns presentation).
  */
@@ -47,7 +48,7 @@ import {
 } from "react";
 import { Schema } from "effect";
 import { useMutation, useQuery_experimental as useQueryState } from "convex/react";
-import { parseTableId, sourcesOperations } from "@kiero/contracts";
+import { parseTableId } from "@kiero/contracts";
 import { api } from "../../../../../convex/_generated/api";
 import type { MemberView } from "../../../../../convex/access/membership/functions";
 import { ConversationPage, SourceConversationRow } from "../../../../../convex/sources/read/rows";
@@ -61,6 +62,7 @@ import {
   type SubmitEvent,
 } from "../company/CompanyGate";
 import { asConvexId } from "../company/convex-ids";
+import { useStatementSource } from "../company/statement-source";
 import {
   PROJECT_PARAM,
   SOURCE_PARAM,
@@ -83,29 +85,6 @@ const PAGE_SIZE = 30;
 
 /** The growth cap (four pages): the unread projection stays bounded. */
 const MAX_PAGE_SIZE = 120;
-
-/**
- * A fresh idempotency key per logical message (regenerated after success).
- * The shape is the certified `idem_` + v4-uuid pattern the command
- * envelope's idempotency-key schema requires; the UUID always comes from
- * getRandomValues (the baseline CSPRNG API).
- */
-function uuidV4(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40; // version 4
-  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80; // RFC 4122 variant
-  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-function freshKey(): string {
-  return `idem_${uuidV4()}`;
-}
-
-/** The typed result shapes of the two send commands (contract authority). */
-const prepareUploadResult = sourcesOperations["sources.prepareUpload"].result;
-const acceptSourceResult = sourcesOperations["sources.acceptSource"].result;
 
 // ---------------------------------------------------------------------------
 // Root: the shared company-feature gate around this surface
@@ -146,14 +125,15 @@ function ConversationMain({
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [text, setText] = useState("");
   const [hintedProjects, setHintedProjects] = useState<readonly string[]>([]);
-  const [idemKey, setIdemKey] = useState(freshKey);
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [sentSourceId, setSentSourceId] = useState<string | null>(null);
   const [correcting, setCorrecting] = useState<SourceConversationRowType | null>(null);
 
-  const prepareUpload = useMutation(api.sources.uploads.commands.prepareUploadCommand);
-  const acceptSource = useMutation(api.sources.accept.commands.acceptSourceCommand);
+  // The shared statement-to-source send: the hook holds ONE idempotency
+  // key per logical message and rotates it only after a confirmed
+  // acceptance, so a lost-response retry converges on one source.
+  const source = useStatementSource();
 
   const timezone =
     typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "Europe/Warsaw";
@@ -240,52 +220,27 @@ function ConversationMain({
     }
     setSending(true);
     setNotice(null);
-    try {
-      const prepared = await prepareUpload({
-        envelope: envelopeOf("sources.prepareUpload", {
-          draftId: idemKey,
-          parts: 1,
-          mediaKinds: [],
-        }),
-      });
-      if (prepared._tag === "error") {
-        setNotice({ kind: "error", text: failureHint(prepared.error.code, prepared.error.message) });
-        return;
-      }
-      const upload = Schema.decodeUnknownSync(prepareUploadResult)(prepared.value);
-      const accepted = await acceptSource({
-        envelope: {
-          operation: "sources.acceptSource",
-          input: {
-            uploadId: upload.uploadId,
-            authorText,
-            timezoneSnapshot: timezone,
-            projectHints: [...hintedProjects],
-          },
-          expectedRevisions: [],
-          idempotencyKey: idemKey,
-        },
-      });
-      if (accepted._tag === "error") {
-        setNotice({ kind: "error", text: failureHint(accepted.error.code, accepted.error.message) });
-        return;
-      }
-      const receipt = Schema.decodeUnknownSync(acceptSourceResult)(accepted.value);
-      // Confirmed durable acceptance: the logical message is complete. A new
-      // draft gets a new idempotency key; the watch state takes over below.
-      setSentSourceId(receipt.sourceId);
+    const outcome = await source.send({
+      authorText,
+      timezoneSnapshot: timezone,
+      projectHints: hintedProjects,
+    });
+    if (outcome._tag === "refused") {
+      setNotice({ kind: "error", text: failureHint(outcome.code, outcome.message) });
+    } else if (outcome._tag === "lost") {
+      // Unknown response (network lost): the SAME key retries the SAME
+      // logical source, never a duplicate.
+      setNotice({ kind: "error", text: copy.lostResponseNotice });
+    } else {
+      // Confirmed durable acceptance: the logical message is complete (the
+      // helper minted the next draft's key); the watch state takes over.
+      setSentSourceId(outcome.receipt.sourceId);
       setNotice({ kind: "ok", text: copy.savedNotice });
       setText("");
       setHintedProjects([]);
       setCorrecting(null);
-      setIdemKey(freshKey());
-    } catch {
-      // Unknown response (network lost): the SAME key retries the SAME
-      // logical source — never a duplicate.
-      setNotice({ kind: "error", text: copy.lostResponseNotice });
-    } finally {
-      setSending(false);
     }
+    setSending(false);
   }
 
   function toggleHint(projectId: string): void {

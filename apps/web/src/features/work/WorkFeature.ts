@@ -44,8 +44,6 @@ import {
 import {
   boundTermLabel,
   checklistItemStateLabels,
-  eventStateLabels,
-  taskStateLabels,
   workCopy as copy,
 } from "./state";
 
@@ -253,6 +251,3 @@ export function EventRow({
     createElement("p", null, copy.revisionLabel(event.revisionCounter)),
   );
 }
-
-/** Re-exported for the co-teraz surface's link copy (one Polish source). */
-export { taskStateLabels, eventStateLabels };

@@ -25,9 +25,23 @@ import {
   type TaxBasis,
   type TemporalRole,
 } from "@kiero/contracts";
+import {
+  MONEY_CERTAINTY_LABELS,
+  MONEY_ROLE_LABELS,
+  TAX_BASIS_LABELS,
+  TEMPORAL_ROLE_LABELS,
+} from "../../../../../packages/domain/findings/labels";
+import type { CompanyTemporalContext } from "../company/time";
 import { entityRefKindLabels, extensionsCopy as copy } from "./state";
 
 /** One structural field view (decoded and encoded forms both satisfy it). */
+/**
+ * The UI's unbranded view of the contract's ExtensionFieldShape: the
+ * contract brands its ids (Brand<"ExtensionFieldId">), and the headless
+ * fixtures and draft builders speak plain strings. The one conversion
+ * happens at decodeSearchResult's boundary; everything downstream stays
+ * brand-free (the a11y fixtures construct rows directly).
+ */
 export interface FieldShape {
   readonly fieldId: string;
   readonly label: string;
@@ -189,20 +203,27 @@ export function parseScalarValue(
       const role = (temporalRoleOrder as readonly string[]).includes(slots.temporalRole)
         ? slots.temporalRole
         : "agreed";
+      // Each shape refuses with ITS OWN typed code, so the hint map can
+      // tell the boss which format is wrong (day, month, year or exact).
       let shape: Record<string, unknown> | null = null;
+      let invalidCode = "input_required";
       if (slots.temporalShape === "day") {
+        invalidCode = "input_day_invalid";
         shape = DAY_PATTERN.test(slots.temporalValue)
           ? { _tag: "day", day: slots.temporalValue }
           : null;
       } else if (slots.temporalShape === "month") {
+        invalidCode = "input_month_invalid";
         shape = MONTH_PATTERN.test(slots.temporalValue)
           ? { _tag: "month", month: slots.temporalValue }
           : null;
       } else if (slots.temporalShape === "year") {
+        invalidCode = "input_year_invalid";
         shape = YEAR_PATTERN.test(slots.temporalValue)
           ? { _tag: "year", year: slots.temporalValue }
           : null;
       } else if (slots.temporalShape === "exact") {
+        invalidCode = "input_exact_invalid";
         const zone = context.companyZone ?? "";
         const offset = context.zoneOffset ?? "";
         shape =
@@ -211,7 +232,7 @@ export function parseScalarValue(
             : null;
       }
       if (shape === null) {
-        return { ok: false, code: "input_day_invalid" };
+        return { ok: false, code: invalidCode };
       }
       return {
         ok: true,
@@ -352,10 +373,7 @@ export function buildExtensionValue(
 // ---------------------------------------------------------------------------
 
 /** The extra context the temporal editor needs (company zone, UTC offset). */
-export interface TemporalContext {
-  readonly companyZone: string;
-  readonly zoneOffset: string;
-}
+export type TemporalContext = CompanyTemporalContext;
 
 function labeled(id: string, label: string, control: ReactNode): ReactNode {
   return createElement("div", null, createElement("label", { htmlFor: id }, label), control);
@@ -455,7 +473,7 @@ export function FieldValueControls({
             "select",
             { id: id("role"), value: slots.moneyRole, onChange: (event: ChangeEvent<HTMLSelectElement>) => set("moneyRole")(event.target.value) },
             ...moneyRoleOrder.map((role) =>
-              createElement("option", { key: role, value: role }, moneyRoleLabels[role]),
+              createElement("option", { key: role, value: role }, MONEY_ROLE_LABELS[role]),
             ),
           ),
         ),
@@ -466,7 +484,7 @@ export function FieldValueControls({
             "select",
             { id: id("tax"), value: slots.taxBasis, onChange: (event: ChangeEvent<HTMLSelectElement>) => set("taxBasis")(event.target.value) },
             ...taxBasisOrder.map((basis) =>
-              createElement("option", { key: basis, value: basis }, taxBasisLabels[basis]),
+              createElement("option", { key: basis, value: basis }, TAX_BASIS_LABELS[basis]),
             ),
           ),
         ),
@@ -476,8 +494,8 @@ export function FieldValueControls({
           createElement(
             "select",
             { id: id("certainty"), value: slots.certainty, onChange: (event: ChangeEvent<HTMLSelectElement>) => set("certainty")(event.target.value) },
-            createElement("option", { value: "exact" }, "kwota dokładna"),
-            createElement("option", { value: "estimate" }, "kwota szacunkowa"),
+            createElement("option", { value: "exact" }, MONEY_CERTAINTY_LABELS.exact),
+            createElement("option", { value: "estimate" }, MONEY_CERTAINTY_LABELS.estimate),
           ),
         ),
       );
@@ -534,7 +552,7 @@ export function FieldValueControls({
             "select",
             { id: id("trole"), value: slots.temporalRole, onChange: (event: ChangeEvent<HTMLSelectElement>) => set("temporalRole")(event.target.value) },
             ...temporalRoleOrder.map((role) =>
-              createElement("option", { key: role, value: role }, temporalRoleLabels[role]),
+              createElement("option", { key: role, value: role }, TEMPORAL_ROLE_LABELS[role]),
             ),
           ),
         ),
@@ -570,14 +588,10 @@ export function FieldValueControls({
   }
 }
 
-/** Polish labels of the money roles (the contract's closed vocabulary). */
-const moneyRoleLabels: Record<MoneyRole, string> = {
-  price_proposal: "wycena",
-  agreed_price: "uzgodniona cena",
-  material_cost: "koszt materiałów",
-  deposit_received: "otrzymana zaliczka",
-  estimated_labor: "szacunek robocizny",
-};
+// The money-role, tax-basis, certainty and temporal-role renderings come
+// from the findings domain's one label module, the same single-source
+// pattern the work and memory surfaces ride; only the option ORDER of the
+// selects is this editor's own concern.
 
 const moneyRoleOrder: readonly MoneyRole[] = [
   "price_proposal",
@@ -587,19 +601,6 @@ const moneyRoleOrder: readonly MoneyRole[] = [
   "estimated_labor",
 ];
 
-const taxBasisLabels: Record<TaxBasis, string> = {
-  net: "netto",
-  gross: "brutto",
-  not_specified: "podatek nieokreślony",
-};
-
 const taxBasisOrder: readonly TaxBasis[] = ["net", "gross", "not_specified"];
-
-const temporalRoleLabels: Record<TemporalRole, string> = {
-  proposed: "propozycja",
-  internal: "plan wewnętrzny",
-  agreed: "uzgodnione",
-  actual: "stan faktyczny",
-};
 
 const temporalRoleOrder: readonly TemporalRole[] = ["proposed", "internal", "agreed", "actual"];

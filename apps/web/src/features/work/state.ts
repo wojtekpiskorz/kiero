@@ -4,10 +4,12 @@
  * closed-error hints for the /praca surface.
  *
  * The task-state, checklist-mark and event-state labels come from the pure
- * domain rules (`packages/domain/work`) through one relative import: the
- * Polish rendering of the fixed vocabulary has exactly one source, shared
- * with the backend lanes that consume the same module. Bound deadlines and
- * event times decode through the contract codecs at the boundary and
+ * domain rules (`packages/domain/work`) through one relative import, and
+ * the temporal-role and tax-basis labels from the findings domain's label
+ * module (`packages/domain/findings/labels`): the Polish rendering of the
+ * fixed vocabulary has exactly one source, shared with the backend lanes
+ * and the other surfaces that consume the same modules. Bound deadlines
+ * and event times decode through the contract codecs at the boundary and
  * render exactly what is there: exact instants stay exact, date-only terms
  * say which day they end with, and a term the memory does not currently
  * know renders as unknown or disputed, never as a guessed date.
@@ -23,8 +25,11 @@ import {
   KnowledgeState,
   TemporalValue,
   type TaxBasis,
-  type TemporalRole,
 } from "@kiero/contracts";
+import {
+  TAX_BASIS_LABELS,
+  TEMPORAL_ROLE_LABELS,
+} from "../../../../../packages/domain/findings/labels";
 import {
   CHECKLIST_ITEM_STATE_LABELS,
   EVENT_STATE_LABELS,
@@ -233,20 +238,9 @@ export function failureHint(code: string | undefined, serverMessage: string): st
 // Wire-value renderers (contract-decoded -> plain Polish)
 // ---------------------------------------------------------------------------
 
-/** Polish role names for temporal values (the contract's closed vocabulary). */
-const temporalRoleLabels: Record<TemporalRole, string> = {
-  proposed: "propozycja",
-  internal: "plan wewnętrzny",
-  agreed: "uzgodnione",
-  actual: "stan faktyczny",
-};
-
-const taxBasisLabels: Record<TaxBasis, string> = {
-  net: "netto",
-  gross: "brutto",
-  // The first-class honest state: never guessed, always visible.
-  not_specified: "podatek nieokreślony",
-};
+// The temporal-role and tax-basis renderings come from the findings
+// domain's one label module (packages/domain/findings/labels.ts), the
+// same single-source pattern as the state vocabularies above.
 
 /** Renders one decoded date-only bound; no component is invented. */
 function dateOnlyLabel(bound: Extract<TemporalValue["shape"], { _tag: "day" | "month" | "year" }>): string {
@@ -285,12 +279,12 @@ export function temporalValueLabel(temporal: TemporalValue): string {
       break;
     }
   }
-  return `${when} (${temporalRoleLabels[temporal.role]}; powiedziano: „${temporal.originalExpression}”)`;
+  return `${when} (${TEMPORAL_ROLE_LABELS[temporal.role]}; powiedziano: „${temporal.originalExpression}”)`;
 }
 
 /** The honest tax-basis label of a money value (never guessed). */
 export function taxBasisLabel(taxBasis: TaxBasis): string {
-  return taxBasisLabels[taxBasis];
+  return TAX_BASIS_LABELS[taxBasis];
 }
 
 /**

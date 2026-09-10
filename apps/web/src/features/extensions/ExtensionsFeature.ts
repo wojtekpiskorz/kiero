@@ -21,16 +21,18 @@
  *   finding's value (optionally under a newer definition version) with the
  *   revision the boss actually saw, keeping author, time and reason.
  *
- * The value/correction sections live in ./record.ts; both share the
- * memory-dispatch hook from ./hooks.
+ * The value/correction sections live in ./record.ts; both dispatch through
+ * the shared checked-dispatch hook (`../company/dispatch`).
  */
 
 import { createElement, useState, type ChangeEvent, type ReactNode } from "react";
-import { useQuery_experimental as useQueryState } from "convex/react";
+import { useMutation, useQuery_experimental as useQueryState } from "convex/react";
 import { Schema } from "effect";
 import { memoryOperations, parseTableId } from "@kiero/contracts";
 import { api } from "../../../../../convex/_generated/api";
-import { CompanyFeatureGate, SessionEnded } from "../company/CompanyGate";
+import { CompanyFeatureGate, SessionEnded, type MemberOverview } from "../company/CompanyGate";
+import { useCheckedDispatch, NoticeArea } from "../company/dispatch";
+import { temporalContextOf } from "../company/time";
 import { PROJECT_PARAM, searchParam, writeScopeParam } from "../company/route-params";
 import {
   deriveFieldId,
@@ -38,7 +40,6 @@ import {
   fieldKindLabels,
   extensionsCopy as copy,
 } from "./state";
-import { useMemoryDispatch, NoticeArea } from "./hooks";
 import { ValueSection, CorrectSection, type Candidate, type FindingsScopeArgs } from "./record";
 import type { FieldShape } from "./value-editor";
 
@@ -48,20 +49,23 @@ export type { FieldShape };
 export function ExtensionsFeature(): ReactNode {
   return createElement(CompanyFeatureGate, {
     title: copy.title,
-    member: () => createElement(ExtensionsMain),
+    // The member callback already carries the company's timezone (the
+    // gate's MemberOverview); the surface takes it here instead of
+    // subscribing to the work module's overview for one string.
+    member: (overview: MemberOverview) =>
+      createElement(ExtensionsMain, { companyTimezone: overview.company.timezone }),
   });
 }
 
-function ExtensionsMain(): ReactNode {
+function ExtensionsMain({ companyTimezone }: { readonly companyTimezone: string }): ReactNode {
   const projects = useQueryState({ query: api.projects.functions.projectsOverview, args: {} });
-  const work = useQueryState({ query: api.work.functions.workOverview, args: {} });
   const [scope, setScope] = useState<string>(() => searchParam(PROJECT_PARAM) ?? "company");
   const [candidates, setCandidates] = useState<readonly Candidate[]>([]);
 
-  if (projects.status === "error" || work.status === "error") {
+  if (projects.status === "error") {
     return createElement(SessionEnded);
   }
-  if (projects.status !== "success" || work.status !== "success") {
+  if (projects.status !== "success") {
     return createElement("p", { role: "status" }, "Sprawdzamy Twoją sesję…");
   }
 
@@ -70,6 +74,7 @@ function ExtensionsMain(): ReactNode {
     scope === "company" || scopeProjectId === null
       ? { scope: { _tag: "company" } }
       : { scope: { _tag: "project", projectId: scopeProjectId } };
+  const temporal = temporalContextOf(companyTimezone);
 
   return createElement(
     "section",
@@ -98,30 +103,15 @@ function ExtensionsMain(): ReactNode {
     createElement(VersionSection, { candidates }),
     createElement(ValueSection, {
       candidates,
-      temporal: temporalContextOf(work.data.companyTimezone),
+      temporal,
       findingsArgs,
     }),
     createElement(CorrectSection, {
       candidates,
-      temporal: temporalContextOf(work.data.companyTimezone),
+      temporal,
       findingsArgs,
     }),
   );
-}
-
-/** The temporal editor's company context: zone plus its current UTC offset. */
-function temporalContextOf(companyZone: string): { readonly companyZone: string; readonly zoneOffset: string } {
-  let zoneOffset = "";
-  try {
-    const part = new Intl.DateTimeFormat("en-US", { timeZone: companyZone, timeZoneName: "longOffset" })
-      .formatToParts(new Date())
-      .find((piece) => piece.type === "timeZoneName");
-    const match = part === undefined ? null : /GMT([+-]\d{2}:\d{2})/.exec(part.value);
-    zoneOffset = match?.[1] ?? "";
-  } catch {
-    zoneOffset = "";
-  }
-  return { companyZone, zoneOffset };
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +165,10 @@ function CatalogSection({
   readonly candidates: readonly Candidate[];
   readonly onCandidates: (candidates: readonly Candidate[]) => void;
 }): ReactNode {
-  const { run, notice, busy } = useMemoryDispatch();
+  const { run, notice, busy } = useCheckedDispatch(
+    useMutation(api.memory.findings.functions.dispatchMemoryCommandEntry),
+    failureHint,
+  );
   const [name, setName] = useState("");
 
   async function submit(event: { preventDefault(): void }): Promise<void> {
@@ -427,7 +420,10 @@ export function FieldsEditor({
 }
 
 function DefineSection(): ReactNode {
-  const { run, notice, busy, setNotice } = useMemoryDispatch();
+  const { run, notice, busy, setNotice } = useCheckedDispatch(
+    useMutation(api.memory.findings.functions.dispatchMemoryCommandEntry),
+    failureHint,
+  );
   const [name, setName] = useState("");
   const [drafts, setDrafts] = useState<readonly FieldDraft[]>([freshDraft()]);
 
@@ -474,7 +470,10 @@ function DefineSection(): ReactNode {
 // ---------------------------------------------------------------------------
 
 function VersionSection({ candidates }: { readonly candidates: readonly Candidate[] }): ReactNode {
-  const { run, notice, busy, setNotice } = useMemoryDispatch();
+  const { run, notice, busy, setNotice } = useCheckedDispatch(
+    useMutation(api.memory.findings.functions.dispatchMemoryCommandEntry),
+    failureHint,
+  );
   const [definitionId, setDefinitionId] = useState("");
   const [changeNote, setChangeNote] = useState("");
   const candidate = candidates.find((entry) => entry.definitionId === definitionId) ?? null;
@@ -555,6 +554,8 @@ export function decodeSearchResult(value: unknown): readonly Candidate[] {
   const decoded = Schema.decodeUnknownSync(searchResultSchema)(value);
   return decoded.candidates.map((candidate) => ({
     ...candidate,
+    // The one brand strip: contract ids are branded, the UI's fixtures and
+    // builders speak plain strings (FieldShape's doc tells the story).
     fields: candidate.fields as unknown as readonly FieldShape[],
     similarity: { verdict: candidate.similarity.verdict },
   }));

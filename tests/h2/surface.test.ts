@@ -19,7 +19,12 @@
  * - the extension value builders: wire values that decode through the
  *   contract, with typed refusals for the invalid inputs (the
  *   "invalid extension version/value" failure family has its server half
- *   proven live; these pin the client half).
+ *   proven live; these pin the client half);
+ * - the shared statement-to-source send: one idempotency key per logical
+ *   statement, so a lost-response resubmit converges on one source
+ *   (finding 1 of review round 1);
+ * - the snooze parser reads the boss's wall time in the COMPANY zone
+ *   (finding 4: DST-honest on the target day, never the phone's zone).
  *
  * The live halves (real Convex fixtures: create/edit/state transitions,
  * checklist independence, closed-project obligation, overdue date-only
@@ -31,13 +36,14 @@
 
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
-import { operations } from "@kiero/contracts";
+import { operations, ResultEnvelope } from "@kiero/contracts";
 import { subjectLinkPath } from "@kiero/domain";
 import {
   CHECKLIST_ITEM_STATE_LABELS,
   EVENT_STATE_LABELS,
   TASK_STATE_LABELS,
 } from "../../packages/domain/work/index";
+import { TAX_BASIS_LABELS, TEMPORAL_ROLE_LABELS } from "../../packages/domain/findings/labels";
 import { appFeatures } from "../../apps/web/src/app/app-features";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
@@ -48,6 +54,7 @@ import {
   failureHint as workFailureHint,
   taskStateLabels,
   taxBasisLabel,
+  temporalValueLabel,
   workCopy,
 } from "../../apps/web/src/features/work/state";
 import { failureHint as extensionsFailureHint } from "../../apps/web/src/features/extensions/state";
@@ -65,6 +72,13 @@ import {
   taskRecordLink,
   unassignedOpenTasks,
 } from "../../apps/web/src/features/now/state";
+import { NoticeArea } from "../../apps/web/src/features/company/dispatch";
+import {
+  freshStatementKey,
+  nextStatementKey,
+  sendStatementAsSource,
+  type StatementSourceMutations,
+} from "../../apps/web/src/features/company/statement-source";
 import { deriveFieldId, fieldKindLabels } from "../../apps/web/src/features/extensions/state";
 import {
   buildExtensionValue,
@@ -339,8 +353,23 @@ describe("vocabulary and copy", () => {
   });
 
   it("scopes the snooze copy to one boss and one task", () => {
-    expect(nowCopy.remindersIntro).toContain("nie zmienia terminu zadania");
-    expect(nowCopy.remindersIntro).toContain("przypomnień innych szefów");
+    // The scope note renders inside the snooze control itself (where the
+    // decision happens), not on a section the screen does not have.
+    expect(nowCopy.snoozeScopeNote).toContain("nie zmienia terminu zadania");
+    expect(nowCopy.snoozeScopeNote).toContain("przypomnień innych szefów");
+  });
+
+  it("renders the value vocabularies from the findings domain's one label module", () => {
+    // Single-sourcing (finding 5): the work surface renders the SAME maps
+    // the extension value editor and the memory surface import.
+    expect(taxBasisLabel("not_specified")).toBe(TAX_BASIS_LABELS.not_specified);
+    expect(taxBasisLabel("net")).toBe(TAX_BASIS_LABELS.net);
+    const temporal = {
+      shape: { _tag: "day", day: "2026-09-11" },
+      originalExpression: "koniec tygodnia",
+      role: "actual",
+    } as Parameters<typeof temporalValueLabel>[0];
+    expect(temporalValueLabel(temporal)).toContain(TEMPORAL_ROLE_LABELS.actual);
   });
 
   it("renders unknown money tax basis without guessing", () => {
@@ -439,6 +468,23 @@ describe("extension value builders", () => {
     expect(parseScalarValue("text", slotsOf({}))).toEqual({ ok: false, code: "input_required" });
   });
 
+  it("discriminates the temporal parse failures per shape (typed codes, live hints)", () => {
+    // A bad month, year or exact datetime names ITS format, not the day's
+    // (the input_month_invalid / input_year_invalid hints stop being dead).
+    expect(
+      parseScalarValue("temporal", slotsOf({ temporalShape: "month", temporalValue: "wrzesien", originalExpression: "wrzesien" })),
+    ).toEqual({ ok: false, code: "input_month_invalid" });
+    expect(
+      parseScalarValue("temporal", slotsOf({ temporalShape: "year", temporalValue: "26", originalExpression: "26" })),
+    ).toEqual({ ok: false, code: "input_year_invalid" });
+    expect(
+      parseScalarValue("temporal", slotsOf({ temporalShape: "exact", temporalExact: "jutro", originalExpression: "jutro" })),
+    ).toEqual({ ok: false, code: "input_exact_invalid" });
+    for (const code of ["input_day_invalid", "input_month_invalid", "input_year_invalid", "input_exact_invalid"]) {
+      expect(extensionsFailureHint(code, `server ${code}`)).not.toBe(`server ${code}`);
+    }
+  });
+
   it("builds a financial value whose tax basis stays explicitly visible", () => {
     const built = parseScalarValue("financial", slotsOf({ amount: "1250.50", taxBasis: "not_specified" }));
     expect(built.ok).toBe(true);
@@ -490,18 +536,150 @@ describe("extension value builders", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Snooze input parsing
+// Snooze input parsing (the company zone's wall time)
 // ---------------------------------------------------------------------------
 
 describe("the snooze moment parser", () => {
-  it("parses a datetime-local value into an instant", () => {
-    expect(snoozeUntilMs("2026-09-11T08:30")).toBe(Date.parse("2026-09-11T08:30:00"));
+  it("parses a datetime-local value as the company zone's wall time", () => {
+    // Summer (CEST, +02:00) and winter (CET, +01:00): the offset comes from
+    // the TARGET DAY in the firm's zone, so the same wall clock maps to the
+    // instant the firm means regardless of the test machine's own zone
+    // (CONTEXT.md "Strefa czasu firmy": reminder times do not follow the
+    // boss's phone).
+    expect(snoozeUntilMs("2026-09-11T08:30", "Europe/Warsaw")).toBe(
+      Date.parse("2026-09-11T08:30:00.000+02:00"),
+    );
+    expect(snoozeUntilMs("2026-01-15T08:30", "Europe/Warsaw")).toBe(
+      Date.parse("2026-01-15T08:30:00.000+01:00"),
+    );
   });
 
-  it("refuses empty or malformed values", () => {
-    expect(snoozeUntilMs("")).toBeNull();
-    expect(snoozeUntilMs("jutro rano")).toBeNull();
-    expect(snoozeUntilMs("2026-09-11")).toBeNull();
+  it("refuses empty, malformed values and an unresolvable company zone", () => {
+    expect(snoozeUntilMs("", "Europe/Warsaw")).toBeNull();
+    expect(snoozeUntilMs("jutro rano", "Europe/Warsaw")).toBeNull();
+    expect(snoozeUntilMs("2026-09-11", "Europe/Warsaw")).toBeNull();
+    expect(snoozeUntilMs("2026-09-11T08:30", "Not/AZone")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The shared statement-to-source send (one key per logical statement)
+// ---------------------------------------------------------------------------
+
+/** One command the fake server saw: which command, under which key. */
+interface RecordedSend {
+  readonly kind: "draft" | "accept";
+  readonly key: string;
+}
+
+/**
+ * A fake server with J1's acceptance-key uniqueness: one idempotency key
+ * resolves to ONE source. The FIRST accept under a fresh key is recorded
+ * and then its RESPONSE is lost (the write happened; the boss saw nothing).
+ */
+function lostResponseServer(): {
+  readonly mutations: StatementSourceMutations;
+  readonly sources: Map<string, string>;
+  readonly recorded: RecordedSend[];
+} {
+  const sources = new Map<string, string>();
+  const recorded: RecordedSend[] = [];
+  let next = 0;
+  const mutations: StatementSourceMutations = {
+    prepareUpload: async (args) => {
+      const draftId = (args.envelope.input as { readonly draftId: string }).draftId;
+      recorded.push({ kind: "draft", key: draftId });
+      return Schema.decodeUnknownSync(ResultEnvelope)({
+        _tag: "ok",
+        value: { uploadId: `uploads_${draftId}`, stage: "draft" },
+      });
+    },
+    acceptSource: async (args) => {
+      const key = args.envelope.idempotencyKey ?? "";
+      recorded.push({ kind: "accept", key });
+      const existing = sources.get(key);
+      if (existing !== undefined) {
+        return Schema.decodeUnknownSync(ResultEnvelope)({
+          _tag: "ok",
+          value: { sourceId: existing, fullyAcceptedAtMs: 1 },
+        });
+      }
+      const sourceId = `sources_${next++}`;
+      sources.set(key, sourceId);
+      throw new Error("network lost");
+    },
+  };
+  return { mutations, sources, recorded };
+}
+
+const STATEMENT = {
+  authorText: "Płytki mają 8 mm grubości.",
+  timezoneSnapshot: "Europe/Warsaw",
+  projectHints: [],
+} as const;
+
+describe("the shared statement-to-source send", () => {
+  it("converges a lost-response resubmit of the same logical statement on one source", async () => {
+    const fake = lostResponseServer();
+    const key = freshStatementKey();
+
+    // First attempt: the server accepted the source, the response was lost.
+    const lost = await sendStatementAsSource(fake.mutations, key, STATEMENT);
+    expect(lost).toMatchObject({ _tag: "lost" });
+    // The key discipline keeps the key: only a CONFIRMED acceptance rotates.
+    expect(nextStatementKey(key, lost)).toBe(key);
+
+    // The resubmit of the SAME logical statement rides the SAME key, so the
+    // server's acceptance-key uniqueness answers with the source that
+    // already exists: one statement, one source, never a second one.
+    const retry = await sendStatementAsSource(fake.mutations, nextStatementKey(key, lost), STATEMENT);
+    expect(retry).toMatchObject({ _tag: "accepted", receipt: { sourceId: "sources_0" } });
+    expect(nextStatementKey(key, retry)).not.toBe(key);
+
+    // Every command of BOTH attempts carried the ONE key: the draft id and
+    // the acceptance idempotency key are the same value, never two
+    // unrelated fresh keys.
+    expect(fake.sources.size).toBe(1);
+    expect(fake.recorded.map((entry) => entry.key)).toEqual([key, key, key, key]);
+  });
+
+  it("reports a refused send without consuming the statement's key", async () => {
+    const refused = Schema.decodeUnknownSync(ResultEnvelope)({
+      _tag: "error",
+      error: { _tag: "unauthenticated", code: "session_inactive", message: "sesja wygasła" },
+    });
+    const mutations: StatementSourceMutations = {
+      prepareUpload: async () => refused,
+      acceptSource: async () => refused,
+    };
+    const key = freshStatementKey();
+    const outcome = await sendStatementAsSource(mutations, key, STATEMENT);
+    expect(outcome).toMatchObject({ _tag: "refused", code: "session_inactive" });
+    expect(nextStatementKey(key, outcome)).toBe(key);
+  });
+
+  it("mints keys in the command envelope's certified idem shape", () => {
+    expect(freshStatementKey()).toMatch(/^idem_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(freshStatementKey()).not.toBe(freshStatementKey());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The shared notice area (one definition, alert on error, status on ok)
+// ---------------------------------------------------------------------------
+
+describe("the shared dispatch notice area", () => {
+  it("renders an alert for errors and a status for confirmations", () => {
+    const error = renderToString(
+      createElement(NoticeArea, { notice: { kind: "error", text: "Nie udało się." } }),
+    );
+    expect(error).toContain('role="alert"');
+    expect(error).toContain("Nie udało się.");
+    const ok = renderToString(
+      createElement(NoticeArea, { notice: { kind: "ok", text: "Zapisano." } }),
+    );
+    expect(ok).toContain('role="status"');
+    expect(renderToString(createElement(NoticeArea, { notice: null }))).toBe("");
   });
 });
 

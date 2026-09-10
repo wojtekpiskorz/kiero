@@ -17,6 +17,8 @@
  */
 
 import type { EventView, TaskView } from "../../../../../convex/work/read";
+import { sessionFailureHints } from "../conversation/state";
+import { zoneOffsetOf } from "../company/time";
 import type { ProjectJoin } from "../work/WorkFeature";
 
 /** The query-param task deep-link key (G4 parity: /co-teraz?zadanie=<id>). */
@@ -115,11 +117,10 @@ export const nowCopy = {
   othersHeading: "Zadania innych koordynatorów",
   othersIntro: "Otwarta praca koordynowana przez innych szefów firmy.",
   noOthers: "Inni szefowie nie koordynują teraz otwartych zadań.",
-  closedHeading: "Zaległości z zamkniętych projektów",
+  closedHeading: "Zobowiązania z zamkniętych projektów",
   closedIntro:
     "Zamknięcie projektu nie zamyka jego otwartych zobowiązań: te zadania pozostają w firmowej kolejce i nadal przypominają.",
   noClosed: "Zamknięte projekty nie zostawiają otwartych zobowiązań.",
-  closedProjectMark: "zamknięty projekt, zostały zobowiązania",
   eventsHeading: "Zdarzenia czekające na potwierdzenie",
   eventsIntro:
     "Planowane zdarzenia, których termin minął bez potwierdzenia. Upływ daty niczego nie potwierdza: oznacz Odbyło się albo Anulowane.",
@@ -127,16 +128,11 @@ export const nowCopy = {
   questionsHeading: "Sprawy do wyjaśnienia",
   questionsIntro:
     "Pytania agenta o sprzeczności i niejednoznaczności. Rozstrzygnięcie ma autora i zostaje w historii.",
-  noQuestions: "Brak nierozstrzygniętych spraw.",
   companyScopeLabel: "wiedza firmy",
   projectScopeLabel: (name: string): string => `projekt: ${name}`,
-  remindersHeading: "Przypomnienia o zadaniach",
-  remindersIntro:
-    "Twój osobisty stan przypomnień. Odroczenie wstrzymuje Twoje przypomnienia o jednym zadaniu do wskazanego momentu; nie zmienia terminu zadania ani przypomnień innych szefów.",
   // Row copy
   recordLinkTask: "szczegóły zadania",
   recordLinkEvent: "szczegóły zdarzenia",
-  questionLink: "sprawa w Pamięci",
   overdueMark: "po terminie",
   snoozedUntil: (label: string): string => `przypomnienia odroczone do ${label}`,
   pendingReminderAt: (label: string): string => `przypomnienie zaplanowane na ${label}`,
@@ -152,8 +148,10 @@ export const nowCopy = {
   stateWaitingReasonLabel: "Powód przeszkody (dla stanu Czeka)",
   stateWaitingReasonPlaceholder: "np. czekamy na okna",
   // Snooze control
-  snoozeLabel: "Odrocz przypomnienia",
-  snoozeUntilLabel: (title: string): string => `Odrocz przypomnienia o „${title}” do`,
+  snoozeUntilLabel: (title: string, companyZone: string): string =>
+    `Odrocz przypomnienia o „${title}” do (strefa firmy ${companyZone})`,
+  snoozeScopeNote:
+    "Odroczenie wstrzymuje Twoje przypomnienia o jednym zadaniu do wskazanego momentu; nie zmienia terminu zadania ani przypomnień innych szefów.",
   snoozeSubmit: "Odrocz",
   snoozed: "Przypomnienia odroczone.",
   // Question answering
@@ -179,14 +177,49 @@ export const nowCopy = {
 
 /**
  * Parses one datetime-local value ("YYYY-MM-DDTHH:mm") into the instant it
- * names, or null when empty or malformed. The browser interprets the local
- * wall time of the device the boss holds; the chosen INSTANT is what the
- * snooze command stores.
+ * names IN THE COMPANY ZONE (CONTEXT.md "Strefa czasu firmy": reminder
+ * times are the firm's wall times and do not follow the boss's phone).
+ * The zone's offset is derived ON THE TARGET DAY (UTC noon, away from the
+ * DST transition hours), so a snooze into another DST period still lands
+ * on the moment the firm means. The chosen INSTANT is what the snooze
+ * command stores; an unresolvable zone refuses instead of guessing.
  */
-export function snoozeUntilMs(value: string): number | null {
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+export function snoozeUntilMs(value: string, companyZone: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})$/.exec(value);
+  if (match === null) {
     return null;
   }
-  const ms = Date.parse(`${value}:00`);
+  const [, year, month, day, time] = match;
+  if (year === undefined || month === undefined || day === undefined || time === undefined) {
+    return null;
+  }
+  const zoneOffset = zoneOffsetOf(
+    companyZone,
+    Date.UTC(Number.parseInt(year, 10), Number.parseInt(month, 10) - 1, Number.parseInt(day, 10), 12),
+  );
+  if (zoneOffset === "") {
+    return null;
+  }
+  const ms = Date.parse(`${year}-${month}-${day}T${time}:00.000${zoneOffset}`);
   return Number.isNaN(ms) ? null : ms;
+}
+
+// ---------------------------------------------------------------------------
+// Closed-error hints (the attention command this surface owns)
+// ---------------------------------------------------------------------------
+
+/** Extra Polish hints for the closed-error codes the snooze command can meet. */
+const codeHints: Record<string, string> = {
+  ...sessionFailureHints,
+  snooze_until_not_in_future: "Moment odroczenia musi być w przyszłości.",
+  snooze_until_too_far: "Nie można odroczyć przypomnień tak daleko w przyszłość.",
+  task_not_found: "Nie ma takiego zadania; odśwież widok.",
+};
+
+/** The Polish hint for a closed-error code, or the server message. */
+export function failureHint(code: string | undefined, serverMessage: string): string {
+  if (code === undefined) {
+    return serverMessage;
+  }
+  return codeHints[code] ?? serverMessage;
 }

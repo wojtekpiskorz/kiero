@@ -3,10 +3,12 @@
  *
  * Recording one value is deliberately the full evidence-backed path, not a
  * free write: the boss's statement first becomes a REAL accepted source
- * (the conversation's own prepare/accept commands), then ONE staged change
- * set carries the typed value with that source as its evidence witness,
- * and the publish commits atomically. Corrections ride C2's audited
- * command with the revision the boss actually saw.
+ * through the shared statement-to-source send (`../company/statement-source`,
+ * the SAME one-key loop the conversation rides, so a lost-response resubmit
+ * converges on one source), then ONE staged change set carries the typed
+ * value with that source as its evidence witness, and the publish commits
+ * atomically. Corrections ride C2's audited command with the revision the
+ * boss actually saw.
  *
  * JSX-free (createElement only), node-importable like the rest.
  */
@@ -14,16 +16,17 @@
 import { createElement, useState, type ChangeEvent, type ReactNode } from "react";
 import { useMutation, useQuery_experimental as useQueryState } from "convex/react";
 import { Schema } from "effect";
-import { FindingValue, memoryOperations, sourcesOperations } from "@kiero/contracts";
+import { FindingValue, memoryOperations } from "@kiero/contracts";
 import { api } from "../../../../../convex/_generated/api";
 import type { CurrentFindingWireRow } from "../../../../../convex/memory/findings/read";
 import type { FindingHistoryWireRow } from "../../../../../convex/memory/findings/exposition";
-import { SessionEnded, envelopeOf } from "../company/CompanyGate";
+import { SessionEnded } from "../company/CompanyGate";
 import { asConvexId } from "../company/convex-ids";
+import { useCheckedDispatch, NoticeArea } from "../company/dispatch";
+import { useStatementSource } from "../company/statement-source";
 import { signInCopy } from "../sign-in/state";
 import { failureHint, extensionsCopy as copy } from "./state";
-import { useMemoryDispatch, NoticeArea } from "./hooks";
-import type { FieldShape } from "./value-editor";
+import type { FieldShape, TemporalContext } from "./value-editor";
 import {
   FieldValueControls,
   buildExtensionValue,
@@ -49,25 +52,8 @@ export interface FindingsScopeArgs {
   readonly scope: { readonly _tag: "company" } | { readonly _tag: "project"; readonly projectId: string };
 }
 
-/** The typed result shapes of the two source commands (contract authority). */
-const prepareUploadResult = sourcesOperations["sources.prepareUpload"].result;
-const acceptSourceResult = sourcesOperations["sources.acceptSource"].result;
+/** The typed result shape of the staged-change-set command (contract authority). */
 const prepareChangeSetResult = memoryOperations["memory.prepareChangeSet"].result;
-
-/**
- * A fresh idempotency key per logical statement. The shape is the certified
- * `idem_` + v4-uuid pattern the command envelope requires; the UUID always
- * comes from getRandomValues (the baseline CSPRNG API), never from a
- * weaker source.
- */
-function uuidV4(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40; // version 4
-  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80; // RFC 4122 variant
-  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
 
 /** Renders the per-field value controls of one candidate's version. */
 function CandidateValueFields({
@@ -77,7 +63,7 @@ function CandidateValueFields({
   onInputs,
 }: {
   readonly candidate: Candidate;
-  readonly temporal: { readonly companyZone: string; readonly zoneOffset: string };
+  readonly temporal: TemporalContext;
   readonly inputs: Record<string, FieldInputSlots>;
   readonly onInputs: (inputs: Record<string, FieldInputSlots>) => void;
 }): ReactNode {
@@ -110,12 +96,19 @@ export function ValueSection({
   findingsArgs,
 }: {
   readonly candidates: readonly Candidate[];
-  readonly temporal: { readonly companyZone: string; readonly zoneOffset: string };
+  readonly temporal: TemporalContext;
   readonly findingsArgs: FindingsScopeArgs;
 }): ReactNode {
-  const memory = useMemoryDispatch();
-  const prepareUpload = useMutation(api.sources.uploads.commands.prepareUploadCommand);
-  const acceptSource = useMutation(api.sources.accept.commands.acceptSourceCommand);
+  // The sections' checked memory dispatch: the memory mutation with THIS
+  // surface's hint map (the shared runner does the rest).
+  const memory = useCheckedDispatch(
+    useMutation(api.memory.findings.functions.dispatchMemoryCommandEntry),
+    failureHint,
+  );
+  // The statement-to-source send: the hook holds ONE idempotency key for
+  // this logical statement and rotates it only after a confirmed
+  // acceptance, so a lost-response resubmit converges on one source.
+  const source = useStatementSource();
   const [statement, setStatement] = useState("");
   const [semanticKey, setSemanticKey] = useState("");
   const [versionId, setVersionId] = useState("");
@@ -148,37 +141,23 @@ export function ValueSection({
     memory.setBusy(true);
     try {
       // The boss's statement becomes a REAL source first (the evidence
-      // basis), exactly like the conversation's send loop.
-      const prepared = await prepareUpload({
-        envelope: envelopeOf("sources.prepareUpload", {
-          draftId: `idem_${uuidV4()}`,
-          parts: 1,
-          mediaKinds: [],
-        }),
+      // basis): the same one-key send loop the conversation rides.
+      const outcome = await source.send({
+        authorText: statement.trim(),
+        timezoneSnapshot: temporal.companyZone,
+        projectHints: [],
       });
-      if (prepared._tag === "error") {
-        memory.setNotice({ kind: "error", text: failureHint(prepared.error.code, prepared.error.message) });
+      if (outcome._tag === "refused") {
+        memory.setNotice({ kind: "error", text: failureHint(outcome.code, outcome.message) });
         return;
       }
-      const upload = Schema.decodeUnknownSync(prepareUploadResult)(prepared.value);
-      const accepted = await acceptSource({
-        envelope: {
-          operation: "sources.acceptSource",
-          input: {
-            uploadId: upload.uploadId,
-            authorText: statement.trim(),
-            timezoneSnapshot: temporal.companyZone,
-            projectHints: [],
-          },
-          expectedRevisions: [],
-          idempotencyKey: `idem_${uuidV4()}`,
-        },
-      });
-      if (accepted._tag === "error") {
-        memory.setNotice({ kind: "error", text: failureHint(accepted.error.code, accepted.error.message) });
+      if (outcome._tag === "lost") {
+        // Network lost after an unknown point: the SAME key retries the
+        // SAME logical source, so the resubmit converges on one source.
+        memory.setNotice({ kind: "error", text: signInCopy.failures.network });
         return;
       }
-      const receipt = Schema.decodeUnknownSync(acceptSourceResult)(accepted.value);
+      const receipt = outcome.receipt;
       const staged = await memory.run(
         "memory.prepareChangeSet",
         {
@@ -199,6 +178,9 @@ export function ValueSection({
         copy.valueSaved,
       );
       if (staged === null) {
+        // The source is durable; the staged change set is not. A resubmit
+        // re-sends the SAME key, so the evidence still converges on one
+        // source and the second staging attempt publishes.
         return;
       }
       const changeSet = Schema.decodeUnknownSync(prepareChangeSetResult)(staged);
@@ -296,10 +278,13 @@ export function CorrectSection({
   findingsArgs,
 }: {
   readonly candidates: readonly Candidate[];
-  readonly temporal: { readonly companyZone: string; readonly zoneOffset: string };
+  readonly temporal: TemporalContext;
   readonly findingsArgs: FindingsScopeArgs;
 }): ReactNode {
-  const memory = useMemoryDispatch();
+  const memory = useCheckedDispatch(
+    useMutation(api.memory.findings.functions.dispatchMemoryCommandEntry),
+    failureHint,
+  );
   const findings = useQueryState({
     query: api.memory.findings.functions.readCurrentFindings,
     args: findingsArgs,

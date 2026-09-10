@@ -22,6 +22,11 @@ export const extensionsFeatureEntry = appFeatureEntry({
   navLabel: "Dodatkowe informacje",
   screenHeading: "Dodatkowe informacje",
   consumedOperations: [
+    // The value-recording section's statement becomes a real source through
+    // the shared statement-to-source send (the same commands the
+    // conversation rides), so the surface consumes D1's send pair too.
+    "sources.prepareUpload",
+    "sources.acceptSource",
     "memory.searchExtensionCatalog",
     "memory.defineExtension",
     "memory.versionExtensionDefinition",

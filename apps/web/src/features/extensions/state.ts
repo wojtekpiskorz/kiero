@@ -239,6 +239,7 @@ const codeHints: Record<string, string> = {
   input_day_invalid: "Data musi mieć format RRRR-MM-DD.",
   input_month_invalid: "Miesiąc musi mieć format RRRR-MM.",
   input_year_invalid: "Rok musi mieć format RRRR.",
+  input_exact_invalid: "Data i godzina musi mieć format RRRR-MM-DD, GG:MM.",
   input_field_id_invalid:
     "Identyfikator pola: małe litery, cyfry i podkreślenia, zaczyna się od litery (do 64 znaków).",
   input_option_invalid: "Każda opcja musi mieć format id:etykieta.",

@@ -20,7 +20,10 @@
  *   reminders about ONE task and never moves the task's deadline.
  *
  * State changes and snoozes ride the same checked operations the work
- * surface uses; every row shows the revision the command will verify.
+ * surface uses (through the one shared dispatch hook, each control with
+ * its own command's hint map); every row shows the revision the command
+ * will verify. The snooze input interprets the boss's wall time in the
+ * COMPANY zone (CONTEXT.md "Strefa czasu firmy"), never the phone's.
  */
 
 import { createElement, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
@@ -29,17 +32,17 @@ import { parseTableId } from "@kiero/contracts";
 import { api } from "../../../../../convex/_generated/api";
 import type { ProjectsOverview } from "../../../../../convex/projects/functions";
 import type { EventView, TaskView } from "../../../../../convex/work/read";
+import type { ClarificationWireRow } from "../../../../../convex/memory/findings/exposition";
 import {
   CompanyFeatureGate,
   SessionEnded,
-  envelopeOf,
   type MemberOverview,
-  type Notice,
   type SubmitEvent,
 } from "../company/CompanyGate";
+import { useCheckedDispatch, NoticeArea } from "../company/dispatch";
 import { SOURCE_PARAM } from "../company/route-params";
 import { instantLabel } from "../conversation/state";
-import { signInCopy } from "../sign-in/state";
+import { failureHint as memoryFailureHint } from "../memory/state";
 import {
   boundTermLabel,
   checklistItemStateLabels,
@@ -55,6 +58,7 @@ import {
   closedProjectObligations,
   eventsAwaitingConfirmation,
   eventRecordLink,
+  failureHint as nowFailureHint,
   myOpenTasks,
   nowCopy as copy,
   othersOpenTasks,
@@ -118,11 +122,8 @@ function useMyTaskReminders(): RemindersState {
   if (reminders.data._tag !== "ok") {
     return { state: "unavailable" };
   }
-  const value = reminders.data.value as {
-    intents: ReminderIntentRow[];
-    snoozes: ReminderSnoozeRow[];
-  };
-  return { state: "ok", data: { intents: value.intents ?? [], snoozes: value.snoozes ?? [] } };
+  const value = reminders.data.value as MyTaskReminders;
+  return { state: "ok", data: value };
 }
 
 /** The reminder-state line of one task (personal, from F4's projection). */
@@ -177,6 +178,9 @@ function NowMain({ overview }: { readonly overview: MemberOverview }): ReactNode
   }
   const projects = projectJoinOf(catalog.data);
   const myMembershipId = overview.members.find((member) => member.isSelf)?.membershipId ?? "";
+  // The company zone the snooze input interprets wall time against
+  // (CONTEXT.md "Strefa czasu firmy"); the work overview already carries it.
+  const companyTimezone = work.data.companyTimezone;
 
   return createElement(
     "section",
@@ -202,6 +206,7 @@ function NowMain({ overview }: { readonly overview: MemberOverview }): ReactNode
       projects,
       reminders,
       snoozable: true,
+      companyTimezone,
     }),
     createElement(TaskSection, {
       heading: copy.sharedHeading,
@@ -211,6 +216,7 @@ function NowMain({ overview }: { readonly overview: MemberOverview }): ReactNode
       projects,
       reminders,
       snoozable: true,
+      companyTimezone,
     }),
     createElement(TaskSection, {
       heading: copy.othersHeading,
@@ -220,6 +226,7 @@ function NowMain({ overview }: { readonly overview: MemberOverview }): ReactNode
       projects,
       reminders,
       snoozable: false,
+      companyTimezone,
     }),
     createElement(TaskSection, {
       heading: copy.closedHeading,
@@ -229,6 +236,7 @@ function NowMain({ overview }: { readonly overview: MemberOverview }): ReactNode
       projects,
       reminders,
       snoozable: true,
+      companyTimezone,
     }),
     createElement(EventsSection, { events: eventsAwaitingConfirmation(work.data.events), projects }),
     createElement(QuestionsSection, { catalog: catalog.data }),
@@ -355,6 +363,7 @@ function TaskSection({
   projects,
   reminders,
   snoozable,
+  companyTimezone,
 }: {
   readonly heading: string;
   readonly intro: string;
@@ -363,6 +372,7 @@ function TaskSection({
   readonly projects: Map<string, ProjectJoin>;
   readonly reminders: RemindersState;
   readonly snoozable: boolean;
+  readonly companyTimezone: string;
 }): ReactNode {
   return createElement(
     "section",
@@ -398,7 +408,9 @@ function TaskSection({
                 createElement("a", { href: taskRecordLink(task.taskId) }, copy.recordLinkTask),
               ),
               createElement(TaskStateControl, { task }),
-              snoozable ? createElement(SnoozeControl, { task }) : null,
+              snoozable
+                ? createElement(SnoozeControl, { task, companyTimezone })
+                : null,
             ),
           ),
         ),
@@ -407,35 +419,22 @@ function TaskSection({
 
 /** The per-task state change (one explicit decision, revision-checked). */
 function TaskStateControl({ task }: { readonly task: TaskView }): ReactNode {
-  const dispatch = useMutation(api.work.functions.dispatchWork);
+  const work = useCheckedDispatch(useMutation(api.work.functions.dispatchWork), workFailureHint);
   const [state, setState] = useState<(typeof taskStateOrder)[number]>(task.state === "waiting" ? "waiting" : "todo");
   const [waitingReason, setWaitingReason] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(null);
 
   async function submit(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    setBusy(true);
-    setNotice(null);
-    try {
-      const result = await dispatch({
-        envelope: envelopeOf("work.changeTaskState", {
-          taskId: task.taskId,
-          expectedRevision: task.revisionCounter,
-          state,
-          ...(state === "waiting" ? { waitingReason: waitingReason.trim() } : {}),
-        }),
-      });
-      setNotice(
-        result._tag === "error"
-          ? { kind: "error", text: workFailureHint(result.error.code, result.error.message) }
-          : { kind: "ok", text: copy.stateChanged },
-      );
-    } catch {
-      setNotice({ kind: "error", text: signInCopy.failures.network });
-    } finally {
-      setBusy(false);
-    }
+    await work.run(
+      "work.changeTaskState",
+      {
+        taskId: task.taskId,
+        expectedRevision: task.revisionCounter,
+        state,
+        ...(state === "waiting" ? { waitingReason: waitingReason.trim() } : {}),
+      },
+      copy.stateChanged,
+    );
   }
 
   return createElement(
@@ -465,51 +464,47 @@ function TaskStateControl({ task }: { readonly task: TaskView }): ReactNode {
           required: true,
         })
       : null,
-    createElement("button", { type: "submit", disabled: busy }, copy.stateChangeLabel),
-    notice === null
-      ? null
-      : createElement("p", { role: notice.kind === "error" ? "alert" : "status" }, notice.text),
+    createElement("button", { type: "submit", disabled: work.busy }, copy.stateChangeLabel),
+    createElement(NoticeArea, { notice: work.notice }),
   );
 }
 
 /** The per-task personal snooze (F4: one task, one boss, one chosen moment). */
-function SnoozeControl({ task }: { readonly task: TaskView }): ReactNode {
-  const snooze = useMutation(api.attention.reminders.commands.snoozeTaskRemindersCommand);
+function SnoozeControl({
+  task,
+  companyTimezone,
+}: {
+  readonly task: TaskView;
+  readonly companyTimezone: string;
+}): ReactNode {
+  // The attention command's own hint map: snooze refusals must never be
+  // mapped through the work surface's codes.
+  const snooze = useCheckedDispatch(
+    useMutation(api.attention.reminders.commands.snoozeTaskRemindersCommand),
+    nowFailureHint,
+  );
   const [until, setUntil] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(null);
 
   async function submit(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    const untilMsValue = snoozeUntilMs(until);
+    // The boss's wall time means the COMPANY's wall time (CONTEXT.md
+    // "Strefa czasu firmy"): the parser builds the instant in that zone,
+    // never in the phone's.
+    const untilMsValue = snoozeUntilMs(until, companyTimezone);
     if (untilMsValue === null) {
-      setNotice({ kind: "error", text: copy.snoozeInvalid });
+      snooze.setNotice({ kind: "error", text: copy.snoozeInvalid });
       return;
     }
-    setBusy(true);
-    setNotice(null);
-    try {
-      const result = await snooze({
-        envelope: envelopeOf("attention.snoozeTaskReminders", {
-          taskId: task.taskId,
-          untilMs: untilMsValue,
-        }),
-      });
-      setNotice(
-        result._tag === "error"
-          ? { kind: "error", text: workFailureHint(result.error.code, result.error.message) }
-          : { kind: "ok", text: copy.snoozed },
-      );
-    } catch {
-      setNotice({ kind: "error", text: signInCopy.failures.network });
-    } finally {
-      setBusy(false);
-    }
+    await snooze.run(
+      "attention.snoozeTaskReminders",
+      { taskId: task.taskId, untilMs: untilMsValue },
+      copy.snoozed,
+    );
   }
 
   return createElement(
     "form", { onSubmit: (event) => void submit(event) },
-    createElement("label", { htmlFor: `now-snooze-${task.taskId}` }, copy.snoozeUntilLabel(task.title)),
+    createElement("label", { htmlFor: `now-snooze-${task.taskId}` }, copy.snoozeUntilLabel(task.title, companyTimezone)),
     createElement("input", {
       id: `now-snooze-${task.taskId}`,
       type: "datetime-local",
@@ -517,10 +512,9 @@ function SnoozeControl({ task }: { readonly task: TaskView }): ReactNode {
       onChange: (event: ChangeEvent<HTMLInputElement>) => setUntil(event.target.value),
       required: true,
     }),
-    createElement("button", { type: "submit", disabled: busy || until === "" }, copy.snoozeSubmit),
-    notice === null
-      ? null
-      : createElement("p", { role: notice.kind === "error" ? "alert" : "status" }, notice.text),
+    createElement("p", null, copy.snoozeScopeNote),
+    createElement("button", { type: "submit", disabled: snooze.busy || until === "" }, copy.snoozeSubmit),
+    createElement(NoticeArea, { notice: snooze.notice }),
   );
 }
 
@@ -535,10 +529,8 @@ function EventsSection({
   readonly events: readonly EventView[];
   readonly projects: Map<string, ProjectJoin>;
 }): ReactNode {
-  const dispatch = useMutation(api.work.functions.dispatchWork);
+  const work = useCheckedDispatch(useMutation(api.work.functions.dispatchWork), workFailureHint);
   const [state, setState] = useState<Record<string, "occurred" | "cancelled">>({});
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(null);
 
   async function confirm(eventId: string, event: SubmitEvent): Promise<void> {
     event.preventDefault();
@@ -547,26 +539,11 @@ function EventsSection({
     if (record === undefined) {
       return;
     }
-    setBusy(true);
-    setNotice(null);
-    try {
-      const result = await dispatch({
-        envelope: envelopeOf("work.changeEventState", {
-          eventId,
-          expectedRevision: record.revisionCounter,
-          state: chosen,
-        }),
-      });
-      setNotice(
-        result._tag === "error"
-          ? { kind: "error", text: workFailureHint(result.error.code, result.error.message) }
-          : { kind: "ok", text: copy.eventConfirmed },
-      );
-    } catch {
-      setNotice({ kind: "error", text: signInCopy.failures.network });
-    } finally {
-      setBusy(false);
-    }
+    await work.run(
+      "work.changeEventState",
+      { eventId, expectedRevision: record.revisionCounter, state: chosen },
+      copy.eventConfirmed,
+    );
   }
 
   return createElement(
@@ -574,7 +551,7 @@ function EventsSection({
     null,
     createElement("h2", null, copy.eventsHeading),
     createElement("p", null, copy.eventsIntro),
-    notice === null ? null : createElement("p", { role: notice.kind === "error" ? "alert" : "status" }, notice.text),
+    createElement(NoticeArea, { notice: work.notice }),
     events.length === 0
       ? createElement("p", null, copy.noEvents)
       : createElement(
@@ -604,7 +581,7 @@ function EventsSection({
                   createElement("option", { value: "occurred" }, eventStateLabels.occurred),
                   createElement("option", { value: "cancelled" }, eventStateLabels.cancelled),
                 ),
-                createElement("button", { type: "submit", disabled: busy }, copy.eventConfirmSubmit),
+                createElement("button", { type: "submit", disabled: work.busy }, copy.eventConfirmSubmit),
               ),
             ),
           ),
@@ -615,13 +592,6 @@ function EventsSection({
 // ---------------------------------------------------------------------------
 // Questions across firm memory and every project
 // ---------------------------------------------------------------------------
-
-interface ClarificationRow {
-  readonly clarificationId: string;
-  readonly question: string;
-  readonly state: "open" | "resolved";
-  readonly conflictingEvidence: readonly { readonly sourceId: string; readonly fragmentId: string }[];
-}
 
 function QuestionsSection({ catalog }: { readonly catalog: ProjectsOverview }): ReactNode {
   return createElement(
@@ -667,7 +637,7 @@ function ScopeQuestions({
   if (clarifications.status !== "success") {
     return createElement("p", { role: "status" }, "Sprawdzamy Twoją sesję…");
   }
-  const open = (clarifications.data as readonly ClarificationRow[]).filter((row) => row.state === "open");
+  const open = (clarifications.data as readonly ClarificationWireRow[]).filter((row) => row.state === "open");
   if (open.length === 0) {
     return null;
   }
@@ -682,11 +652,14 @@ function ScopeQuestions({
   );
 }
 
-function OpenQuestionRow({ row }: { readonly row: ClarificationRow }): ReactNode {
-  const dispatch = useMutation(api.memory.findings.functions.dispatchMemoryCommandEntry);
+function OpenQuestionRow({ row }: { readonly row: ClarificationWireRow }): ReactNode {
+  // The memory command's own hint map: clarification refusals must never
+  // be mapped through the work surface's codes.
+  const memory = useCheckedDispatch(
+    useMutation(api.memory.findings.functions.dispatchMemoryCommandEntry),
+    memoryFailureHint,
+  );
   const [answer, setAnswer] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(null);
 
   async function submit(event: SubmitEvent): Promise<void> {
     event.preventDefault();
@@ -694,24 +667,15 @@ function OpenQuestionRow({ row }: { readonly row: ClarificationRow }): ReactNode
     if (trimmed === "") {
       return;
     }
-    setBusy(true);
-    setNotice(null);
-    try {
-      const result = await dispatch({
-        envelope: envelopeOf("memory.resolveClarification", {
-          clarificationId: row.clarificationId,
-          resolutionNote: trimmed,
-        }),
-      });
-      if (result._tag === "error") {
-        setNotice({ kind: "error", text: workFailureHint(result.error.code, result.error.message) });
-        return;
-      }
+    // The ok notice confirms the resolve (copy.answered); the answer field
+    // clears only on a confirmed resolution.
+    const value = await memory.run(
+      "memory.resolveClarification",
+      { clarificationId: row.clarificationId, resolutionNote: trimmed },
+      copy.answered,
+    );
+    if (value !== null) {
       setAnswer("");
-    } catch {
-      setNotice({ kind: "error", text: signInCopy.failures.network });
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -744,10 +708,8 @@ function OpenQuestionRow({ row }: { readonly row: ClarificationRow }): ReactNode
         onChange: (event: ChangeEvent<HTMLTextAreaElement>) => setAnswer(event.target.value),
         required: true,
       }),
-      createElement("button", { type: "submit", disabled: busy || answer.trim().length === 0 }, copy.answerSubmit),
-      notice === null
-        ? null
-        : createElement("p", { role: notice.kind === "error" ? "alert" : "status" }, notice.text),
+      createElement("button", { type: "submit", disabled: memory.busy || answer.trim().length === 0 }, copy.answerSubmit),
+      createElement(NoticeArea, { notice: memory.notice }),
     ),
   );
 }

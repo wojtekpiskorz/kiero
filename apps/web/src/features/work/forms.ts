@@ -2,13 +2,14 @@
  * Work feature forms (H2): the checked-command controls of the /praca
  * surface. JSX-free (createElement only), node-importable like the rest.
  *
- * One shared `useWorkDispatch` hook drives every form: the command goes
- * through C4's checked dispatch with the revision the boss actually sees
- * (`expectedRevision` from the loaded overview), so a concurrent change
- * refuses honestly instead of overwriting. Term bindings come from the
- * current findings of the chosen scope (company memory plus the project's
- * own), filtered by the pure binding rules; the server re-checks every
- * rule anyway.
+ * Every form rides the one shared `useCheckedDispatch` hook
+ * (`../company/dispatch`), parameterized by the work mutation and the
+ * work hint map: the command goes through C4's checked dispatch with the
+ * revision the boss actually sees (`expectedRevision` from the loaded
+ * overview), so a concurrent change refuses honestly instead of
+ * overwriting. Term bindings come from the current findings of the chosen
+ * scope (company memory plus the project's own), filtered by the pure
+ * binding rules; the server re-checks every rule anyway.
  */
 
 import { createElement, useState, type ChangeEvent, type ReactNode } from "react";
@@ -21,8 +22,8 @@ import type {
   TaskView,
 } from "../../../../../convex/work/read";
 import type { ContactView } from "../../../../../convex/projects/functions";
-import { envelopeOf, type MemberOverview, type Notice, type SubmitEvent } from "../company/CompanyGate";
-import { signInCopy } from "../sign-in/state";
+import { type MemberOverview, type SubmitEvent } from "../company/CompanyGate";
+import { useCheckedDispatch, NoticeArea } from "../company/dispatch";
 import {
   bindableDeadline,
   bindableEventTime,
@@ -42,41 +43,9 @@ import type { ProjectJoin } from "./WorkFeature";
 // The shared dispatch hook
 // ---------------------------------------------------------------------------
 
-/** One form's dispatch state (notice + busy + the checked run). */
-export function useWorkDispatch(): {
-  readonly run: (operation: string, input: unknown, okText: string) => Promise<void>;
-  readonly notice: Notice | null;
-  readonly busy: boolean;
-} {
-  const dispatch = useMutation(api.work.functions.dispatchWork);
-  const [notice, setNotice] = useState<Notice | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function run(operation: string, input: unknown, okText: string): Promise<void> {
-    setNotice(null);
-    setBusy(true);
-    try {
-      const result = await dispatch({ envelope: envelopeOf(operation, input) });
-      setNotice(
-        result._tag === "error"
-          ? { kind: "error", text: failureHint(result.error.code, result.error.message) }
-          : { kind: "ok", text: okText },
-      );
-    } catch {
-      setNotice({ kind: "error", text: signInCopy.failures.network });
-    } finally {
-      setBusy(false);
-    }
-  }
-  return { run, notice, busy };
-}
-
-/** The result notice area every form renders (alert on error, status on ok). */
-export function NoticeArea({ notice }: { readonly notice: Notice | null }): ReactNode {
-  if (notice === null) {
-    return null;
-  }
-  return createElement("p", { role: notice.kind === "error" ? "alert" : "status" }, notice.text);
+/** The work forms' checked dispatch (the work mutation plus hint map). */
+function useWorkDispatch() {
+  return useCheckedDispatch(useMutation(api.work.functions.dispatchWork), failureHint);
 }
 
 // ---------------------------------------------------------------------------
