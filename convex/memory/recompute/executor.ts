@@ -282,6 +282,51 @@ async function publishCascadeCarrier(
   });
 }
 
+/** One resolved direct dependent of a root: its live row and current revision. */
+interface ResolvedDependent {
+  readonly cause: "derivation" | "shared_evidence" | "assignment";
+  readonly finding: Doc<"findings">;
+  readonly currentRevision: Doc<"findingRevisions">;
+}
+
+/**
+ * Resolves one root's DIRECT dependents: each distinct edge's finding,
+ * tenant-checked, with its current revision — the shared opening of the
+ * stale-marking and revalidation walks. The per-dependent decisions stay
+ * with their callers.
+ */
+async function resolveDirectDependents(
+  db: MutationCtx["db"],
+  companyId: Id<"companies">,
+  rootFindingId: Id<"findings">,
+): Promise<ResolvedDependent[]> {
+  const edgeRows = await db
+    .query("findingDependencies")
+    .withIndex("by_depends_on", (q) => q.eq("dependsOnFindingId", rootFindingId))
+    .collect();
+  const seen = new Set<Id<"findings">>();
+  const resolved: ResolvedDependent[] = [];
+  for (const edge of edgeRows) {
+    if (seen.has(edge.dependentFindingId)) {
+      continue;
+    }
+    seen.add(edge.dependentFindingId);
+    const finding = await db.get(edge.dependentFindingId);
+    if (finding === null || finding.companyId !== companyId) {
+      continue; // tenant scope: cross-company edges are never followed
+    }
+    if (finding.currentRevisionId === undefined) {
+      continue;
+    }
+    const currentRevision = await db.get(finding.currentRevisionId);
+    if (currentRevision === null) {
+      continue;
+    }
+    resolved.push({ cause: edge.cause, finding, currentRevision });
+  }
+  return resolved;
+}
+
 /**
  * Marks the direct dependents of one root finding `updating`-until-
  * revalidated and registers their linked re-analysis — one bounded,
@@ -299,37 +344,16 @@ async function markStaleDependents(
   },
 ): Promise<void> {
   const { companyId, actorUserId, rootFindingId } = args;
-  const edgeRows = await tx.db
-    .query("findingDependencies")
-    .withIndex("by_depends_on", (q) => q.eq("dependsOnFindingId", rootFindingId))
-    .collect();
 
-  // The validating pass: resolve each distinct dependent with its current
-  // revision and witness lifecycles, decide, and COLLECT the markings.
-  const seenDependents = new Set<Id<"findings">>();
-  const decisions: {
-    finding: Doc<"findings">;
-    currentRevision: Doc<"findingRevisions">;
-  }[] = [];
-  for (const edge of edgeRows) {
-    if (seenDependents.has(edge.dependentFindingId)) {
-      continue;
-    }
-    seenDependents.add(edge.dependentFindingId);
-    const finding = await tx.db.get(edge.dependentFindingId);
-    if (finding === null || finding.companyId !== companyId) {
-      continue; // tenant scope: cross-company edges are never followed
-    }
-    if (finding.currentRevisionId === undefined) {
-      continue;
-    }
-    const currentRevision = await tx.db.get(finding.currentRevisionId);
-    if (currentRevision === null) {
-      continue;
-    }
+  // The validating pass: resolve the direct dependents, read their witness
+  // lifecycles, decide, and COLLECT the markings.
+  const decisions: ResolvedDependent[] = [];
+  for (const dependent of await resolveDirectDependents(tx.db, companyId, rootFindingId)) {
     const links = await tx.db
       .query("evidenceLinks")
-      .withIndex("by_revision", (q) => q.eq("findingRevisionId", currentRevision._id))
+      .withIndex("by_revision", (q) =>
+        q.eq("findingRevisionId", dependent.currentRevision._id),
+      )
       .collect();
     const witnesses = [];
     for (const link of links) {
@@ -341,13 +365,13 @@ async function markStaleDependents(
       });
     }
     const decision = decideDependentRecomputation({
-      cause: edge.cause,
-      currentRevisionOrigin: currentRevision.origin,
-      currentKnowledgeTag: knowledgeTagOf(currentRevision.knowledgeState),
+      cause: dependent.cause,
+      currentRevisionOrigin: dependent.currentRevision.origin,
+      currentKnowledgeTag: knowledgeTagOf(dependent.currentRevision.knowledgeState),
       currentWitnesses: witnesses,
     });
     if (decision.decision === "mark_updating") {
-      decisions.push({ finding, currentRevision });
+      decisions.push(dependent);
     }
   }
 
@@ -359,44 +383,44 @@ async function markStaleDependents(
   // --- the commit loop: only pre-validated writes from here ----------------
   const nowMs = Date.now();
   const targets: RecomputeTarget[] = [];
-  for (const decision of decisions) {
+  for (const marked of decisions) {
     const markedKnowledge = encodeKnowledgeState(
       explicitUpdating(updatingUntilRevalidatedReason(args.rootFindingId)),
     );
     const revisionId = await tx.db.insert("findingRevisions", {
-      findingId: decision.finding._id,
-      revision: decision.finding.revisionCounter + 1,
+      findingId: marked.finding._id,
+      revision: marked.finding.revisionCounter + 1,
       // The inferred value is preserved verbatim; only its epistemic state
       // moves to updating-until-revalidated (never discarded).
-      value: decision.currentRevision.value,
+      value: marked.currentRevision.value,
       knowledgeState: markedKnowledge,
-      supersedesRevisionId: decision.currentRevision._id,
+      supersedesRevisionId: marked.currentRevision._id,
       origin: "withdrawal_marking",
       reason: dependentUpdatingReason(args.rootFindingId, args.cause),
       recordedByUserId: actorUserId,
       recordedAtMs: nowMs,
     });
-    await tx.db.patch(decision.finding._id, {
+    await tx.db.patch(marked.finding._id, {
       currentRevisionId: revisionId,
       knowledgeState: markedKnowledge,
-      revisionCounter: decision.finding.revisionCounter + 1,
+      revisionCounter: marked.finding.revisionCounter + 1,
       updatedAtMs: nowMs,
     });
     await publishEvent(tx, {
       companyId: args.companyId,
       eventName: "memory.findingRevised",
       payload: {
-        findingId: decision.finding._id,
+        findingId: marked.finding._id,
         revisionId,
-        supersedesRevisionId: decision.currentRevision._id,
+        supersedesRevisionId: marked.currentRevision._id,
       },
       dedupKey: `memory.findingRevised:${revisionId}`,
     });
-    if (decision.currentRevision.provenance !== undefined) {
-      const provenanceSource = await tx.db.get(decision.currentRevision.provenance.sourceId);
+    if (marked.currentRevision.provenance !== undefined) {
+      const provenanceSource = await tx.db.get(marked.currentRevision.provenance.sourceId);
       targets.push({
-        findingId: decision.finding._id,
-        provenanceSourceId: decision.currentRevision.provenance.sourceId,
+        findingId: marked.finding._id,
+        provenanceSourceId: marked.currentRevision.provenance.sourceId,
         provenanceSourceActive:
           provenanceSource !== null && provenanceSource.lifecycle === "active",
       });
@@ -406,7 +430,7 @@ async function markStaleDependents(
     await publishCascadeCarrier(tx, {
       companyId,
       actorUserId,
-      rootFindingId: decision.finding._id,
+      rootFindingId: marked.finding._id,
       markingRevisionId: revisionId,
     });
   }
@@ -427,38 +451,22 @@ async function revalidateUpdatingDependents(
   tx: MutationCtx,
   args: { companyId: Id<"companies">; rootFindingId: Id<"findings">; triggerKey: string },
 ): Promise<number> {
-  const edgeRows = await tx.db
-    .query("findingDependencies")
-    .withIndex("by_depends_on", (q) => q.eq("dependsOnFindingId", args.rootFindingId))
-    .collect();
-  const seen = new Set<Id<"findings">>();
   const targets: RecomputeTarget[] = [];
-  for (const edge of edgeRows) {
-    if (seen.has(edge.dependentFindingId)) {
+  for (const dependent of await resolveDirectDependents(
+    tx.db,
+    args.companyId,
+    args.rootFindingId,
+  )) {
+    if (knowledgeTagOf(dependent.currentRevision.knowledgeState) !== "updating") {
       continue;
     }
-    seen.add(edge.dependentFindingId);
-    const finding = await tx.db.get(edge.dependentFindingId);
-    if (finding === null || finding.companyId !== args.companyId) {
+    if (dependent.currentRevision.provenance === undefined) {
       continue;
     }
-    if (finding.currentRevisionId === undefined) {
-      continue;
-    }
-    const currentRevision = await tx.db.get(finding.currentRevisionId);
-    if (currentRevision === null) {
-      continue;
-    }
-    if (knowledgeTagOf(currentRevision.knowledgeState) !== "updating") {
-      continue;
-    }
-    if (currentRevision.provenance === undefined) {
-      continue;
-    }
-    const provenanceSource = await tx.db.get(currentRevision.provenance.sourceId);
+    const provenanceSource = await tx.db.get(dependent.currentRevision.provenance.sourceId);
     targets.push({
-      findingId: finding._id,
-      provenanceSourceId: currentRevision.provenance.sourceId,
+      findingId: dependent.finding._id,
+      provenanceSourceId: dependent.currentRevision.provenance.sourceId,
       provenanceSourceActive:
         provenanceSource !== null && provenanceSource.lifecycle === "active",
     });

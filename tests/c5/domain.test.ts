@@ -1,9 +1,10 @@
 /**
  * C5 focused verification, part 1: the pure recomputation core — the
- * dependency traversal (cycle-safe, resumable), the dependent-marking
- * decision (sole-witness vs corroborated vs derived), the revalidation
- * transitions, bounded recomputation grouping, the automation-exclusion
- * gate and the stale-plan interaction with C2's guard.
+ * dependent-marking decision (sole-witness vs corroborated vs derived),
+ * the updating-until-revalidated state, bounded recomputation grouping,
+ * the automation-exclusion gate and the stale-plan interaction with C2's
+ * guard. (Cycle safety of the graph itself is pinned in tests/c2 with
+ * wouldCreateCycle; the durable cascade terminates on marking idempotence.)
  */
 
 import { describe, expect, it } from "vitest";
