@@ -25,7 +25,7 @@
 
 import { MAX_ATTACHMENTS, MIN_PART_BYTES } from "../../../../../convex/sources/uploads/protocol";
 
-export { MAX_ATTACHMENTS, MIN_PART_BYTES };
+export { MAX_ATTACHMENTS };
 
 /** One attachment's byte size, in send order (audio first, then photos). */
 export interface AttachmentBytes {

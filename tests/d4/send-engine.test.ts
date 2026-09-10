@@ -407,4 +407,55 @@ describe("runSend: retry policy", () => {
     }
     expect(accept.accepted).toHaveLength(0);
   });
+
+  it("accepts a session answering with the SAME kinds in another order, pairing bytes by kind (the planner's multiset rule is the one verdict)", async () => {
+    const accept = fakeAccept();
+    const putCalls: { attachmentId: string; partNumber: number; bytes: number }[] = [];
+    // The declaration is canonical [audio, image]; this server answer
+    // lists the image first. The server's own rule (kindsMatch) is
+    // multiset equality, so the session is valid: the engine must derive
+    // the verdict from declarationMatches and hand each blob a session
+    // attachment id of the SAME kind, never punish a reorder.
+    const gateway: UploadGateway = {
+      prepare: async () => ({
+        uploadId: "up-reordered",
+        stage: "draft",
+        attachments: [
+          { attachmentId: "at-image", kind: "image", objectKey: "k-img" },
+          { attachmentId: "at-audio", kind: "audio", objectKey: "k-aud" },
+        ],
+      }),
+      putPart: async (_uploadId, attachmentId, partNumber, bytes) => {
+        putCalls.push({ attachmentId, partNumber, bytes: bytes.size });
+      },
+      complete: async () => undefined,
+      finalize: async () => undefined,
+    };
+    const audio = new Blob([new Uint8Array(6 * MIB)]); // 2 parts: 5 MiB + 1 MiB
+    const photo = new Blob([new Uint8Array(64 * 1024)]); // 1 part
+    const outcome = await runSend(
+      material({ audio, photos: [{ blob: photo }] }),
+      gateway,
+      accept.port,
+      hooksOf().hooks,
+      retry3,
+    );
+    expect(outcome.ok).toBe(true);
+    // The audio bytes landed on the AUDIO attachment id...
+    expect(
+      putCalls
+        .filter((part) => part.attachmentId === "at-audio")
+        .map((part) => [part.partNumber, part.bytes]),
+    ).toEqual([
+      [1, MIN_PART_BYTES],
+      [2, 1 * MIB],
+    ]);
+    // ...and the photo bytes on the IMAGE attachment id.
+    expect(
+      putCalls
+        .filter((part) => part.attachmentId === "at-image")
+        .map((part) => part.bytes),
+    ).toEqual([64 * 1024]);
+    expect(accept.accepted).toHaveLength(1);
+  });
 });

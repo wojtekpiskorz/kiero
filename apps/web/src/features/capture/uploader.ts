@@ -29,6 +29,7 @@
 
 import {
   canonicalMediaKinds,
+  declarationMatches,
   declaredPartsOf,
   missingPartNumbers,
   partCountOf,
@@ -201,21 +202,23 @@ export async function runSend(
   // A previously finalized upload (crash between finalize and accept) goes
   // straight to acceptance on the SAME durable objects.
   if (prepared.stage !== "finalized") {
-    if (prepared.attachments.length !== attachments.length) {
+    // ONE declaration rule (the planner's declarationMatches, mirroring
+    // the server's multiset kindsMatch): the session must carry exactly
+    // the declared kinds, in any order.
+    if (!declarationMatches(mediaKinds, prepared.attachments.map((attachment) => attachment.kind))) {
       return failed(
         { kind: "envelope", code: "attachment_declaration_mismatch", message: "sesja wysyłki nie zgadza się z lokalnym szkicem" },
         "gateway",
       );
     }
+    // The loop below is NOT the verdict: it hands each local blob a session
+    // attachment id of the same kind, so bytes land on the right id even if
+    // the server ever reorders its answer (same-kind images pair in order).
+    const unpaired = [...prepared.attachments];
     for (let index = 0; index < attachments.length; index += 1) {
       const local = attachments[index]!;
-      const session = prepared.attachments[index]!;
-      if (session.kind !== local.kind) {
-        return failed(
-          { kind: "envelope", code: "attachment_declaration_mismatch", message: "sesja wysyłki nie zgadza się z lokalnym szkicem" },
-          "gateway",
-        );
-      }
+      const pairIndex = unpaired.findIndex((candidate) => candidate.kind === local.kind);
+      const session = unpaired.splice(pairIndex, 1)[0]!;
       try {
         await uploadOneAttachment(gateway, hooks, retry, prepared.uploadId, session, local.blob, index, attachments.length);
       } catch (cause) {

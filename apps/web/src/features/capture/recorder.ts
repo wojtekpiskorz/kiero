@@ -84,6 +84,42 @@ export function negotiateMimeType(isTypeSupported: (mimeType: string) => boolean
 export const RECORDING_TIMESLICE_MS = 1_000;
 
 // ---------------------------------------------------------------------------
+// The production wiring: the browser media APIs as one MediaBoundary
+// ---------------------------------------------------------------------------
+
+/** The real MediaRecorder constructor with its static support probe. */
+type RecorderConstructor = (new (
+  stream: MediaStreamLike,
+  options: { readonly mimeType: string },
+) => MediaRecorderLike) & { isTypeSupported(mimeType: string): boolean };
+
+/**
+ * The browser media APIs as one MediaBoundary. Reached through structural
+ * probes so this module typechecks in the node test configuration too;
+ * at runtime (browser) the real APIs sit behind the exact same seam the
+ * deterministic tests and the live proof mock. Null when the browser
+ * offers no MediaRecorder or getUserMedia (rendered honestly as
+ * `recorder_unsupported`).
+ */
+export function browserMediaBoundary(): MediaBoundary | null {
+  const recorderClass = (globalThis as unknown as { MediaRecorder?: RecorderConstructor }).MediaRecorder;
+  const mediaDevices = (
+    globalThis as {
+      navigator?: { mediaDevices?: { getUserMedia(constraints: { readonly audio: true }): Promise<MediaStreamLike> } };
+    }
+  ).navigator?.mediaDevices;
+  if (recorderClass === undefined || mediaDevices === undefined) {
+    return null;
+  }
+  return {
+    getUserMedia: (constraints) => mediaDevices.getUserMedia(constraints),
+    isTypeSupported: (mimeType) => recorderClass.isTypeSupported(mimeType),
+    createMediaRecorder: (stream, mimeType) => new recorderClass(stream, { mimeType }),
+    now: () => Date.now(),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The sinks (how the engine reports progress to the feature)
 // ---------------------------------------------------------------------------
 

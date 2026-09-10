@@ -31,9 +31,6 @@ import type { MediaEnv } from "./media/r2";
 import type { TelemetryEnv } from "./telemetry/emit";
 import type { NormalizerEnv } from "./images/normalizer";
 
-/** The Worker bindings the gateway routes consume (see platform/bridge.ts). */
-export type Env = BridgeEnv & TelemetryEnv & UploadsEnv & MediaEnv & NormalizerEnv;
-
 /**
  * D4 append (minimal, flagged to the coordinator): browser CORS for the
  * upload channel. D4's composer is the FIRST cross-origin consumer of the
@@ -51,12 +48,15 @@ interface CorsEnv {
   readonly ALLOWED_APP_ORIGINS?: string;
 }
 
+/** The Worker bindings the gateway routes consume (see platform/bridge.ts). */
+export type Env = BridgeEnv & TelemetryEnv & UploadsEnv & MediaEnv & NormalizerEnv & CorsEnv;
+
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get("origin");
   if (origin === null || origin.length === 0) {
     return {};
   }
-  const configured = (env as CorsEnv).ALLOWED_APP_ORIGINS ?? "";
+  const configured = env.ALLOWED_APP_ORIGINS ?? "";
   const allowed = configured
     .split(",")
     .map((value) => value.trim())

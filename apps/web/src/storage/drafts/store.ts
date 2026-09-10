@@ -172,8 +172,6 @@ export interface DraftPersistence {
   get(key: string): Promise<unknown>;
   put(key: string, value: unknown): Promise<void>;
   delete(key: string): Promise<void>;
-  /** Lists stored keys beginning with the prefix, in storage order. */
-  keys(prefix: string): Promise<string[]>;
 }
 
 /** The typed store over one persistence surface. */
@@ -363,7 +361,6 @@ interface IdbObjectStoreLike {
   get(key: string): IdbRequestLike;
   put(value: unknown, key?: string): IdbRequestLike;
   delete(key: string): IdbRequestLike;
-  getAllKeys(): IdbRequestLike;
 }
 
 const DB_NAME = "kiero-drafts";
@@ -442,17 +439,7 @@ export function idbPersistence(connect: () => IdbDatabaseLike): DraftPersistence
     },
     async delete(key) {
       try {
-        await inTransaction<void>("readwrite", (store) => store.delete(key));
-      } catch (cause) {
-        throw rethrowClassified(cause);
-      }
-    },
-    async keys(prefix) {
-      try {
-        const all = await inTransaction<unknown[]>("readonly", (store) => store.getAllKeys());
-        return all.filter(
-          (key): key is string => typeof key === "string" && key.startsWith(prefix),
-        );
+        return await inTransaction<void>("readwrite", (store) => store.delete(key));
       } catch (cause) {
         throw rethrowClassified(cause);
       }
@@ -520,9 +507,6 @@ export function memoryPersistence(): DraftPersistence & {
         throw failing.error;
       }
       entries.delete(key);
-    },
-    async keys(prefix) {
-      return [...entries.keys()].filter((key) => key.startsWith(prefix));
     },
   };
 }

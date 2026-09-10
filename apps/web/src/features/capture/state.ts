@@ -41,7 +41,6 @@ export const captureCopy = {
     "Obecnie wiadomość wymaga choć krótkiego tekstu — nagranie i zdjęcia go uzupełniają.",
   // Photos
   photosLabel: "Zdjęcia",
-  addPhotosButton: "Dodaj zdjęcia",
   photoRemoveButton: "Usuń",
   photosEmpty: "Brak zdjęć.",
   attachmentsTooMany:
@@ -134,7 +133,7 @@ const captureFailureHints: Partial<Record<string, string>> = {
   upload_stage_not_acceptable:
     "Materiały nie są jeszcze w całości na serwerze. Wznów wysyłkę.",
   author_text_empty: captureCopy.textRequiredNote,
-  client_credential_missing: "Sesja wygasła. Zaloguj się ponownie i wznow wysyłkę.",
+  client_credential_missing: "Sesja wygasła. Zaloguj się ponownie i wznów wysyłkę.",
   part_manifest_empty: "Materiał nie dotarł w całości. Wznów wysyłkę.",
   attachment_bytes_mismatch: "Serwer zapisał inną liczbę bajtów. Wznów wysyłkę.",
 };
