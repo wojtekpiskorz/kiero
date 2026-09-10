@@ -62,7 +62,7 @@ export function sourceUserMessage(context: AnalysisContext): string {
   return [
     `WIADOMOŚĆ ŹRÓDŁOWA (${source.sourceId}):`,
     `Wysłano: ${new Date(source.sentAtMs).toISOString()} w strefie ${source.sentAtTimezone}`,
-    `Tabletki projektów wskazane przez nadawcę (kontekst, nie rozstrzygnięcie): ${hints}`,
+    `Podpowiedzi projektów wskazane przez nadawcę (kontekst, nie rozstrzygnięcie): ${hints}`,
     `Zakres przeanalizowanych materiałów: ${coverage}`,
     "",
     text,

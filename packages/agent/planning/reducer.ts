@@ -119,7 +119,7 @@ function scopeOf(
 ): { ok: true; scope: ContextScope; label: string } | { ok: false; reason: string } {
   if (scopeKind === "company") {
     if (projectId !== null) {
-      return { ok: false, reason: "zakaz firmy (company) nie przyjmuje projectId" };
+      return { ok: false, reason: "zakres firmy (company) nie przyjmuje projectId" };
     }
     return { ok: true, scope: { kind: "company" }, label: "pamięć firmy" };
   }

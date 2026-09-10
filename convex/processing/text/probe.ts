@@ -345,7 +345,7 @@ export const disarmAnalysisFailure = internalMutation({
     const marker = await ctx.db
       .query("processingSteps")
       .withIndex("by_run_sequence", (q) =>
-        q.eq("runId", args.runId).eq("sequence", 100_000 + args.sequence),
+        q.eq("runId", args.runId).eq("sequence", FAILURE_MARKER_BASE + args.sequence),
       )
       .first();
     if (marker !== null) {

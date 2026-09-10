@@ -708,7 +708,7 @@ describe("one grounding predicate (groupIsTextGrounded)", () => {
 
 describe("versioned prompt and pipeline labels", () => {
   it("pins the Polish system prompt and the pipeline/schema versions", () => {
-    expect(PLANNING_PROMPT_VERSION).toBe("e3.prompt-pl/2");
+    expect(PLANNING_PROMPT_VERSION).toBe("e3.prompt-pl/3");
     expect(PLANNING_SCHEMA_VERSION).toBe("e3.schema/1");
     expect(TEXT_ANALYSIS_PIPELINE_VERSION).toBe("e3.text/1");
     expect(analysisSystemPrompt()).toContain("agentem pamięci firmy budowlanej");

@@ -14,7 +14,7 @@
 export const TEXT_ANALYSIS_PIPELINE_VERSION = "e3.text/1" as const;
 
 /** The Polish analysis system prompt version (packages/agent/planning/prompt.ts). */
-export const PLANNING_PROMPT_VERSION = "e3.prompt-pl/2" as const;
+export const PLANNING_PROMPT_VERSION = "e3.prompt-pl/3" as const;
 
 /** The tool/input schema version the model's arguments decode against. */
 export const PLANNING_SCHEMA_VERSION = "e3.schema/1" as const;

@@ -850,14 +850,18 @@ export const completeAnalysisRun = internalMutation({
     const loadRow = steps.find((stepRow_) => stepRow_.stepKind === "load_context");
     const loadOutput = loadRow?.outputRef;
     let completeness: string | null = null;
+    let parsedLoad: unknown = null;
     if (loadOutput !== undefined) {
       try {
-        const parsedLoad = JSON.parse(loadOutput) as { completeness?: unknown };
-        if (typeof parsedLoad.completeness === "string") {
-          completeness = parsedLoad.completeness;
+        parsedLoad = JSON.parse(loadOutput);
+        if (
+          typeof parsedLoad === "object" && parsedLoad !== null &&
+          typeof (parsedLoad as { completeness?: unknown }).completeness === "string"
+        ) {
+          completeness = (parsedLoad as { completeness: string }).completeness;
         }
       } catch {
-        // Non-JSON load output (never produced by this lane); leave null.
+        // Non-JSON load output (never produced by this lane); degrade, never throw.
       }
     }
     let workflowId: string | null = null;
@@ -878,7 +882,7 @@ export const completeAnalysisRun = internalMutation({
         groups: groupOutcomes,
         clarified,
         completeness,
-        load: loadOutput === undefined ? null : JSON.parse(loadOutput),
+        load: parsedLoad,
       }),
       finishedAtMs: nowMs,
     });
