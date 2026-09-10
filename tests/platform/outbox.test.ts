@@ -149,9 +149,10 @@ describe("drain event projection (three-way)", () => {
     expect(projectEventToJobInputs("operations.diagnosticEmitted", {}, "dk")).toEqual([
       { kind: "no_consumer" },
     ]);
-    // An event may carry SEVERAL edges (D5 fan-out): sourceAccepted projects
-    // onto BOTH E3's extract projection (row dedup identity) and D5's
-    // normalize projection (payload-derived dedup, never the row's).
+    // An event may carry SEVERAL edges (D5 fan-out, F2 append): the
+    // sourceAccepted row projects onto E3's extract (row dedup identity),
+    // D5's normalize and F2's notification-intents (both payload-derived
+    // dedup, never the row's).
     expect(
       projectEventToJobInputs(
         "sources.sourceAccepted",
@@ -170,6 +171,12 @@ describe("drain event projection (three-way)", () => {
         jobKind: "processing.normalize_photo",
         input: { sourceId: "s1", attachmentIds: ["a1"] },
         dedupKey: "processing.normalize_photo:s1",
+      },
+      {
+        kind: "job",
+        jobKind: "attention.evaluate_due_intents",
+        input: { trigger: "source_accepted", sourceId: "s1", clarificationId: null, changeSetId: null },
+        dedupKey: "attention.evaluate_due_intents:source:s1",
       },
     ]);
 
@@ -192,7 +199,11 @@ describe("drain event projection (three-way)", () => {
       projectEventToJobInputs("sources.sourceAccepted", { sourceId: "s1" }, "dk").map(
         (projection) => (projection.kind === "job" ? projection.jobKind : projection.kind),
       ),
-    ).toEqual(["processing.extract_fragments", "processing.normalize_photo"]);
+    ).toEqual([
+      "processing.extract_fragments",
+      "processing.normalize_photo",
+      "attention.evaluate_due_intents",
+    ]);
     expect(CONSUMER_PROJECTION_MISSING).toBe("consumer_projection_missing");
   });
 });

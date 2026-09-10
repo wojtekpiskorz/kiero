@@ -27,14 +27,19 @@ describe("convex executor composition", () => {
         // proof for the accepted-photo normalization edge).
         "processing.normalize_photo",
 
+        // F2's sanctioned append (issue #42 owns the notification-intent
+        // lane: the durable reaction to the three consumed events).
+        "attention.evaluate_due_intents",
         // E3's sanctioned append (issue #37 owns the text-analysis lane:
         // the mechanical A3 analyze executor is replaced behind the same
         // seam by the real workflow, and the extract edge is implemented).
         "processing.extract_fragments",
-        // C5's sanctioned append (issue #28 owns the recomputation lane:
-        // withdrawal marking, the updating cascade and the linked
-        // re-analysis registrations).
+
+        // C5's sanctioned append (issue #28 owns the recomputation lane).
         "memory.recompute_dependents",
+        // G3's sanctioned append (issue #47 owns the declared consumer
+        // proof for the calendar.copyOutcomeRecorded edge).
+        "calendar.reconcile_outcome",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");
@@ -48,7 +53,6 @@ describe("convex executor composition", () => {
 
   it("unimplemented kinds (the fail-closed placeholders) stay unimplemented", () => {
     expect(jobExecutors["deletion.purge_source"]).toBeUndefined();
-    expect(jobExecutors["calendar.reconcile_outcome"]).toBeUndefined();
   });
 });
 

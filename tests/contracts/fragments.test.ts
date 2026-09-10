@@ -90,7 +90,7 @@ function memberLiterals(validator: GenericValidator, table: string): string[] {
 }
 
 describe("schema composition", () => {
-  it("composes exactly the closed table inventory (68 tables)", () => {
+  it("composes exactly the closed table inventory (70 tables)", () => {
     const composed = Object.keys(tables).sort();
     const inventory = [...TABLE_ID_NAMES].sort();
     expect(composed).toEqual(inventory);
@@ -101,8 +101,10 @@ describe("schema composition", () => {
     // accountRecoveries; 65 since the B4 amendment added
     // gmCompanyActivations; 66 since C4 added workRevisions; 68 since the
     // D6 amendment added audioTranscripts and audioSegments (the resumable
-    // long-audio STT fragment).
-    expect(composed).toHaveLength(68);
+    // long-audio STT fragment); 70 since the G3 amendment added
+    // calendarSyncAttempts and calendarProofEvents (the sync attempt
+    // ledger and the proof-only fake-Google event store).
+    expect(composed).toHaveLength(70);
   });
 
   it("gives the domain event envelope a durable outbox home", () => {

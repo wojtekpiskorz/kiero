@@ -111,6 +111,11 @@ export const TABLE_ID_NAMES = [
   // calendar/projection
   "calendarCopies",
   "calendarSyncState",
+  // calendar/sync (G3 amendment, the G1/G2 closed-inventory precedent):
+  // the per-leg attempt/outcome ledger, and the proof-only fake-Google
+  // event store the guarded fixtures write.
+  "calendarSyncAttempts",
+  "calendarProofEvents",
   // operations/exports
   "exports",
   "exportSourceLinks",
