@@ -56,6 +56,10 @@ import type * as calendar_connection_operations from "../calendar/connection/ope
 import type * as calendar_connection_proof from "../calendar/connection/proof.js";
 import type * as calendar_connection_proofHttp from "../calendar/connection/proofHttp.js";
 import type * as calendar_connection_protocol from "../calendar/connection/protocol.js";
+import type * as calendar_projection_dispatch from "../calendar/projection/dispatch.js";
+import type * as calendar_projection_functions from "../calendar/projection/functions.js";
+import type * as calendar_projection_operations from "../calendar/projection/operations.js";
+import type * as calendar_projection_proof from "../calendar/projection/proof.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as integrations_ai_dispatch from "../integrations/ai/dispatch.js";
@@ -190,6 +194,10 @@ declare const fullApi: ApiFromModules<{
   "calendar/connection/proof": typeof calendar_connection_proof;
   "calendar/connection/proofHttp": typeof calendar_connection_proofHttp;
   "calendar/connection/protocol": typeof calendar_connection_protocol;
+  "calendar/projection/dispatch": typeof calendar_projection_dispatch;
+  "calendar/projection/functions": typeof calendar_projection_functions;
+  "calendar/projection/operations": typeof calendar_projection_operations;
+  "calendar/projection/proof": typeof calendar_projection_proof;
   crons: typeof crons;
   http: typeof http;
   "integrations/ai/dispatch": typeof integrations_ai_dispatch;
