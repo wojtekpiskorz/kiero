@@ -29,13 +29,10 @@
  *   sibling pending intent of the same recipient, company and scope
  *   bucket — the
  *   window stays open from the first entry until the actual fire instant,
- *   so deferred quiet-hour work collapses into ONE current summary; read
- *   sources leave the batch before delivery.
- *
- * The evaluation order is pinned in ./model.ts (`EVALUATION_ORDER`):
- * business validity, recipient rights, assignment, read state, then the
- * personal delivery decision — suppression before deferral, exactly like
- * F1's seam.
+ *   so deferred quiet-hour work collapses into ONE current summary. Each
+ *   per-intent re-check (death, read state) runs BEFORE the per-bucket
+ *   personal decision, so a read entry leaves the batch and a revoked
+ *   member's intent dies regardless of preferences.
  */
 
 import { Schema } from "effect";
