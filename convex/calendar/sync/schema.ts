@@ -96,7 +96,13 @@ export const calendarSyncTables = {
     desiredState: v.union(v.literal("projected"), v.literal("withdrawn")),
     hiddenBasis: v.boolean(),
     desiredPayloadHash: v.optional(v.string()),
-    /** The copy's updatedAtMs at leg start (the J4 latency basis). */
+    /**
+     * The copy's `updatedAtMs` at leg start (the J4 latency basis).
+     * `updatedAtMs` moves only on desire changes (create, correction,
+     * withdrawal, hide, restore); ledger completions never touch it, so a
+     * reconnect rebuild or drift leg measures from the desire revision,
+     * never from the last ledger touch.
+     */
     desiredAtMs: shared.tsMs,
     startedAtMs: shared.tsMs,
     completedAtMs: v.optional(shared.tsMs),
