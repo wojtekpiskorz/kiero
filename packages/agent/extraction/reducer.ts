@@ -195,7 +195,10 @@ function locateJoinEvidence(
       located.push({
         _tag: "image_region",
         observationId: observation.observationId,
-        region: observation.region,
+        x: observation.x,
+        y: observation.y,
+        width: observation.width,
+        height: observation.height,
         representationId: observation.representationId,
         extractionId: observation.extractionId,
       });
@@ -456,24 +459,24 @@ function applyClarificationJoin(
     );
   }
   // A conflict may live across modalities (the typed text vs the recording):
-  // quotes locate over the author text first, then the transcript.
-  const grounding = locateJoinEvidence(context, args.quotes, [], []);
-  if (grounding.located.length === 0) {
-    const acrossModalities = locateJoinEvidence(context, [], args.quotes, []);
-    if (acrossModalities.located.length === 0) {
-      return reject(
-        state,
-        "sprawa do wyjaśnienia wymaga co najmniej jednego dosłownego cytatu z tej wiadomości lub jej transkrypcji",
-      );
-    }
+  // quotes locate over the author text first, then the transcript. The
+  // stored evidence is whichever pass located; a clarification is never
+  // admitted with an empty evidence list.
+  const grounded = locateJoinEvidence(context, args.quotes, [], []);
+  const evidence =
+    grounded.located.length > 0
+      ? grounded.located
+      : locateJoinEvidence(context, [], args.quotes, []).located;
+  if (evidence.length === 0) {
+    return reject(
+      state,
+      "sprawa do wyjaśnienia wymaga co najmniej jednego dosłownego cytatu z tej wiadomości lub jej transkrypcji",
+    );
   }
   return {
     state: {
       ...state,
-      clarifications: [
-        ...state.clarifications,
-        { question: args.question, evidence: grounding.located, scope: scope.scope },
-      ],
+      clarifications: [...state.clarifications, { question: args.question, evidence, scope: scope.scope }],
     },
     toolResult: "SPRAWA DO WYJAŚNIENIA zapisana w planie; nie zapisuj wartości dla tej informacji.",
   };

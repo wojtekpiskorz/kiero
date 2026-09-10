@@ -17,23 +17,20 @@
  *    wait — the join proceeds partial-safe over them.
  * 2. the per-image vision passes (one ACTION + one record MUTATION each,
  *    through E2's vision adapter; both routes failing leaves the image
- *    pending with a sanitized reason, resumable).
+ *    pending with a sanitized reason, resumable), in ./vision.ts.
  * 3. `loadJoinedContextStage`: E3's tenant-filtered context plus the
  *    joined coverage, the assembled transcript segments and the vision
  *    observations, with the run's version pins.
  * 4. `modelJoinStage` (one ACTION): the bounded agent loop over E2's chat
  *    route with the JOIN tool surface; decoded calls accumulate through
- *    the multimodal reducer — never executed.
+ *    the multimodal reducer (never executed), in ./modelStage.ts.
  * 5. `raiseJoinClarificationStage` (one mutation per question): the
  *    source-backed Sprawa do wyjaśnienia through C2's checked dispatch,
  *    with mixed-family fragment anchors.
  * 6. `publishJoinGroupStage` (one mutation per bounded group): the
- *    completeness gate against a FRESH coverage read (a mid-run
- *    re-normalization refuses the group — coordinates never move beneath
- *    a published finding), the mid-run staleness guard, per-evidence
- *    fragment ensuring (text ranges, audio intervals, image regions), then
- *    C2 prepare + publish with the analysis revisions as caller
- *    expectations.
+ *    completeness gate against a FRESH coverage read, the mid-run
+ *    staleness guard, per-evidence fragment ensuring, then C2 prepare +
+ *    publish, in ./publish.ts.
  *
  * Text-only sources never reach the workflow (the executor no-ops them —
  * E3's analyze owns those); E3's text analysis of a mixed source runs
@@ -45,47 +42,25 @@
 import { Schema } from "effect";
 import { v } from "convex/values";
 import { start, vResultValidator, type WorkflowId } from "@convex-dev/workflow";
-import {
-  joinMultimodalInput,
-  okResult,
-  type ResultEnvelope,
-} from "@kiero/contracts";
-import {
-  ROUTING_CONFIG_VERSION,
-  runChatTurn,
-  type AnyChatToolSpec,
-  type ChatCallResult,
-  type OpenRouterCredentials,
-} from "@kiero/providers";
+import { joinMultimodalInput, okResult, type ResultEnvelope } from "@kiero/contracts";
+import { ROUTING_CONFIG_VERSION } from "@kiero/providers";
 import {
   JOIN_PROMPT_VERSION,
   JOIN_SCHEMA_VERSION,
-  JOIN_TOOLS,
-  MAX_JOIN_MODEL_TURNS,
   MEDIA_WAIT_BUDGET_MS,
   MULTIMODAL_JOIN_PIPELINE_VERSION,
-  applyMultimodalCall,
   boundMultimodalGroups,
-  decideGroupPublish,
   decideJoinedCompleteness,
-  emptyMultimodalState,
-  emptyJoinPlanNudge,
   inputWorthWaiting,
-  joinAnalysisSystemPrompt,
   joinCoverage as joinCoverageOf,
-  joinSourceUserMessage,
-  mediaClaimsBackedByCompleteInputs,
-  validateImageRegion,
   type AnalysisContext,
   type JoinAnalysisContext,
   type LocatedEvidence,
-  type MultimodalFindingProposal,
   type MultimodalPlanningState,
 } from "@kiero/agent";
 import { workflow } from "../../platform/pipeline";
-import { bridgeIdentity, resolveRequestContext } from "../../platform/context";
+import { bridgeIdentity, authorSessionId, resolveRequestContext } from "../../platform/context";
 import { dispatchMemoryCommand } from "../../memory/findings/dispatch";
-import { identifyProjectEntry, performIdentifyProject } from "../../projects/operations";
 import { orderAudioTranscript } from "../audio/orders";
 import { loadAnalysisContext } from "../text/analysisContext";
 import type { JobExecutor } from "../../platform/executors";
@@ -98,14 +73,17 @@ import {
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import {
+  JOIN_CLARIFICATION_BASE,
   JOIN_CLARIFY_STEP_KIND,
+  JOIN_EVALUATE_SEQUENCE,
   JOIN_EVALUATE_STEP_KIND,
-  JOIN_MODEL_STEP_KIND,
+  JOIN_LOAD_CONTEXT_SEQUENCE,
   JOIN_PUBLISH_STEP_KIND,
   JOIN_STEP_BASE,
   JOIN_VISION_STEP_OFFSET,
+  anchorOfEvidence,
   ensureAnchorFragment,
-  joinStepRow,
+  initialAnalysisRun,
   recordJoinStep,
 } from "./journal";
 import {
@@ -119,60 +97,6 @@ import { orderVisionExtraction } from "./visionOrders";
 export const JOIN_MODEL_CONFIGURATION_VERSION =
   `e2.routing/${ROUTING_CONFIG_VERSION}#chat_analysis+vision_extraction`;
 
-// Stage sequence numbers inside the E4 keyspace.
-export const JOIN_EVALUATE_SEQUENCE = JOIN_STEP_BASE + 1;
-export const JOIN_LOAD_CONTEXT_SEQUENCE = JOIN_STEP_BASE + 2;
-export const JOIN_MODEL_SEQUENCE = JOIN_STEP_BASE + 3;
-/** Clarification steps start here (one per raised question). */
-export const JOIN_CLARIFICATION_BASE = JOIN_STEP_BASE + 500;
-/** Publication-group steps start here (one per bounded group). */
-export const JOIN_GROUP_BASE = JOIN_STEP_BASE + 1_000;
-
-/** E4's own failure/outcome marker bases (the A3 crash-proof pattern). */
-export const JOIN_FAILURE_MARKER_BASE = 16_000_000;
-export const JOIN_OUTCOME_MARKER_BASE = 17_000_000;
-
-/** Whether the armed THROW marker exists for one stage sequence. */
-async function joinFailureMarkerArmed(
-  db: MutationCtx["db"],
-  runId: Id<"processingRuns">,
-  sequence: number,
-): Promise<boolean> {
-  const rows = await db
-    .query("processingSteps")
-    .withIndex("by_run_sequence", (q) => q.eq("runId", runId).eq("sequence", JOIN_FAILURE_MARKER_BASE + sequence))
-    .collect();
-  return rows.length > 0;
-}
-
-/** Whether the armed OUTCOME marker exists for one stage sequence. */
-async function joinOutcomeMarkerArmed(
-  db: MutationCtx["db"],
-  runId: Id<"processingRuns">,
-  sequence: number,
-): Promise<boolean> {
-  const rows = await db
-    .query("processingSteps")
-    .withIndex("by_run_sequence", (q) => q.eq("runId", runId).eq("sequence", JOIN_OUTCOME_MARKER_BASE + sequence))
-    .collect();
-  return rows.length > 0;
-}
-
-/** The author session: the agent acts within the source author's firm. */
-async function authorSessionId(
-  db: MutationCtx["db"],
-  authorUserId: Id<"users">,
-): Promise<Id<"sessions"> | null> {
-  const sessions = await db
-    .query("sessions")
-    .withIndex("by_user_started", (q) => q.eq("userId", authorUserId))
-    .collect();
-  const live = sessions
-    .filter((session) => session.revokedAtMs === undefined)
-    .sort((a, b) => b.startedAtMs - a.startedAtMs);
-  return live[0]?._id ?? null;
-}
-
 // ---------------------------------------------------------------------------
 // Stage 1: evaluate media (order STT/vision, compute the joined coverage,
 // bounded-wait actively progressing inputs).
@@ -182,14 +106,6 @@ async function authorSessionId(
 export interface EvaluateMediaResult {
   readonly mediaPresent: boolean;
   readonly visionOrderIds: Id<"visionOrders">[];
-  readonly coverageInputs: readonly {
-    attachmentId: string | null;
-    kind: "text" | "audio" | "image";
-    status: string;
-    extractionId: string | null;
-    representationId: string | null;
-    lastErrorKind: string | null;
-  }[];
   readonly completeness: "complete" | "partial_unresolved_inputs" | "blocked_external";
 }
 
@@ -228,7 +144,7 @@ export const evaluateMediaStage = internalMutation({
         state: "succeeded",
         output: { mediaPresent: false },
       });
-      return { mediaPresent: false, visionOrderIds: [], coverageInputs: [], completeness: "complete" };
+      return { mediaPresent: false, visionOrderIds: [], completeness: "complete" };
     }
     const session = await authorSessionId(ctx.db, source.authorUserId);
     const requestContext =
@@ -299,7 +215,6 @@ export const evaluateMediaStage = internalMutation({
     return {
       mediaPresent: true,
       visionOrderIds,
-      coverageInputs: snapshot.inputs,
       completeness,
     };
   },
@@ -429,209 +344,6 @@ export const loadJoinedContextStage = internalMutation({
 });
 
 // ---------------------------------------------------------------------------
-// Stage 4: the bounded joined agent loop through E2's chat adapter.
-// ---------------------------------------------------------------------------
-
-/** Records one provider call's attempts (step row + processingAttempts). */
-export const recordJoinModelCall = internalMutation({
-  args: {
-    runId: v.id("processingRuns"),
-    turn: v.number(),
-    record: v.any(),
-    companyId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const existing = await joinStepRow(ctx.db, args.runId, JOIN_MODEL_SEQUENCE, JOIN_MODEL_STEP_KIND);
-    const stepId =
-      existing?._id ??
-      (await ctx.db.insert("processingSteps", {
-        runId: args.runId,
-        stepKind: JOIN_MODEL_STEP_KIND,
-        sequence: JOIN_MODEL_SEQUENCE,
-        state: "running",
-        startedAtMs: Date.now(),
-      }));
-    const attempts = (args.record as { attempts: Record<string, unknown>[] }).attempts;
-    let index = 0;
-    let highestAttemptNumber = args.turn * 100;
-    for (const attempt of attempts) {
-      index += 1;
-      let attemptNumber = args.turn * 100 + index;
-      while (
-        (await ctx.db
-          .query("processingAttempts")
-          .withIndex("by_step_attempt", (q) => q.eq("stepId", stepId).eq("attempt", attemptNumber))
-          .first()) !== null
-      ) {
-        attemptNumber += 1_000;
-      }
-      highestAttemptNumber = Math.max(highestAttemptNumber, attemptNumber);
-      const outcome = attempt.outcome === "succeeded" ? "succeeded" : "failed";
-      const model =
-        typeof attempt.observedModel === "string"
-          ? attempt.observedModel
-          : typeof attempt.requestedModel === "string"
-            ? attempt.requestedModel
-            : null;
-      await ctx.db.insert("processingAttempts", {
-        stepId: stepId as Id<"processingSteps">,
-        attempt: attemptNumber,
-        outcome,
-        provider: "openrouter",
-        ...(model === null ? {} : { model }),
-        ...(outcome === "failed" && typeof attempt.failureKind === "string"
-          ? { errorKind: attempt.failureKind }
-          : {}),
-        startedAtMs: typeof attempt.startedAtMs === "number" ? attempt.startedAtMs : Date.now(),
-        finishedAtMs: typeof attempt.finishedAtMs === "number" ? attempt.finishedAtMs : Date.now(),
-      });
-    }
-    const success = attempts.find((a) => a.outcome === "succeeded");
-    const failure = [...attempts].reverse().find((a) => a.outcome === "failed");
-    const named = success ?? failure;
-    await ctx.runMutation(internal.integrations.ai.record.recordProviderCall, {
-      companyId: args.companyId,
-      routeId: "chat_analysis",
-      actualModel:
-        (typeof named?.observedModel === "string" ? named.observedModel : undefined) ??
-        (typeof named?.requestedModel === "string" ? named.requestedModel : undefined) ??
-        "unknown",
-      outcome: success !== undefined ? "succeeded" : "failed",
-      dedupKey: `integrations.modelCall:e4:${args.runId}:turn${args.turn}:a${highestAttemptNumber}`,
-    });
-  },
-});
-
-/** Marks the join model step finished with its bounded summary. */
-export const finalizeJoinModelStep = internalMutation({
-  args: { runId: v.id("processingRuns"), summary: v.any() },
-  handler: async (ctx, args) => {
-    await recordJoinStep(ctx.db, args.runId, JOIN_MODEL_SEQUENCE, JOIN_MODEL_STEP_KIND, {
-      state: "succeeded",
-      output: args.summary,
-    });
-  },
-});
-
-/** The bounded joined agent loop: decoded tool calls accumulate, never execute. */
-export const modelJoinStage = internalAction({
-  args: { runId: v.id("processingRuns"), loaded: v.any() },
-  returns: v.any(),
-  handler: async (ctx, args): Promise<MultimodalPlanningState & { turns: number }> => {
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (apiKey === undefined || apiKey === "") {
-      throw new Error("join: provider_key_not_configured");
-    }
-    const credentials: OpenRouterCredentials = { apiKey };
-    const loaded = args.loaded as LoadedJoinResult;
-    const context = loaded.context;
-    const tools: AnyChatToolSpec[] = JOIN_TOOLS.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      input: tool.input,
-    }));
-    let state = emptyMultimodalState();
-    const messages: {
-      role: "user" | "assistant";
-      content: { kind: "text"; text: string }[];
-    }[] = [
-      {
-        role: "user",
-        content: [{ kind: "text", text: joinSourceUserMessage(context) }],
-      },
-    ];
-    let turns = 0;
-    let finalText = "";
-    const turnLog: { turn: number; text: string; calls: string[]; results: string[] }[] = [];
-    while (turns < MAX_JOIN_MODEL_TURNS) {
-      turns += 1;
-      const call: ChatCallResult = await runChatTurn(credentials, {
-        messages,
-        tools,
-        systemPrompt: joinAnalysisSystemPrompt(),
-      });
-      await ctx.runMutation(internal.processing.multimodal.join.recordJoinModelCall, {
-        runId: args.runId,
-        turn: turns,
-        record: call.record,
-        companyId: loaded.companyId,
-      });
-      if (call.outcome.outcome === "failed") {
-        const kind = call.outcome.failure.kind;
-        const hasValidatedWork =
-          state.proposals.length > 0 || state.clarifications.length > 0;
-        if ((kind === "output_rejected" || kind === "unknown_tool") && hasValidatedWork) {
-          break; // keep the validated partial plan (E3's semantics)
-        }
-        throw new Error(`join: provider_failed:${kind}`);
-      }
-      const turn = call.outcome.value;
-      finalText = turn.text.slice(0, 600);
-      if (turn.toolCalls.length === 0) {
-        const empty =
-          state.proposals.length === 0 &&
-          state.clarifications.length === 0 &&
-          state.projectBindings.length === 0;
-        if (empty && turns < MAX_JOIN_MODEL_TURNS) {
-          messages.push({
-            role: "user",
-            content: [{ kind: "text", text: emptyJoinPlanNudge() }],
-          });
-          continue;
-        }
-        break;
-      }
-      messages.push({
-        role: "assistant",
-        content: [
-          {
-            kind: "text",
-            text: turn.toolCalls
-              .map((call_) => JSON.stringify({ narzedzie: call_.name, argumenty: call_.arguments }))
-              .join("\n"),
-          },
-        ],
-      });
-      const turnResults: string[] = [];
-      for (const toolCall of turn.toolCalls) {
-        const outcome = applyMultimodalCall(
-          state,
-          context,
-          { id: toolCall.id, name: toolCall.name, arguments: toolCall.arguments },
-          loaded.companyDefaultCurrency,
-        );
-        state = outcome.state;
-        turnResults.push(outcome.toolResult.slice(0, 200));
-        messages.push({
-          role: "user",
-          content: [
-            { kind: "text", text: `WYNIK NARZĘDZIA ${toolCall.name}: ${outcome.toolResult}` },
-          ],
-        });
-      }
-      turnLog.push({
-        turn: turns,
-        text: turn.text.slice(0, 300),
-        calls: turn.toolCalls.map((call_) => call_.name),
-        results: turnResults,
-      });
-    }
-    await ctx.runMutation(internal.processing.multimodal.join.finalizeJoinModelStep, {
-      runId: args.runId,
-      summary: {
-        turns,
-        proposals: state.proposals.length,
-        clarifications: state.clarifications.length,
-        projects: state.projectBindings.length,
-        finalText,
-        turnLog,
-      },
-    });
-    return { ...state, turns };
-  },
-});
-
-// ---------------------------------------------------------------------------
 // Stage 5: one source-backed clarification with mixed-family anchors.
 // ---------------------------------------------------------------------------
 
@@ -698,318 +410,6 @@ export const raiseJoinClarificationStage = internalMutation({
   },
 });
 
-/** Rebuilds the fragment anchor of one located evidence item (total per tag). */
-function anchorOfEvidence(
-  item: LocatedEvidence,
-):
-  | { _tag: "whole_source" }
-  | { _tag: "text_range"; startOffset: number; endOffset: number }
-  | { _tag: "audio_interval"; startMs: number; endMs: number }
-  | { _tag: "image_region"; x: number; y: number; width: number; height: number } {
-  switch (item._tag) {
-    case "text_range":
-      return { _tag: "text_range", startOffset: item.startOffset, endOffset: item.endOffset };
-    case "audio_interval":
-      return { _tag: "audio_interval", startMs: item.startMs, endMs: item.endMs };
-    case "image_region":
-      return {
-        _tag: "image_region",
-        x: item.region.x,
-        y: item.region.y,
-        width: item.region.width,
-        height: item.region.height,
-      };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Stage 6: one bounded joined publication group through C1 + C2.
-// ---------------------------------------------------------------------------
-
-/** The wire shape of one joined proposal as the workflow hands it over. */
-export interface JoinGroupProposalWire {
-  readonly intent: "record" | "correct";
-  readonly semanticKey: string;
-  /**
-   * Located evidence EXACTLY as the reducer accumulated it (the
-   * LocatedEvidence union: image items carry their region NESTED under
-   * `region`, never as flat x/y fields — the coordinate-space authority).
-   */
-  readonly evidence: readonly LocatedEvidence[];
-  readonly replacesFindingId: string | null;
-  readonly derivesFromFindingIds: readonly string[];
-  readonly readConfidence: number;
-  readonly valueWire: unknown;
-}
-
-/** One bounded joined group handed to the publish stage. */
-export interface JoinGroupStageInput {
-  readonly key: { kind: "company" | "project"; projectId: string | null };
-  readonly proposals: JoinGroupProposalWire[];
-  readonly analysisRevisions: { findingId: string; revision: number }[];
-  readonly waitForMedia: boolean;
-  readonly bindingDisplayName?: string | null;
-}
-
-export const publishJoinGroupStage = internalMutation({
-  args: { runId: v.id("processingRuns"), index: v.number(), group: v.any() },
-  handler: async (ctx, args): Promise<ResultEnvelope> =>
-    publishJoinGroupTransaction(ctx, {
-      runId: args.runId,
-      index: args.index,
-      group: args.group,
-    }),
-});
-
-/** The publish transaction (idempotent by step sequence; testable). */
-export async function publishJoinGroupTransaction(
-  ctx: MutationCtx,
-  params: { runId: Id<"processingRuns">; index: number; group: unknown },
-): Promise<ResultEnvelope> {
-  const group = params.group as JoinGroupStageInput;
-  const sequence = JOIN_GROUP_BASE + params.index;
-  const run = await ctx.db.get(params.runId);
-  if (run === null) {
-    throw new Error("join: run row missing");
-  }
-  const source = await ctx.db.get(run.sourceId);
-  if (source === null) {
-    throw new Error("join: source row missing");
-  }
-  const finish = async (state: "succeeded" | "failed", output: unknown) => {
-    await recordJoinStep(ctx.db, params.runId, sequence, JOIN_PUBLISH_STEP_KIND, { state, output });
-    return okResult({ outcome: output });
-  };
-
-  // The deterministic group-isolation proof hook (E3's pattern).
-  if (await joinOutcomeMarkerArmed(ctx.db, params.runId, sequence)) {
-    return finish("failed", { outcome: "failed", error: "probe_injected_group_failure" });
-  }
-
-  // Partial-safe bounding: a group whose evidence waits for unresolved
-  // media claims inspection of nothing — recorded pending, never published.
-  if (group.waitForMedia) {
-    return finish("succeeded", { outcome: "pending_segments", key: group.key });
-  }
-
-  // Defensive honesty against a FRESH coverage read: every evidence
-  // extraction must still be a complete input (a mid-run re-normalization
-  // or a superseded transcript version refuses the group — coordinates
-  // never move beneath a published finding; the recovery is a linked
-  // reanalysis, which re-joins onto the newer versions).
-  const freshView = await loadCoverageSourceView(ctx.db, source._id);
-  const freshCoverage = joinCoverageOf(freshView);
-  const wireProposals: MultimodalFindingProposal[] = group.proposals.map((proposal) => ({
-    intent: proposal.intent,
-    semanticKey: proposal.semanticKey,
-    scope:
-      group.key.kind === "company"
-        ? { kind: "company" }
-        : { kind: "project", projectId: group.key.projectId ?? "" },
-    valueWire: proposal.valueWire,
-    knowledgeStateWire: "known",
-    evidence: proposal.evidence,
-    replacesFindingId: proposal.replacesFindingId,
-    derivesFromFindingIds: [...proposal.derivesFromFindingIds],
-    readConfidence: proposal.readConfidence,
-  }));
-  if (!mediaClaimsBackedByCompleteInputs({ proposals: wireProposals }, freshCoverage)) {
-    return finish("succeeded", { outcome: "pending_segments", key: group.key, fresh: true });
-  }
-
-    // --- resolve the group's scope (C1 identification for `new:N`) -------
-    let scopeProjectId: Id<"projects"> | null = null;
-    if (group.key.kind === "project") {
-      const handle = group.key.projectId ?? "";
-      if (handle.startsWith("new:")) {
-        const displayName = group.bindingDisplayName ?? null;
-        if (displayName === null || displayName.trim().length === 0) {
-          return finish("failed", { outcome: "failed", error: "project_binding_missing" });
-        }
-        const session = await authorSessionId(ctx.db, source.authorUserId);
-        if (session === null) {
-          return finish("failed", { outcome: "failed", error: "actor_session_unavailable" });
-        }
-        const bridgeContext = await resolveRequestContext(
-          ctx.db,
-          bridgeIdentity(session, Date.now()),
-        );
-        if (bridgeContext === null) {
-          return finish("failed", { outcome: "failed", error: "actor_context_unresolved" });
-        }
-        const input = Schema.decodeUnknownSync(identifyProjectEntry.input)({
-          displayName,
-          initialStage: "inquiry",
-          clientId: null,
-        });
-        const identified = await performIdentifyProject(ctx, bridgeContext, input);
-        if (identified._tag !== "ok") {
-          return finish("failed", { outcome: "failed", error: identified.error.code });
-        }
-        const created = identified.value as { projectId: string };
-        const normalized = ctx.db.normalizeId("projects", created.projectId);
-        if (normalized === null) {
-          return finish("failed", { outcome: "failed", error: "project_id_unresolvable" });
-        }
-        scopeProjectId = normalized;
-      } else {
-        const normalized = ctx.db.normalizeId("projects", handle);
-        if (normalized === null) {
-          return finish("failed", { outcome: "failed", error: "project_scope_invalid" });
-        }
-        const project = await ctx.db.get(normalized);
-        if (project === null || project.companyId !== source.companyId) {
-          return finish("failed", { outcome: "failed", error: "project_scope_not_found" });
-        }
-        scopeProjectId = normalized;
-      }
-    }
-
-    // --- the mid-run staleness guard (E3's rule, joined) ------------------
-    const currentRevisions: Record<string, number> = {};
-    for (const expectation of group.analysisRevisions) {
-      const findingId = ctx.db.normalizeId("findings", expectation.findingId);
-      const finding = findingId === null ? null : await ctx.db.get(findingId);
-      if (finding === null || finding.companyId !== source.companyId) {
-        continue;
-      }
-      currentRevisions[finding._id] = finding.revisionCounter;
-    }
-    const decision = decideGroupPublish({
-      analysisRevisions: group.analysisRevisions,
-      currentRevisions,
-    });
-    if (decision.decision === "refuse") {
-      return finish("succeeded", {
-        outcome: "stale_refused",
-        key: group.key,
-        code: decision.code,
-      });
-    }
-
-    // --- build the source-linked planned revisions with mixed anchors ----
-    const plannedRevisions: unknown[] = [];
-    for (const proposal of group.proposals) {
-      const evidence: {
-        sourceId: string;
-        fragmentId: string | null;
-        supportKind: string;
-        extractionId: string;
-      }[] = [];
-      for (const item of proposal.evidence) {
-        const extractionId = ctx.db.normalizeId("extractions", item.extractionId);
-        if (extractionId === null) {
-          return finish("failed", { outcome: "failed", error: "extraction_id_invalid" });
-        }
-        const extraction = await ctx.db.get(extractionId);
-        if (extraction === null || extraction.sourceId !== source._id) {
-          // Cross-tenant or foreign-source extraction: typed refusal.
-          return finish("failed", { outcome: "failed", error: "extraction_not_in_source" });
-        }
-        if (item._tag === "image_region") {
-          // The coordinate-space authority: the region must lie inside the
-          // representation the extraction row pins.
-          const representationId = extraction.representationId;
-          if (representationId === undefined) {
-            return finish("failed", { outcome: "failed", error: "vision_extraction_unpinned" });
-          }
-          const representation = await ctx.db.get(representationId);
-          if (representation === null) {
-            return finish("failed", { outcome: "failed", error: "representation_row_missing" });
-          }
-          const check = validateImageRegion(item.region, {
-            width: representation.width ?? 0,
-            height: representation.height ?? 0,
-          });
-          if (!check.valid) {
-            return finish("failed", {
-              outcome: "failed",
-              error: `image_region_invalid:${check.reason}`,
-            });
-          }
-        }
-        const fragmentId = await ensureAnchorFragment(
-          ctx.db,
-          source._id,
-          extractionId,
-          anchorOfEvidence(item),
-        );
-        evidence.push({
-          sourceId: source._id,
-          fragmentId,
-          supportKind: "support",
-          extractionId,
-        });
-      }
-      plannedRevisions.push({
-        findingId: proposal.replacesFindingId,
-        scope:
-          scopeProjectId === null
-            ? { _tag: "company" }
-            : { _tag: "project", projectId: scopeProjectId },
-        semanticKey: proposal.semanticKey,
-        value: proposal.valueWire,
-        knowledgeState: { _tag: "known" },
-        effectiveFrom: null,
-        evidence,
-        derivesFrom: proposal.derivesFromFindingIds,
-      });
-    }
-
-    // --- C2 prepare + publish through the checked dispatch ---------------
-    const session = await authorSessionId(ctx.db, source.authorUserId);
-    if (session === null) {
-      return finish("failed", { outcome: "failed", error: "actor_session_unavailable" });
-    }
-    const prepared = await dispatchMemoryCommand(
-      ctx,
-      {
-        operation: "memory.prepareChangeSet",
-        input: { sourceId: source._id, plannedRevisions },
-        expectedRevisions: [],
-      },
-      session,
-    );
-    if (prepared._tag !== "ok") {
-      return finish("failed", { outcome: "failed", error: prepared.error.code });
-    }
-    const changeSet = prepared.value as { changeSetId: Id<"changeSets"> };
-    const published = await dispatchMemoryCommand(
-      ctx,
-      {
-        operation: "memory.publishChangeSet",
-        input: {
-          changeSetId: changeSet.changeSetId,
-          expectedRevisions: group.analysisRevisions,
-        },
-        expectedRevisions: [],
-      },
-      session,
-    );
-    if (published._tag !== "ok") {
-      const kind = published.error.code;
-      const stale = kind === "stale_plan" || kind === "caller_expectation_mismatch";
-      return finish(stale ? "succeeded" : "failed", {
-        outcome: stale ? "stale_refused" : "failed",
-        key: group.key,
-        error: kind,
-      });
-    }
-    const receipt = published.value as { publishedRevisionIds: Id<"findingRevisions">[] };
-
-    // --- crash-proof hook: the armed marker throws AFTER the writes ------
-    if (await joinFailureMarkerArmed(ctx.db, params.runId, sequence)) {
-      throw new Error("join: injected failure after group publication");
-    }
-    return finish("succeeded", {
-      outcome: "published",
-      key: group.key,
-      changeSetId: changeSet.changeSetId,
-      revisions: receipt.publishedRevisionIds.length,
-      ...(scopeProjectId !== null ? { projectId: scopeProjectId } : {}),
-    });
-}
-
 // ---------------------------------------------------------------------------
 // The workflow, its completion hook and the registered executor.
 // ---------------------------------------------------------------------------
@@ -1032,9 +432,11 @@ export const joinMultimodalWorkflow = workflow
     // budget to actively-progressing inputs (photo normalization, STT
     // segments); blocked and terminal inputs never wait. A SECOND evaluate
     // pass afterwards picks up representations that became retained during
-    // the wait (idempotent: existing orders replay, the step record takes
-    // the latest pass's output) and recomputes the pending vision orders the
-    // vision stage attempts.
+    // the wait (idempotent: existing orders replay) and recomputes the
+    // pending vision orders the vision stage attempts. The journal keeps
+    // the FIRST pass's step record (recordJoinStep never patches a
+    // succeeded step); the load-context step that follows records the
+    // post-wait coverage the workflow actually consumes.
     const evaluate = await step.runMutation(
       internal.processing.multimodal.join.evaluateMediaStage,
       { runId: args.runId },
@@ -1075,7 +477,7 @@ export const joinMultimodalWorkflow = workflow
       { runId: args.runId },
     );
     const plan = await step.runAction(
-      internal.processing.multimodal.join.modelJoinStage,
+      internal.processing.multimodal.modelStage.modelJoinStage,
       {
         runId: args.runId,
         loaded: {
@@ -1114,7 +516,7 @@ export const joinMultimodalWorkflow = workflow
       stagesCompleted += 1;
     }
     for (const [index, group] of bounded.groups.entries()) {
-      await step.runMutation(internal.processing.multimodal.join.publishJoinGroupStage, {
+      await step.runMutation(internal.processing.multimodal.publish.publishJoinGroupStage, {
         runId: args.runId,
         index,
         group: {
@@ -1259,15 +661,10 @@ export const joinMultimodalExecutor: JobExecutor = {
       ? null
       : ctx.db.normalizeId("processingRuns", decoded.processingRunId);
     if (runId === null) {
-      const runs = await ctx.db
-        .query("processingRuns")
-        .withIndex("by_source_started", (q) => q.eq("sourceId", sourceId))
-        .collect();
-      const initial = runs.slice().sort((a, b) => a.startedAtMs - b.startedAtMs)[0];
-      if (initial === undefined) {
+      runId = await initialAnalysisRun(ctx.db, sourceId);
+      if (runId === null) {
         return { outcome: "failed", errorKind: "processing_run_missing", retryable: false };
       }
-      runId = initial._id;
     }
     const workflowId = await start(
       ctx,
@@ -1318,7 +715,7 @@ export async function restartJoinWorkflow(
       target === "evaluate"
         ? internal.processing.multimodal.join.evaluateMediaStage
         : target === "model"
-          ? internal.processing.multimodal.join.modelJoinStage
-          : internal.processing.multimodal.join.publishJoinGroupStage,
+          ? internal.processing.multimodal.modelStage.modelJoinStage
+          : internal.processing.multimodal.publish.publishJoinGroupStage,
   });
 }

@@ -23,10 +23,13 @@ import { Schema } from "effect";
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
 import { forbiddenError, validationError, type RequestContext } from "@kiero/runtime";
 import { ROUTING_CONFIG_VERSION } from "@kiero/providers";
+import { base64ToBytes } from "@kiero/media-worker/wav";
 import { VISION_EXTRACTION_PIPELINE_VERSION } from "@kiero/agent";
 import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
+import { sha256HexOfBytes } from "../audio/segmentation";
 import { decideRetainedSelection, toRepresentationView } from "../images/protocol";
+import { initialAnalysisRun } from "./journal";
 
 /** The vision order receipt. */
 export interface VisionOrderReceipt {
@@ -46,21 +49,6 @@ export interface OrderVisionInput {
   readonly bytesChannel: "media_worker" | "proof_inline";
   /** proof_inline only: bytes whose sha-256 equals the retained contentHash. */
   readonly proofImageBase64?: string | undefined;
-}
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes as BufferSource);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function base64ToBytes(base64: string): Uint8Array {
-  const normalized = base64.replace(/^data:[^,]*,/, "").trim();
-  const binary = atob(normalized);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
 }
 
 /** Runs one vision order inside the caller's mutation transaction. */
@@ -123,12 +111,8 @@ export async function orderVisionExtraction(
 
   // The run whose journal the join's vision steps anchor to (the source's
   // initial analysis run, D6's anchoring rule).
-  const runs = await tx.db
-    .query("processingRuns")
-    .withIndex("by_source_started", (q) => q.eq("sourceId", attachment.sourceId as Id<"sources">))
-    .collect();
-  const run = runs.slice().sort((a, b) => a.startedAtMs - b.startedAtMs)[0];
-  if (run === undefined) {
+  const runId = await initialAnalysisRun(tx.db, attachment.sourceId as Id<"sources">);
+  if (runId === null) {
     return errorResult(validationError("processing_run_missing"));
   }
 
@@ -160,7 +144,7 @@ export async function orderVisionExtraction(
       return errorResult(validationError("proof_bytes_missing"));
     }
     const bytes = base64ToBytes(input.proofImageBase64);
-    const sha = await sha256Hex(bytes);
+    const sha = await sha256HexOfBytes(bytes);
     const recordedHash = representation.contentHash.replace(/^sha256:/, "");
     if (recordedHash !== sha) {
       return errorResult(validationError("proof_bytes_hash_mismatch"));
@@ -181,7 +165,7 @@ export async function orderVisionExtraction(
     sourceId: attachment.sourceId,
     attachmentId,
     representationId,
-    processingRunId: run._id,
+    processingRunId: runId,
     pipelineVersion: VISION_EXTRACTION_PIPELINE_VERSION,
     visionRoutingVersion: ROUTING_CONFIG_VERSION,
     bytesChannel: input.bytesChannel,

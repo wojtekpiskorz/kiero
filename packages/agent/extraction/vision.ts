@@ -129,7 +129,12 @@ export function observationIdOf(attachmentId: string, index: number): string {
   return `obs:${attachmentId}:${index}`;
 }
 
-/** One observation loaded into the joined context (wire form). */
+/**
+ * One observation loaded into the joined context (wire form). The region
+ * coordinates ride FLAT, in the fragment-anchor shape. The nested `region`
+ * object is the PROVIDER decode schema's shape (and the durable
+ * `observationsJson` record's) and is flattened once, at the load edge.
+ */
 export interface JoinVisionObservation {
   /** The stable handle the model cites (`obs:<attachmentId>:<index>`). */
   readonly observationId: string;
@@ -138,7 +143,10 @@ export interface JoinVisionObservation {
   /** The vision extraction version the observation was read by. */
   readonly extractionId: string;
   readonly text: string;
-  readonly region: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
 }
 
 /** Parses an observation handle back to its parts (null when malformed). */

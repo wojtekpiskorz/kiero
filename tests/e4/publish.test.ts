@@ -13,18 +13,16 @@
  * - an image region outside the pinned representation's coordinate space
  *   is a TYPED refusal (region_outside_representation);
  * - a WELL-FORMED image-grounded group mints fragments with the EXACT
- *   nested region coordinates of the LocatedEvidence wire (the regression
- *   shape: flat x/y reads used to zero the region and fail every
- *   image-grounded publication with region_not_positive);
+ *   region coordinates of the LocatedEvidence wire (one flat shape: the
+ *   evidence carries the fragment-anchor fields verbatim, so a mismatch
+ *   cannot arise between the two);
  * - re-running the transaction is idempotent per (run, sequence, kind):
  *   the fragment is ensured, never duplicated.
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  publishJoinGroupTransaction,
-  JOIN_GROUP_BASE,
-} from "../../convex/processing/multimodal/join";
+import { publishJoinGroupTransaction } from "../../convex/processing/multimodal/publish";
+import { JOIN_GROUP_BASE } from "../../convex/processing/multimodal/journal";
 import { asTx, fakeCtx, type FakeCtx } from "../d2/harness";
 
 const TABLES = [
@@ -77,7 +75,7 @@ function imageGroup(evidenceRegion = REGION) {
           {
             _tag: "image_region",
             observationId: `obs:${seed.representationId}:0`,
-            region: evidenceRegion,
+            ...evidenceRegion,
             representationId: seed.representationId,
             extractionId: seed.visionExtractionId,
           },
@@ -317,7 +315,7 @@ describe("the publish transaction's partial-safe refusals", () => {
 });
 
 describe("the publish transaction's anchor minting (the wire-shape regression)", () => {
-  it("a well-formed image-grounded group mints fragments with the EXACT nested region", async () => {
+  it("a well-formed image-grounded group mints fragments with the EXACT region coordinates", async () => {
     await publish(imageGroup());
     // The C2 section refuses (no author session in the fixture) — but the
     // fragments were already minted with the exact coordinates.
@@ -338,4 +336,5 @@ describe("the publish transaction's anchor minting (the wire-shape regression)",
     await publish(imageGroup());
     const fragments = ctx.db.rows("sourceFragments");
     expect(fragments).toHaveLength(1);
-  });});
+  });
+});

@@ -65,7 +65,7 @@ export interface BoundedJoinPlan {
 
 /** Whether one proposal's evidence kinds are all complete in the coverage. */
 export function proposalGroundingComplete(
-  proposal: MultimodalFindingProposal,
+  proposal: { readonly evidence: readonly LocatedEvidence[] },
   coverage: { readonly inputs: readonly RequiredInput[] },
 ): boolean {
   return proposal.evidence.every((evidence) =>
@@ -83,10 +83,12 @@ export function proposalGroundingComplete(
  * evidence whose extraction version the coverage does not report COMPLETE.
  * The reducer admits such evidence only from completed extractions loaded
  * into the context; this predicate re-proves it over ANY plan (wire or
- * pure), so the publish stage and the tests share one authority.
+ * pure), so the publish stage and the tests share one authority. The
+ * parameter is structural on purpose: it accepts the wire proposals the
+ * workflow hands over exactly as it accepts the reducer's own.
  */
 export function mediaClaimsBackedByCompleteInputs(
-  plan: { readonly proposals: readonly MultimodalFindingProposal[] },
+  plan: { readonly proposals: readonly { readonly evidence: readonly LocatedEvidence[] }[] },
   coverage: { readonly inputs: readonly RequiredInput[] },
 ): boolean {
   return plan.proposals.every((proposal) => proposalGroundingComplete(proposal, coverage));

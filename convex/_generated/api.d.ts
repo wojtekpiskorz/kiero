@@ -157,7 +157,9 @@ import type * as processing_images_protocol from "../processing/images/protocol.
 import type * as processing_multimodal_coverageLoader from "../processing/multimodal/coverageLoader.js";
 import type * as processing_multimodal_join from "../processing/multimodal/join.js";
 import type * as processing_multimodal_journal from "../processing/multimodal/journal.js";
+import type * as processing_multimodal_modelStage from "../processing/multimodal/modelStage.js";
 import type * as processing_multimodal_probe from "../processing/multimodal/probe.js";
+import type * as processing_multimodal_publish from "../processing/multimodal/publish.js";
 import type * as processing_multimodal_vision from "../processing/multimodal/vision.js";
 import type * as processing_multimodal_visionOrders from "../processing/multimodal/visionOrders.js";
 import type * as processing_text_analysisContext from "../processing/text/analysisContext.js";
@@ -355,7 +357,9 @@ declare const fullApi: ApiFromModules<{
   "processing/multimodal/coverageLoader": typeof processing_multimodal_coverageLoader;
   "processing/multimodal/join": typeof processing_multimodal_join;
   "processing/multimodal/journal": typeof processing_multimodal_journal;
+  "processing/multimodal/modelStage": typeof processing_multimodal_modelStage;
   "processing/multimodal/probe": typeof processing_multimodal_probe;
+  "processing/multimodal/publish": typeof processing_multimodal_publish;
   "processing/multimodal/vision": typeof processing_multimodal_vision;
   "processing/multimodal/visionOrders": typeof processing_multimodal_visionOrders;
   "processing/text/analysisContext": typeof processing_text_analysisContext;

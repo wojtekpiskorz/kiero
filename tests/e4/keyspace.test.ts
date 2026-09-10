@@ -28,10 +28,8 @@ import {
   JOIN_EVALUATE_SEQUENCE,
   JOIN_GROUP_BASE,
   JOIN_LOAD_CONTEXT_SEQUENCE,
-  JOIN_MODEL_SEQUENCE,
-} from "../../convex/processing/multimodal/join";
-import {
   JOIN_MARKER_BASE,
+  JOIN_MODEL_SEQUENCE,
   JOIN_STEP_BASE,
   JOIN_VISION_STEP_OFFSET,
 } from "../../convex/processing/multimodal/journal";

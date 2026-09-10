@@ -30,6 +30,7 @@
 import { v } from "convex/values";
 import { Schema } from "effect";
 import { runVisionExtraction, type OpenRouterCredentials } from "@kiero/providers";
+import { base64ToBytes } from "@kiero/media-worker/wav";
 import {
   VisionExtractionOutput,
   validateImageRegion,
@@ -38,6 +39,7 @@ import { internalAction, internalMutation, internalQuery } from "../../_generate
 import { internal } from "../../_generated/api";
 import type { MutationCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
+import { sha256HexOfBytes } from "../audio/segmentation";
 import {
   JOIN_VISION_STEP_KIND,
   recordJoinStep,
@@ -115,21 +117,6 @@ function openRouterCredentials(): OpenRouterCredentials | null {
   return { apiKey };
 }
 
-function base64ToBytes(base64: string): Uint8Array {
-  const normalized = base64.replace(/^data:[^,]*,/, "").trim();
-  const binary = atob(normalized);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes as BufferSource);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 /** The supported vision mime types of E2's inline image content parts. */
 type VisionMime = "image/png" | "image/jpeg" | "image/webp";
 
@@ -157,7 +144,7 @@ async function resolveImageBytes(
     if (proofImageBase64 === undefined || proofBytesSha256 === undefined) {
       return { ok: false, code: "proof_stash_missing" };
     }
-    const sha = await sha256Hex(base64ToBytes(proofImageBase64));
+    const sha = await sha256HexOfBytes(base64ToBytes(proofImageBase64));
     // The ledger records contentHash in its prefixed form (`sha256:<hex>`).
     const recordedHash = contentHash.replace(/^sha256:/, "");
     if (sha !== proofBytesSha256 || sha !== recordedHash) {

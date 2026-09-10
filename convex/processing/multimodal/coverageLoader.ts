@@ -229,7 +229,9 @@ export function parseRecordedObservations(
  * The observations of the completed vision orders the coverage reports:
  * rebuilt from the durable order record, with stable per-representation
  * handles. The extraction id pins the version; the representation id pins
- * the coordinate space.
+ * the coordinate space. This is the ONE place the record's nested
+ * `region` object flattens into the fragment-anchor shape everything
+ * downstream (prompt, evidence, anchors) speaks.
  */
 export async function loadCompletedVisionObservations(
   db: LoaderDb,
@@ -267,7 +269,10 @@ export async function loadCompletedVisionObservations(
         representationId: input.representationId,
         extractionId,
         text: recorded.text,
-        region: recorded.region,
+        x: recorded.region.x,
+        y: recorded.region.y,
+        width: recorded.region.width,
+        height: recorded.region.height,
       });
     }
   }

@@ -70,7 +70,10 @@ const OBSERVATIONS = [
     representationId: "mediaRep_img1",
     extractionId: "extractions_vision_img1",
     text: "12 400",
-    region: { x: 40, y: 60, width: 300, height: 80 },
+    x: 40,
+    y: 60,
+    width: 300,
+    height: 80,
   },
 ];
 
@@ -183,7 +186,10 @@ describe("the joined reducer accumulates multimodal evidence", () => {
       _tag: "image_region",
       representationId: "mediaRep_img1",
       extractionId: "extractions_vision_img1",
-      region: { x: 40, y: 60, width: 300, height: 80 },
+      x: 40,
+      y: 60,
+      width: 300,
+      height: 80,
     });
   });
 
@@ -212,6 +218,69 @@ describe("the joined reducer accumulates multimodal evidence", () => {
   });
 });
 
+describe("clarification evidence carries across modalities", () => {
+  function clarificationCall(args: Record<string, unknown>) {
+    return {
+      id: "call_clar",
+      name: "memory_ask_clarification",
+      arguments: {
+        question: "Która kwota jest aktualna?",
+        scopeKind: "company",
+        projectId: null,
+        ...args,
+      },
+    };
+  }
+
+  it("a conflict that lives only in the recording stores the transcript-located fragments", () => {
+    // The quote is not in the typed text (first pass drops it) but IS a
+    // verbatim transcript segment (second pass locates it): the stored
+    // evidence must be the transcript fragments, never an empty list.
+    const outcome = applyMultimodalCall(
+      emptyMultimodalState(),
+      joinedContext(),
+      clarificationCall({ quotes: ["dwanaście tysięcy netto"] }),
+      "PLN",
+    );
+    expect(outcome.state.clarifications).toHaveLength(1);
+    const clarification = outcome.state.clarifications[0];
+    expect(clarification?.evidence.length).toBeGreaterThan(0);
+    expect(clarification?.evidence[0]).toMatchObject({
+      _tag: "audio_interval",
+      startMs: 0,
+      endMs: 2_000,
+      extractionId: "extractions_stt_v1",
+    });
+  });
+
+  it("a quote found in the typed text grounds the clarification as a text range", () => {
+    const outcome = applyMultimodalCall(
+      emptyMultimodalState(),
+      joinedContext(),
+      clarificationCall({ quotes: ["Klient Kaczmarek potwierdza odbiór."] }),
+      "PLN",
+    );
+    expect(outcome.state.clarifications).toHaveLength(1);
+    expect(outcome.state.clarifications[0]?.evidence[0]).toMatchObject({
+      _tag: "text_range",
+      extractionId: "extractions_text",
+    });
+  });
+
+  it("a quote located in NEITHER the text nor the transcript refuses the clarification", () => {
+    const outcome = applyMultimodalCall(
+      emptyMultimodalState(),
+      joinedContext(),
+      clarificationCall({ quotes: ["tego nie ma nigdzie"] }),
+      "PLN",
+    );
+    expect(outcome.state.clarifications).toHaveLength(0);
+    expect(outcome.toolResult).toContain(
+      "sprawa do wyjaśnienia wymaga co najmniej jednego dosłownego cytatu",
+    );
+  });
+});
+
 describe("THE invariant: a text-only fallback never claims image inspection", () => {
   it("with the image pending there are NO observation handles, so an image claim is refused", () => {
     const outcome = applyMultimodalCall(
@@ -236,7 +305,10 @@ describe("THE invariant: a text-only fallback never claims image inspection", ()
           {
             _tag: "image_region",
             observationId: "obs:mediaRep_img1:0",
-            region: { x: 40, y: 60, width: 300, height: 80 },
+            x: 40,
+            y: 60,
+            width: 300,
+            height: 80,
             representationId: "mediaRep_img1",
             extractionId: "extractions_vision_img1",
           },

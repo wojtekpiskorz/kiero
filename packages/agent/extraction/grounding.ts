@@ -107,7 +107,12 @@ export function resolveObservationReference(
 /** The modality kinds a piece of located evidence belongs to. */
 export type EvidenceKind = "text" | "audio" | "image";
 
-/** One located evidence item in wire form (journal-safe). */
+/**
+ * One located evidence item in wire form (journal-safe). Image items carry
+ * the region coordinates FLAT, exactly as the fragment-anchor contract
+ * (`sourceFragments.anchor.image_region`) spells them: one anchor shape
+ * everywhere, so evidence can never diverge from the anchor it mints.
+ */
 export type LocatedEvidence =
   | {
       readonly _tag: "text_range";
@@ -126,7 +131,10 @@ export type LocatedEvidence =
   | {
       readonly _tag: "image_region";
       readonly observationId: string;
-      readonly region: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+      readonly x: number;
+      readonly y: number;
+      readonly width: number;
+      readonly height: number;
       readonly representationId: string;
       readonly extractionId: string;
     };

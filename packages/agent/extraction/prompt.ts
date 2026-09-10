@@ -98,7 +98,7 @@ export function joinSourceUserMessage(context: JoinAnalysisContext): string {
   const observations = context.visionObservations
     .map(
       (observation) =>
-        `- ${observation.observationId} (zdjęcie ${observation.attachmentId}): „${observation.text}” [obszar x=${observation.region.x}, y=${observation.region.y}, szer=${observation.region.width}, wys=${observation.region.height}]`,
+        `- ${observation.observationId} (zdjęcie ${observation.attachmentId}): „${observation.text}” [obszar x=${observation.x}, y=${observation.y}, szer=${observation.width}, wys=${observation.height}]`,
     )
     .join("\n");
   const observationBlock =

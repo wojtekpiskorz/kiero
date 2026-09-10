@@ -130,7 +130,10 @@ describe("observation reference resolution (image evidence)", () => {
       representationId: "mediaRep_img1",
       extractionId: "extractions_vision_img1",
       text: "12 400 zł",
-      region: { x: 40, y: 60, width: 300, height: 80 },
+      x: 40,
+      y: 60,
+      width: 300,
+      height: 80,
     },
   ];
 

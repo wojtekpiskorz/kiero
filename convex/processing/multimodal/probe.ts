@@ -41,6 +41,7 @@ import { decideJoinedCompleteness, joinCoverage } from "@kiero/agent";
 import {
   JOIN_VISION_MARKER_KIND,
   JOIN_MARKER_BASE,
+  initialAnalysisRun,
   recordJoinStep,
 } from "./journal";
 import { loadCoverageSourceView } from "./coverageLoader";
@@ -391,24 +392,20 @@ export const setVisionUnavailable = internalMutation({
     if (source === null || source.companyId !== resolved.companyId) {
       return errorResult(notFoundError("sources"));
     }
-    const runs = await ctx.db
-      .query("processingRuns")
-      .withIndex("by_source_started", (q) => q.eq("sourceId", args.sourceId))
-      .collect();
-    const initial = runs.slice().sort((a, b) => a.startedAtMs - b.startedAtMs)[0];
-    if (initial === undefined) {
+    const initialRunId = await initialAnalysisRun(ctx.db, args.sourceId);
+    if (initialRunId === null) {
       return errorResult(notFoundError("processingRuns"));
     }
     const existing = await ctx.db
       .query("processingSteps")
       .withIndex("by_run_sequence", (q) =>
-        q.eq("runId", initial._id).eq("sequence", JOIN_MARKER_BASE),
+        q.eq("runId", initialRunId).eq("sequence", JOIN_MARKER_BASE),
       )
       .collect();
     const ours = existing.find((row) => row.stepKind === JOIN_VISION_MARKER_KIND);
     if (args.arm && ours === undefined) {
       await ctx.db.insert("processingSteps", {
-        runId: initial._id,
+        runId: initialRunId,
         stepKind: JOIN_VISION_MARKER_KIND,
         sequence: JOIN_MARKER_BASE,
         state: "failed",
@@ -452,12 +449,8 @@ export const resumeJoinForSource = internalMutation({
     if (source === null || companyId === null || source.companyId !== companyId) {
       return errorResult(notFoundError("sources"));
     }
-    const runs = await ctx.db
-      .query("processingRuns")
-      .withIndex("by_source_started", (q) => q.eq("sourceId", args.sourceId))
-      .collect();
-    const initial = runs.slice().sort((a, b) => a.startedAtMs - b.startedAtMs)[0];
-    if (initial === undefined) {
+    const initialRunId = await initialAnalysisRun(ctx.db, args.sourceId);
+    if (initialRunId === null) {
       return errorResult(notFoundError("processingRuns"));
     }
     await registerDurableJob(ctx, {
@@ -465,7 +458,7 @@ export const resumeJoinForSource = internalMutation({
       input: { sourceId: args.sourceId, processingRunId: null, reanalysisOfRunId: null },
       companyId: source.companyId,
       sourceId: args.sourceId,
-      processingRunId: initial._id,
+      processingRunId: initialRunId,
       policy: { maxAttempts: 3, backoffBaseMs: 2_000 },
       dedupKey: `processing.join_multimodal:${args.sourceId}`,
     });

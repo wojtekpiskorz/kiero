@@ -20,6 +20,7 @@
 
 import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
+import type { LocatedEvidence } from "@kiero/agent";
 
 /**
  * Step-sequence keyspace: E4 join stages (evaluate/vision/model/clarify/
@@ -33,6 +34,19 @@ export const JOIN_STEP_BASE = 10_000_000;
 export const JOIN_VISION_STEP_OFFSET = 1_000;
 /** Probe marker base for E4 (armed vision unavailability). */
 export const JOIN_MARKER_BASE = 15_000_000;
+
+// Stage sequence numbers inside the E4 keyspace.
+export const JOIN_EVALUATE_SEQUENCE = JOIN_STEP_BASE + 1;
+export const JOIN_LOAD_CONTEXT_SEQUENCE = JOIN_STEP_BASE + 2;
+export const JOIN_MODEL_SEQUENCE = JOIN_STEP_BASE + 3;
+/** Clarification steps start here (one per raised question). */
+export const JOIN_CLARIFICATION_BASE = JOIN_STEP_BASE + 500;
+/** Publication-group steps start here (one per bounded group). */
+export const JOIN_GROUP_BASE = JOIN_STEP_BASE + 1_000;
+
+/** E4's own failure/outcome marker bases (the A3 crash-proof pattern). */
+export const JOIN_FAILURE_MARKER_BASE = 16_000_000;
+export const JOIN_OUTCOME_MARKER_BASE = 17_000_000;
 
 /** The step kinds E4 writes on `processingSteps` (lookup guards). */
 export const JOIN_EVALUATE_STEP_KIND = "e4_evaluate_media";
@@ -168,4 +182,75 @@ export async function visionUnavailableArmed(
     )
     .collect();
   return rows.some((row) => row.stepKind === JOIN_VISION_MARKER_KIND);
+}
+
+/** Whether the armed THROW marker exists for one stage sequence. */
+export async function joinFailureMarkerArmed(
+  db: MarkerDb,
+  runId: Id<"processingRuns">,
+  sequence: number,
+): Promise<boolean> {
+  const rows = await db
+    .query("processingSteps")
+    .withIndex("by_run_sequence", (q) => q.eq("runId", runId).eq("sequence", JOIN_FAILURE_MARKER_BASE + sequence))
+    .collect();
+  return rows.length > 0;
+}
+
+/** Whether the armed OUTCOME marker exists for one stage sequence. */
+export async function joinOutcomeMarkerArmed(
+  db: MarkerDb,
+  runId: Id<"processingRuns">,
+  sequence: number,
+): Promise<boolean> {
+  const rows = await db
+    .query("processingSteps")
+    .withIndex("by_run_sequence", (q) => q.eq("runId", runId).eq("sequence", JOIN_OUTCOME_MARKER_BASE + sequence))
+    .collect();
+  return rows.length > 0;
+}
+
+/**
+ * Projects one located evidence item onto the anchor of the fragment it
+ * ensures. This is a verbatim field-pick, NOT a shape conversion: the
+ * evidence carries the anchor coordinates in exactly the fragment-anchor
+ * spelling (flat for image regions), so only the provenance fields (quote,
+ * ids) are dropped; there is no nested-to-flat step left to get wrong.
+ */
+export function anchorOfEvidence(evidence: LocatedEvidence): JoinFragmentAnchor {
+  switch (evidence._tag) {
+    case "text_range":
+      return { _tag: evidence._tag, startOffset: evidence.startOffset, endOffset: evidence.endOffset };
+    case "audio_interval":
+      return { _tag: evidence._tag, startMs: evidence.startMs, endMs: evidence.endMs };
+    case "image_region":
+      return {
+        _tag: evidence._tag,
+        x: evidence.x,
+        y: evidence.y,
+        width: evidence.width,
+        height: evidence.height,
+      };
+  }
+}
+
+/** The DB read surface run resolution needs (query or mutation ctx fit). */
+type RunLookupDb = Pick<MutationCtx["db"], "query">;
+
+/**
+ * The source's INITIAL analysis run (D6's anchoring rule): the earliest
+ * run row by startedAtMs, the one run whose journal E3's text stages,
+ * D6's segment steps and E4's join steps all anchor to. Indexed scan; the
+ * first row is the answer, nothing is collected or sorted in memory.
+ */
+export async function initialAnalysisRun(
+  db: RunLookupDb,
+  sourceId: Id<"sources">,
+): Promise<Id<"processingRuns"> | null> {
+  const run = await db
+    .query("processingRuns")
+    .withIndex("by_source_started", (q) => q.eq("sourceId", sourceId))
+    .order("asc")
+    .first();
+  return run?._id ?? null;
 }
