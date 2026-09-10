@@ -102,6 +102,13 @@ import type * as sources_probe_shared from "../sources/probe_shared.js";
 import type * as sources_read_probe from "../sources/read/probe.js";
 import type * as sources_read_rows from "../sources/read/rows.js";
 import type * as sources_read_views from "../sources/read/views.js";
+import type * as work_dispatch from "../work/dispatch.js";
+import type * as work_functions from "../work/functions.js";
+import type * as work_operations from "../work/operations.js";
+import type * as work_policy from "../work/policy.js";
+import type * as work_probe from "../work/probe.js";
+import type * as work_read from "../work/read.js";
+import type * as work_references from "../work/references.js";
 
 import type {
   ApiFromModules,
@@ -204,6 +211,13 @@ declare const fullApi: ApiFromModules<{
   "sources/read/probe": typeof sources_read_probe;
   "sources/read/rows": typeof sources_read_rows;
   "sources/read/views": typeof sources_read_views;
+  "work/dispatch": typeof work_dispatch;
+  "work/functions": typeof work_functions;
+  "work/operations": typeof work_operations;
+  "work/policy": typeof work_policy;
+  "work/probe": typeof work_probe;
+  "work/read": typeof work_read;
+  "work/references": typeof work_references;
 }>;
 
 /**

@@ -47,11 +47,12 @@ describe("composed registry integrity", () => {
     // added the four admission/issuance/transfer operations to the access
     // surface; 66 since the B4 amendment added the six audited GM operations
     // (recoverAccount, gmInspectCompany, gmOnboardCompany, gmActivateCompany,
-    // gmRestoreAdministrator, gmEndCompanyAlpha); naive greps of
-    // `kind: "operation"` overcount by one because
+    // gmRestoreAdministrator, gmEndCompanyAlpha); 67/41 since the C4
+    // amendment added work.promoteChecklistItem and work.eventChanged;
+    // naive greps of `kind: "operation"` overcount by one because
     // registration.ts declares the interface field.)
-    expect(operationNames).toHaveLength(66);
-    expect(eventNames).toHaveLength(40);
+    expect(operationNames).toHaveLength(67);
+    expect(eventNames).toHaveLength(41);
     for (const name of operationNames) {
       expect(operations[name]?.name).toBe(name);
       expect(name).toMatch(/^[a-z][a-z0-9_]*\.[a-z][a-zA-Z0-9_]*$/);

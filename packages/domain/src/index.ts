@@ -13,3 +13,7 @@ export const DOMAIN_NOT_IMPLEMENTED: "bootstrap-placeholder" =
 // same way convex/schema.ts gains an import spread per fragment. Later
 // domains (projects, work, calendar) repeat this one-line pattern.
 export * from "../findings/index";
+
+// C4 coordinated addition (flagged, the same one-line pattern): the work
+// domain owns its rules in packages/domain/work/**.
+export * from "../work/index";

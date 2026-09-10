@@ -99,8 +99,9 @@ describe("schema composition", () => {
     // B1 amendment registered the six Convex Auth provider tables; 64 since
     // the B2 amendment added linkingAttempts, emailChangeRequests and
     // accountRecoveries; 65 since the B4 amendment added
-    // gmCompanyActivations (the alpha-participation authority).
-    expect(composed).toHaveLength(65);
+    // gmCompanyActivations (the alpha-participation authority); 66 since the
+    // C4 amendment added workRevisions (task/item/event change history).
+    expect(composed).toHaveLength(66);
   });
 
   it("gives the domain event envelope a durable outbox home", () => {
