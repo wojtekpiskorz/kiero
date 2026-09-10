@@ -61,6 +61,7 @@ type IndexCondition = { readonly field: string; readonly op: "eq" | "lte"; reado
 
 class FakeQuery {
   private conditions: IndexCondition[] = [];
+  private rowPredicate: ((row: Row) => boolean) | null = null;
 
   constructor(private readonly rows: Row[]) {}
 
@@ -76,6 +77,32 @@ class FakeQuery {
       },
     };
     fn(builder);
+    return this;
+  }
+
+  /**
+   * `filter()` after `withIndex` (F2 append, the D5 `lte` precedent): the
+   * post-index row predicate Convex applies in memory. The builder covers
+   * the expression shape the production code uses (`q.eq(q.field(f), v)`),
+   * evaluated per row; anything richer fails loudly instead of silently
+   * passing.
+   */
+  filter(
+    fn: (q: {
+      field(name: string): unknown;
+      eq(left: unknown, right: unknown): (row: Row) => boolean;
+    }) => (row: Row) => boolean,
+  ): FakeQuery {
+    const builder = {
+      field: (name: string) => name,
+      eq: (left: unknown, right: unknown) => {
+        if (typeof left !== "string") {
+          throw new Error("fake filter: only q.eq(q.field(name), value) is emulated");
+        }
+        return (row: Row) => row[left] === right;
+      },
+    };
+    this.rowPredicate = fn(builder);
     return this;
   }
 
@@ -115,7 +142,7 @@ class FakeQuery {
           (typeof current === "number" || typeof current === "string") &&
           current <= (value as typeof current)
         );
-      }),
+      }) && (this.rowPredicate === null || this.rowPredicate(row)),
     );
   }
 }

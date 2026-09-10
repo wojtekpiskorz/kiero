@@ -172,6 +172,19 @@ export const transcribeSegmentInput = Schema.Struct({
   transcriptId: tableIdSchema("audioTranscripts"),
 });
 
+// F2 amendment (issue #42, flagged coordinated change on the B3/D5
+// precedent): the notification-intent executor input. The drain projects
+// the three consumed events onto this shape; the nullable ids let every
+// trigger share one closed input (the B3 optional-field precedent), and
+// the trigger vocabulary IS the generic assignment/agent-message state
+// contract (E4 later emits the same terminal states through these edges).
+export const attentionIntentsInput = Schema.Struct({
+  trigger: Schema.Literals(["source_accepted", "clarification_raised", "change_set_published"]),
+  sourceId: Schema.NullOr(tableIdSchema("sources")),
+  clarificationId: Schema.NullOr(tableIdSchema("clarifications")),
+  changeSetId: Schema.NullOr(tableIdSchema("changeSets")),
+});
+
 function decodeFeatureId(value: string): Schema.Schema.Type<typeof FeatureId> {
   return Schema.decodeUnknownSync(FeatureId)(value);
 }
@@ -246,6 +259,16 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "processing.transcribe_segment",
     input: transcribeSegmentInput,
   }),
+  // F2 amendment (issue #42, flagged coordinated change): the durable
+  // notification-intent executor — intent creation from the consumed
+  // events plus the due-time evaluator kick
+  // (`convex/attention/delivery/executor.ts` implements it).
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("attention.evaluate"),
+    jobKind: "attention.evaluate_due_intents",
+    input: attentionIntentsInput,
+  }),
 ];
 
 function consumer(eventName: string, jobKind: EventConsumerEntry["jobKind"]): EventConsumerEntry {
@@ -293,6 +316,18 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   // A3 certification amendment: the platform's echo publication drains into
   // its own durable delivery job through the same edge mechanism.
   consumer("platform.echoRequested", "platform.echo_delivery"),
+  // F2 amendment (issue #42, flagged coordinated change): the three
+  // intent-source events drain into the notification-intent executor.
+  // Acceptance creates the per-recipient source intents; a raised
+  // clarification creates the addressed agent-question intent; a published
+  // change set creates NOTHING (ordinary agent confirmations produce no
+  // push) and only wakes the evaluator because the assignment may have
+  // gone terminal. Each edge's projection derives its own dedup identity
+  // from the event's SUBJECT, never the outbox row (the acceptance row's
+  // key already carries `processing.extract_fragments`).
+  consumer("sources.sourceAccepted", "attention.evaluate_due_intents"),
+  consumer("memory.clarificationRaised", "attention.evaluate_due_intents"),
+  consumer("memory.changeSetPublished", "attention.evaluate_due_intents"),
 ];
 
 /**

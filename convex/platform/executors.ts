@@ -35,6 +35,11 @@
  * - `processing.normalize_photo` (../processing/images/executor.ts, D5):
  *   the accepted-photo normalization executor (architecture protocol step
  *   4) with the echo-template uncertain-outcome semantics.
+ * - `attention.evaluate_due_intents` (../attention/delivery/executor.ts,
+ *   F2): the durable notification-intent reaction to the three consumed
+ *   events (acceptance creates source intents, a raised clarification
+ *   creates the addressed agent-question intent, a published change set
+ *   only wakes the evaluator).
  */
 
 import type { FunctionReference } from "convex/server";
@@ -48,6 +53,7 @@ import { cleanupRevocationExecutor } from "../access/membership/cleanup";
 import { recomputeDependentsExecutor } from "../memory/recompute/executor";
 import { transcribeSegmentExecutor } from "../processing/audio/executor";
 import { normalizePhotoExecutor } from "../processing/images/executor";
+import { attentionIntentsExecutor } from "../attention/delivery/executor";
 
 /** One durable job row (the executable counterpart of an outbox event). */
 export type DurableJobDoc = Doc<"durableJobs">;
@@ -78,4 +84,5 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [recomputeDependentsExecutor.jobKind]: recomputeDependentsExecutor,
   [transcribeSegmentExecutor.jobKind]: transcribeSegmentExecutor,
   [normalizePhotoExecutor.jobKind]: normalizePhotoExecutor,
+  [attentionIntentsExecutor.jobKind]: attentionIntentsExecutor,
 };

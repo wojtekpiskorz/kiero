@@ -205,6 +205,53 @@ function projectOneEdge(
       dedupKey: `processing.normalize_photo:${String(payload.sourceId)}`,
     };
   }
+  // F2 registration (issue #42 owns these edges' projections): the three
+  // intent-source events project onto `attention.evaluate_due_intents`.
+  // The dedup keys are derived from each event's SUBJECT (source,
+  // clarification, change set), never the outbox row — the acceptance row's
+  // key already carries the extract job, and a differently-keyed duplicate
+  // event still collapses onto the same semantic intents. The
+  // change-set-published payload carries no source id; the executor
+  // resolves the change set's source itself.
+  if (jobKind === "attention.evaluate_due_intents") {
+    if (eventName === "sources.sourceAccepted") {
+      return {
+        kind: "job",
+        jobKind,
+        input: {
+          trigger: "source_accepted",
+          sourceId: payload.sourceId,
+          clarificationId: null,
+          changeSetId: null,
+        },
+        dedupKey: `attention.evaluate_due_intents:source:${String(payload.sourceId)}`,
+      };
+    }
+    if (eventName === "memory.clarificationRaised") {
+      return {
+        kind: "job",
+        jobKind,
+        input: {
+          trigger: "clarification_raised",
+          sourceId: null,
+          clarificationId: payload.clarificationId,
+          changeSetId: null,
+        },
+        dedupKey: `attention.evaluate_due_intents:clarification:${String(payload.clarificationId)}`,
+      };
+    }
+    return {
+      kind: "job",
+      jobKind,
+      input: {
+        trigger: "change_set_published",
+        sourceId: null,
+        clarificationId: null,
+        changeSetId: payload.changeSetId,
+      },
+      dedupKey: `attention.evaluate_due_intents:changeset:${String(payload.changeSetId)}`,
+    };
+  }
   return { kind: "unprojected_edge", jobKind };
 }
 
