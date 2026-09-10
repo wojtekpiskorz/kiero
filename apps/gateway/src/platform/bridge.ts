@@ -69,16 +69,23 @@ export async function postBridge(
       error: errorResult(unavailableError(true, "backend_unreachable")),
     };
   }
-  if (response.status === 404) {
-    return {
-      ok: false,
-      error: errorResult(unavailableError(false, "backend_route_missing")),
-    };
-  }
+  // A 404 whose body decodes as a ResultEnvelope is an ANSWER, not a
+  // missing route: Convex boundaries map not_found envelopes to HTTP 404
+  // (envelopeHttpStatus), and masking that as route-missing would turn
+  // every legitimate not-found refusal into a sanitized 503 (D3's media
+  // channel is the first lane whose envelopes cross here). Convex itself
+  // answers an unknown route with a plain-text 404 that cannot decode, so
+  // route-missing keeps its precise closed error (D3 amendment, flagged).
   let payload: unknown;
   try {
     payload = await response.json();
   } catch {
+    if (response.status === 404) {
+      return {
+        ok: false,
+        error: errorResult(unavailableError(false, "backend_route_missing")),
+      };
+    }
     return {
       ok: false,
       error: errorResult(unavailableError(true, "backend_response_not_json")),
@@ -86,6 +93,12 @@ export async function postBridge(
   }
   const decoded = Schema.decodeUnknownOption(ResultEnvelope)(payload);
   if (decoded._tag === "None") {
+    if (response.status === 404) {
+      return {
+        ok: false,
+        error: errorResult(unavailableError(false, "backend_route_missing")),
+      };
+    }
     return {
       ok: false,
       error: errorResult(unavailableError(false, "backend_response_invalid")),
