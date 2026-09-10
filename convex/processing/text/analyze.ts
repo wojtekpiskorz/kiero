@@ -32,11 +32,13 @@
  *    a stale plan refuse instead of overwriting a newer correction.
  *
  * Crash/replay semantics: every stage records its step idempotently
- * (insert-if-absent on run+sequence); the workflow journal replays
- * completed actions without re-calling the provider; a crash during one
- * group's publication rolls back that group's transaction entirely, and a
- * restart re-executes only unjournaled steps — no duplicate revisions,
- * tasks or intents.
+ * through the shared run journal (./journal.ts — one owner for step
+ * recording, failure/outcome markers, fragment ensuring and text-extraction
+ * resolution, used by this module, the extract executor and the probes);
+ * the workflow journal replays completed actions without re-calling the
+ * provider; a crash during one group's publication rolls back that group's
+ * transaction entirely, and a restart re-executes only unjournaled steps —
+ * no duplicate revisions, tasks or intents.
  */
 
 import { Schema } from "effect";
@@ -65,9 +67,12 @@ import {
   assistantToolCallsMessage,
   boundPublicationGroups,
   decideGroupPublish,
+  decideRunCompleteness,
   emptyPlanningState,
   emptyPlanNudge,
   finalTurnInstruction,
+  groupIsTextGrounded,
+  revisionSnapshotOf,
   sourceUserMessage,
   toolResultMessage,
   type AnalysisContext,
@@ -86,6 +91,14 @@ import {
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
 import { loadAnalysisContext } from "./analysisContext";
+import {
+  ensureFragment,
+  failureMarkerArmed,
+  outcomeMarkerArmed,
+  recordStep,
+  resolveTextExtraction,
+  stepRow,
+} from "./journal";
 
 /** The model-configuration version label recorded on every run. */
 export const MODEL_CONFIGURATION_VERSION = `e2.routing/${ROUTING_CONFIG_VERSION}#chat_analysis`;
@@ -97,78 +110,6 @@ export const MODEL_ANALYSIS_SEQUENCE = 30;
 export const CLARIFICATION_SEQUENCE_BASE = 500;
 /** Publication-group steps start here (one per bounded group). */
 export const GROUP_SEQUENCE_BASE = 1_000;
-/** Failure markers (the A3 crash-proof pattern) live outside the stages. */
-export const FAILURE_MARKER_BASE = 100_000;
-/** Outcome markers (recorded group failure, no exception) for the isolation proof. */
-export const OUTCOME_MARKER_BASE = 200_000;
-
-// ---------------------------------------------------------------------------
-// Idempotent step recording (insert-if-absent on run+sequence).
-// ---------------------------------------------------------------------------
-
-async function stepRow(
-  db: MutationCtx["db"],
-  runId: Id<"processingRuns">,
-  sequence: number,
-) {
-  return db
-    .query("processingSteps")
-    .withIndex("by_run_sequence", (q) => q.eq("runId", runId).eq("sequence", sequence))
-    .first();
-}
-
-/** Whether the armed failure marker exists for one stage index. */
-export async function analysisFailureArmed(
-  db: MutationCtx["db"],
-  runId: Id<"processingRuns">,
-  sequence: number,
-): Promise<boolean> {
-  const marker = await stepRow(db, runId, FAILURE_MARKER_BASE + sequence);
-  return marker !== null;
-}
-
-/**
- * Whether the armed OUTCOME marker exists for one stage index: unlike the
- * throw marker, this one makes the group's publication fail as a RECORDED
- * OUTCOME (state failed, no exception), so the workflow continues and the
- * independent groups still commit — the deterministic proof of group
- * isolation ("independent groups commit once and failed work stays
- * pending").
- */
-export async function analysisOutcomeFailureArmed(
-  db: MutationCtx["db"],
-  runId: Id<"processingRuns">,
-  sequence: number,
-): Promise<boolean> {
-  const marker = await stepRow(db, runId, OUTCOME_MARKER_BASE + sequence);
-  return marker !== null;
-}
-
-/** Records one step row idempotently with its outcome payload. */
-async function recordStep(
-  db: MutationCtx["db"],
-  runId: Id<"processingRuns">,
-  sequence: number,
-  stepKind: string,
-  outcome: { state: "succeeded" | "failed"; output: unknown },
-): Promise<void> {
-  const existing = await stepRow(db, runId, sequence);
-  const patch = {
-    runId,
-    stepKind,
-    sequence,
-    state: outcome.state,
-    startedAtMs: Date.now(),
-    finishedAtMs: Date.now(),
-    outputRef: JSON.stringify(outcome.output),
-  };
-  if (existing === null) {
-    await db.insert("processingSteps", patch);
-  } else if (existing.state === "running" || existing.state === "pending") {
-    await db.patch(existing._id, patch);
-  }
-}
-
 /**
  * The author session: the agent acts within the source author's firm
  * permissions ("Działa w zakresie uprawnień użytkownika i firmy", issue 8)
@@ -186,47 +127,6 @@ async function authorSessionId(
     .filter((q) => q.eq(q.field("revokedAtMs"), undefined))
     .first();
   return session?._id ?? null;
-}
-
-/** Finds or creates the text-range fragment for one located quote. */
-async function ensureTextRangeFragment(
-  db: MutationCtx["db"],
-  sourceId: Id<"sources">,
-  extractionId: Id<"extractions">,
-  startOffset: number,
-  endOffset: number,
-): Promise<Id<"sourceFragments">> {
-  const fragments = await db
-    .query("sourceFragments")
-    .withIndex("by_extraction", (q) => q.eq("extractionId", extractionId))
-    .collect();
-  const match = fragments.find(
-    (fragment) =>
-      fragment.anchor._tag === "text_range" &&
-      fragment.anchor.startOffset === startOffset &&
-      fragment.anchor.endOffset === endOffset,
-  );
-  if (match !== undefined) {
-    return match._id;
-  }
-  return db.insert("sourceFragments", {
-    extractionId,
-    sourceId,
-    anchor: { _tag: "text_range", startOffset, endOffset },
-    createdAtMs: Date.now(),
-  });
-}
-
-/** The text extraction id of one source (D1 guarantees exactly one). */
-async function textExtractionOf(
-  db: MutationCtx["db"],
-  sourceId: Id<"sources">,
-): Promise<Id<"extractions"> | null> {
-  const row = await db
-    .query("extractions")
-    .withIndex("by_source_kind", (q) => q.eq("sourceId", sourceId).eq("kind", "text"))
-    .first();
-  return row?._id ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -280,10 +180,8 @@ export const loadContextStage = internalMutation({
         projects: context.projects.length,
         findings: context.findings.length,
         pendingSegments: context.coverage.pendingSegments,
-        recordedRevisions: context.findings.map((finding) => ({
-          findingId: finding.findingId,
-          revision: finding.revisionCounter,
-        })),
+        completeness: decideRunCompleteness(context.coverage),
+        recordedRevisions: revisionSnapshotOf(context),
       },
     });
     return {
@@ -550,7 +448,7 @@ export const raiseClarificationStage = internalMutation({
       scope: { kind: "company" | "project"; projectId: string | null };
     };
     const sequence = CLARIFICATION_SEQUENCE_BASE + args.index;
-    const extractionId = await textExtractionOf(ctx.db, source._id);
+    const extractionId = await resolveTextExtraction(ctx.db, source._id, null);
     if (extractionId === null) {
       await recordStep(ctx.db, args.runId, sequence, "raise_clarification", {
         state: "failed",
@@ -561,13 +459,11 @@ export const raiseClarificationStage = internalMutation({
     const fragmentIds: Id<"sourceFragments">[] = [];
     for (const quote of draft.quotes) {
       fragmentIds.push(
-        await ensureTextRangeFragment(
-          ctx.db,
-          source._id,
-          extractionId,
-          quote.startOffset,
-          quote.endOffset,
-        ),
+        await ensureFragment(ctx.db, source._id, extractionId, {
+          _tag: "text_range",
+          startOffset: quote.startOffset,
+          endOffset: quote.endOffset,
+        }),
       );
     }
     const session = await authorSessionId(ctx.db, source.authorUserId);
@@ -651,18 +547,15 @@ export const publishGroupStage = internalMutation({
     // The deterministic group-isolation proof hook: a recorded failure that
     // does NOT throw, so the workflow continues and independent groups
     // still commit (failed work stays explicit against the source).
-    if (await analysisOutcomeFailureArmed(ctx.db, args.runId, sequence)) {
+    if (await outcomeMarkerArmed(ctx.db, args.runId, sequence)) {
       return finish("failed", { outcome: "failed", error: "probe_injected_group_failure" });
     }
 
-    // Defensive honesty: a group with no textual basis and no derivations
-    // claims inspection of nothing — pending, never published.
-    if (
-      group.proposals.every(
-        (proposal) =>
-          proposal.evidence.length === 0 && proposal.derivesFromFindingIds.length === 0,
-      )
-    ) {
+    // Defensive honesty, one predicate (the same one the pure tests pin):
+    // a group whose proposals are not all text-grounded claims inspection of
+    // nothing — pending, never published. The reducer refuses basis-less
+    // proposals, so this fires only on journaled-plan corruption.
+    if (!groupIsTextGrounded(group)) {
       return finish("succeeded", { outcome: "pending_segments", key: group.key });
     }
 
@@ -740,7 +633,7 @@ export const publishGroupStage = internalMutation({
     }
 
     // --- build the source-linked planned revisions (wire form) ---------
-    const extractionId = await textExtractionOf(ctx.db, source._id);
+    const extractionId = await resolveTextExtraction(ctx.db, source._id, null);
     if (extractionId === null) {
       return finish("failed", { outcome: "failed", error: "text_extraction_missing" });
     }
@@ -753,13 +646,11 @@ export const publishGroupStage = internalMutation({
         extractionId: string;
       }[] = [];
       for (const located of proposal.evidence) {
-        const fragmentId = await ensureTextRangeFragment(
-          ctx.db,
-          source._id,
-          extractionId,
-          located.startOffset,
-          located.endOffset,
-        );
+        const fragmentId = await ensureFragment(ctx.db, source._id, extractionId, {
+          _tag: "text_range",
+          startOffset: located.startOffset,
+          endOffset: located.endOffset,
+        });
         evidence.push({
           sourceId: source._id,
           fragmentId,
@@ -827,7 +718,7 @@ export const publishGroupStage = internalMutation({
     const receipt = published.value as { publishedRevisionIds: Id<"findingRevisions">[] };
 
     // --- crash-proof hook: the armed marker throws AFTER the writes ----
-    if (await analysisFailureArmed(ctx.db, args.runId, sequence)) {
+    if (await failureMarkerArmed(ctx.db, args.runId, sequence)) {
       throw new Error("analysis: injected failure after group publication");
     }
     return finish("succeeded", {
@@ -956,7 +847,19 @@ export const completeAnalysisRun = internalMutation({
       .filter((stepRow_) => stepRow_.stepKind === "publish_group")
       .map((stepRow_) => ({ sequence: stepRow_.sequence, state: stepRow_.state, output: stepRow_.outputRef }));
     const clarified = steps.filter((stepRow_) => stepRow_.stepKind === "raise_clarification").length;
-    const loadOutput = steps.find((stepRow_) => stepRow_.stepKind === "load_context")?.outputRef;
+    const loadRow = steps.find((stepRow_) => stepRow_.stepKind === "load_context");
+    const loadOutput = loadRow?.outputRef;
+    let completeness: string | null = null;
+    if (loadOutput !== undefined) {
+      try {
+        const parsedLoad = JSON.parse(loadOutput) as { completeness?: unknown };
+        if (typeof parsedLoad.completeness === "string") {
+          completeness = parsedLoad.completeness;
+        }
+      } catch {
+        // Non-JSON load output (never produced by this lane); leave null.
+      }
+    }
     let workflowId: string | null = null;
     if (selected_checkpoint !== undefined) {
       try {
@@ -974,6 +877,7 @@ export const completeAnalysisRun = internalMutation({
         ...(workflowId === null ? {} : { workflowId }),
         groups: groupOutcomes,
         clarified,
+        completeness,
         load: loadOutput === undefined ? null : JSON.parse(loadOutput),
       }),
       finishedAtMs: nowMs,

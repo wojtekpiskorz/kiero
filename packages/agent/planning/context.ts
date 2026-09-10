@@ -31,6 +31,32 @@ export type ContextScope =
   | { readonly kind: "company" }
   | { readonly kind: "project"; readonly projectId: string };
 
+/**
+ * Any scope-like value (a `ContextScope` or a bounding group key): kind
+ * plus, for projects, the project identity (null/undefined tolerated on
+ * the company kind, where it is meaningless).
+ */
+export interface ScopeLike {
+  readonly kind: "company" | "project";
+  readonly projectId?: string | null;
+}
+
+/**
+ * THE scope-equality rule: same kind, and for projects the same project
+ * identity. Every scope comparison in the planning package (finding
+ * lookup, duplicate detection, correction targeting, group bounding) goes
+ * through this one helper.
+ */
+export function sameScope(a: ScopeLike, b: ScopeLike): boolean {
+  if (a.kind !== b.kind) {
+    return false;
+  }
+  if (a.kind === "company") {
+    return true;
+  }
+  return (a.projectId ?? null) === (b.projectId ?? null);
+}
+
 /** One current finding row as the analysis sees it (wire value form). */
 export interface ContextFinding {
   readonly findingId: string;
@@ -97,12 +123,7 @@ export function findContextFinding(
 ): ContextFinding | undefined {
   return context.findings.find(
     (finding) =>
-      finding.semanticKey === semanticKey &&
-      finding.scope.kind === scope.kind &&
-      (scope.kind === "company" ||
-        (finding.scope.kind === "project" &&
-          scope.kind === "project" &&
-          finding.scope.projectId === scope.projectId)),
+      finding.semanticKey === semanticKey && sameScope(finding.scope, scope),
   );
 }
 
@@ -122,12 +143,4 @@ export function revisionSnapshotOf(
     findingId: finding.findingId,
     revision: finding.revisionCounter,
   }));
-}
-
-/** Whether one scope refers to a known context project (or firm memory). */
-export function scopeResolvable(
-  context: AnalysisContext,
-  scope: ContextScope,
-): boolean {
-  return scope.kind === "company" || findContextProject(context, scope.projectId) !== undefined;
 }

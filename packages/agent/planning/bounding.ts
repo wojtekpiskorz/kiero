@@ -22,7 +22,12 @@
  *   truth (C2's stale-plan guard wired; issue #8 precedence).
  */
 
-import type { AnalysisContext, ContextScope } from "./context";
+import {
+  revisionSnapshotOf,
+  sameScope,
+  type AnalysisContext,
+  type ContextScope,
+} from "./context";
 import type { ClarificationDraft, FindingProposal, PlanningState } from "./reducer";
 
 /** The stable identity of one publication group. */
@@ -50,10 +55,6 @@ export interface BoundedPlan {
   readonly clarifications: readonly ClarificationDraft[];
 }
 
-function sameKey(scope: ContextScope, key: GroupKey): boolean {
-  return scope.kind === key.kind && (key.kind === "company" || (scope.kind === "project" && scope.projectId === key.projectId));
-}
-
 /** The group key of one scope (project scopes keep their handle/id). */
 export function groupKeyOfScope(scope: ContextScope): GroupKey {
   return scope.kind === "company"
@@ -72,10 +73,8 @@ export function boundPublicationGroups(
   state: PlanningState,
   context: AnalysisContext,
 ): BoundedPlan {
-  const analysisRevisions = context.findings.map((finding) => ({
-    findingId: finding.findingId,
-    revision: finding.revisionCounter,
-  }));
+  // The input-revision version of the run, from the one derivation.
+  const analysisRevisions = revisionSnapshotOf(context);
   const groups = new Map<string, PublicationGroup>();
   const accepted: FindingProposal[] = [];
   for (const proposal of state.proposals) {
@@ -84,7 +83,7 @@ export function boundPublicationGroups(
       return basis === undefined ? null : basis.scope;
     });
     const foreignBasis = basisScopes.some(
-      (basisScope) => basisScope !== null && !sameKey(basisScope, groupKeyOfScope(proposal.scope)),
+      (basisScope) => basisScope !== null && !sameScope(basisScope, proposal.scope),
     );
     if (foreignBasis) {
       continue; // A derivation must commit with its basis, never across scopes.
@@ -154,7 +153,27 @@ export function decideGroupPublish(
   return { decision: "publish" };
 }
 
-/** Whether one group's proposals are all text-grounded (no segment claims). */
-export function groupIsTextGrounded(group: PublicationGroup): boolean {
-  return group.proposals.every((proposal) => proposal.evidence.length > 0 || proposal.derivesFromFindingIds.length > 0);
+/**
+ * The minimal proposal shape the grounding predicate needs (satisfied by
+ * both the pure `FindingProposal` and the wire group the publish stage
+ * receives — one predicate, both halves).
+ */
+export interface GroundingProposalShape {
+  readonly evidence: readonly unknown[];
+  readonly derivesFromFindingIds: readonly string[];
+}
+
+/**
+ * Whether one group's proposals are all text-grounded: every proposal
+ * carries located textual evidence or a derivation basis. This is THE
+ * grounding predicate — the publish stage marks a group that fails it
+ * `pending_segments` (claims inspection of nothing), never publishes it.
+ */
+export function groupIsTextGrounded(group: {
+  readonly proposals: readonly GroundingProposalShape[];
+}): boolean {
+  return group.proposals.every(
+    (proposal) =>
+      proposal.evidence.length > 0 || proposal.derivesFromFindingIds.length > 0,
+  );
 }

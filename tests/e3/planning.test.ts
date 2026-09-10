@@ -24,9 +24,10 @@ import {
   decideGroupPublish,
   decideRunCompleteness,
   emptyPlanningState,
+  groupIsTextGrounded,
   isCompleteTranscript,
   locateQuote,
-  mayClaimInspection,
+  sameScope,
   analysisSystemPrompt,
   sourceUserMessage,
   PLANNING_PROMPT_VERSION,
@@ -647,9 +648,57 @@ describe("pending-segment honesty (text-only cannot claim a pending image)", () 
     );
   });
 
-  it("claims of inspecting a pending (not-yet-extracted) segment are refused", () => {
-    expect(mayClaimInspection(pending, "vision")).toBe(false);
-    expect(mayClaimInspection(pending, "text")).toBe(true);
+  it("the inspection guard is structural: evidence must locate verbatim in this source's text", () => {
+    // There is no per-kind runtime predicate because the tool surface
+    // exposes no other basis kind: a quote that does not occur in the
+    // author text is refused by the reducer, so a text-only run can never
+    // cite a segment it did not inspect.
+    const outcome = applyDecodedCall(
+      emptyPlanningState(),
+      contextOf(),
+      decodedUpsert({ ...UPSERT_WEDNESDAY, quotes: ["zdjęcie z delivering-notatki"] }),
+      "PLN",
+    );
+    expect(outcome.state.proposals).toHaveLength(0);
+    expect(outcome.toolResult).toContain("ODRZUCONO");
+  });
+});
+
+describe("one scope-equality rule (sameScope)", () => {
+  it("equal kinds and project identities compare equal; everything else does not", () => {
+    expect(sameScope({ kind: "company" }, { kind: "company", projectId: null })).toBe(true);
+    expect(
+      sameScope(
+        { kind: "project", projectId: "p1" },
+        { kind: "project", projectId: "p1" },
+      ),
+    ).toBe(true);
+    expect(
+      sameScope(
+        { kind: "project", projectId: "p1" },
+        { kind: "project", projectId: "p2" },
+      ),
+    ).toBe(false);
+    expect(sameScope({ kind: "company" }, { kind: "project", projectId: "p1" })).toBe(false);
+  });
+});
+
+describe("one grounding predicate (groupIsTextGrounded)", () => {
+  it("every proposal needs textual evidence or a derivation basis", () => {
+    const grounded = {
+      proposals: [
+        { evidence: [{ quote: "q" }], derivesFromFindingIds: [] },
+        { evidence: [], derivesFromFindingIds: ["f1"] },
+      ],
+    };
+    const ungrounded = {
+      proposals: [
+        { evidence: [{ quote: "q" }], derivesFromFindingIds: [] },
+        { evidence: [], derivesFromFindingIds: [] },
+      ],
+    };
+    expect(groupIsTextGrounded(grounded)).toBe(true);
+    expect(groupIsTextGrounded(ungrounded)).toBe(false);
   });
 });
 

@@ -44,7 +44,13 @@ import {
   serviceSessionId,
 } from "../../sources/probe_shared";
 
-import { analysisFailureArmed, analysisOutcomeFailureArmed, restartAnalysisWorkflow } from "./analyze";
+import { restartAnalysisWorkflow } from "./analyze";
+import {
+  FAILURE_MARKER_BASE,
+  OUTCOME_MARKER_BASE,
+  failureMarkerArmed,
+  outcomeMarkerArmed,
+} from "./journal";
 import { vWorkflowId } from "@convex-dev/workflow";
 
 // --- inspection ------------------------------------------------------------
@@ -268,14 +274,14 @@ export const probeKickReanalysis = action({
 export const armAnalysisFailure = internalMutation({
   args: { runId: v.id("processingRuns"), sequence: v.number() },
   handler: async (ctx, args) => {
-    const armed = await analysisFailureArmed(ctx.db, args.runId, args.sequence);
+    const armed = await failureMarkerArmed(ctx.db, args.runId, args.sequence);
     if (armed) {
       return okResult({ armed: true });
     }
     await ctx.db.insert("processingSteps", {
       runId: args.runId,
       stepKind: "failure_marker",
-      sequence: 100_000 + args.sequence,
+      sequence: FAILURE_MARKER_BASE + args.sequence,
       state: "failed",
       outputRef: "armed",
       startedAtMs: Date.now(),
@@ -302,14 +308,14 @@ export const probeArmAnalysisFailure = action({
 export const armAnalysisOutcomeFailure = internalMutation({
   args: { runId: v.id("processingRuns"), sequence: v.number() },
   handler: async (ctx, args) => {
-    const armed = await analysisOutcomeFailureArmed(ctx.db, args.runId, args.sequence);
+    const armed = await outcomeMarkerArmed(ctx.db, args.runId, args.sequence);
     if (armed) {
       return okResult({ armed: true });
     }
     await ctx.db.insert("processingSteps", {
       runId: args.runId,
       stepKind: "outcome_failure_marker",
-      sequence: 200_000 + args.sequence,
+      sequence: OUTCOME_MARKER_BASE + args.sequence,
       state: "failed",
       outputRef: "armed",
       startedAtMs: Date.now(),

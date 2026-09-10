@@ -26,6 +26,7 @@ import {
 import {
   findContextFinding,
   findContextProject,
+  sameScope,
   type AnalysisContext,
   type ContextScope,
 } from "./context";
@@ -192,11 +193,7 @@ function applyUpsert(
     return reject(state, scope.reason);
   }
   const duplicateInPlan = state.proposals.some(
-    (p) =>
-      p.semanticKey === args.semanticKey &&
-      p.scope.kind === scope.scope.kind &&
-      (scope.scope.kind === "company" ||
-        (p.scope.kind === "project" && p.scope.projectId === scope.scope.projectId)),
+    (p) => p.semanticKey === args.semanticKey && sameScope(p.scope, scope.scope),
   );
   if (duplicateInPlan) {
     return reject(state, `propozycja dla ${args.semanticKey} w tym zakresie już istnieje w planie`);
@@ -209,10 +206,6 @@ function applyUpsert(
       state,
       "żaden cytat nie występuje dosłownie w wiadomości, a brak podstawy wnioskowej — popraw cytaty",
     );
-  }
-  if (dropped.length > 0) {
-    // Partial grounding is honest: keep located quotes, name the dropped.
-    void dropped;
   }
 
   // Value construction (server-side anchoring and guards).
@@ -274,7 +267,7 @@ function applyUpsert(
     if (target === undefined) {
       return reject(state, "replacesFindingId nie wskazuje ustalenia z kontekstu tej firmy");
     }
-    if (target.semanticKey !== args.semanticKey || target.scope.kind !== scope.scope.kind || (scope.scope.kind === "project" && (target.scope.kind !== "project" || target.scope.projectId !== scope.scope.projectId))) {
+    if (target.semanticKey !== args.semanticKey || !sameScope(target.scope, scope.scope)) {
       return reject(
         state,
         "korekta nie może zmieniać znaczenia ani zakresu ustalenia — dopasuj semanticKey i scope",

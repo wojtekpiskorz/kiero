@@ -109,6 +109,7 @@ import type * as platform_publish from "../platform/publish.js";
 import type * as processing_text_analysisContext from "../processing/text/analysisContext.js";
 import type * as processing_text_analyze from "../processing/text/analyze.js";
 import type * as processing_text_extract from "../processing/text/extract.js";
+import type * as processing_text_journal from "../processing/text/journal.js";
 import type * as processing_text_probe from "../processing/text/probe.js";
 import type * as projects_dispatch from "../projects/dispatch.js";
 import type * as projects_functions from "../projects/functions.js";
@@ -233,6 +234,7 @@ declare const fullApi: ApiFromModules<{
   "processing/text/analysisContext": typeof processing_text_analysisContext;
   "processing/text/analyze": typeof processing_text_analyze;
   "processing/text/extract": typeof processing_text_extract;
+  "processing/text/journal": typeof processing_text_journal;
   "processing/text/probe": typeof processing_text_probe;
   "projects/dispatch": typeof projects_dispatch;
   "projects/functions": typeof projects_functions;

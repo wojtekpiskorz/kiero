@@ -5,17 +5,18 @@
  *
  * The analysis context records which parts of the source were actually
  * inspectable by THIS run: completed extraction kinds versus attachments
- * still waiting for theirs. The rules here are pure decisions over that
- * snapshot:
+ * still waiting for theirs. The runtime rules that consume the snapshot:
  *
- * - a run whose source still has pending segments is NOT a complete
- *   transcript: it completes as partial, never as a full analysis;
- * - a text-only run cannot claim to have inspected a pending image or
- *   audio segment: proposals whose declared basis is a not-yet-extracted
- *   segment are refused, whatever the model said;
- * - text-grounded findings remain publishable: they do not claim image
- *   inspection, and unrelated confirmed information is not blocked by an
- *   unrelated backlog (protocol step 6).
+ * - `decideRunCompleteness` is wired into BOTH halves of the pipeline: the
+ *   load stage records the label on its step output, and the completion
+ *   summary copies it onto the run's checkpoint — a run whose source still
+ *   has pending segments completes PARTIAL, never as a complete transcript;
+ * - the inspection guard itself is STRUCTURAL, not a per-proposal runtime
+ *   check: every evidence quote a plan may carry must locate verbatim in
+ *   THIS source's author text (the reducer refuses hallucinated quotes),
+ *   so a text-only run can never cite an image or audio segment it did not
+ *   inspect. There is no per-kind runtime predicate because the tool
+ *   surface exposes no other basis kind to check.
  */
 
 /** Media kinds whose extraction may be pending on one source. */
@@ -32,34 +33,9 @@ export interface CoverageSnapshot {
   readonly pendingSegments: readonly PendingSegmentKind[];
 }
 
-/** Whether one extraction kind has a completed version. */
-export function hasCompletedExtraction(
-  coverage: CoverageSnapshot,
-  kind: "text" | "stt" | "vision",
-): boolean {
-  return coverage.extractedKinds.includes(kind);
-}
-
-/**
- * Whether the whole source was inspectable: no required segment is pending.
- * A run over a source with pending segments completes PARTIAL, never as a
- * complete transcript.
- */
+/** Whether the whole source was inspectable: no required segment is pending. */
 export function isCompleteTranscript(coverage: CoverageSnapshot): boolean {
   return coverage.pendingSegments.length === 0;
-}
-
-/**
- * Whether a proposal may ground itself in one media kind. A pending image
- * or audio segment supports no claim of inspection; completed text, STT and
- * vision extractions do. This is the server-side honesty guard: the model
- * never gets to assert inspection the run did not perform.
- */
-export function mayClaimInspection(
-  coverage: CoverageSnapshot,
-  basisKind: "text" | "stt" | "vision",
-): boolean {
-  return hasCompletedExtraction(coverage, basisKind);
 }
 
 /** The honest run-completion state recorded with the analysis outcome. */

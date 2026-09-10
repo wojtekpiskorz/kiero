@@ -9,7 +9,6 @@ import { Schema } from "effect";
 import { DateRange, executors } from "@kiero/contracts";
 import { jobExecutors } from "../../convex/platform/executors";
 import { echoExecutor } from "../../convex/platform/echo";
-import { analyzeChangePlanExecutor } from "../../convex/platform/pipeline";
 
 describe("convex executor composition", () => {
   it("registers exactly the implemented executors (platform + B3 + E3 text lane)", () => {
@@ -27,7 +26,6 @@ describe("convex executor composition", () => {
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");
-    expect(analyzeChangePlanExecutor.jobKind).toBe("processing.analyze_change_plan");
   });
 
   it("every registered kind exists in the A2/A3 registry executor table", () => {
