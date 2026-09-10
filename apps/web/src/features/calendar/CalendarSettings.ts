@@ -66,11 +66,9 @@ export function CalendarSettings({ actionsEnabled }: { readonly actionsEnabled: 
   // Without the actor's own connection row there is nothing to operate on;
   // the connection panel above already explains those states. The lean
   // read branches carry `selection: null` (no own connection means no
-  // scope to read), so the non-null selection is the full branch's honest
-  // discriminator for the sync read alone (`reconnectNeeded` exists on the
-  // full branch only). The projection read's selection gate lives below the
-  // view annotations; both assignments turn server-side shape drift into a
-  // compile error instead of a silently blanked section.
+  // scope to read), so the non-null selection is the projection read's
+  // full-branch discriminator; the sync read discriminates on
+  // `reconnectNeeded`, which exists on the full branch only.
   if (
     !("reconnectNeeded" in sync.data) ||
     typeof sync.data.reconnectNeeded !== "boolean"
