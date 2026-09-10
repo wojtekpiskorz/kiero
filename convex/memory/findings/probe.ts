@@ -318,6 +318,47 @@ export const probeReadCurrentFindings = action({
   },
 });
 
+// H1 exposition-read probes (guarded): the same internal twins the public
+// queries ride, so the boss-facing history/clarification reads are provable
+// live against the real authorization path without a development-auth
+// shortcut.
+
+/** The guarded finding-history read (revisions + provenance). */
+export const probeReadFindingHistory = action({
+  args: { findingId: v.id("findings"), sessionId: v.optional(v.string()) },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    if (!probeGuardEnabled()) {
+      return probeDisabled();
+    }
+    const sessionId = await resolveProbeSession(ctx, args.sessionId);
+    if (sessionId === null) {
+      return serviceIdentityUnavailable();
+    }
+    return ctx.runQuery(internal.memory.findings.functions.readFindingHistoryFor, {
+      serviceSessionId: sessionId,
+      findingId: args.findingId,
+    });
+  },
+});
+
+/** The guarded clarifications read (open + resolved, with evidence). */
+export const probeReadClarifications = action({
+  args: { scope: v.any(), sessionId: v.optional(v.string()) },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    if (!probeGuardEnabled()) {
+      return probeDisabled();
+    }
+    const sessionId = await resolveProbeSession(ctx, args.sessionId);
+    if (sessionId === null) {
+      return serviceIdentityUnavailable();
+    }
+    return ctx.runQuery(internal.memory.findings.functions.readClarificationsFor, {
+      serviceSessionId: sessionId,
+      scope: args.scope,
+    });
+  },
+});
+
 /** Runs the deployed pure temporal resolver (guarded; no state touched). */
 export const probeResolveRelativeDay = action({
   args: { expression: v.string(), sentAtMs: v.float64(), timezone: v.string() },

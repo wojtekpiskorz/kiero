@@ -9,6 +9,7 @@
 
 import { composeAppFeatures, type AppFeatureEntry } from "./registry";
 import { conversationFeatureEntry } from "./features/conversation/entry";
+import { memoryFeatureEntry } from "./features/memory/entry";
 import { coTerazFeatureEntry } from "./features/co-teraz/entry";
 import { projectsFeatureEntry } from "./features/projects/entry";
 import { membershipFeatureEntry } from "./features/membership/entry";
@@ -18,6 +19,9 @@ import { gmAccessFeatureEntry } from "./features/gm/entry";
 /** Every registered host feature, in navigation order. The first entry ("/") is the default route. */
 export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
   conversationFeatureEntry,
+  // H1's sanctioned host mount: the boss-facing memory views (findings,
+  // history/provenance, clarifications, direct correction).
+  memoryFeatureEntry,
   coTerazFeatureEntry,
   projectsFeatureEntry,
   // B3's sanctioned host mount: the first mounted feature (sign-in gate +
