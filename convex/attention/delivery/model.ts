@@ -144,17 +144,10 @@ export interface BatchSummary {
  * The evaluation order of one due-intent sweep, as a value: read/death
  * re-checks happen per intent BEFORE the per-bucket personal decision, so
  * a read entry leaves the batch ("Pomijamy przeczytane wiadomości") and a
- * revoked member's intent dies regardless of preferences. Exported for the
- * pure tests to pin the order the evaluator documents.
+ * revoked member's intent dies regardless of preferences. The order lives
+ * in the evaluator itself; no separate stage list is kept (a second list
+ * would contradict the implementation, as review round 2 found).
  */
-export const EVALUATION_ORDER = [
-  "business_validity",
-  "recipient_rights",
-  "assignment",
-  "read_state",
-  "personal_delivery",
-] as const;
-export type EvaluationStage = (typeof EVALUATION_ORDER)[number];
 
 /**
  * The closed death-reason vocabulary recorded on suppressed intents. F1's
