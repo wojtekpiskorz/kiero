@@ -181,13 +181,13 @@ async function runOneAttempt(
   // The four early answers spell their returns out: each names its own
   // kind and reason at the return site, which reads as the decision
   // table it mirrors.
-  const connectionOfCopy = await ctx.runQuery(internal.calendar.sync.functions.copyConnectionOf, {
+  const connectionId = await ctx.runQuery(internal.calendar.sync.functions.copyConnectionOf, {
     copyId,
   });
-  if (connectionOfCopy === null) {
+  if (connectionId === null) {
     return { kind: "copy_missing", reason: null, accessLost: false, remoteOutcome: null, attemptOutcome: null };
   }
-  const credential = await freshAccessToken(ctx, connectionOfCopy.connectionId);
+  const credential = await freshAccessToken(ctx, connectionId);
   if ("barrier" in credential) {
     return { kind: "barrier", reason: credential.barrier, accessLost: false, remoteOutcome: null, attemptOutcome: null };
   }
@@ -331,9 +331,9 @@ export const copyIdsOfConnection = internalQuery({
  */
 export const copyConnectionOf = internalQuery({
   args: { copyId: v.id("calendarCopies") },
-  handler: async (ctx, args): Promise<{ connectionId: Id<"calendarConnections"> } | null> => {
+  handler: async (ctx, args): Promise<Id<"calendarConnections"> | null> => {
     const copy = await ctx.db.get(args.copyId);
-    return copy === null ? null : { connectionId: copy.connectionId };
+    return copy === null ? null : copy.connectionId;
   },
 });
 
