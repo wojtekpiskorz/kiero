@@ -21,6 +21,9 @@ import { calendarFeatureEntry } from "./features/calendar/entry";
 import { gmAccessFeatureEntry } from "./features/gm/entry";
 // F3's sanctioned host mount: the Polish web push settings screen.
 import { notificationsFeatureEntry } from "./features/notifications/entry";
+// H4's sanctioned host mount: the audited GM processing inspector (entry
+// file owns the shape, this line the wiring).
+import { gmProcessingFeatureEntry } from "./features/gm/processing-entry";
 
 /** Every registered host feature, in navigation order. The first entry ("/") is the default route. */
 export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
@@ -40,6 +43,9 @@ export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
   // B4's sanctioned host mount: the audited GM operator surface (entry/exit
   // GM mode, inspection, recovery, onboarding, activation, restoration).
   gmAccessFeatureEntry,
+  // H4's sanctioned host mount: the audited processing inspection and GM
+  // retry controls (B4's GM mode required; no boss-facing mutation).
+  gmProcessingFeatureEntry,
   // G1's sanctioned host mount: the optional personal Calendar connection
   // (sign-in gate reused; connection lifecycle only, never identity).
   calendarFeatureEntry,
