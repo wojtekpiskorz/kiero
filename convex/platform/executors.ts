@@ -27,6 +27,10 @@
  *   the resumable per-segment STT workflow over one audio transcript order
  *   (the first model-call executor; the contracts amendment E2 named as
  *   its prerequisite, registered in @kiero/contracts by D6, flagged).
+
+ * - `processing.normalize_photo` (../processing/images/executor.ts, D5):
+ *   the accepted-photo normalization executor (architecture protocol step
+ *   4) with the echo-template uncertain-outcome semantics.
  */
 
 import type { FunctionReference } from "convex/server";
@@ -38,6 +42,8 @@ import { analyzeChangePlanExecutor as e3AnalyzeChangePlanExecutor } from "../pro
 import { extractFragmentsExecutor } from "../processing/text/extract";
 import { cleanupRevocationExecutor } from "../access/membership/cleanup";
 import { transcribeSegmentExecutor } from "../processing/audio/executor";
+
+import { normalizePhotoExecutor } from "../processing/images/executor";
 
 /** One durable job row (the executable counterpart of an outbox event). */
 export type DurableJobDoc = Doc<"durableJobs">;
@@ -66,4 +72,6 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [extractFragmentsExecutor.jobKind]: extractFragmentsExecutor,
   [cleanupRevocationExecutor.jobKind]: cleanupRevocationExecutor,
   [transcribeSegmentExecutor.jobKind]: transcribeSegmentExecutor,
+
+  [normalizePhotoExecutor.jobKind]: normalizePhotoExecutor,
 };

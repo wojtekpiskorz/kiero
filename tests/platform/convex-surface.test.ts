@@ -23,6 +23,10 @@ describe("convex executor composition", () => {
         // contracts amendment registering the kind is flagged there).
         "processing.transcribe_segment",
 
+        // D5's sanctioned append (issue #33 owns the declared consumer
+        // proof for the accepted-photo normalization edge).
+        "processing.normalize_photo",
+
         // E3's sanctioned append (issue #37 owns the text-analysis lane:
         // the mechanical A3 analyze executor is replaced behind the same
         // seam by the real workflow, and the extract edge is implemented).
