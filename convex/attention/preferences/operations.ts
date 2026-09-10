@@ -80,6 +80,85 @@ export function dedupeProjectIds(projectIds: readonly string[]): string[] {
   return out;
 }
 
+/** The row's write shape (Convex Ids for the muted projects). */
+interface PreferenceWrite {
+  readonly mutedProjectIds: Id<"projects">[];
+  readonly companyEntriesMuted: boolean;
+  readonly taskRemindersMuted: boolean;
+  readonly hidePreviewContent: boolean;
+  readonly quietHours: QuietHoursWindow | null;
+}
+
+/**
+ * The ONE row-to-write mapping: a stored row (or null for a first change)
+ * becomes the carry-over base in exactly the shape insert/patch consume.
+ */
+export function preferenceWriteOf(row: Doc<"notificationPreferences"> | null): PreferenceWrite {
+  if (row === null) {
+    return {
+      mutedProjectIds: [],
+      companyEntriesMuted: false,
+      taskRemindersMuted: false,
+      hidePreviewContent: false,
+      quietHours: null,
+    };
+  }
+  return {
+    mutedProjectIds: [...row.mutedProjectIds],
+    companyEntriesMuted: row.companyEntriesMuted,
+    taskRemindersMuted: row.taskRemindersMuted,
+    hidePreviewContent: row.hidePreviewContent,
+    quietHours:
+      row.quietHoursStartMinute !== undefined && row.quietHoursEndMinute !== undefined
+        ? {
+            startMinuteOfDay: row.quietHoursStartMinute,
+            endMinuteOfDay: row.quietHoursEndMinute,
+          }
+        : null,
+  };
+}
+
+/**
+ * The quiet-hours override columns for one window (the SET case), spelled
+ * once for both write branches. The null case differs honestly between
+ * them: insert omits the columns (absent = not set), patch writes explicit
+ * `undefined` (which removes them); absence IS the "not set" state the
+ * evaluation resolves to the company default, and there is deliberately no
+ * way to store "no quiet hours".
+ */
+export function quietHoursFields(window: QuietHoursWindow): {
+  quietHoursStartMinute: number;
+  quietHoursEndMinute: number;
+} {
+  return {
+    quietHoursStartMinute: window.startMinuteOfDay,
+    quietHoursEndMinute: window.endMinuteOfDay,
+  };
+}
+
+/**
+ * Applies one patch over the carry-over base: present keys replace, omitted
+ * keys pass the stored value through verbatim (independent changes cannot
+ * clobber each other). `validatedMutedProjectIds` is the already
+ * tenant-checked list when the patch carries one.
+ */
+export function applyPreferencePatch(
+  base: PreferenceWrite,
+  input: ChangePreferencesInput,
+  validatedMutedProjectIds: Id<"projects">[] | undefined,
+): PreferenceWrite {
+  return {
+    mutedProjectIds:
+      validatedMutedProjectIds !== undefined
+        ? [...validatedMutedProjectIds]
+        : base.mutedProjectIds,
+    companyEntriesMuted: input.companyEntriesMuted ?? base.companyEntriesMuted,
+    taskRemindersMuted: input.taskRemindersMuted ?? base.taskRemindersMuted,
+    hidePreviewContent: input.hidePreviewContent ?? base.hidePreviewContent,
+    quietHours: input.quietHours === undefined ? base.quietHours : input.quietHours,
+  };
+}
+
 /** Whether a patch carries at least one control to change. */
 export function patchIsEmpty(input: ChangePreferencesInput): boolean {
   return (
@@ -148,41 +227,10 @@ export async function performChangeNotificationPreferences(
     .withIndex("by_company_user", (q) => q.eq("companyId", companyId).eq("userId", userId))
     .first();
 
-  // Carry-over base in the WRITE shape (Convex Ids for the muted projects);
-  // omitted keys keep the stored value (defaults for a first change: no
-  // mutes, nothing hidden).
-  const base = existing === null
-    ? {
-        mutedProjectIds: [] as Id<"projects">[],
-        companyEntriesMuted: false,
-        taskRemindersMuted: false,
-        hidePreviewContent: false,
-        quietHours: null as QuietHoursWindow | null,
-      }
-    : {
-        mutedProjectIds: [...existing.mutedProjectIds],
-        companyEntriesMuted: existing.companyEntriesMuted,
-        taskRemindersMuted: existing.taskRemindersMuted,
-        hidePreviewContent: existing.hidePreviewContent,
-        quietHours:
-          existing.quietHoursStartMinute !== undefined && existing.quietHoursEndMinute !== undefined
-            ? {
-                startMinuteOfDay: existing.quietHoursStartMinute,
-                endMinuteOfDay: existing.quietHoursEndMinute,
-              }
-            : null,
-      };
-  const next = {
-    mutedProjectIds:
-      mutedProjectIds !== undefined ? [...mutedProjectIds] : base.mutedProjectIds,
-    companyEntriesMuted: input.companyEntriesMuted ?? base.companyEntriesMuted,
-    taskRemindersMuted: input.taskRemindersMuted ?? base.taskRemindersMuted,
-    hidePreviewContent: input.hidePreviewContent ?? base.hidePreviewContent,
-    // `null` reverts to the company default window by REMOVING the override
-    // columns (absence is the "not set" state; the evaluation resolves the
-    // default). There is deliberately no way to store "no quiet hours".
-    quietHours: input.quietHours === undefined ? base.quietHours : input.quietHours,
-  };
+  // Carry-over base through the ONE row-to-write mapping; omitted keys keep
+  // the stored value (defaults for a first change: no mutes, nothing
+  // hidden).
+  const next = applyPreferencePatch(preferenceWriteOf(existing), input, mutedProjectIds);
 
   if (existing === null) {
     await tx.db.insert("notificationPreferences", {
@@ -192,12 +240,8 @@ export async function performChangeNotificationPreferences(
       companyEntriesMuted: next.companyEntriesMuted,
       taskRemindersMuted: next.taskRemindersMuted,
       hidePreviewContent: next.hidePreviewContent,
-      ...(next.quietHours === null
-        ? {}
-        : {
-            quietHoursStartMinute: next.quietHours.startMinuteOfDay,
-            quietHoursEndMinute: next.quietHours.endMinuteOfDay,
-          }),
+      // Insert omits the override columns when reverting (absent = not set).
+      ...(next.quietHours === null ? {} : quietHoursFields(next.quietHours)),
       updatedAtMs: nowMs,
     });
   } else {
@@ -206,12 +250,10 @@ export async function performChangeNotificationPreferences(
       companyEntriesMuted: next.companyEntriesMuted,
       taskRemindersMuted: next.taskRemindersMuted,
       hidePreviewContent: next.hidePreviewContent,
+      // Patch removes the override columns when reverting (undefined clears).
       ...(next.quietHours === null
         ? { quietHoursStartMinute: undefined, quietHoursEndMinute: undefined }
-        : {
-            quietHoursStartMinute: next.quietHours.startMinuteOfDay,
-            quietHoursEndMinute: next.quietHours.endMinuteOfDay,
-          }),
+        : quietHoursFields(next.quietHours)),
       updatedAtMs: nowMs,
     });
   }

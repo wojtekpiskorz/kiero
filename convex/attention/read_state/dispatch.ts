@@ -4,7 +4,8 @@
  *
  * `dispatchReadStateCommand` is @kiero/runtime's `dispatchCommand` over the
  * canonical context resolution (verified identity -> session -> user -> one
- * active membership -> company) and the platform authorization seam. Two
+ * active membership -> company) and the platform authorization seam,
+ * through the attention lane's shared resolver (../context.ts). Two
  * identity sources exist and only two, both verified server-side: Convex
  * Auth (`ctx.auth`, the user path) and the service bridge (a verified
  * service session id, used by the internal transactional entry and the
@@ -16,18 +17,8 @@
 
 import { Schema } from "effect";
 import type { ResultEnvelope } from "@kiero/contracts";
-import {
-  dispatchCommand,
-  membershipPolicy,
-  type CommandDeps,
-  type HandlerRegistry,
-  type RequestContext,
-} from "@kiero/runtime";
-import {
-  bridgeIdentity,
-  identityFromConvexAuth,
-  resolveRequestContext,
-} from "../../platform/context";
+import { dispatchCommand, membershipPolicy, type CommandDeps, type HandlerRegistry } from "@kiero/runtime";
+import { attentionContextResolver } from "../context";
 import type { MutationCtx } from "../../_generated/server";
 import { markSourceReadOperation, performMarkSourceRead } from "./operations";
 
@@ -55,15 +46,8 @@ export async function dispatchReadStateCommand(
   envelope: unknown,
   serviceSessionId: string | undefined,
 ): Promise<ResultEnvelope> {
-  const resolveContext = async (tx: MutationCtx): Promise<RequestContext | null> => {
-    const identity =
-      serviceSessionId === undefined
-        ? await identityFromConvexAuth(tx.auth, Date.now())
-        : bridgeIdentity(serviceSessionId, Date.now());
-    return resolveRequestContext(tx.db, identity);
-  };
   const deps: CommandDeps<MutationCtx> = {
-    resolveContext,
+    resolveContext: attentionContextResolver(serviceSessionId),
     policy: membershipPolicy,
     handlers: readStateHandlers(),
   };

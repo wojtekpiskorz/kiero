@@ -17,11 +17,13 @@
  * Two callable shapes, one checked resolution (the lane pattern): public
  * queries (Convex Auth; honestly `unauthenticated` until B1) and internal
  * queries behind the verified service session (the A3 bridge identity).
+ * The identity-to-scope resolution lives in the two helpers below, each
+ * spelled once (the resolveOwnScope pattern of the sibling read lane).
  */
 
 import { v } from "convex/values";
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
-import { forbiddenError, unauthenticatedError } from "@kiero/runtime";
+import { forbiddenError, unauthenticatedError, type RequestContext } from "@kiero/runtime";
 import { internalQuery, query } from "../../_generated/server";
 import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
@@ -36,8 +38,6 @@ import {
   effectiveQuietHours,
   isValidTimezone,
   type DeliveryDecisionInput,
-  type DeliveryKind,
-  type EntryScope,
   type PersonalNotificationSettings,
 } from "./evaluation";
 import { storedPreferencesOf } from "./operations";
@@ -55,6 +55,42 @@ export interface EffectivePreferences {
   readonly quietHoursSource: "personal" | "company_default";
 }
 
+/** One resolved actor scope: the company and user every query below reads. */
+interface ActorScope {
+  readonly companyId: Id<"companies">;
+  readonly userId: Id<"users">;
+}
+
+/** Resolves the caller's scope from Convex Auth (the user path). */
+async function resolveOwnScope(ctx: QueryCtx): Promise<ActorScope | null> {
+  const identity = await identityFromConvexAuth(ctx.auth, Date.now());
+  const context = await resolveRequestContext(ctx.db, identity);
+  return scopeOf(ctx, context);
+}
+
+/** Resolves the caller's scope from a verified service session (bridge path). */
+async function resolveBridgeScope(
+  ctx: QueryCtx,
+  serviceSessionId: string,
+): Promise<ActorScope | null> {
+  const context = await resolveRequestContext(ctx.db, bridgeIdentity(serviceSessionId, Date.now()));
+  return scopeOf(ctx, context);
+}
+
+/** Narrows a resolved context into the query scope (null when unresolvable). */
+async function scopeOf(ctx: QueryCtx, context: RequestContext | null): Promise<ActorScope | null> {
+  if (context === null) {
+    return null;
+  }
+  const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
+  const userId = ctx.db.normalizeId("users", context.actor.userId);
+  if (companyId === null || userId === null) {
+    return null;
+  }
+  return { companyId, userId };
+}
+
+/** The personal settings plus the quiet-hours window that applies. */
 async function effectivePreferences(
   ctx: QueryCtx,
   companyId: Id<"companies">,
@@ -106,14 +142,7 @@ async function evaluateDelivery(
   ctx: QueryCtx,
   companyId: Id<"companies">,
   userId: Id<"users">,
-  request: {
-    readonly kind: DeliveryKind;
-    readonly scope: EntryScope;
-    readonly projectIds: string[];
-    readonly isAuthor: boolean;
-    readonly read: boolean;
-    readonly nowMs: number;
-  },
+  request: DeliveryRequest,
 ): Promise<ResultEnvelope> {
   const inputs = await resolveEvaluationInputs(ctx, companyId, userId);
   if (!inputs.ok) {
@@ -140,49 +169,18 @@ async function evaluateDelivery(
   });
 }
 
-// --- public queries (Convex Auth identity) -----------------------------------
+/** One hypothetical delivery the evaluation decides over (the seam input). */
+export interface DeliveryRequest {
+  readonly kind: DeliveryDecisionInput["kind"];
+  readonly scope: DeliveryDecisionInput["scope"];
+  readonly projectIds: string[];
+  readonly isAuthor: boolean;
+  readonly read: boolean;
+  readonly nowMs: number;
+}
 
-/** The effective personal notification settings (client path). */
-export const myNotificationPreferences = query({
-  args: {},
-  handler: async (ctx): Promise<ResultEnvelope> => {
-    const identity = await identityFromConvexAuth(ctx.auth, Date.now());
-    const context = await resolveRequestContext(ctx.db, identity);
-    if (context === null) {
-      return errorResult(unauthenticatedError());
-    }
-    const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
-    const userId = ctx.db.normalizeId("users", context.actor.userId);
-    if (companyId === null || userId === null) {
-      return errorResult(unauthenticatedError());
-    }
-    return effectivePreferences(ctx, companyId, userId);
-  },
-});
-
-// --- internal queries (verified service session; the A3 bridge identity) ----
-
-/** The effective settings for a verified service session (bridge path). */
-export const myNotificationPreferencesFor = internalQuery({
-  args: { serviceSessionId: v.string() },
-  handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const context = await resolveRequestContext(
-      ctx.db,
-      bridgeIdentity(args.serviceSessionId, Date.now()),
-    );
-    if (context === null) {
-      return errorResult(forbiddenError("no_verified_identity"));
-    }
-    const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
-    const userId = ctx.db.normalizeId("users", context.actor.userId);
-    if (companyId === null || userId === null) {
-      return errorResult(forbiddenError("no_verified_identity"));
-    }
-    return effectivePreferences(ctx, companyId, userId);
-  },
-});
-
-const deliveryRequestValidator = v.object({
+/** The Convex args validator for one delivery request (shared with the probe). */
+export const deliveryRequestValidator = v.object({
   kind: v.union(
     v.literal("source_entry"),
     v.literal("clarification"),
@@ -195,6 +193,34 @@ const deliveryRequestValidator = v.object({
   nowMs: v.float64(),
 });
 
+// --- public queries (Convex Auth identity) -----------------------------------
+
+/** The effective personal notification settings (client path). */
+export const myNotificationPreferences = query({
+  args: {},
+  handler: async (ctx): Promise<ResultEnvelope> => {
+    const scope = await resolveOwnScope(ctx);
+    if (scope === null) {
+      return errorResult(unauthenticatedError());
+    }
+    return effectivePreferences(ctx, scope.companyId, scope.userId);
+  },
+});
+
+// --- internal queries (verified service session; the A3 bridge identity) ----
+
+/** The effective settings for a verified service session (bridge path). */
+export const myNotificationPreferencesFor = internalQuery({
+  args: { serviceSessionId: v.string() },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    const scope = await resolveBridgeScope(ctx, args.serviceSessionId);
+    if (scope === null) {
+      return errorResult(forbiddenError("no_verified_identity"));
+    }
+    return effectivePreferences(ctx, scope.companyId, scope.userId);
+  },
+});
+
 /**
  * The live evaluation seam: the actor's REAL stored preferences and REAL
  * company timezone decide one hypothetical delivery at `nowMs` (bridge
@@ -203,18 +229,10 @@ const deliveryRequestValidator = v.object({
 export const evaluatePersonalDeliveryFor = internalQuery({
   args: { serviceSessionId: v.string(), request: deliveryRequestValidator },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const context = await resolveRequestContext(
-      ctx.db,
-      bridgeIdentity(args.serviceSessionId, Date.now()),
-    );
-    if (context === null) {
+    const scope = await resolveBridgeScope(ctx, args.serviceSessionId);
+    if (scope === null) {
       return errorResult(forbiddenError("no_verified_identity"));
     }
-    const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
-    const userId = ctx.db.normalizeId("users", context.actor.userId);
-    if (companyId === null || userId === null) {
-      return errorResult(forbiddenError("no_verified_identity"));
-    }
-    return evaluateDelivery(ctx, companyId, userId, args.request);
+    return evaluateDelivery(ctx, scope.companyId, scope.userId, args.request);
   },
 });

@@ -69,7 +69,7 @@ const myPrefs = (sessionId) =>
 const evaluate = (request, sessionId) =>
   client().action("attention/preferences/probe:probeEvaluatePersonalDelivery", {
     ...(sessionId === undefined ? {} : { sessionId }),
-    ...request,
+    request,
   });
 const companyView = (numItems, sessionId) =>
   client().action("sources/read/probe:probeCompanyConversation", {
@@ -121,17 +121,17 @@ const proj = async (name) => {
 const P1 = await proj("Banan (F1)");
 const P2 = await proj("Kaczmarek (F1)");
 
-const bossB = await client().action("attention/read_state/probe:probeSeedBoss", {
+const bossB = await client().action("attention/probe_shared:probeSeedBoss", {
   email: "f1-boss-b@kiero.invalid",
   displayName: "F1 boss B",
   deviceLabel: "f1-boss-b-bridge",
 });
-const bossC = await client().action("attention/read_state/probe:probeSeedBoss", {
+const bossC = await client().action("attention/probe_shared:probeSeedBoss", {
   email: "f1-boss-c@kiero.invalid",
   displayName: "F1 boss C (revocation)",
   deviceLabel: "f1-boss-c-bridge",
 });
-const bossD = await client().action("attention/read_state/probe:probeSeedBoss", {
+const bossD = await client().action("attention/probe_shared:probeSeedBoss", {
   email: "f1-boss-d@kiero.invalid",
   displayName: "F1 boss D (GM write denial)",
   deviceLabel: "f1-boss-d-bridge",
@@ -142,14 +142,14 @@ const SESS_C = bossC.value.sessionId;
 const USER_B = bossB.value.userId;
 const USER_C = bossC.value.userId;
 
-const deviceA2 = await client().action("attention/read_state/probe:probeSeedDevice", {
+const deviceA2 = await client().action("attention/probe_shared:probeSeedDevice", {
   email: "platform-service@kiero.invalid",
   deviceLabel: "f1-boss-a-device-2",
 });
 if (!isOk(deviceA2)) throw new Error("device seeding failed");
 const SESS_A2 = deviceA2.value.sessionId;
 
-const gm = await client().action("attention/read_state/probe:probeSeedGm", {});
+const gm = await client().action("attention/probe_shared:probeSeedGm", {});
 if (!isOk(gm)) throw new Error(`GM seeding failed: ${JSON.stringify(gm)}`);
 const SESS_GM = gm.value.sessionId;
 
@@ -328,7 +328,7 @@ record(
 
 // --- A11: revoked membership fails closed -----------------------------------
 const cBefore = await markRead({ sourceId: S2, read: true }, SESS_C);
-const revoked = await client().action("attention/read_state/probe:probeRevokeFixtureMembership", {
+const revoked = await client().action("attention/probe_shared:probeRevokeFixtureMembership", {
   email: "f1-boss-c@kiero.invalid",
 });
 const cAfter = await markRead({ sourceId: S2, read: true }, SESS_C);

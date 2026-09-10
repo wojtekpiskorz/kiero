@@ -3,10 +3,11 @@
  * path every lane uses, with this lane's handler registry.
  *
  * `dispatchPreferencesCommand` is @kiero/runtime's `dispatchCommand` over
- * the canonical context resolution and the platform authorization seam.
- * Two identity sources exist and only two, both verified server-side
- * (Convex Auth for the public mutation; the verified service session for
- * the internal transactional entry and the guarded dev-proof actions).
+ * the canonical context resolution and the platform authorization seam,
+ * through the attention lane's shared resolver (../context.ts). Two
+ * identity sources exist and only two, both verified server-side (Convex
+ * Auth for the public mutation; the verified service session for the
+ * internal transactional entry and the guarded dev-proof actions).
  *
  * The handler runs inside ONE Convex mutation, so the whole preference
  * upsert commits atomically.
@@ -14,18 +15,8 @@
 
 import { Schema } from "effect";
 import type { ResultEnvelope } from "@kiero/contracts";
-import {
-  dispatchCommand,
-  membershipPolicy,
-  type CommandDeps,
-  type HandlerRegistry,
-  type RequestContext,
-} from "@kiero/runtime";
-import {
-  bridgeIdentity,
-  identityFromConvexAuth,
-  resolveRequestContext,
-} from "../../platform/context";
+import { dispatchCommand, membershipPolicy, type CommandDeps, type HandlerRegistry } from "@kiero/runtime";
+import { attentionContextResolver } from "../context";
 import type { MutationCtx } from "../../_generated/server";
 import { changePreferencesOperation, performChangeNotificationPreferences } from "./operations";
 
@@ -52,15 +43,8 @@ export async function dispatchPreferencesCommand(
   envelope: unknown,
   serviceSessionId: string | undefined,
 ): Promise<ResultEnvelope> {
-  const resolveContext = async (tx: MutationCtx): Promise<RequestContext | null> => {
-    const identity =
-      serviceSessionId === undefined
-        ? await identityFromConvexAuth(tx.auth, Date.now())
-        : bridgeIdentity(serviceSessionId, Date.now());
-    return resolveRequestContext(tx.db, identity);
-  };
   const deps: CommandDeps<MutationCtx> = {
-    resolveContext,
+    resolveContext: attentionContextResolver(serviceSessionId),
     policy: membershipPolicy,
     handlers: preferencesHandlers(),
   };

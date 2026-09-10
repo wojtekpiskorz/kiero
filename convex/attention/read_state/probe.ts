@@ -1,7 +1,7 @@
 /**
  * F1 read-state dev proofs (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, exactly like the A3 platform and D1 lane probes; shared
- * plumbing lives in convex/sources/probe_shared.ts).
+ * variable, exactly like the A3 platform and D1 lane probes; the lane's
+ * shared people fixtures live in convex/attention/probe_shared.ts).
  *
  * No business work happens here; these entries exist so the F1 evidence can
  * run against the REAL dev deployment without a development-auth shortcut:
@@ -20,10 +20,6 @@
  *   outbox events, proving one event per actual transition).
  * - `probeCrashMarkSourceRead`: performs the FULL mark transaction and then
  *   THROWS before commit, proving rollback of row and event together.
- * - `probeSeedBoss` / `probeSeedDevice` / `probeSeedGm`: idempotent
- *   fixtures (a second boss in the service company; an extra device
- *   session for an existing user; a GM user with an open grant and an open
- *   alpha activation of the service company).
  */
 
 import { v } from "convex/values";
@@ -40,23 +36,11 @@ import { forbiddenError, membershipPolicy, type RequestContext } from "@kiero/ru
 import { bridgeIdentity, resolveRequestContext } from "../../platform/context";
 import { markSourceReadOperation, performMarkSourceRead } from "./operations";
 import {
-  SERVICE_EMAIL,
-  bridgeContextForEmail,
   probeDisabled,
   probeGuardEnabled,
   resolveProbeSession,
   serviceIdentityUnavailable,
-} from "../../sources/probe_shared";
-
-/** The F1 second-boss fixture (seeded below; company A = the service company). */
-export const F1_BOSS_EMAIL = "f1-boss-b@kiero.invalid";
-
-/** The F1 GM fixture operator (open grant + open alpha activation). */
-export const F1_GM_EMAIL = "f1-gm@kiero.invalid";
-
-/** Device labels of the seeded sessions (visible in evidence only). */
-export const F1_BOSS_DEVICE = "f1-boss-b-bridge";
-export const F1_GM_DEVICE = "f1-gm-bridge";
+} from "../probe_shared";
 
 // --- command + read probes -----------------------------------------------------
 
@@ -161,255 +145,6 @@ export const probeCrashMarkSourceRead = action({
       serviceSessionId: sessionId,
     });
     return errorResult(forbiddenError("crash_proof_did_not_throw"));
-  },
-});
-
-// --- fixtures ---------------------------------------------------------------------
-
-/** Ensures one boss fixture of the service company: user, membership, session. */
-export const seedBoss = internalMutation({
-  args: { email: v.string(), displayName: v.string(), deviceLabel: v.string() },
-  handler: async (ctx, args) => {
-    const company = await bridgeContextForEmail(ctx.db, SERVICE_EMAIL);
-    if (company === null) {
-      return serviceIdentityUnavailable();
-    }
-    const companyId = ctx.db.normalizeId("companies", company.actor.companyId);
-    if (companyId === null) {
-      return serviceIdentityUnavailable();
-    }
-    let userId = (
-      await ctx.db.query("users").withIndex("by_email", (q) => q.eq("email", args.email)).first()
-    )?._id;
-    if (userId === undefined) {
-      userId = await ctx.db.insert("users", {
-        email: args.email,
-        displayName: args.displayName,
-        createdAtMs: Date.now(),
-      });
-    }
-    const membership =
-      await ctx.db
-        .query("memberships")
-        .withIndex("by_company_user", (q) => q.eq("companyId", companyId).eq("userId", userId))
-        .filter((q) => q.eq(q.field("state"), "active"))
-        .first();
-    const membershipId =
-      membership?._id ??
-      (await ctx.db.insert("memberships", {
-        companyId,
-        userId,
-        role: "member",
-        state: "active",
-        createdAtMs: Date.now(),
-      }));
-    const session =
-      await ctx.db
-        .query("sessions")
-        .withIndex("by_user_started", (q) => q.eq("userId", userId))
-        .order("desc")
-        .filter((q) => q.eq(q.field("deviceLabel"), args.deviceLabel))
-        .filter((q) => q.eq(q.field("revokedAtMs"), undefined))
-        .first();
-    const sessionId =
-      session?._id ??
-      (await ctx.db.insert("sessions", {
-        userId,
-        startedAtMs: Date.now(),
-        lastSeenAtMs: Date.now(),
-        deviceLabel: args.deviceLabel,
-      }));
-    return okResult({ companyId, userId, membershipId, sessionId });
-  },
-});
-
-export const probeSeedBoss = action({
-  args: { email: v.string(), displayName: v.string(), deviceLabel: v.string() },
-  handler: async (ctx, args): Promise<ResultEnvelope> => {
-    if (!probeGuardEnabled()) {
-      return probeDisabled();
-    }
-    return ctx.runMutation(internal.attention.read_state.probe.seedBoss, {
-      email: args.email,
-      displayName: args.displayName,
-      deviceLabel: args.deviceLabel,
-    });
-  },
-});
-
-/** Ensures one EXTRA device session for an existing fixture user (guarded). */
-export const seedDevice = internalMutation({
-  args: { email: v.string(), deviceLabel: v.string() },
-  handler: async (ctx, args) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
-      .first();
-    if (user === null) {
-      return errorResult(forbiddenError("fixture_user_missing"));
-    }
-    const session =
-      await ctx.db
-        .query("sessions")
-        .withIndex("by_user_started", (q) => q.eq("userId", user._id))
-        .order("desc")
-        .filter((q) => q.eq(q.field("deviceLabel"), args.deviceLabel))
-        .filter((q) => q.eq(q.field("revokedAtMs"), undefined))
-        .first();
-    const sessionId =
-      session?._id ??
-      (await ctx.db.insert("sessions", {
-        userId: user._id,
-        startedAtMs: Date.now(),
-        lastSeenAtMs: Date.now(),
-        deviceLabel: args.deviceLabel,
-      }));
-    return okResult({ sessionId });
-  },
-});
-
-export const probeSeedDevice = action({
-  args: { email: v.string(), deviceLabel: v.string() },
-  handler: async (ctx, args): Promise<ResultEnvelope> => {
-    if (!probeGuardEnabled()) {
-      return probeDisabled();
-    }
-    return ctx.runMutation(internal.attention.read_state.probe.seedDevice, {
-      email: args.email,
-      deviceLabel: args.deviceLabel,
-    });
-  },
-});
-
-/**
- * Revokes one fixture boss's membership in the service company (guarded).
- * The F1 failure evidence for revoked membership: after this, the same
- * live session resolves NO active membership and every attention command
- * through it fails closed. A dev fixture flip, exactly like the D1 seed
- * fixtures — production revocation is B3's audited operation.
- */
-export const revokeFixtureMembership = internalMutation({
-  args: { email: v.string() },
-  handler: async (ctx, args) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
-      .first();
-    if (user === null) {
-      return errorResult(forbiddenError("fixture_user_missing"));
-    }
-    const company = await bridgeContextForEmail(ctx.db, SERVICE_EMAIL);
-    if (company === null) {
-      return serviceIdentityUnavailable();
-    }
-    const companyId = ctx.db.normalizeId("companies", company.actor.companyId);
-    if (companyId === null) {
-      return serviceIdentityUnavailable();
-    }
-    const membership = await ctx.db
-      .query("memberships")
-      .withIndex("by_company_user", (q) => q.eq("companyId", companyId).eq("userId", user._id))
-      .filter((q) => q.eq(q.field("state"), "active"))
-      .first();
-    if (membership === null) {
-      return okResult({ alreadyRevoked: true });
-    }
-    await ctx.db.patch(membership._id, { state: "revoked", revokedAtMs: Date.now() });
-    return okResult({ alreadyRevoked: false });
-  },
-});
-
-export const probeRevokeFixtureMembership = action({
-  args: { email: v.string() },
-  handler: async (ctx, args): Promise<ResultEnvelope> => {
-    if (!probeGuardEnabled()) {
-      return probeDisabled();
-    }
-    return ctx.runMutation(internal.attention.read_state.probe.revokeFixtureMembership, {
-      email: args.email,
-    });
-  },
-});
-
-/**
- * Ensures the GM fixture: a GM user with an OPEN grant and an OPEN alpha
- * activation of the service company, plus a session. Mirrors the B4 row
- * shapes; used only to prove GM reads never write boss state.
- */
-export const seedGm = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const company = await bridgeContextForEmail(ctx.db, SERVICE_EMAIL);
-    if (company === null) {
-      return serviceIdentityUnavailable();
-    }
-    const companyId = ctx.db.normalizeId("companies", company.actor.companyId);
-    if (companyId === null) {
-      return serviceIdentityUnavailable();
-    }
-    let userId = (
-      await ctx.db.query("users").withIndex("by_email", (q) => q.eq("email", F1_GM_EMAIL)).first()
-    )?._id;
-    if (userId === undefined) {
-      userId = await ctx.db.insert("users", {
-        email: F1_GM_EMAIL,
-        displayName: "F1 GM proof",
-        createdAtMs: Date.now(),
-      });
-    }
-    const openGrant =
-      await ctx.db
-        .query("gmAccessGrants")
-        .withIndex("by_user_open", (q) => q.eq("userId", userId))
-        .filter((q) => q.eq(q.field("closedAtMs"), undefined))
-        .first();
-    const grantId =
-      openGrant?._id ??
-      (await ctx.db.insert("gmAccessGrants", {
-        userId,
-        reason: "F1 dev proof: read-state inspection",
-        enteredAtMs: Date.now(),
-      }));
-    const openActivation =
-      await ctx.db
-        .query("gmCompanyActivations")
-        .withIndex("by_company_open", (q) => q.eq("companyId", companyId))
-        .filter((q) => q.eq(q.field("endedAtMs"), undefined))
-        .first();
-    const activationId =
-      openActivation?._id ??
-      (await ctx.db.insert("gmCompanyActivations", {
-        companyId,
-        activatedByUserId: userId,
-        activatedAtMs: Date.now(),
-      }));
-    const session =
-      await ctx.db
-        .query("sessions")
-        .withIndex("by_user_started", (q) => q.eq("userId", userId))
-        .order("desc")
-        .filter((q) => q.eq(q.field("deviceLabel"), F1_GM_DEVICE))
-        .filter((q) => q.eq(q.field("revokedAtMs"), undefined))
-        .first();
-    const sessionId =
-      session?._id ??
-      (await ctx.db.insert("sessions", {
-        userId,
-        startedAtMs: Date.now(),
-        lastSeenAtMs: Date.now(),
-        deviceLabel: F1_GM_DEVICE,
-      }));
-    return okResult({ companyId, gmUserId: userId, grantId, activationId, sessionId });
-  },
-});
-
-export const probeSeedGm = action({
-  args: {},
-  handler: async (ctx): Promise<ResultEnvelope> => {
-    if (!probeGuardEnabled()) {
-      return probeDisabled();
-    }
-    return ctx.runMutation(internal.attention.read_state.probe.seedGm, {});
   },
 });
 

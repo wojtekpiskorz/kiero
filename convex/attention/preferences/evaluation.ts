@@ -193,10 +193,7 @@ function timezoneOffsetMs(instantMs: number, timeZone: string): number {
  * (guess the offset, correct, re-check) so times inside a DST transition
  * night resolve to the closer instant the way schedulers expect.
  */
-function wallTimeToInstantMs(
-  wall: Omit<WallTimeParts, "minuteOfDay"> & { readonly minuteOfDay: number },
-  timeZone: string,
-): number {
+function wallTimeToInstantMs(wall: WallTimeParts, timeZone: string): number {
   const wallAsUtc = Date.UTC(wall.year, wall.month - 1, wall.day, 0, wall.minuteOfDay);
   const firstGuess = wallAsUtc - timezoneOffsetMs(wallAsUtc, timeZone);
   const secondGuess = wallAsUtc - timezoneOffsetMs(firstGuess, timeZone);
