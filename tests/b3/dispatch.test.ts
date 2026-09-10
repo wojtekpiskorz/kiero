@@ -299,11 +299,13 @@ describe("the declared consumer edge (access revocation drains durably)", () => 
   });
 
   it("leaves events without a registered edge undelivered by consumers", () => {
-    // D5 added the normalize edge to sourceAccepted; the extract seam stays
-    // the loud unprojected one until E3 owns its projection.
-    expect(projectEventToJobInputs("sources.sourceAccepted", {}, "d")[0]).toEqual({
-      kind: "unprojected_edge",
-      jobKind: "processing.extract_fragments",
-    });
+    // E3 owns the extract projection and D5 the normalize projection;
+    // both edges fan out from sources.sourceAccepted. The still-unprojected
+    // example is C5's recomputation edge.
+    const projections = projectEventToJobInputs("sources.sourceAccepted", {}, "d");
+    expect(projections.map((projection) => projection.kind)).toEqual(["job", "job"]);
+    expect(projectEventToJobInputs("memory.dependentsMarkedStale", {}, "d")).toEqual([
+      { kind: "unprojected_edge", jobKind: "memory.recompute_dependents" },
+    ]);
   });
 });

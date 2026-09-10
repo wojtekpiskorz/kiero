@@ -12,7 +12,7 @@
  *   resolves the actor through the SAME canonical chain and decodes the
  *   scope through the operation's contract schema (Effect decoding at the
  *   untrusted boundary), failing sanitized otherwise. Rows carry their
- *   encoded (wire) value shapes — see ./core.ts.
+ *   encoded (wire) value shapes — see ./semantics.ts.
  *
  * `markWithdrawnSource` (internal mutation) exposes the withdrawal marking
  * core over the service bridge: the operation exists now (issue #25's

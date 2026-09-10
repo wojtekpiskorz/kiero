@@ -149,9 +149,9 @@ describe("drain event projection (three-way)", () => {
     expect(projectEventToJobInputs("operations.diagnosticEmitted", {}, "dk")).toEqual([
       { kind: "no_consumer" },
     ]);
-    // An event may carry SEVERAL edges (D5): sourceAccepted fans out to the
-    // extract seam (still unprojected until E3 — reports itself loudly) and
-    // the D5 normalize projection (payload-derived dedup, never the row's).
+    // An event may carry SEVERAL edges (D5 fan-out): sourceAccepted projects
+    // onto BOTH E3's extract projection (row dedup identity) and D5's
+    // normalize projection (payload-derived dedup, never the row's).
     expect(
       projectEventToJobInputs(
         "sources.sourceAccepted",
@@ -159,7 +159,12 @@ describe("drain event projection (three-way)", () => {
         "dk",
       ),
     ).toEqual([
-      { kind: "unprojected_edge", jobKind: "processing.extract_fragments" },
+      {
+        kind: "job",
+        jobKind: "processing.extract_fragments",
+        input: { sourceId: "s1", extractionId: null },
+        dedupKey: "dk",
+      },
       {
         kind: "job",
         jobKind: "processing.normalize_photo",
@@ -167,6 +172,27 @@ describe("drain event projection (three-way)", () => {
         dedupKey: "processing.normalize_photo:s1",
       },
     ]);
+
+    expect(projectEventToJobInputs("platform.echoRequested", { message: "m" }, "dk")).toEqual([
+      {
+        kind: "job",
+        jobKind: "platform.echo_delivery",
+        input: { dedupKey: "dk", message: "m" },
+        dedupKey: "dk",
+      },
+    ]);
+    expect(projectEventToJobInputs("operations.diagnosticEmitted", {}, "dk")).toEqual([
+      { kind: "no_consumer" },
+    ]);
+    // E3 owns this edge's projection: an accepted source drains into the
+    // extract executor, which resolves the text extraction in-company when
+    // the payload cannot name it (D1's publisher registered the real job
+    // atomically under the same dedup key).
+    expect(
+      projectEventToJobInputs("sources.sourceAccepted", { sourceId: "s1" }, "dk").map(
+        (projection) => (projection.kind === "job" ? projection.jobKind : projection.kind),
+      ),
+    ).toEqual(["processing.extract_fragments", "processing.normalize_photo"]);
     expect(CONSUMER_PROJECTION_MISSING).toBe("consumer_projection_missing");
   });
 });
