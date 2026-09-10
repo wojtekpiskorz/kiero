@@ -140,25 +140,6 @@ export interface BatchSummary {
   readonly deliveredAtMs: number;
 }
 
-/** Builds the collapsed current summary for one delivered bucket. */
-export function buildBatchSummary(input: {
-  semanticKind: "source_entry" | "clarification";
-  bucket: string;
-  scope: BatchScope;
-  sourceIds: readonly string[];
-  clarificationIds: readonly string[];
-  deliveredAtMs: number;
-}): BatchSummary {
-  return {
-    semanticKind: input.semanticKind,
-    bucket: input.bucket,
-    scope: input.scope,
-    sourceIds: [...input.sourceIds],
-    clarificationIds: [...input.clarificationIds],
-    deliveredAtMs: input.deliveredAtMs,
-  };
-}
-
 /**
  * The evaluation order of one due-intent sweep, as a value: read/death
  * re-checks happen per intent BEFORE the per-bucket personal decision, so
@@ -175,7 +156,12 @@ export const EVALUATION_ORDER = [
 ] as const;
 export type EvaluationStage = (typeof EVALUATION_ORDER)[number];
 
-/** The closed death-reason vocabulary recorded on suppressed intents. */
+/**
+ * The closed death-reason vocabulary recorded on suppressed intents. F1's
+ * personal-decision suppression reasons are members verbatim (quiet hours
+ * never suppress — they defer), so the evaluator records the seam's reason
+ * directly.
+ */
 export const SUPPRESSED_REASONS = [
   "source_no_longer_valid",
   "clarification_resolved",
@@ -189,14 +175,3 @@ export const SUPPRESSED_REASONS = [
   "muted_task_reminders",
 ] as const;
 export type SuppressedReason = (typeof SUPPRESSED_REASONS)[number];
-
-/**
- * Maps F1's personal-decision suppression reasons onto the intent's death
- * reason (quiet hours never suppress — they defer, so `deferred` has no
- * mapping here).
- */
-export function deathReasonOfPersonalSuppression(
-  reason: "own_entry" | "already_read" | "muted_project" | "muted_company_entries" | "muted_task_reminders",
-): SuppressedReason {
-  return reason;
-}

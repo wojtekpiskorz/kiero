@@ -62,6 +62,7 @@ type IndexCondition = { readonly field: string; readonly op: "eq" | "lte"; reado
 class FakeQuery {
   private conditions: IndexCondition[] = [];
   private rowPredicate: ((row: Row) => boolean) | null = null;
+  private orderDirection: "asc" | "desc" = "asc";
 
   constructor(private readonly rows: Row[]) {}
 
@@ -106,6 +107,19 @@ class FakeQuery {
     return this;
   }
 
+  /**
+   * `order("asc"|"desc")` (F2 append, round 1): the fake models DOCUMENT
+   * CREATION order, not the index's key order — ascending is insertion
+   * order and descending reverses it (Convex ties index order to
+   * _creationTime last, so this is exact for tests that seed rows in key
+   * order and an approximation otherwise). Tests needing key-order
+   * semantics must seed accordingly.
+   */
+  order(dir: "asc" | "desc"): FakeQuery {
+    this.orderDirection = dir;
+    return this;
+  }
+
   async first(): Promise<Row | null> {
     return this.filtered()[0] ?? null;
   }
@@ -129,7 +143,7 @@ class FakeQuery {
   }
 
   private filtered(): Row[] {
-    return this.rows.filter((row) =>
+    const matched = this.rows.filter((row) =>
       this.conditions.every(({ field, op, value }) => {
         if (op === "eq") {
           return row[field] === value;
@@ -144,6 +158,7 @@ class FakeQuery {
         );
       }) && (this.rowPredicate === null || this.rowPredicate(row)),
     );
+    return this.orderDirection === "desc" ? [...matched].reverse() : matched;
   }
 }
 

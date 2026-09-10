@@ -27,7 +27,6 @@ import {
   ASSIGNMENT_RETRY_MS,
   BATCH_WINDOW_MS,
   batchBucketOf,
-  buildBatchSummary,
   dueAtMsOf,
   joinsBatch,
   resolveAssignment,
@@ -215,6 +214,36 @@ function deliveredSummaries(userId: string) {
   return [...distinct].map((json) => JSON.parse(json));
 }
 
+/**
+ * One OPEN company-scoped clarification about a source, addressed through
+ * its first conflicting fragment (the checked dispatch's linkage path).
+ */
+async function seedClarification(firm: Firm, sourceId: string, raisedAtMs = T0): Promise<string> {
+  const extractionId = await ctx.db.insert("extractions", {
+    sourceId,
+    kind: "text",
+    pipelineVersion: "f2.test/1",
+    model: "author-text",
+    provider: "kiero",
+    processingRunId: ctx.db.rows("processingRuns")[0]?._id ?? "k0test",
+    createdAtMs: raisedAtMs,
+  });
+  const fragmentId = await ctx.db.insert("sourceFragments", {
+    sourceId,
+    extractionId,
+    basis: { _tag: "whole_source" },
+    createdAtMs: raisedAtMs,
+  });
+  return ctx.db.insert("clarifications", {
+    companyId: firm.companyId,
+    scopeKind: "company",
+    question: "Który termin jest właściwy?",
+    conflictingFragmentIds: [fragmentId],
+    state: "open",
+    raisedAtMs,
+  });
+}
+
 beforeEach(() => {
   ctx = fakeCtx([...TABLES]);
 });
@@ -247,24 +276,193 @@ describe("the 60-second batching window arithmetic", () => {
     expect(batchBucketOf({ kind: "project", projectIds: ["p1", "p2"] })).toBe("mixed:p1|p2");
     expect(batchBucketOf({ kind: "project", projectIds: ["p2", "p1"] })).toBe("mixed:p1|p2");
   });
+});
 
-  it("builds the collapsed summary with the entries it covers", () => {
-    const summary = buildBatchSummary({
-      semanticKind: "source_entry",
-      bucket: "project:p1",
-      scope: { kind: "project", projectIds: ["p1"] },
-      sourceIds: ["s1", "s2"],
-      clarificationIds: [],
-      deliveredAtMs: T0_DUE,
+// ---------------------------------------------------------------------------
+// Round-1 review regressions: the tenant bound, the shared re-check and the
+// latest-run read.
+// ---------------------------------------------------------------------------
+
+describe("the tenant bound on the batch collapse", () => {
+  /** A second firm whose only members are its author and firm A's boss B. */
+  async function seedSecondFirm(): Promise<{ companyId: string; authorUserId: string }> {
+    const companyId = await ctx.db.insert("companies", {
+      name: "F2 second firm",
+      timezone: "Europe/Warsaw",
+      defaultCurrency: "PLN",
+      createdAtMs: T0,
     });
-    expect(summary).toEqual({
-      semanticKind: "source_entry",
-      bucket: "project:p1",
-      scope: { kind: "project", projectIds: ["p1"] },
-      sourceIds: ["s1", "s2"],
-      clarificationIds: [],
-      deliveredAtMs: T0_DUE,
+    const authorUserId = await ctx.db.insert("users", {
+      email: "f2-second-author@kiero.invalid",
+      displayName: "f2-second-author",
+      createdAtMs: T0,
     });
+    await ctx.db.insert("memberships", {
+      companyId,
+      userId: authorUserId,
+      role: "member",
+      state: "active",
+      createdAtMs: T0,
+    });
+    // Boss B is ALSO a member of the second firm: same person, two tenants.
+    await ctx.db.insert("memberships", {
+      companyId,
+      userId: ctx.db.rows("users").find((row) => row.email === "f2-b@kiero.invalid")!._id,
+      role: "member",
+      state: "active",
+      createdAtMs: T0,
+    });
+    return { companyId, authorUserId };
+  }
+
+  it("two firms' company buckets never merge for one shared boss", async () => {
+    const firm = await seedFirm();
+    const second = await seedSecondFirm();
+    const sourceA = await seedSource(firm); // terminal unassigned -> company
+    const sourceB = await seedSource(firm, { authorUserId: second.authorUserId });
+    // Firm B's source belongs to the SECOND firm: re-point the fixture rows.
+    await ctx.db.patch(sourceB.sourceId, { companyId: second.companyId });
+    const runB = ctx.db
+      .rows("processingRuns")
+      .filter((row) => row.sourceId === sourceB.sourceId)[0]!;
+    await ctx.db.patch(runB._id, { companyId: second.companyId });
+    for (const source of [sourceA, sourceB]) {
+      await performEnsureSourceIntents(tx(), source.sourceId as never);
+    }
+    await performEvaluateDueIntents(tx(), { nowMs: T0_DUE });
+    // B receives TWO separate collapsed summaries — one per firm — never a
+    // cross-tenant merge under either firm's timezone/rights.
+    const summaries = deliveredSummaries(firm.bossB);
+    expect(summaries).toHaveLength(2);
+    const byFirm = summaries.map((summary) => summary.sourceIds[0]);
+    expect(new Set(byFirm)).toEqual(new Set([sourceA.sourceId, sourceB.sourceId]));
+    for (const summary of summaries) {
+      expect(summary.bucket).toBe("company");
+      expect(summary.sourceIds).toHaveLength(1);
+    }
+  });
+
+  it("a boss revoked in firm A still receives in firm B", async () => {
+    const firm = await seedFirm();
+    const second = await seedSecondFirm();
+    const sourceA = await seedSource(firm);
+    const sourceB = await seedSource(firm, { authorUserId: second.authorUserId });
+    await ctx.db.patch(sourceB.sourceId, { companyId: second.companyId });
+    const runB = ctx.db
+      .rows("processingRuns")
+      .filter((row) => row.sourceId === sourceB.sourceId)[0]!;
+    await ctx.db.patch(runB._id, { companyId: second.companyId });
+    for (const source of [sourceA, sourceB]) {
+      await performEnsureSourceIntents(tx(), source.sourceId as never);
+    }
+    // B is revoked in firm A BEFORE due time, still active in firm B.
+    const membershipA = ctx.db
+      .rows("memberships")
+      .find((row) => row.userId === firm.bossB && row.companyId === firm.companyId)!;
+    await ctx.db.patch(membershipA._id, { state: "revoked", revokedAtMs: T0 + 1 });
+    await performEvaluateDueIntents(tx(), { nowMs: T0_DUE });
+    // Firm A's intent dies on A's revocation; firm B's delivers.
+    const intents = ctx.db
+      .rows("notificationIntents")
+      .filter((row) => row.recipientUserId === firm.bossB);
+    expect(intents).toHaveLength(2);
+    const inA = intents.find((row) => row.companyId === firm.companyId)!;
+    const inB = intents.find((row) => row.companyId === second.companyId)!;
+    expect(inA.state).toBe("suppressed");
+    expect(inA.suppressedReason).toBe("membership_revoked");
+    expect(inB.state).toBe("delivered");
+    expect((JSON.parse(String(inB.deliveryJson)) as { sourceIds: string[] }).sourceIds).toEqual([
+      sourceB.sourceId,
+    ]);
+  });
+});
+
+describe("the shared due/sibling re-check", () => {
+  it("a clarification resolved inside the window is never absorbed by a sibling batch", async () => {
+    const firm = await seedFirm();
+    const source = await seedSource(firm);
+    // One OPEN question (due now, fires the author's clarification bucket)
+    // and one raised 5 s later that was RESOLVED before its own due time:
+    // the sibling absorption used to key it into the same bucket without
+    // re-checking the open state, delivering a dead question.
+    const openId = await seedClarification(firm, source.sourceId, T0);
+    const resolvedId = await seedClarification(firm, source.sourceId, T0 + 5_000);
+    for (const id of [openId, resolvedId]) {
+      await performEnsureClarificationIntents(tx(), id as never);
+    }
+    await ctx.db.patch(resolvedId, {
+      state: "resolved",
+      resolvedByUserId: firm.bossA,
+      resolutionNote: "rozstrzygnięte",
+      resolvedAtMs: T0 + 10_000,
+    });
+    await performEvaluateDueIntents(tx(), { nowMs: T0_DUE });
+    const resolvedIntent = ctx.db
+      .rows("notificationIntents")
+      .find((row) => row.clarificationId === resolvedId)!;
+    expect(resolvedIntent.state).toBe("suppressed");
+    expect(resolvedIntent.suppressedReason).toBe("clarification_resolved");
+    // The OPEN question still delivers, alone in its summary.
+    const summaries = deliveredSummaries(firm.bossA);
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]!.clarificationIds).toEqual([openId]);
+  });
+});
+
+describe("the latest-run read", () => {
+  /** Seeds `count` runs for one source, ascending startedAtMs by insertion. */
+  async function seedRuns(
+    firm: Firm,
+    sourceId: string,
+    states: readonly ("running" | "succeeded" | "failed" | "superseded")[],
+  ): Promise<void> {
+    for (const [index, state] of states.entries()) {
+      await ctx.db.insert("processingRuns", {
+        companyId: firm.companyId,
+        sourceId,
+        kind: index === 0 ? "initial_analysis" : "reanalysis",
+        pipelineVersion: "f2.test/1",
+        promptVersion: "f2.test/1",
+        schemaVersion: "f2.test/1",
+        modelConfigurationVersion: "f2.test/1",
+        state,
+        startedAtMs: T0 + index,
+        ...(state === "running" ? {} : { finishedAtMs: T0 + index + 1 }),
+      });
+    }
+  }
+
+  it("reads the LATEST run even past twenty earlier terminal runs", async () => {
+    const firm = await seedFirm();
+    const p1 = await seedProject(firm, "Banan");
+    // Twenty terminal-succeeded runs, then a NEWEST running reanalysis: the
+    // bounded-take read would resolve terminal off the twentieth row and
+    // bypass the pending classification (and the project mute).
+    await seedPreferences(firm, firm.bossB, { mutedProjectIds: [p1] });
+    const source = await seedSource(firm, { projectIds: [p1], runState: "none" });
+    await seedRuns(firm, source.sourceId, [
+      ...Array.from({ length: 20 }, () => "succeeded" as const),
+      "running",
+    ]);
+    await performEnsureSourceIntents(tx(), source.sourceId as never);
+    await performEvaluateDueIntents(tx(), { nowMs: T0_DUE });
+    // The latest run is RUNNING: assignment is pending, nothing delivers or
+    // dies — and the muted project is never bypassed by a company read.
+    const intent = intentsOf(firm.bossB, "pending")[0]!;
+    expect(intent.dueAtMs).toBe(T0_DUE + ASSIGNMENT_RETRY_MS);
+    expect(ctx.db.rows("notificationIntents").filter((row) => row.state !== "pending")).toHaveLength(0);
+  });
+
+  it("a stale superseded row does not defer a terminal newest run", async () => {
+    const firm = await seedFirm();
+    const source = await seedSource(firm, { runState: "none" });
+    await seedRuns(firm, source.sourceId, ["superseded", "succeeded"]);
+    await performEnsureSourceIntents(tx(), source.sourceId as never);
+    await performEvaluateDueIntents(tx(), { nowMs: T0_DUE });
+    // The LATEST run succeeded: the entry delivers (company scope), it does
+    // not wait on the older superseded row.
+    expect(deliveredSummaries(firm.bossB)).toHaveLength(1);
+    expect(deliveredSummaries(firm.bossB)[0]!.bucket).toBe("company");
   });
 });
 
@@ -619,36 +817,6 @@ describe("the due-time evaluator", () => {
 // ---------------------------------------------------------------------------
 
 describe("durable clarification-intent creation", () => {
-  async function seedClarification(
-    firm: Firm,
-    sourceId: string,
-    raisedAtMs = T0,
-  ): Promise<string> {
-    const extractionId = await ctx.db.insert("extractions", {
-      sourceId,
-      kind: "text",
-      pipelineVersion: "f2.test/1",
-      model: "author-text",
-      provider: "kiero",
-      processingRunId: ctx.db.rows("processingRuns")[0]?._id ?? "k0test",
-      createdAtMs: raisedAtMs,
-    });
-    const fragmentId = await ctx.db.insert("sourceFragments", {
-      sourceId,
-      extractionId,
-      basis: { _tag: "whole_source" },
-      createdAtMs: raisedAtMs,
-    });
-    return ctx.db.insert("clarifications", {
-      companyId: firm.companyId,
-      scopeKind: "company",
-      question: "Który termin jest właściwy?",
-      conflictingFragmentIds: [fragmentId],
-      state: "open",
-      raisedAtMs,
-    });
-  }
-
   it("addresses the source author, who may receive it about their own entry", async () => {
     const firm = await seedFirm();
     const source = await seedSource(firm);

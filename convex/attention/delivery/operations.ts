@@ -26,7 +26,8 @@
  *   membership rights (a revoked member's intent dies), source business
  *   validity and the terminal assignment classification, then applies
  *   quiet hours through the same seam. A firing bucket carries every
- *   sibling pending intent of the same recipient and scope bucket — the
+ *   sibling pending intent of the same recipient, company and scope
+ *   bucket — the
  *   window stays open from the first entry until the actual fire instant,
  *   so deferred quiet-hour work collapses into ONE current summary; read
  *   sources leave the batch before delivery.
@@ -54,12 +55,11 @@ import { preferenceWriteOf } from "../preferences/operations";
 import {
   ASSIGNMENT_RETRY_MS,
   batchBucketOf,
-  buildBatchSummary,
-  deathReasonOfPersonalSuppression,
   dueAtMsOf,
   joinsBatch,
   resolveAssignment,
   type BatchScope,
+  type BatchSummary,
   type SuppressedReason,
 } from "./model";
 
@@ -318,24 +318,22 @@ class AssignmentCache {
       this.sources.set(sourceId, "invalid");
       return "invalid";
     }
-    const runs = await this.tx.db
+    // The LATEST run: the index orders by started time, so descending +
+    // first is the newest row (the sources/read/views.ts latest-run
+    // precedent). A bounded take would read the newest of the OLDEST N —
+    // past N runs a stale succeeded would mark a running analysis terminal
+    // and a stale superseded would defer forever.
+    const latestRun = await this.tx.db
       .query("processingRuns")
       .withIndex("by_source_started", (q) => q.eq("sourceId", sourceId))
-      .take(20);
-    // The latest run by started time (bounded collect + reduce; the same
-    // result the index's descending order would hand `first()`).
-    const latestRun =
-      runs.length === 0
-        ? null
-        : runs.reduce((latest, candidate) =>
-            candidate.startedAtMs > latest.startedAtMs ? candidate : latest,
-          );
+      .order("desc")
+      .first();
     const links = await this.tx.db
       .query("sourceProjectLinks")
       .withIndex("by_source", (q) => q.eq("sourceId", sourceId))
       .collect();
     const resolution = resolveAssignment(
-      latestRun === null ? null : { state: latestRun.state as "running" | "succeeded" | "failed" | "superseded" },
+      latestRun === null ? null : { state: latestRun.state },
       links.map((link) => link.projectId),
     );
     const value: "pending" | BatchScope =
@@ -422,53 +420,77 @@ interface Bucket {
   readonly intents: { readonly intent: PendingIntent; readonly read: boolean }[];
 }
 
-/** The scope bucket one intent belongs to, resolved through the caches. */
-async function bucketKeyOf(
+/** What the shared due/sibling re-check decided about one intent. */
+type Recheck =
+  | { readonly outcome: "die"; readonly reason: SuppressedReason }
+  /** The source's assignment classification is still pending: wait. */
+  | { readonly outcome: "wait" }
+  | { readonly outcome: "bucket"; readonly bucketKey: string; readonly scope: BatchScope };
+
+/**
+ * THE shared re-check list, called by the due loop AND the sibling
+ * absorption — one definition, so the two paths can never drift apart
+ * again (round-1 review: a clarification resolved inside the window was
+ * still absorbed because only the due path checked it). Callers filter to
+ * the two notifiable kinds first.
+ */
+async function recheckIntent(
   tx: MutationCtx,
   assignment: AssignmentCache,
   intent: PendingIntent,
-): Promise<"pending" | "invalid" | string> {
+): Promise<Recheck> {
   if (intent.semanticKind === "source_entry") {
     if (intent.sourceId === undefined) {
-      return "invalid";
+      return { outcome: "die", reason: "source_no_longer_valid" };
     }
     const resolution = await assignment.resolve(intent.sourceId);
-    if (resolution === "pending" || resolution === "invalid") {
-      return resolution;
+    if (resolution === "invalid") {
+      return { outcome: "die", reason: "source_no_longer_valid" };
     }
-    return batchBucketOf(resolution);
+    if (resolution === "pending") {
+      return { outcome: "wait" };
+    }
+    return { outcome: "bucket", bucketKey: batchBucketOf(resolution), scope: resolution };
   }
   if (intent.clarificationId === undefined) {
-    return "invalid";
+    return { outcome: "die", reason: "clarification_resolved" };
   }
   const clarification = await tx.db.get(intent.clarificationId);
-  if (clarification === null) {
-    return "invalid";
+  if (clarification === null || clarification.state !== "open") {
+    // A resolved/closed question no longer notifies ("Pomijamy ...
+    // zamknięte" — one current summary, never stale replay).
+    return { outcome: "die", reason: "clarification_resolved" };
   }
   const scope: BatchScope =
     clarification.scopeKind === "project" && clarification.scopeProjectId !== undefined
       ? { kind: "project", projectIds: [clarification.scopeProjectId] }
       : { kind: "company", projectIds: [] };
-  return `clarification:${batchBucketOf(scope)}`;
+  return { outcome: "bucket", bucketKey: `clarification:${batchBucketOf(scope)}`, scope };
 }
 
-/** Adds one due intent to its bucket (read entries still form the bucket). */
-async function addToBucket(
+/**
+ * Adds one due intent to its bucket (read entries still form the bucket).
+ * The map key binds the recipient AND the company: the company scope's
+ * bucket key is the literal `company` in EVERY firm, and one person may
+ * hold pending intents in several firms (quiet hours keep them alive for
+ * hours); without the tenant bound, merge order would decide whose
+ * timezone, mutes, rights and summary the collapsed batch carries.
+ */
+function addToBucket(
   buckets: Map<string, Bucket>,
   intent: PendingIntent,
-  bucketKey: string,
-  scope: BatchScope,
+  bucketInfo: { readonly bucketKey: string; readonly scope: BatchScope },
   semanticKind: "source_entry" | "clarification",
   read: boolean,
-): Promise<void> {
-  const mapKey = `${intent.recipientUserId}|${bucketKey}`;
+): void {
+  const mapKey = `${intent.companyId}|${intent.recipientUserId}|${bucketInfo.bucketKey}`;
   const existing = buckets.get(mapKey);
   if (existing === undefined) {
     buckets.set(mapKey, {
       recipientUserId: intent.recipientUserId,
       companyId: intent.companyId,
-      bucketKey,
-      scope,
+      bucketKey: bucketInfo.bucketKey,
+      scope: bucketInfo.scope,
       semanticKind,
       intents: [{ intent, read }],
     });
@@ -504,56 +526,33 @@ export async function performEvaluateDueIntents(
     // task_reminder is F4's kind; confirmation is never created (ordinary
     // agent confirmations produce no push intent). Neither is pending here
     // today; if one ever is, it stays for its owning lane's evaluator.
-    if (intent.semanticKind !== "source_entry" && intent.semanticKind !== "clarification") {
+    const kind: "source_entry" | "clarification" | null =
+      intent.semanticKind === "source_entry" || intent.semanticKind === "clarification"
+        ? intent.semanticKind
+        : null;
+    if (kind === null) {
       continue;
     }
 
-    // --- business validity --------------------------------------------------
-    if (intent.semanticKind === "source_entry") {
-      if (intent.sourceId === undefined) {
-        await settleIntent(tx, intent, { state: "suppressed", reason: "source_no_longer_valid" }, nowMs);
-        continue;
-      }
-      const resolution = await assignment.resolve(intent.sourceId);
-      if (resolution === "invalid") {
-        await settleIntent(tx, intent, { state: "suppressed", reason: "source_no_longer_valid" }, nowMs);
-        continue;
-      }
-      // --- assignment: still pending -> wait, never a company bypass -------
-      if (resolution === "pending") {
-        await deferIntent(tx, intent, nowMs + ASSIGNMENT_RETRY_MS, nowMs);
-        continue;
-      }
-      // --- read state: read entries leave the batch before delivery, but
-      // still form the bucket — the batch's window is anchored at the FIRST
-      // entry, so a read entry's fire instant may yet carry an unread
-      // sibling accepted inside that same window.
-      const read = await readOf(tx, intent.recipientUserId, intent.sourceId);
-      await addToBucket(buckets, intent, batchBucketOf(resolution), resolution, "source_entry", read);
+    // --- the SHARED re-check: business validity, assignment, open state ---
+    const recheck = await recheckIntent(tx, assignment, intent);
+    if (recheck.outcome === "die") {
+      await settleIntent(tx, intent, { state: "suppressed", reason: recheck.reason }, nowMs);
       continue;
     }
-
-    // --- clarification: resolved/closed questions no longer notify ---------
-    if (intent.clarificationId === undefined) {
-      await settleIntent(tx, intent, { state: "suppressed", reason: "clarification_resolved" }, nowMs);
+    if (recheck.outcome === "wait") {
+      // Assignment still pending: wait, never a company bypass.
+      await deferIntent(tx, intent, nowMs + ASSIGNMENT_RETRY_MS, nowMs);
       continue;
     }
-    const clarification = await tx.db.get(intent.clarificationId);
-    if (clarification === null || clarification.state !== "open") {
-      await settleIntent(tx, intent, { state: "suppressed", reason: "clarification_resolved" }, nowMs);
-      continue;
-    }
-    // The author may be asked about their own source; the read rule is the
-    // underlying source's read state for this recipient.
-    if (intent.sourceId !== undefined && (await readOf(tx, intent.recipientUserId, intent.sourceId))) {
-      await settleIntent(tx, intent, { state: "suppressed", reason: "already_read" }, nowMs);
-      continue;
-    }
-    const scope: BatchScope =
-      clarification.scopeKind === "project" && clarification.scopeProjectId !== undefined
-        ? { kind: "project", projectIds: [clarification.scopeProjectId] }
-        : { kind: "company", projectIds: [] };
-    await addToBucket(buckets, intent, `clarification:${batchBucketOf(scope)}`, scope, "clarification", false);
+    // --- read state: read entries leave the batch before delivery, but
+    // still form the bucket — the batch's window is anchored at the FIRST
+    // entry, so a read entry's fire instant may yet carry an unread
+    // sibling accepted inside that same window.
+    const read =
+      intent.sourceId !== undefined &&
+      (await readOf(tx, intent.recipientUserId, intent.sourceId));
+    addToBucket(buckets, intent, recheck, kind, read);
   }
 
   for (const bucket of buckets.values()) {
@@ -584,29 +583,44 @@ export async function performEvaluateDueIntents(
     }
 
     // --- the window stays open until the ACTUAL fire instant: every sibling
-    // pending intent of this recipient in the same scope bucket joins the
-    // batch (an intent accepted after this instant cannot exist yet; one
-    // accepted before it keeps its own later window only if it lands in a
-    // DIFFERENT bucket). Read siblings die like read due entries.
+    // pending intent of this recipient IN THE SAME COMPANY and the same
+    // scope bucket joins the batch (an intent accepted after this instant
+    // cannot exist yet; one accepted before it keeps its own later window
+    // only if it lands in a DIFFERENT bucket). The tenant bound is load-
+    // bearing: the sibling scan otherwise reads every firm's pending
+    // intents of this person, and merge order would decide whose rights
+    // and timezone the collapsed batch answers to. Read siblings and
+    // siblings the SHARED re-check kills die like their due counterparts.
     const siblings = await tx.db
       .query("notificationIntents")
       .withIndex("by_recipient_state", (q) =>
         q.eq("recipientUserId", bucket.recipientUserId).eq("state", "pending"),
       )
+      .filter((q) => q.eq(q.field("companyId"), bucket.companyId))
       .collect();
     const liveIds = new Set(live.map((intent) => intent._id));
     for (const candidate of siblings) {
       if (candidate.semanticKind !== bucket.semanticKind || liveIds.has(candidate._id)) {
         continue;
       }
-      const key = await bucketKeyOf(tx, assignment, candidate);
-      if (key !== bucket.bucketKey || !joinsBatch(anchorOf(candidate), nowMs)) {
+      const recheck = await recheckIntent(tx, assignment, candidate);
+      if (recheck.outcome === "wait") {
+        // Assignment still pending: this sweep does not own it; the
+        // candidate's own chain re-checks.
         continue;
       }
-      if (
+      if (recheck.outcome === "die") {
+        await settleIntent(tx, candidate, { state: "suppressed", reason: recheck.reason }, nowMs);
+        touched.push(candidate._id);
+        continue;
+      }
+      if (recheck.bucketKey !== bucket.bucketKey || !joinsBatch(anchorOf(candidate), nowMs)) {
+        continue;
+      }
+      const read =
         candidate.sourceId !== undefined &&
-        (await readOf(tx, candidate.recipientUserId, candidate.sourceId))
-      ) {
+        (await readOf(tx, candidate.recipientUserId, candidate.sourceId));
+      if (read) {
         await settleIntent(tx, candidate, { state: "suppressed", reason: "already_read" }, nowMs);
         touched.push(candidate._id);
         continue;
@@ -633,7 +647,10 @@ export async function performEvaluateDueIntents(
       kind: bucket.semanticKind,
       scope: bucket.scope.kind,
       projectIds: [...bucket.scope.projectIds],
-      isAuthor: bucket.semanticKind === "clarification",
+      // The seam reads isAuthor only for source entries (the own-entry
+      // suppression), and a source_entry intent never exists for the author
+      // (creation excludes them): false is the honest value for both kinds.
+      isAuthor: false,
       read: false, // read intents already left the batch above
       nowMs,
       companyTimezone: company.timezone,
@@ -641,9 +658,8 @@ export async function performEvaluateDueIntents(
     });
 
     if (decision.decision === "suppressed") {
-      const reason = deathReasonOfPersonalSuppression(decision.reason);
       for (const intent of live) {
-        await settleIntent(tx, intent, { state: "suppressed", reason }, nowMs);
+        await settleIntent(tx, intent, { state: "suppressed", reason: decision.reason }, nowMs);
       }
       continue;
     }
@@ -658,7 +674,7 @@ export async function performEvaluateDueIntents(
     }
 
     // --- eligible: ONE collapsed current summary for the batch --------------
-    const summary = buildBatchSummary({
+    const deliveryJson = JSON.stringify({
       semanticKind: bucket.semanticKind,
       bucket: bucket.bucketKey,
       scope: bucket.scope,
@@ -669,8 +685,7 @@ export async function performEvaluateDueIntents(
         intent.clarificationId !== undefined ? [intent.clarificationId] : [],
       ),
       deliveredAtMs: nowMs,
-    });
-    const deliveryJson = JSON.stringify(summary);
+    } satisfies BatchSummary);
     for (const intent of live) {
       await settleIntent(tx, intent, { state: "delivered", deliveryJson }, nowMs);
     }
