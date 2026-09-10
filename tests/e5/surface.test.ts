@@ -12,7 +12,7 @@ import { Schema } from "effect";
 import { searchIndexInput, searchOperations } from "@kiero/contracts";
 import { projectEventToJobInputs } from "../../convex/platform/outbox";
 import { jobExecutors } from "../../convex/platform/executors";
-import { searchIndexExecutor, draftKeyForDraft } from "../../convex/search/executor";
+import { searchIndexExecutor, draftKeyOf } from "../../convex/search/executor";
 import { buildDedupKey } from "../../convex/search/generations";
 import {
   searchMutationHandlers,
@@ -141,7 +141,7 @@ describe("executor and dispatch registration", () => {
 
   it("draft keys prefer the fragment, then the finding, then the source", () => {
     expect(
-      draftKeyForDraft({
+      draftKeyOf({
         generationId: "g" as never,
         companyId: "c" as never,
         sourceFragmentId: "f1" as never,
@@ -150,7 +150,7 @@ describe("executor and dispatch registration", () => {
       }),
     ).toBe("fragment:f1");
     expect(
-      draftKeyForDraft({
+      draftKeyOf({
         generationId: "g" as never,
         companyId: "c" as never,
         findingId: "fd1" as never,
@@ -159,7 +159,7 @@ describe("executor and dispatch registration", () => {
       }),
     ).toBe("finding:fd1");
     expect(
-      draftKeyForDraft({
+      draftKeyOf({
         generationId: "g" as never,
         companyId: "c" as never,
         sourceId: "s1" as never,

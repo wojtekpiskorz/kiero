@@ -97,6 +97,19 @@ async function completeJob(
 }
 
 /**
+ * Fails the job and answers the envelope with the SAME closed kind, so the
+ * durable row and the caller's error can never diverge (review round 1:
+ * eleven hand-synced pairs and one bare envelope exit).
+ */
+async function failJob(
+  tx: MutationCtx,
+  job: JobLike,
+  kind: string,
+): Promise<ResultEnvelope> {
+  return failJob(tx, job, kind);
+}
+
+/**
  * Writes one batch of validated rows for a job: all rows validate FIRST
  * (nothing commits on any failure), then each writes idempotently.
  */
@@ -121,12 +134,10 @@ export async function recordIndexEntries(
     const normalized = tx.db.normalizeId("searchIndexGenerations", generationId);
     const generation = normalized === null ? null : await tx.db.get(normalized);
     if (generation === null) {
-      await completeJob(tx, job, { state: "failed", errorKind: "generation_not_found" });
-      return errorResult(validationError("generation_not_found"));
+      return failJob(tx, job, "generation_not_found");
     }
     if (generation.state === "retired") {
-      await completeJob(tx, job, { state: "failed", errorKind: "generation_retired" });
-      return errorResult(validationError("generation_retired"));
+      return failJob(tx, job, "generation_retired");
     }
     generations.set(generationId, generation);
   }
@@ -135,18 +146,16 @@ export async function recordIndexEntries(
   for (const row of rows) {
     const generation = generations.get(row.generationId);
     if (generation === undefined) {
-      return errorResult(validationError("generation_not_found"));
+      return failJob(tx, job, "generation_not_found");
     }
     const textVerdict = validatePreparedText(row.preparedText);
     if (!textVerdict.ok) {
-      await completeJob(tx, job, { state: "failed", errorKind: textVerdict.errorKind });
-      return errorResult(validationError(textVerdict.errorKind));
+      return failJob(tx, job, textVerdict.errorKind);
     }
     if (row.embedding !== undefined) {
       const verdict = validateEmbeddingForGeneration(generation.dimensions, row.embedding);
       if (!verdict.ok) {
-        await completeJob(tx, job, { state: "failed", errorKind: verdict.errorKind });
-        return errorResult(validationError(verdict.errorKind));
+        return failJob(tx, job, verdict.errorKind);
       }
     }
   }
@@ -157,30 +166,25 @@ export async function recordIndexEntries(
   for (const row of rows) {
     const companyId = tx.db.normalizeId("companies", row.companyId);
     if (companyId === null) {
-      await completeJob(tx, job, { state: "failed", errorKind: "company_id_invalid" });
-      return errorResult(validationError("company_id_invalid"));
+      return failJob(tx, job, "company_id_invalid");
     }
     const generationId = tx.db.normalizeId("searchIndexGenerations", row.generationId);
     if (generationId === null) {
-      await completeJob(tx, job, { state: "failed", errorKind: "generation_id_invalid" });
-      return errorResult(validationError("generation_id_invalid"));
+      return failJob(tx, job, "generation_id_invalid");
     }
     if (row.findingId !== undefined) {
       const findingId = tx.db.normalizeId("findings", row.findingId);
       const finding = findingId === null ? null : await tx.db.get(findingId);
       if (finding === null || finding.companyId !== companyId) {
-        await completeJob(tx, job, { state: "failed", errorKind: "finding_tenant_mismatch" });
-        return errorResult(validationError("finding_tenant_mismatch"));
+        return failJob(tx, job, "finding_tenant_mismatch");
       }
       if (row.findingRevisionId === undefined) {
-        await completeJob(tx, job, { state: "failed", errorKind: "finding_revision_missing" });
-        return errorResult(validationError("finding_revision_missing"));
+        return failJob(tx, job, "finding_revision_missing");
       }
       const revisionId = tx.db.normalizeId("findingRevisions", row.findingRevisionId);
       const revision = revisionId === null ? null : await tx.db.get(revisionId);
       if (revision === null || revision.findingId !== finding._id) {
-        await completeJob(tx, job, { state: "failed", errorKind: "finding_revision_mismatch" });
-        return errorResult(validationError("finding_revision_mismatch"));
+        return failJob(tx, job, "finding_revision_mismatch");
       }
       const existing = await tx.db
         .query("searchEntries")
@@ -216,8 +220,7 @@ export async function recordIndexEntries(
       row.sourceId === undefined ? null : tx.db.normalizeId("sources", row.sourceId);
     const source = sourceId === null ? null : await tx.db.get(sourceId);
     if (source === null || source.companyId !== companyId) {
-      await completeJob(tx, job, { state: "failed", errorKind: "source_tenant_mismatch" });
-      return errorResult(validationError("source_tenant_mismatch"));
+      return failJob(tx, job, "source_tenant_mismatch");
     }
     const fragmentId =
       row.sourceFragmentId === undefined
@@ -225,8 +228,7 @@ export async function recordIndexEntries(
         : tx.db.normalizeId("sourceFragments", row.sourceFragmentId);
     const fragment = fragmentId === null ? null : await tx.db.get(fragmentId);
     if (fragment !== null && fragment.sourceId !== source._id) {
-      await completeJob(tx, job, { state: "failed", errorKind: "fragment_source_mismatch" });
-      return errorResult(validationError("fragment_source_mismatch"));
+      return failJob(tx, job, "fragment_source_mismatch");
     }
     if (fragmentId !== null) {
       const existing = await tx.db

@@ -77,7 +77,7 @@ export async function performStartIndexGeneration(
 /** The verified cutover: build evidence checked, then the atomic switch. */
 export async function performCutOverIndexGeneration(
   tx: MutationCtx,
-  _context: RequestContext,
+  context: RequestContext,
   input: { generationId: string },
 ): Promise<ResultEnvelope> {
   const generationId = tx.db.normalizeId("searchIndexGenerations", input.generationId);
@@ -112,7 +112,7 @@ export async function performCutOverIndexGeneration(
   }
   await tx.db.patch(generationId, { state: "active", activatedAtMs: Date.now() });
   await publishEvent(tx, {
-    companyId: _context.actor.companyId,
+    companyId: context.actor.companyId,
     eventName: "search.indexGenerationCutOver",
     payload: { generationId },
     dedupKey: `search.indexGenerationCutOver:${generationId}`,

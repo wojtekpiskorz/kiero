@@ -7,7 +7,7 @@
  * 4096 dimensions only after the live route proves it." The pins mirror
  * @kiero/providers' routing constants (E2 owns them); this package pins its
  * own copy so the pure cores stay free of node-typed imports, and
- * tests/e5/candidate.test.ts fails loudly if either side drifts. Any change
+ * tests/e5/cores.test.ts fails loudly if either side drifts. Any change
  * to model, dimensions or preparation is a NEW generation, never a
  * per-request knob: `isCompatibleCandidate` is the single gate both
  * `search.startIndexGeneration` and the index-write path consult.

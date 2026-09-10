@@ -174,7 +174,7 @@ export const indexWork = internalQuery({
           stats: collected.stats,
           alreadyEmbedded: existing
             .filter((row) => row.embedding !== undefined)
-            .map((row) => draftKey(row)),
+            .map((row) => draftKeyOf(row)),
         },
       };
     }
@@ -196,20 +196,23 @@ export const indexWork = internalQuery({
   },
 });
 
-function draftKey(row: Doc<"searchEntries">): string {
-  return row.sourceFragmentId !== undefined
-    ? `fragment:${row.sourceFragmentId}`
-    : row.findingId !== undefined
-      ? `finding:${row.findingId}`
-      : `source:${row.sourceId ?? ""}`;
-}
-
-function draftKeyOf(draft: EntryDraft): string {
-  return draft.sourceFragmentId !== undefined
-    ? `fragment:${draft.sourceFragmentId}`
-    : draft.findingId !== undefined
-      ? `finding:${draft.findingId}`
-      : `source:${draft.sourceId ?? ""}`;
+/**
+ * The ONE keying rule for index-entry drafts and rows (review round 1: it
+ * lived in three functions): fragment identity first, then finding, then
+ * the source-only entry.
+ */
+export function draftKeyOf(input: {
+  readonly sourceFragmentId?: string;
+  readonly findingId?: string;
+  readonly sourceId?: string;
+  readonly generationId?: string;
+  readonly companyId?: string;
+}): string {
+  return input.sourceFragmentId !== undefined
+    ? `fragment:${input.sourceFragmentId}`
+    : input.findingId !== undefined
+      ? `finding:${input.findingId}`
+      : `source:${input.sourceId ?? ""}`;
 }
 
 /** Reads the server-held OpenRouter key; presence only, never its value. */
@@ -298,10 +301,6 @@ export const runIndexPass = internalAction({
 });
 
 /** Exposed for the focused unit tests: the draft key derivation. */
-export function draftKeyForDraft(draft: EntryDraft): string {
-  return draftKeyOf(draft);
-}
-
 /** Narrow type re-export so tests pin the Convex id branding. */
 export type SearchEntryDoc = Doc<"searchEntries">;
 export type GenerationId = Id<"searchIndexGenerations">;
