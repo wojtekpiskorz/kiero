@@ -61,9 +61,7 @@ export type SyncAttemptOutcome = (typeof SYNC_ATTEMPT_OUTCOMES)[number];
  * (no cast: the annotation is a real pin — widening the literals would
  * fail typecheck here, not silently widen the row type).
  */
-function vocabularyOf<T extends string>(
-  kinds: readonly T[],
-): ValueValidator<T> {
+function vocabularyOf<T extends string>(kinds: readonly T[]): ValueValidator<T> {
   return v.union(...kinds.map((kind) => v.literal(kind)));
 }
 
