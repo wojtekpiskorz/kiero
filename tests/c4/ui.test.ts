@@ -86,6 +86,20 @@ describe("the work-list feature vocabulary", () => {
     expect(workCopy.coordinatorLabel(false)).toContain("wspólna kolejka");
   });
 
+  it("points the empty state at the create form that exists, in glossary terms", () => {
+    // "Zadanie" is the glossary term; the empty state must name the control
+    // the surface actually renders (the create form below), never a missing
+    // one — and the create copy exists and describes what really happens.
+    expect(workCopy.noTasks).toContain("zadanie");
+    expect(workCopy.noTasks).not.toContain("zobowiązanie");
+    expect(workCopy.noTasks).toContain("poniżej");
+    expect(workCopy.createHeading).toContain("Zapisz zadanie");
+    expect(workCopy.createIntro).toContain("Do zrobienia");
+    expect(workCopy.createIntro).toContain("wspólnej kolejce");
+    expect(workCopy.createPlaceholder).toMatch(/.+/u);
+    expect(workCopy.created).toMatch(/[Zz]adanie/);
+  });
+
   it("renders derived dueness as present claims, never as state changes", () => {
     expect(workCopy.duenessLabel({ kind: "overdue", due: { _tag: "instant", epochMs: 0 } })).toBe(
       "po terminie",

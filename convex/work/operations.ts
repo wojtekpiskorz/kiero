@@ -18,16 +18,22 @@
  * either both exist or neither does ("dependent event/task creation
  * commits atomically when they share one agreement").
  *
- * HISTORY: every write records one immutable `workRevisions` row (actor,
- * via, evidence basis, time, full snapshot after the change) in the same
- * transaction as the current-row patch, and publishes its canonical
- * `work.*` event atomically.
+ * HISTORY: every write records its immutable `workRevisions` row AND its
+ * canonical `work.*` event through the ONE lane pattern,
+ * `recordCommittedChange` (./references.ts): the subject's full snapshot
+ * re-read after the row write, the uniform dedup key, both in the same
+ * transaction as the current-row change. No call site hand-builds a
+ * history row, payload or dedup key.
  *
  * REVISION discipline: `tasks.revisionCounter` is the optimistic counter of
  * the task AGGREGATE — task fields, task state and its checklist points all
  * advance it and all verify it. Item edits never read or write the task's
  * STATE (structural independence); they only serialize through its counter.
  * `events.revisionCounter` is the event's own counter.
+ * `tasks.stateChangedAtMs` moves ONLY when the state itself moves: a field
+ * edit or a Czeka reason re-description advances the revision and
+ * `updatedAtMs` but leaves the task where the last real state change put it
+ * in `by_company_state`.
  *
  * There is deliberately no input through which checklist progress, an
  * elapsed deadline or a passed event date could change a task or event
@@ -63,8 +69,6 @@ import {
 } from "@kiero/domain";
 import {
   companyScopeOf,
-  eventSnapshotOf,
-  itemSnapshotOf,
   loadCompanyContact,
   loadCompanyEvent,
   loadCompanyMembership,
@@ -73,10 +77,7 @@ import {
   loadCompanyTask,
   loadCurrentFinding,
   loadTaskItem,
-  publishWorkEvent,
-  recordWorkRevision,
-  requireRow,
-  taskSnapshotOf,
+  recordCommittedChange,
   type CompanyScope,
 } from "./references";
 
@@ -396,17 +397,15 @@ export async function commitChangeTask(
       updatedAtMs: nowMs,
       stateChangedAtMs: nowMs,
     });
-    await recordWorkRevision(tx, {
+    await recordCommittedChange(tx, {
       scope,
-      subjectKind: "task",
-      taskId,
+      subject: { kind: "task", taskId },
       revision: 1,
       change: "created",
-      snapshot: taskSnapshotOf(await requireRow(tx, taskId)),
+      event: { eventName: "work.taskChanged", taskId },
       basisSourceId: plan.basisSourceId,
       nowMs,
     });
-    await publishWorkEvent(tx, scope.companyId, "work.taskChanged", { taskId }, `work.taskChanged:${taskId}:1`);
     return taskId;
   }
 
@@ -424,23 +423,15 @@ export async function commitChangeTask(
     revisionCounter: revision,
     updatedAtMs: nowMs,
   });
-  await recordWorkRevision(tx, {
+  await recordCommittedChange(tx, {
     scope,
-    subjectKind: "task",
-    taskId: plan.existing._id,
+    subject: { kind: "task", taskId: plan.existing._id },
     revision,
     change: "changed",
-    snapshot: taskSnapshotOf(await requireRow(tx, plan.existing._id)),
+    event: { eventName: "work.taskChanged", taskId: plan.existing._id },
     basisSourceId: plan.basisSourceId,
     nowMs,
   });
-  await publishWorkEvent(
-    tx,
-    scope.companyId,
-    "work.taskChanged",
-    { taskId: plan.existing._id },
-    `work.taskChanged:${plan.existing._id}:${revision}`,
-  );
   return plan.existing._id;
 }
 
@@ -511,29 +502,24 @@ export async function performChangeTaskState(
   // --- the atomic commit: state/reason + revision + history + event --------
   const revision = task.revisionCounter + 1;
   if (decision.kind === "reason_changed") {
+    // The domain decision is the authority: the obstacle was re-described,
+    // the STATE did not move — so `stateChangedAtMs` stays where the last
+    // real state change left it (same rule as the ordinary field-update
+    // path), and the task keeps its position in `by_company_state`.
     await tx.db.patch(task._id, {
       waitingReason: decision.waitingReason,
       revisionCounter: revision,
       updatedAtMs: nowMs,
-      stateChangedAtMs: nowMs,
     });
-    await recordWorkRevision(tx, {
+    await recordCommittedChange(tx, {
       scope,
-      subjectKind: "task",
-      taskId: task._id,
+      subject: { kind: "task", taskId: task._id },
       revision,
       change: "changed",
-      snapshot: taskSnapshotOf(await requireRow(tx, task._id)),
+      event: { eventName: "work.taskChanged", taskId: task._id },
       basisSourceId: basis.sourceId,
       nowMs,
     });
-    await publishWorkEvent(
-      tx,
-      scope.companyId,
-      "work.taskChanged",
-      { taskId: task._id },
-      `work.taskChanged:${task._id}:${revision}`,
-    );
     return receipt;
   }
 
@@ -544,23 +530,20 @@ export async function performChangeTaskState(
     updatedAtMs: nowMs,
     stateChangedAtMs: nowMs,
   });
-  await recordWorkRevision(tx, {
+  await recordCommittedChange(tx, {
     scope,
-    subjectKind: "task",
-    taskId: task._id,
+    subject: { kind: "task", taskId: task._id },
     revision,
     change: "state_changed",
-    snapshot: taskSnapshotOf(await requireRow(tx, task._id)),
+    event: {
+      eventName: "work.taskStateChanged",
+      taskId: task._id,
+      fromState: decision.from,
+      toState: decision.to,
+    },
     basisSourceId: basis.sourceId,
     nowMs,
   });
-  await publishWorkEvent(
-    tx,
-    scope.companyId,
-    "work.taskStateChanged",
-    { taskId: task._id, fromState: decision.from, toState: decision.to },
-    `work.taskStateChanged:${task._id}:${revision}`,
-  );
   return receipt;
 }
 
@@ -657,24 +640,15 @@ export async function performChangeChecklistItem(
   }
   // The task row: ONLY its aggregate counter moves. Its state is untouched.
   await tx.db.patch(task._id, { revisionCounter: taskRevision, updatedAtMs: nowMs });
-  await recordWorkRevision(tx, {
+  await recordCommittedChange(tx, {
     scope,
-    subjectKind: "checklist_item",
-    taskId: task._id,
-    itemId,
+    subject: { kind: "checklist_item", taskId: task._id, itemId },
     revision: taskRevision,
     change: decision.kind === "create" ? "created" : "changed",
-    snapshot: itemSnapshotOf(await requireRow(tx, itemId)),
+    event: { eventName: "work.checklistItemChanged", taskId: task._id, itemId, state: input.state },
     basisSourceId: basis.sourceId,
     nowMs,
   });
-  await publishWorkEvent(
-    tx,
-    scope.companyId,
-    "work.checklistItemChanged",
-    { taskId: task._id, itemId, state: input.state },
-    `work.checklistItemChanged:${itemId}:${taskRevision}`,
-  );
   return okResult(Schema.decodeUnknownSync(changeChecklistItemEntry.result)({ itemId }));
 }
 
@@ -762,24 +736,18 @@ export async function performPromoteChecklistItem(
     updatedAtMs: nowMs,
   });
   await tx.db.patch(parent._id, { revisionCounter: parentRevision, updatedAtMs: nowMs });
-  await recordWorkRevision(tx, {
+  // The point changed, but the canonical event is about the PARENT task
+  // whose aggregate revision moved (the helper derives that dedup identity
+  // from the event variant itself).
+  await recordCommittedChange(tx, {
     scope,
-    subjectKind: "checklist_item",
-    taskId: parent._id,
-    itemId: item._id,
+    subject: { kind: "checklist_item", taskId: parent._id, itemId: item._id },
     revision: parentRevision,
     change: "promoted",
-    snapshot: itemSnapshotOf(await requireRow(tx, item._id)),
+    event: { eventName: "work.taskChanged", taskId: parent._id },
     basisSourceId: basis.sourceId,
     nowMs,
   });
-  await publishWorkEvent(
-    tx,
-    scope.companyId,
-    "work.taskChanged",
-    { taskId: parent._id },
-    `work.taskChanged:${parent._id}:${parentRevision}`,
-  );
   return okResult(Schema.decodeUnknownSync(promoteChecklistItemEntry.result)({ taskId }));
 }
 
@@ -872,17 +840,15 @@ export async function commitChangeEvent(tx: MutationCtx, plan: EventChangePlan):
       createdAtMs: nowMs,
       updatedAtMs: nowMs,
     });
-    await recordWorkRevision(tx, {
+    await recordCommittedChange(tx, {
       scope,
-      subjectKind: "event",
-      eventId,
+      subject: { kind: "event", eventId },
       revision: 1,
       change: "created",
-      snapshot: eventSnapshotOf(await requireRow(tx, eventId)),
+      event: { eventName: "work.eventChanged", eventId },
       basisSourceId: plan.basisSourceId,
       nowMs,
     });
-    await publishWorkEvent(tx, scope.companyId, "work.eventChanged", { eventId }, `work.eventChanged:${eventId}:1`);
     return eventId;
   }
   if (plan.unchanged) {
@@ -895,23 +861,15 @@ export async function commitChangeEvent(tx: MutationCtx, plan: EventChangePlan):
     revisionCounter: revision,
     updatedAtMs: nowMs,
   });
-  await recordWorkRevision(tx, {
+  await recordCommittedChange(tx, {
     scope,
-    subjectKind: "event",
-    eventId: plan.existing._id,
+    subject: { kind: "event", eventId: plan.existing._id },
     revision,
     change: "changed",
-    snapshot: eventSnapshotOf(await requireRow(tx, plan.existing._id)),
+    event: { eventName: "work.eventChanged", eventId: plan.existing._id },
     basisSourceId: plan.basisSourceId,
     nowMs,
   });
-  await publishWorkEvent(
-    tx,
-    scope.companyId,
-    "work.eventChanged",
-    { eventId: plan.existing._id },
-    `work.eventChanged:${plan.existing._id}:${revision}`,
-  );
   return plan.existing._id;
 }
 
@@ -975,23 +933,20 @@ export async function performChangeEventState(
     revisionCounter: revision,
     updatedAtMs: nowMs,
   });
-  await recordWorkRevision(tx, {
+  await recordCommittedChange(tx, {
     scope,
-    subjectKind: "event",
-    eventId: event._id,
+    subject: { kind: "event", eventId: event._id },
     revision,
     change: "state_changed",
-    snapshot: eventSnapshotOf(await requireRow(tx, event._id)),
+    event: {
+      eventName: "work.eventStateChanged",
+      eventId: event._id,
+      fromState: decision.from,
+      toState: decision.to,
+    },
     basisSourceId: basis.sourceId,
     nowMs,
   });
-  await publishWorkEvent(
-    tx,
-    scope.companyId,
-    "work.eventStateChanged",
-    { eventId: event._id, fromState: decision.from, toState: decision.to },
-    `work.eventStateChanged:${event._id}:${revision}`,
-  );
   return receipt;
 }
 

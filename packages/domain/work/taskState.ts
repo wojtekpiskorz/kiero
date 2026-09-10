@@ -52,7 +52,9 @@ export function isOpenTaskState(state: TaskState): boolean {
 export const MAX_WAITING_REASON_LENGTH = 500;
 
 /** A waiting reason carries words; whitespace-only is not an obstacle. */
-export function validateWaitingReason(reason: string | undefined): Validated<string> {
+export function validateWaitingReason(
+  reason: string | undefined,
+): Validated<string, "waiting_reason_required" | "waiting_reason_too_long"> {
   const trimmed = (reason ?? "").trim();
   if (trimmed.length === 0) {
     return { ok: false, code: "waiting_reason_required" };
@@ -124,10 +126,7 @@ export function decideTaskStateChange(
   if (target.state === "waiting") {
     const reason = validateWaitingReason(target.waitingReason);
     if (!reason.ok) {
-      return {
-        kind: "rejected",
-        code: reason.code === "waiting_reason_too_long" ? "waiting_reason_too_long" : "waiting_reason_required",
-      };
+      return { kind: "rejected", code: reason.code };
     }
     waitingReason = reason.value;
   }

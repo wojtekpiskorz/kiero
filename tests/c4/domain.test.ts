@@ -117,10 +117,17 @@ describe("task state vocabulary (Stan zadania)", () => {
     expect(decideTaskStateChange(current, { state: "waiting", waitingReason: "brak okien" })).toEqual({
       kind: "unchanged",
     });
-    expect(decideTaskStateChange(current, { state: "waiting", waitingReason: "brak drzwi" })).toEqual({
-      kind: "reason_changed",
+    const redescribed = decideTaskStateChange(current, {
+      state: "waiting",
       waitingReason: "brak drzwi",
     });
+    expect(redescribed).toEqual({ kind: "reason_changed", waitingReason: "brak drzwi" });
+    // The domain decision is the authority for the transaction halves: a
+    // re-description is NOT a state move, so no from/to pair exists and the
+    // transaction must not bump `stateChangedAtMs` (which would reposition
+    // the task inside `by_company_state` on a mere reason edit).
+    expect("from" in redescribed).toBe(false);
+    expect("to" in redescribed).toBe(false);
   });
 
   it("clears the reason when leaving Czeka", () => {

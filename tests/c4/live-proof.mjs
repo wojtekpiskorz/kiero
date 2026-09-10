@@ -406,10 +406,19 @@ let membershipA = null;
     waitingReason: "okna przyjadą dopiero w przyszłym tygodniu",
   });
   check("C5 re-describing the obstacle is a recorded change", isOk(redescribed), errCode(redescribed));
+  const stateChangedAtBefore = t1.stateChangedAtMs;
+  const revisionBefore = t1.revisionCounter;
   t1 = (await overview(A.client)).tasks.find((t) => t.taskId === T1);
   check(
     "C6 state did not move while the reason changed",
     t1?.state === "waiting" && t1?.waitingReason === "okna przyjadą dopiero w przyszłym tygodniu",
+  );
+  check(
+    "C6b a re-described reason does NOT bump stateChangedAtMs (no by_company_state repositioning); the revision and updatedAtMs did move",
+    t1?.stateChangedAtMs === stateChangedAtBefore &&
+      t1?.revisionCounter === revisionBefore + 1 &&
+      t1?.updatedAtMs >= t1?.stateChangedAtMs,
+    JSON.stringify({ stateChangedAtMs: t1?.stateChangedAtMs, unchanged: stateChangedAtBefore === t1?.stateChangedAtMs }),
   );
 
   const resumed = await work(A.client, "work.changeTaskState", {
@@ -418,8 +427,14 @@ let membershipA = null;
     state: "in_progress",
   });
   check("C7 leaving Czeka clears the reason", isOk(resumed), errCode(resumed));
+  const stateChangedAtWhileWaiting = t1.stateChangedAtMs;
   t1 = (await overview(A.client)).tasks.find((t) => t.taskId === T1);
   check("C8 obstacle cleared with the state move", t1?.state === "in_progress" && t1?.waitingReason === null);
+  check(
+    "C8b a REAL state move does bump stateChangedAtMs (the contrast with C6b)",
+    t1?.stateChangedAtMs > stateChangedAtWhileWaiting,
+    JSON.stringify({ from: stateChangedAtWhileWaiting, to: t1?.stateChangedAtMs }),
+  );
 
   for (const operation of [
     "work.completeTaskFromChecklist",

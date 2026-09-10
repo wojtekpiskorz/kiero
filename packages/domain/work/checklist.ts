@@ -35,7 +35,9 @@ export const CHECKLIST_ITEM_STATE_LABELS: Readonly<Record<ChecklistItemState, st
 export const MAX_CHECKLIST_DESCRIPTION_LENGTH = 300;
 
 /** A point describes a step; whitespace-only is not a step. */
-export function validateChecklistDescription(description: string): Validated<string> {
+export function validateChecklistDescription(
+  description: string,
+): Validated<string, "checklist_description_empty" | "checklist_description_too_long"> {
   const trimmed = description.trim();
   if (trimmed.length === 0) {
     return { ok: false, code: "checklist_description_empty" };
@@ -93,13 +95,7 @@ export function decideChecklistItemChange(
 ): ChecklistItemChangeDecision {
   const description = validateChecklistDescription(target.description);
   if (!description.ok) {
-    return {
-      kind: "rejected",
-      code:
-        description.code === "checklist_description_too_long"
-          ? "checklist_description_too_long"
-          : "checklist_description_empty",
-    };
+    return { kind: "rejected", code: description.code };
   }
   if (existing === null) {
     return { kind: "create", description: description.value };

@@ -32,7 +32,9 @@ import type { Validated } from "../projects/result";
 export const MAX_TASK_TITLE_LENGTH = 200;
 
 /** A task title names the action; whitespace-only is not one. */
-export function validateTaskTitle(title: string): Validated<string> {
+export function validateTaskTitle(
+  title: string,
+): Validated<string, "task_title_empty" | "task_title_too_long"> {
   const trimmed = title.trim();
   if (trimmed.length === 0) {
     return { ok: false, code: "task_title_empty" };

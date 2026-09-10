@@ -6,13 +6,21 @@
  * load* helper normalizes the id, reads the row and returns null when the
  * row is missing OR belongs to another company — without saying which, so
  * the refusal leaks no existence information across the tenant boundary
- * (the C1/C2 discipline). `recordWorkRevision` is the ONLY writer of
- * `workRevisions`, and every current-row patch in ./operations.ts is made
- * in the same transaction as its history row.
+ * (the C1/C2 discipline). `recordCommittedChange` is the ONE commit
+ * pattern the transaction halves record through (history row + canonical
+ * event with the uniform dedup key, never apart); `recordWorkRevision`
+ * remains the only writer of `workRevisions` underneath it.
  */
 
 import { Schema } from "effect";
-import { events, errorResult, type ResultEnvelope } from "@kiero/contracts";
+import {
+  events,
+  errorResult,
+  type ChecklistItemState,
+  type EventOccurrenceState,
+  type ResultEnvelope,
+  type TaskState,
+} from "@kiero/contracts";
 import { validationError, type RequestContext } from "@kiero/runtime";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -237,4 +245,147 @@ export async function publishWorkEvent(
   }
   Schema.decodeUnknownSync(entry.payload)(payload);
   await publishEvent(tx, { companyId, eventName, payload, dedupKey });
+}
+
+// ---------------------------------------------------------------------------
+// The one commit pattern: history row + canonical event, never apart
+// ---------------------------------------------------------------------------
+
+/**
+ * One canonical work event as the lane publishes it. The variant carries
+ * exactly the identity the event's payload names, so the payload and the
+ * dedup subject derive from it — no call site can hand-build either.
+ */
+export type WorkEventRef =
+  | { readonly eventName: "work.taskChanged"; readonly taskId: Id<"tasks"> }
+  | {
+      readonly eventName: "work.taskStateChanged";
+      readonly taskId: Id<"tasks">;
+      readonly fromState: TaskState;
+      readonly toState: TaskState;
+    }
+  | {
+      readonly eventName: "work.checklistItemChanged";
+      readonly taskId: Id<"tasks">;
+      readonly itemId: Id<"checklistItems">;
+      readonly state: ChecklistItemState;
+    }
+  | { readonly eventName: "work.eventChanged"; readonly eventId: Id<"events"> }
+  | {
+      readonly eventName: "work.eventStateChanged";
+      readonly eventId: Id<"events">;
+      readonly fromState: EventOccurrenceState;
+      readonly toState: EventOccurrenceState;
+    };
+
+/** The work subject one committed change is recorded ABOUT. */
+export type WorkSubjectRef =
+  | { readonly kind: "task"; readonly taskId: Id<"tasks"> }
+  | {
+      readonly kind: "checklist_item";
+      /** The point's parent task (the aggregate the revision serializes). */
+      readonly taskId: Id<"tasks">;
+      readonly itemId: Id<"checklistItems">;
+    }
+  | { readonly kind: "event"; readonly eventId: Id<"events"> };
+
+/** The lane-uniform entry every commit site records right after its write. */
+export interface WorkChangeEntry {
+  readonly scope: CompanyScope;
+  readonly subject: WorkSubjectRef;
+  /** The subject's counter AFTER the change (1 = creation). */
+  readonly revision: number;
+  readonly change: WorkChangeKind;
+  readonly event: WorkEventRef;
+  readonly basisSourceId: Id<"sources"> | undefined;
+  readonly nowMs: number;
+}
+
+/** The payload of one canonical event, derived from its variant. */
+function payloadOf(event: WorkEventRef): Record<string, unknown> {
+  switch (event.eventName) {
+    case "work.taskChanged":
+      return { taskId: event.taskId };
+    case "work.taskStateChanged":
+      return { taskId: event.taskId, fromState: event.fromState, toState: event.toState };
+    case "work.checklistItemChanged":
+      return { taskId: event.taskId, itemId: event.itemId, state: event.state };
+    case "work.eventChanged":
+      return { eventId: event.eventId };
+    case "work.eventStateChanged":
+      return { eventId: event.eventId, fromState: event.fromState, toState: event.toState };
+  }
+}
+
+/**
+ * The record id one canonical event is ABOUT — the uniform dedup identity
+ * (`work.<event>:<id>:<revision>`). Task events of a checklist subject name
+ * the PARENT task (the promotion site: the point changed, the event is
+ * about the task whose aggregate revision moved).
+ */
+function dedupSubjectIdOf(event: WorkEventRef): string {
+  switch (event.eventName) {
+    case "work.taskChanged":
+    case "work.taskStateChanged":
+      return event.taskId;
+    case "work.checklistItemChanged":
+      return event.itemId;
+    case "work.eventChanged":
+    case "work.eventStateChanged":
+      return event.eventId;
+  }
+}
+
+/** The snapshot of one subject as it is NOW (after the caller's write). */
+async function snapshotOfSubject(
+  tx: MutationCtx,
+  subject: WorkSubjectRef,
+): Promise<WorkSnapshot> {
+  switch (subject.kind) {
+    case "task":
+      return taskSnapshotOf(await requireRow(tx, subject.taskId));
+    case "checklist_item":
+      return itemSnapshotOf(await requireRow(tx, subject.itemId));
+    case "event":
+      return eventSnapshotOf(await requireRow(tx, subject.eventId));
+  }
+}
+
+/**
+ * Records ONE committed change: the immutable history row (the subject's
+ * full state re-read AFTER the caller's row write) and its canonical
+ * `work.*` event with the lane's uniform dedup key — together, in the
+ * caller's transaction. This is the ONLY pattern the transaction halves
+ * use; `recordWorkRevision` and `publishWorkEvent` below it are its
+ * building blocks, so a hand-built or drifting dedup key is unrepresentable
+ * at a call site.
+ */
+export async function recordCommittedChange(
+  tx: MutationCtx,
+  entry: WorkChangeEntry,
+): Promise<void> {
+  if (entry.event.eventName.startsWith("work.event") !== (entry.subject.kind === "event")) {
+    throw new Error(
+      `work transaction: event ${entry.event.eventName} cannot record a ${entry.subject.kind} subject`,
+    );
+  }
+  await recordWorkRevision(tx, {
+    scope: entry.scope,
+    subjectKind: entry.subject.kind,
+    ...(entry.subject.kind !== "event" && { taskId: entry.subject.taskId }),
+    ...(entry.subject.kind === "checklist_item" && { itemId: entry.subject.itemId }),
+    ...(entry.subject.kind === "event" && { eventId: entry.subject.eventId }),
+    revision: entry.revision,
+    change: entry.change,
+    snapshot: await snapshotOfSubject(tx, entry.subject),
+    basisSourceId: entry.basisSourceId,
+    nowMs: entry.nowMs,
+  });
+  await publishWorkEvent(
+    tx,
+    entry.scope.companyId,
+    entry.event.eventName,
+    payloadOf(entry.event),
+    `${entry.event.eventName}:${dedupSubjectIdOf(entry.event)}:${entry.revision}`,
+  );
 }

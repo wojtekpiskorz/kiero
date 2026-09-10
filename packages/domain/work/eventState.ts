@@ -35,7 +35,9 @@ export const EVENT_STATE_LABELS: Readonly<Record<EventOccurrenceState, string>> 
 export const MAX_EVENT_TITLE_LENGTH = 200;
 
 /** An event title names the occurrence; whitespace-only is not one. */
-export function validateEventTitle(title: string): Validated<string> {
+export function validateEventTitle(
+  title: string,
+): Validated<string, "event_title_empty" | "event_title_too_long"> {
   const trimmed = title.trim();
   if (trimmed.length === 0) {
     return { ok: false, code: "event_title_empty" };

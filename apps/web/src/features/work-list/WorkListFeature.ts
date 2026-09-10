@@ -252,6 +252,7 @@ function WorkBody({ overview }: { readonly overview: WorkOverviewRead }): ReactN
     createElement(ChecklistForm, { overview, form, run, revisionOf }),
     createElement(PromoteForm, { overview, form, run, revisionOf }),
     createElement(EventStateForm, { overview, form, run, eventRevisionOf }),
+    createElement(CreateTaskForm, { form, run }),
   );
 }
 
@@ -482,8 +483,7 @@ function EventStateForm({
   form,
   run,
   eventRevisionOf,
-}: FormProps & { readonly eventRevisionOf: (eventId: string) => number }): ReactNode {
-  const [eventId, setEventId] = useState(overview.events[0]?.eventId ?? "");
+}: FormProps & { readonly eventRevisionOf: (eventId: string) => number }): ReactNode {  const [eventId, setEventId] = useState(overview.events[0]?.eventId ?? "");
   const [state, setState] = useState<(typeof eventStateOrder)[number]>("occurred");
 
   async function submit(event: SubmitEvent): Promise<void> {
@@ -531,6 +531,90 @@ function EventStateForm({
         ),
       ),
       createElement("button", { type: "submit", disabled: form.busy }, workCopy.eventStateChange),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Create: the minimal obligation recorder
+// ---------------------------------------------------------------------------
+
+/**
+ * The minimal create control: project + title. Everything else stays
+ * unassigned by construction — the task is born Do zrobienia in the shared
+ * queue ("zadanie pozostaje we wspólnej kolejce"); responsibility and a
+ * deadline binding are later explicit commands. The project list comes
+ * from C1's catalog read (all projects, closed included: a closed project
+ * may keep administrative obligations).
+ */
+function CreateTaskForm({
+  form,
+  run,
+}: {
+  readonly form: FormState;
+  readonly run: RunFn;
+}): ReactNode {
+  const projects = useQueryState({
+    query: api.projects.functions.projectsOverview,
+    args: {},
+  });
+  const [projectId, setProjectId] = useState("");
+  const [title, setTitle] = useState("");
+
+  async function submit(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    await run(
+      "work.changeTask",
+      {
+        taskId: null,
+        projectId,
+        title,
+        executorContactId: null,
+        coordinatorMembershipId: null,
+        deadlineFindingId: null,
+        expectedRevision: 1,
+      },
+      workCopy.created,
+    );
+  }
+
+  if (projects.status !== "success") {
+    return createElement("p", { role: "status" }, workCopy.checkingSession);
+  }
+  const all = [...projects.data.active, ...projects.data.closed];
+  if (all.length === 0) {
+    return null; // no project to attach an obligation to: the catalog owns that path
+  }
+  return createElement(
+    "div",
+    null,
+    createElement("h2", null, workCopy.createHeading),
+    createElement("p", null, workCopy.createIntro),
+    createElement("form", { onSubmit: (event) => void submit(event) },
+      createElement("label", { htmlFor: "create-project" }, workCopy.createProjectLabel),
+      createElement("select", {
+        id: "create-project",
+        value: projectId,
+        onChange: (event: ChangeEvent<HTMLSelectElement>) => setProjectId(event.target.value),
+        required: true,
+      },
+        ...all.map((project) =>
+          createElement("option", { key: project.projectId, value: project.projectId },
+            project.activeCodename === null
+              ? project.displayName
+              : `${project.activeCodename} — ${project.displayName}`),
+        ),
+      ),
+      createElement("label", { htmlFor: "create-title" }, workCopy.createTitleLabel),
+      createElement("input", {
+        id: "create-title",
+        type: "text",
+        placeholder: workCopy.createPlaceholder,
+        value: title,
+        onChange: (event: ChangeEvent<HTMLInputElement>) => setTitle(event.target.value),
+        required: true,
+      }),
+      createElement("button", { type: "submit", disabled: form.busy }, workCopy.createSubmit),
     ),
   );
 }

@@ -61,7 +61,7 @@ export const workCopy = {
   tasksHeading: "Zadania",
   tasksNote:
     "Zakończenie zadania to osobna decyzja — odhaczenie całej checklisty go nie kończy, a zadanie można wykonać przy nieodhaczonych punktach, które zachowują swój stan.",
-  noTasks: "Brak zadań. Zapisz pierwsze zobowiązanie poniżej.",
+  noTasks: "Brak zadań. Zapisz pierwsze zadanie poniżej.",
   waitingReasonLabel: "Przeszkoda",
   executorLabel: (name: string | null): string =>
     name === null ? "wykonawca nieznany" : `wykonawca: ${name}`,
@@ -107,6 +107,15 @@ export const workCopy = {
         return "planowane — termin minął bez potwierdzenia";
     }
   },
+  // Create form
+  createHeading: "Zapisz zadanie",
+  createIntro:
+    "Zadanie powstaje z przekazanego zobowiązania albo Twojego bezpośredniego wpisu. Nowe zadanie rodzi się w stanie Do zrobienia; bez wskazanego koordynatora zostaje we wspólnej kolejce firmy.",
+  createProjectLabel: "Projekt",
+  createTitleLabel: "Nazwa zadania",
+  createPlaceholder: "np. Odebrać dostawę okien",
+  createSubmit: "Zapisz zadanie",
+  created: "Zadanie zapisane.",
   // Task state form
   taskStateHeading: "Zmień stan zadania",
   taskStateIntro:
