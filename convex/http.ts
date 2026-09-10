@@ -1,6 +1,6 @@
 /**
  * Convex HTTP actions composition entry (A3; telemetry routes appended by
- * I2, Calendar OAuth routes by G1).
+ * I2; sources/uploads routes by D2; Calendar OAuth routes by G1).
  *
  * Convex serves the default export of the `http` module as the deployment's
  * HTTP router. Route handlers live in their owning lane files; this entry
@@ -24,6 +24,7 @@ import {
   ingestHandler,
   telemetryHealthHandler,
 } from "./operations/telemetry/http";
+import { uploadsBridgeHandler, uploadsStateHandler } from "./sources/uploads/http";
 import {
   calendarStartHandler,
   calendarCallbackHandler,
@@ -46,6 +47,9 @@ http.route({ path: "/platform/health", method: "GET", handler: healthHandler });
 http.route({ path: "/platform/telemetry/ingest", method: "POST", handler: ingestHandler });
 http.route({ path: "/platform/telemetry/heartbeat", method: "POST", handler: heartbeatHandler });
 http.route({ path: "/platform/telemetry/health", method: "GET", handler: telemetryHealthHandler });
+http.route({ path: "/sources/uploads/bridge", method: "POST", handler: uploadsBridgeHandler });
+http.route({ path: "/sources/uploads/state", method: "POST", handler: uploadsStateHandler });
+
 http.route({ path: "/calendar/oauth/start", method: "POST", handler: calendarStartHandler });
 http.route({ path: "/calendar/oauth/callback", method: "GET", handler: calendarCallbackHandler });
 http.route({
