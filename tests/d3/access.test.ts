@@ -148,6 +148,8 @@ describe("granted reads (owner and fellow member)", () => {
       objectKey: retainedKey,
       contentHash: "r2:etag:etag-retained-9",
       transformVersion: "d5.retained/1",
+      bytes: 4_444,
+      mimeType: "image/jpeg",
       verifiedAtMs: Date.now() + 1,
       createdAtMs: Date.now() + 1,
     });
@@ -155,10 +157,62 @@ describe("granted reads (owner and fellow member)", () => {
     const result = await checked(ctx, { attachmentId: media.attachmentId });
     expect(result._tag).toBe("ok");
     if (result._tag === "ok") {
-      const grant = result.value as { objectKey: string; etag: string; role: string };
+      const grant = result.value as { objectKey: string; etag: string; role: string; bytes: number; contentType: string };
       expect(grant.objectKey).toBe(retainedKey);
       expect(grant.etag).toBe("etag-retained-9");
       expect(grant.role).toBe("retained");
+      // The chosen row's OWN records (D5's bytes/mimeType), never the
+      // attachment's received receipt.
+      expect(grant.bytes).toBe(4_444);
+      expect(grant.contentType).toBe("image/jpeg");
+    }
+  });
+
+  it("fails closed on a retained representation that records no byte length", async () => {
+    const ctx = fakeCtx(LEDGER_TABLES);
+    const { fixture, media } = await seedReadableMedia(ctx, "retained-no-bytes");
+    await ctx.db.insert("mediaRepresentations", {
+      attachmentId: media.attachmentId,
+      role: "retained",
+      objectKey: `${media.objectKey}-retained`,
+      contentHash: "r2:etag:etag-retained-nb",
+      transformVersion: "d5.retained/1",
+      verifiedAtMs: Date.now() + 1,
+      createdAtMs: Date.now() + 1,
+    });
+    authenticateAs(ctx, fixture);
+    const result = await checked(ctx, { attachmentId: media.attachmentId });
+    expect(result._tag).toBe("error");
+    if (result._tag === "error") {
+      expect(result.error._tag).toBe("not_found");
+    }
+  });
+
+  it("refuses an exact read of a REMOVED representation and serves its verified sibling instead", async () => {
+    const ctx = fakeCtx(LEDGER_TABLES);
+    const { fixture, media } = await seedReadableMedia(ctx, "removed");
+    const retainedId = await ctx.db.insert("mediaRepresentations", {
+      attachmentId: media.attachmentId,
+      role: "retained",
+      objectKey: `${media.objectKey}-retained`,
+      contentHash: "r2:etag:etag-retained-keep",
+      transformVersion: "d5.retained/1",
+      bytes: 2_222,
+      verifiedAtMs: Date.now() + 1,
+      createdAtMs: Date.now() + 1,
+    });
+    // D5's received-byte cleanup: the received row's object is gone.
+    await ctx.db.patch("mediaRepresentations", media.representationId, { removedAtMs: Date.now() });
+    authenticateAs(ctx, fixture);
+    const exactRemoved = await checked(ctx, { representationId: media.representationId });
+    const canonical = await checked(ctx, { attachmentId: media.attachmentId });
+    expect(exactRemoved._tag).toBe("error");
+    if (exactRemoved._tag === "error") {
+      expect(exactRemoved.error._tag).toBe("not_found");
+    }
+    expect(canonical._tag).toBe("ok");
+    if (canonical._tag === "ok") {
+      expect((canonical.value as { representationId: string }).representationId).toBe(retainedId);
     }
   });
 

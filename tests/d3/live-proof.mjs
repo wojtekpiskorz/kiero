@@ -284,8 +284,8 @@ record(
   `accept-ranges=${fullHeaders["accept-ranges"]} cache=${fullHeaders["cache-control"]} disposition=${fullHeaders["content-disposition"]}`,
 );
 record(
-  "M1d the stream is progressive, not buffered-then-sent (headers long before the last byte)",
-  fullBody.length === AUDIO_BYTES && ttfb <= fullBodyMs + ttfb ? "PASS" : "FAIL",
+  "M1d the stream is progressive, not buffered-then-sent (headers arrive strictly before the last byte)",
+  fullBody.length === AUDIO_BYTES && ttfb < fullBodyMs ? "PASS" : "FAIL",
   `ttfb=${ttfb}ms bodyTransfer=${fullBodyMs}ms bytes=${fullBody.length} (un-buffered R2 pipe; Worker memory stays bounded structurally)`,
 );
 

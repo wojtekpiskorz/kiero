@@ -62,59 +62,86 @@ import { MediaKind } from "@kiero/contracts";
 // ---------------------------------------------------------------------------
 
 /**
+ * A key that must be ABSENT for this union member to match: optional Never
+ * accepts the key's absence and rejects any value, which is what makes
+ * both-present a decode failure rather than a silently-ignored extra key
+ * (Effect strips unknown excess keys by default; the forbidden-twin field
+ * is not unknown, it is named and forbidden).
+ */
+const Forbidden = () => Schema.optional(Schema.Never);
+
+/**
  * What the Worker asks access for: exactly one of the attachment id (the
  * canonical read: the SERVER resolves which representation serves the
  * bytes) or a specific representation id (the exact-version read E4's
  * media anchors and I3/I5's export/backup readers address). Object keys are
  * never accepted from the caller — keys travel ONLY inside the grant, the
- * authorized answer.
+ * authorized answer. The UNION is the exactly-one-id invariant: both,
+ * neither or malformed references fail the decode itself, in this ONE
+ * shared definition (the boundary and the resolver both decode it, so
+ * neither re-implements the check).
  */
-export const MediaAccessInput = Schema.Struct({
-  attachmentId: Schema.optional(Schema.NonEmptyString),
-  representationId: Schema.optional(Schema.NonEmptyString),
-});
+export const MediaAccessInput = Schema.Union([
+  Schema.Struct({
+    attachmentId: Schema.NonEmptyString,
+    representationId: Forbidden(),
+  }),
+  Schema.Struct({
+    attachmentId: Forbidden(),
+    representationId: Schema.NonEmptyString,
+  }),
+]);
 export type MediaAccessInput = Schema.Schema.Type<typeof MediaAccessInput>;
 
+/** The roles that can serve bytes (thumbnail/processing never do). */
+export const ServableRole = Schema.Literals(["received", "retained"]);
+export type ServableRole = Schema.Schema.Type<typeof ServableRole>;
+
 /**
- * The authorized read grant. The object key, etag and byte length are the
- * LEDGER's recorded values (D2's completion receipts; D5's representation
- * records when it lands), never caller-supplied and never probed from R2
- * to decide authorization.
+ * The authorized read grant — a SCHEMA beside the input (the type is
+ * derived; there is no hand-written twin to drift): the Convex resolution
+ * constructs and decodes its grant against this definition before
+ * answering, and the gateway route decodes the answer through the same
+ * one. The object key, etag and byte length are the LEDGER's recorded
+ * values — the CHOSEN representation's own records (D5's rows carry
+ * bytes/mimeType when verified), with the D2 attachment receipt
+ * (receivedBytes/r2ObjectEtag) as the received-role fallback — never
+ * caller-supplied and never probed from R2 to decide authorization.
  */
-export interface MediaAccessGrant {
-  readonly attachmentId: string;
-  readonly sourceId: string;
-  readonly representationId: string;
-  /** Which recorded representation serves the bytes (received/retained). */
-  readonly role: "received" | "retained";
+export const MediaAccessGrant = Schema.Struct({
+  attachmentId: Schema.NonEmptyString,
+  sourceId: Schema.NonEmptyString,
+  representationId: Schema.NonEmptyString,
+  /** Which recorded representation serves the bytes. */
+  role: ServableRole,
   /** The attachment's kind (the contracts vocabulary, pinned by typecheck). */
-  readonly kind: MediaKind;
+  kind: MediaKind,
   /** Server-resolved; the Worker's R2 read uses this and nothing else. */
-  readonly objectKey: string;
+  objectKey: Schema.NonEmptyString,
   /** The ledger-recorded representation etag (unquoted; served quoted). */
-  readonly etag: string;
-  /** The ledger-recorded verified byte length of the representation. */
-  readonly bytes: number;
-  readonly contentType: string;
-  readonly transformVersion: string;
+  etag: Schema.NonEmptyString,
+  /** The chosen representation's ledger-recorded verified byte length. */
+  bytes: Schema.Number.pipe(Schema.check(Schema.isGreaterThan(0))),
+  contentType: Schema.NonEmptyString,
+  transformVersion: Schema.NonEmptyString,
   /** Representation metadata E4's anchors and H3's UI will address. */
-  readonly width?: number | undefined;
-  readonly height?: number | undefined;
-  readonly durationMs?: number | undefined;
-}
+  width: Schema.optional(Schema.Number),
+  height: Schema.optional(Schema.Number),
+  durationMs: Schema.optional(Schema.Number),
+});
+export type MediaAccessGrant = Schema.Schema.Type<typeof MediaAccessGrant>;
 
 // ---------------------------------------------------------------------------
 // The served-content vocabulary.
 // ---------------------------------------------------------------------------
 
 /**
- * The media types this lane serves, pinned to the ONE place they are
- * recorded today: D2's `createMultipartSessions` writes exactly these as
- * the R2 objects' httpMetadata content types (audio/webm, image/jpeg — the
- * alpha browser recording and the received image format). The kind column
- * of the attachment is the ledger's authority; when D5's retained
- * representations record their own content type, that value takes
- * precedence (D5's lane owns the schema amendment).
+ * The FALLBACK media-type mapping, pinned to the ONE place it is recorded
+ * today: D2's `createMultipartSessions` writes exactly these as the R2
+ * objects' httpMetadata content types (audio/webm, image/jpeg — the alpha
+ * browser recording and the received image format). The chosen
+ * representation's OWN recorded mimeType takes precedence when present
+ * (D5's rows carry it); the kind column is the fallback authority.
  */
 export function contentTypeForKind(kind: MediaKind): string {
   return kind === "audio" ? "audio/webm" : "image/jpeg";

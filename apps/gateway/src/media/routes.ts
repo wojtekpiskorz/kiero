@@ -33,6 +33,7 @@
  * GETs).
  */
 
+import { Schema } from "effect";
 import { errorResult, type ResultEnvelope } from "@kiero/contracts";
 import {
   envelopeHttpStatus,
@@ -46,9 +47,9 @@ import { mediaAccess } from "./bridge";
 import { openMediaObject, verifyAgainstGrant, type MediaEnv } from "./r2";
 import {
   MEDIA_CACHE_CONTROL,
+  MediaAccessGrant,
   decideMediaRead,
   quotedEtag,
-  type MediaAccessGrant,
   type MediaReadPlan,
 } from "../../../../convex/sources/media_access/protocol";
 
@@ -63,27 +64,15 @@ function respond(result: ResultEnvelope): Response {
   return jsonResponse(envelopeHttpStatus(result), result);
 }
 
-/** The grant envelope narrowed to its value (runtime field check first). */
+/**
+ * The grant envelope narrowed to its value through the ONE schema that
+ * defines it (the same `MediaAccessGrant` the Convex resolution decoded
+ * its answer against — no hand-written field ladder beside the definition
+ * to drift in either direction).
+ */
 function asGrant(value: unknown): MediaAccessGrant | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-  const record = value as Record<string, unknown>;
-  if (
-    typeof record.attachmentId !== "string" ||
-    typeof record.sourceId !== "string" ||
-    typeof record.representationId !== "string" ||
-    typeof record.role !== "string" ||
-    typeof record.kind !== "string" ||
-    typeof record.objectKey !== "string" ||
-    typeof record.etag !== "string" ||
-    typeof record.bytes !== "number" ||
-    typeof record.contentType !== "string" ||
-    typeof record.transformVersion !== "string"
-  ) {
-    return null;
-  }
-  return value as MediaAccessGrant;
+  const decoded = Schema.decodeUnknownOption(MediaAccessGrant)(value);
+  return decoded._tag === "Some" ? decoded.value : null;
 }
 
 /** The headers every media answer carries (authorization cannot be cached away). */

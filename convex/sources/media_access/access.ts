@@ -38,13 +38,18 @@
  * exactly that version when it is itself verified, which is what E4's
  * media anchors and I3/I5's export/backup readers address.
  *
- * LEDGER CONSISTENCY: the grant's `etag` and `bytes` come from the ledger
- * (D2's completion receipts); the gateway additionally verifies them
- * against the live R2 object before serving a byte, failing closed on
- * mismatch. When D5 adds retained representations with their own byte
- * lengths, its lane records them on the representation row; until then the
- * attachment's verified `receivedBytes` is the exact value for the
- * received representation this seam serves.
+ * LEDGER CONSISTENCY: the grant's `etag`, `bytes` and `contentType`
+ * describe the CHOSEN representation — its own records when they exist
+ * (D5's verified rows carry bytes/mimeType), with the D2 attachment
+ * receipt (receivedBytes/r2ObjectEtag, and the kind-derived media type)
+ * as the received-role fallback. The gateway additionally verifies etag
+ * and size against the live R2 object before serving a byte, failing
+ * closed on mismatch, so a retained representation of a different length
+ * than the received one serves ITS OWN length, never a stale receipt.
+ * D5's `removedAtMs` (received bytes cleaned up after a verified retained
+ * representation) removes a row from selection entirely: its object is
+ * deliberately gone, and an exact-representation read of a removed row
+ * refuses like any missing one.
  */
 
 import { Schema } from "effect";
@@ -52,7 +57,7 @@ import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
 import { notFoundError, validationError, type RequestContext } from "@kiero/runtime";
 import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
-import { contentTypeForKind, type MediaAccessGrant, MediaAccessInput } from "./protocol";
+import { contentTypeForKind, MediaAccessGrant, MediaAccessInput } from "./protocol";
 
 /** The uniform not-readable refusal (existence is not disclosed). */
 export function mediaReferenceNotFound() {
@@ -72,6 +77,15 @@ export interface RepresentationRow {
   readonly durationMs?: number | undefined;
   readonly verifiedAtMs?: number | undefined;
   readonly createdAtMs: number;
+  /**
+   * D5's verified-row records (optional until its rows land): the
+   * representation's OWN byte length, media type and received-byte cleanup
+   * marker. `removedAtMs` present means the object is deliberately gone
+   * from R2 (the received bytes a retained representation replaced).
+   */
+  readonly bytes?: number | undefined;
+  readonly mimeType?: string | undefined;
+  readonly removedAtMs?: number | undefined;
 }
 
 /** The attachment fields the resolution needs. */
@@ -133,12 +147,37 @@ function etagOf(representation: RepresentationRow, attachment: AttachmentRow): s
   return null;
 }
 
-/** The newest verified representation of one servable role, if any. */
+/**
+ * The CHOSEN representation's own ledger-recorded byte length, with the
+ * received-role fallback: D5's verified rows carry `bytes` themselves;
+ * the received representation's D2 record is the attachment receipt
+ * (`receivedBytes`, the manifest byte sum completed at acceptance). A
+ * representation without either record fails closed (the gateway's
+ * size/etag cross-check must never be fed a guess).
+ */
+function bytesOf(representation: RepresentationRow, attachment: AttachmentRow): number | null {
+  if (representation.bytes !== undefined && representation.bytes > 0) {
+    return representation.bytes;
+  }
+  if (representation.role === "received" && attachment.receivedBytes !== undefined) {
+    return attachment.receivedBytes;
+  }
+  return null;
+}
+
+/** The chosen representation's media type, with the kind fallback. */
+function contentTypeOf(representation: RepresentationRow, attachment: AttachmentRow): string {
+  return representation.mimeType ?? contentTypeForKind(attachment.kind);
+}
+
+/** The newest verified, NOT-REMOVED representation of one servable role, if any. */
 function newestVerified(
   rows: readonly RepresentationRow[],
   role: "received" | "retained",
 ): RepresentationRow | null {
-  const candidates = rows.filter((row) => row.role === role && row.verifiedAtMs !== undefined);
+  const candidates = rows.filter(
+    (row) => row.role === role && row.verifiedAtMs !== undefined && row.removedAtMs === undefined,
+  );
   if (candidates.length === 0) {
     return null;
   }
@@ -160,11 +199,8 @@ export async function resolveMediaAccess(
   try {
     decoded = Schema.decodeUnknownSync(MediaAccessInput)(input);
   } catch {
-    return errorResult(validationError("media_reference_malformed"));
-  }
-  const both = decoded.attachmentId !== undefined && decoded.representationId !== undefined;
-  const neither = decoded.attachmentId === undefined && decoded.representationId === undefined;
-  if (both || neither) {
+    // The union already encodes exactly-one-id: both, neither and malformed
+    // references all fail HERE (the shared home owns the invariant).
     return errorResult(validationError("media_reference_malformed"));
   }
   const companyId = db.normalizeId("companies", context.actor.companyId);
@@ -175,10 +211,15 @@ export async function resolveMediaAccess(
   // --- resolve the attachment (directly, or through an exact representation)
   let attachment: AttachmentRow | null;
   let pinned: RepresentationRow | null = null;
-  const representationInput = decoded.representationId;
   const attachmentInput = decoded.attachmentId;
-  if (representationInput !== undefined) {
-    const representationId = db.normalizeId("mediaRepresentations", representationInput);
+  if (attachmentInput !== undefined) {
+    const attachmentId = db.normalizeId("attachments", attachmentInput);
+    if (attachmentId === null) {
+      return errorResult(mediaReferenceNotFound());
+    }
+    attachment = await db.attachmentById(attachmentId);
+  } else {
+    const representationId = db.normalizeId("mediaRepresentations", decoded.representationId);
     if (representationId === null) {
       return errorResult(mediaReferenceNotFound());
     }
@@ -187,12 +228,6 @@ export async function resolveMediaAccess(
       return errorResult(mediaReferenceNotFound());
     }
     attachment = await db.attachmentById(pinned.attachmentId);
-  } else {
-    const attachmentId = db.normalizeId("attachments", attachmentInput!);
-    if (attachmentId === null) {
-      return errorResult(mediaReferenceNotFound());
-    }
-    attachment = await db.attachmentById(attachmentId);
   }
   if (attachment === null) {
     return errorResult(mediaReferenceNotFound());
@@ -212,11 +247,17 @@ export async function resolveMediaAccess(
   const representations = await db.representationsOfAttachment(attachment._id);
   const chosen =
     pinned ?? newestVerified(representations, "retained") ?? newestVerified(representations, "received");
-  if (chosen === null || chosen.verifiedAtMs === undefined) {
+  if (
+    chosen === null ||
+    chosen.verifiedAtMs === undefined ||
+    // D5's received-byte cleanup: the object is deliberately gone.
+    chosen.removedAtMs !== undefined
+  ) {
     return errorResult(mediaReferenceNotFound());
   }
   const etag = etagOf(chosen, attachment);
-  if (etag === null || attachment.receivedBytes === undefined) {
+  const bytes = bytesOf(chosen, attachment);
+  if (etag === null || bytes === null) {
     return errorResult(mediaReferenceNotFound());
   }
 
@@ -228,12 +269,15 @@ export async function resolveMediaAccess(
     kind: attachment.kind,
     objectKey: chosen.objectKey,
     etag,
-    bytes: attachment.receivedBytes,
-    contentType: contentTypeForKind(attachment.kind),
+    bytes,
+    contentType: contentTypeOf(chosen, attachment),
     transformVersion: chosen.transformVersion,
     ...(chosen.width === undefined ? {} : { width: chosen.width }),
     ...(chosen.height === undefined ? {} : { height: chosen.height }),
     ...(chosen.durationMs === undefined ? {} : { durationMs: chosen.durationMs }),
   };
-  return okResult(grant);
+  // Decode the constructed grant against the ONE schema definition: drift
+  // between the resolution and the channel's contract fails HERE, never at
+  // the gateway with a half-valid grant.
+  return okResult(Schema.decodeUnknownSync(MediaAccessGrant)(grant));
 }

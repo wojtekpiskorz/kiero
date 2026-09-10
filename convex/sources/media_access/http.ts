@@ -16,10 +16,12 @@
  * pattern (imports only).
  */
 
+import { Schema } from "effect";
 import { httpAction, type ActionCtx } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { errorResult, type ResultEnvelope } from "@kiero/contracts";
 import { envelopeHttpStatus, unauthenticatedError, validationError } from "@kiero/runtime";
+import { MediaAccessInput } from "./protocol";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -56,17 +58,21 @@ export const mediaAccessHandler = httpAction(async (ctx: ActionCtx, request) => 
   if (!isRecord(body)) {
     return jsonResponse(400, errorResult(validationError("media_reference_malformed")));
   }
-  const attachmentId = typeof body.attachmentId === "string" ? body.attachmentId : undefined;
-  const representationId = typeof body.representationId === "string" ? body.representationId : undefined;
-  if (
-    (attachmentId === undefined && representationId === undefined) ||
-    (attachmentId !== undefined && representationId !== undefined)
-  ) {
+  // The exactly-one-id invariant lives in the ONE shared input schema (the
+  // union): both, neither or malformed references fail this decode — no
+  // hand-written XOR here to drift from the resolver's.
+  const decoded = Schema.decodeUnknownOption(MediaAccessInput)(body);
+  if (decoded._tag === "None") {
     return jsonResponse(400, errorResult(validationError("media_reference_malformed")));
   }
-  const result: ResultEnvelope = await ctx.runQuery(internal.sources["media_access"].commands.mediaAccessFor, {
-    ...(attachmentId === undefined ? {} : { attachmentId }),
-    ...(representationId === undefined ? {} : { representationId }),
-  });
+  // Forward exactly the one decoded reference (the query's optional args
+  // stay optional; the union guarantees one side is a non-empty string).
+  const input = decoded.value;
+  const result: ResultEnvelope = await ctx.runQuery(
+    internal.sources["media_access"].commands.mediaAccessFor,
+    input.attachmentId !== undefined
+      ? { attachmentId: input.attachmentId }
+      : { representationId: input.representationId },
+  );
   return jsonResponse(envelopeHttpStatus(result), result);
 });
