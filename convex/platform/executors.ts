@@ -23,6 +23,11 @@
  *   durable revocation fan-out the access lane owns (device-session
  *   revocation after membership removal; the declared consumer proof of
  *   `access.membershipRevoked` / `access.sessionRevoked`).
+ * - `memory.recompute_dependents` (../memory/recompute/executor.ts, C5):
+ *   the durable withdrawal-recomputation executor — C2's marking core plus
+ *   the dependency-aware updating cascade and the linked re-analysis
+ *   registrations (the declared consumer proof of `sources.sourceWithdrawn`,
+ *   `memory.dependentsMarkedStale` and `memory.findingRevised`).
  */
 
 import type { FunctionReference } from "convex/server";
@@ -33,6 +38,7 @@ import { echoExecutor } from "./echo";
 import { analyzeChangePlanExecutor as e3AnalyzeChangePlanExecutor } from "../processing/text/analyze";
 import { extractFragmentsExecutor } from "../processing/text/extract";
 import { cleanupRevocationExecutor } from "../access/membership/cleanup";
+import { recomputeDependentsExecutor } from "../memory/recompute/executor";
 
 /** One durable job row (the executable counterpart of an outbox event). */
 export type DurableJobDoc = Doc<"durableJobs">;
@@ -60,4 +66,5 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [e3AnalyzeChangePlanExecutor.jobKind]: e3AnalyzeChangePlanExecutor,
   [extractFragmentsExecutor.jobKind]: extractFragmentsExecutor,
   [cleanupRevocationExecutor.jobKind]: cleanupRevocationExecutor,
+  [recomputeDependentsExecutor.jobKind]: recomputeDependentsExecutor,
 };

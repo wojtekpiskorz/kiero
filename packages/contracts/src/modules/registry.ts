@@ -102,10 +102,20 @@ export const revokedAccessCleanupInput = Schema.Struct({
   revokedAtMs: Schema.optionalKey(Schema.Number),
 });
 
+/**
+ * The recomputation input (issue #28 owns this executor's edge). C5
+ * amendment on the B3 input-shape precedent (additive, flagged): `reason`
+ * and `withdrawnByUserId` join the certified shape as NULLABLE fields so
+ * the drain can project event payloads that do not carry them, while the
+ * withdrawal transaction registers the job with the real values — the
+ * marking revisions record the withdrawal's reason and actor.
+ */
 export const recomputeDependentsInput = Schema.Struct({
   rootFindingId: Schema.NullOr(tableIdSchema("findings")),
   sourceId: Schema.NullOr(tableIdSchema("sources")),
   cause: Schema.Literals(["source_withdrawn", "dependent_stale", "reanalysis"]),
+  reason: Schema.NullOr(Schema.NonEmptyString),
+  withdrawnByUserId: Schema.NullOr(tableIdSchema("users")),
 });
 
 export const purgeSourceInput = Schema.Struct({
@@ -220,6 +230,14 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   // Withdrawal/purge re-evaluates dependent findings; history retained.
   consumer("sources.sourceWithdrawn", "memory.recompute_dependents"),
   consumer("memory.dependentsMarkedStale", "memory.recompute_dependents"),
+  // C5 registration (issue #28 owns the revalidation half of this edge):
+  // every revised finding drains into one bounded dependent walk — a basis
+  // that became non-known propagates updating markings through the
+  // dependentsMarkedStale cascade; a basis that became known again
+  // revalidates its updating dependents by registering their linked
+  // re-analysis. Later independent confirmations and explicit corrections
+  // keep their authority; the walk never writes over a newer revision.
+  consumer("memory.findingRevised", "memory.recompute_dependents"),
   // Permanent deletion purges derivatives within the accepted window.
   consumer("sources.sourcePurged", "deletion.purge_source"),
   // Unknown Calendar outcomes always reconcile before another POST.

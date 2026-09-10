@@ -11,7 +11,7 @@ import { jobExecutors } from "../../convex/platform/executors";
 import { echoExecutor } from "../../convex/platform/echo";
 
 describe("convex executor composition", () => {
-  it("registers exactly the implemented executors (platform + B3 + E3 text lane)", () => {
+  it("registers exactly the implemented executors (platform + B3 + E3 + C5 lanes)", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
       [
         "platform.echo_delivery",
@@ -23,6 +23,10 @@ describe("convex executor composition", () => {
         // the mechanical A3 analyze executor is replaced behind the same
         // seam by the real workflow, and the extract edge is implemented).
         "processing.extract_fragments",
+        // C5's sanctioned append (issue #28 owns the recomputation lane:
+        // withdrawal marking, the updating cascade and the linked
+        // re-analysis registrations).
+        "memory.recompute_dependents",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");
@@ -36,7 +40,7 @@ describe("convex executor composition", () => {
 
   it("unimplemented kinds (the fail-closed placeholders) stay unimplemented", () => {
     expect(jobExecutors["deletion.purge_source"]).toBeUndefined();
-    expect(jobExecutors["memory.recompute_dependents"]).toBeUndefined();
+    expect(jobExecutors["calendar.reconcile_outcome"]).toBeUndefined();
   });
 });
 

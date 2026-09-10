@@ -309,6 +309,13 @@ export const memoryEvents = {
     payload: Schema.Struct({
       rootFindingId: tableIdSchema("findings"),
       dependentFindingIds: Schema.Array(tableIdSchema("findings")),
+      /**
+       * C5 amendment (additive, flagged on the B3 precedent): the actor the
+       * recomputation cascade records its markings for (the withdrawal's
+       * actor). Nullable so external publishers without an actor still
+       * decode; the executor then resolves identity itself.
+       */
+      withdrawnByUserId: Schema.NullOr(tableIdSchema("users")),
     }),
   }),
 } as const;

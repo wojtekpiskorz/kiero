@@ -299,11 +299,12 @@ describe("the declared consumer edge (access revocation drains durably)", () => 
   });
 
   it("leaves events without a registered edge undelivered by consumers", () => {
-    // E3 owns the sources.sourceAccepted projection now; the still-
-    // unprojected example is C5's recomputation edge.
-    expect(projectEventToJobInput("memory.dependentsMarkedStale", {}, "d")).toEqual({
+    // E3 owns the sources.sourceAccepted projection; C5 (issue #28) now
+    // owns the three recomputation-edge projections. The still-unprojected
+    // example is the permanent-deletion seam (I4's lane).
+    expect(projectEventToJobInput("sources.sourcePurged", { sourceId: "s1" }, "d")).toEqual({
       kind: "unprojected_edge",
-      jobKind: "memory.recompute_dependents",
+      jobKind: "deletion.purge_source",
     });
   });
 });

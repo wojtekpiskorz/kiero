@@ -21,3 +21,9 @@ export * from "../work/index";
 // C3 coordinated addition (flagged): the extensions domain (versioned typed
 // extensions and catalog reuse) follows the same one-line pattern.
 export * from "../extensions/index";
+
+// C5 coordinated addition (flagged, the same one-line pattern): the
+// withdrawal-recomputation domain owns its rules in
+// packages/domain/provenance/** (dependency traversal, updating-until-
+// revalidated state, bounded recomputation grouping).
+export * from "../provenance/index";
