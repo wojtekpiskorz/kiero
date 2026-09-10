@@ -45,6 +45,11 @@ import type * as access_membership_functions from "../access/membership/function
 import type * as access_membership_operations from "../access/membership/operations.js";
 import type * as access_membership_policy from "../access/membership/policy.js";
 import type * as access_membership_probe from "../access/membership/probe.js";
+import type * as agent_context from "../agent/context.js";
+import type * as agent_evidence from "../agent/evidence.js";
+import type * as agent_execute from "../agent/execute.js";
+import type * as agent_loop from "../agent/loop.js";
+import type * as agent_probe from "../agent/probe.js";
 import type * as attention_context from "../attention/context.js";
 import type * as attention_preferences_commands from "../attention/preferences/commands.js";
 import type * as attention_preferences_dispatch from "../attention/preferences/dispatch.js";
@@ -221,6 +226,11 @@ declare const fullApi: ApiFromModules<{
   "access/membership/operations": typeof access_membership_operations;
   "access/membership/policy": typeof access_membership_policy;
   "access/membership/probe": typeof access_membership_probe;
+  "agent/context": typeof agent_context;
+  "agent/evidence": typeof agent_evidence;
+  "agent/execute": typeof agent_execute;
+  "agent/loop": typeof agent_loop;
+  "agent/probe": typeof agent_probe;
   "attention/context": typeof attention_context;
   "attention/preferences/commands": typeof attention_preferences_commands;
   "attention/preferences/dispatch": typeof attention_preferences_dispatch;

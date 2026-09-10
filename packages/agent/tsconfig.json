@@ -1,6 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src/**/*.ts", "planning/**/*.ts"],
+  "include": ["src/**/*.ts", "planning/**/*.ts", "tools/**/*.ts"],
   "compilerOptions": {
     "types": ["node"]
   }
