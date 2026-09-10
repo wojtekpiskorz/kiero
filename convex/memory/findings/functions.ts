@@ -23,7 +23,7 @@
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { Schema } from "effect";
-import { errorResult, type ResultEnvelope } from "@kiero/contracts";
+import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
 import {
   forbiddenError,
   unauthenticatedError,
@@ -36,10 +36,18 @@ import {
 import {
   resolveAccessContextFromConvexAuth,
 } from "../../access/identity/resolution";
-import { internalMutation, mutation, query } from "../../_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "../../_generated/server";
 import { dispatchMemoryCommand } from "./dispatch";
-import { readCurrentFindingsEntry } from "./semantics";
+import {
+  readClarificationsEntry,
+  readCurrentFindingsEntry,
+  readFindingHistoryEntry,
+} from "./semantics";
 import { readCurrentFindingsRows } from "./read";
+import {
+  readClarificationRows,
+  readFindingHistoryRows,
+} from "./exposition";
 import { performWithdrawalMarking } from "./withdrawal";
 
 /** The client command path: Convex Auth identity, checked dispatch. */
@@ -104,5 +112,89 @@ export const markWithdrawnSource = internalMutation({
       return errorResult(validationError("withdrawal_reason_empty"));
     }
     return performWithdrawalMarking(ctx, context, args.sourceId, args.reason);
+  },
+});
+
+// --- H1 exposition reads (additive, flagged on the B3 precedent) ---------------
+//
+// The same two-callable-shape discipline as the current-findings read: a
+// public query on the B1 live-session chain (the client path), and an
+// internal twin on the A3 service-bridge identity for the guarded dev
+// proofs. Cores live in ./exposition.ts; rows carry their encoded wire
+// shapes.
+
+/** One finding's revision history with provenance (client path). */
+export const readFindingHistory = query({
+  args: { findingId: v.id("findings") },
+  handler: async (ctx, args) => {
+    const context = await resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
+    if (context === null) {
+      throw new ConvexError(unauthenticatedError("no_verified_identity"));
+    }
+    const decoded = Schema.decodeUnknownSync(readFindingHistoryEntry.input)({
+      findingId: args.findingId,
+    });
+    const row = await readFindingHistoryRows(ctx.db, context, decoded);
+    if (!row.ok) {
+      throw new ConvexError(row.error);
+    }
+    return row.row;
+  },
+});
+
+/** The clarifications of one scope, open and resolved (client path). */
+export const readClarifications = query({
+  args: { scope: v.any() },
+  handler: async (ctx, args) => {
+    const context = await resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
+    if (context === null) {
+      throw new ConvexError(unauthenticatedError("no_verified_identity"));
+    }
+    const decoded = Schema.decodeUnknownSync(readClarificationsEntry.input)({
+      scope: args.scope,
+    });
+    const rows = await readClarificationRows(ctx.db, context, decoded);
+    if (!rows.ok) {
+      throw new ConvexError(rows.error);
+    }
+    return rows.rows;
+  },
+});
+
+/** The finding-history read for the verified service session (bridge path). */
+export const readFindingHistoryFor = internalQuery({
+  args: { serviceSessionId: v.string(), findingId: v.id("findings") },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    const context = await resolveRequestContext(
+      ctx.db,
+      bridgeIdentity(args.serviceSessionId, Date.now()),
+    );
+    if (context === null) {
+      return errorResult(forbiddenError("no_verified_identity"));
+    }
+    const decoded = Schema.decodeUnknownSync(readFindingHistoryEntry.input)({
+      findingId: args.findingId,
+    });
+    const row = await readFindingHistoryRows(ctx.db, context, decoded);
+    return row.ok ? okResult(row.row) : errorResult(row.error);
+  },
+});
+
+/** The clarifications read for the verified service session (bridge path). */
+export const readClarificationsFor = internalQuery({
+  args: { serviceSessionId: v.string(), scope: v.any() },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    const context = await resolveRequestContext(
+      ctx.db,
+      bridgeIdentity(args.serviceSessionId, Date.now()),
+    );
+    if (context === null) {
+      return errorResult(forbiddenError("no_verified_identity"));
+    }
+    const decoded = Schema.decodeUnknownSync(readClarificationsEntry.input)({
+      scope: args.scope,
+    });
+    const rows = await readClarificationRows(ctx.db, context, decoded);
+    return rows.ok ? okResult(rows.rows) : errorResult(rows.error);
   },
 });

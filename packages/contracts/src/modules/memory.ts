@@ -135,6 +135,88 @@ export const memoryOperations = {
     }),
     errorKinds: ["forbidden", "validation", "conflict"],
   }),
+  /**
+   * H1 amendment (issue #49, additive, flagged on the B3 precedent): the
+   * boss-facing revision-history read. C2 proved the immutable
+   * findings/findingRevisions/evidenceLinks rows, but no public read exposed
+   * them; the conversation/memory surface must let a boss "inspect
+   * old/current revisions and provenance" without replaying the
+   * conversation. Read-only, same tenant rules as readCurrentFindings;
+   * `value`/`knowledgeState` cross the boundary in their encoded wire form.
+   */
+  "memory.readFindingHistory": operationEntry({
+    kind: "operation",
+    name: "memory.readFindingHistory",
+    input: Schema.Struct({ findingId: tableIdSchema("findings") }),
+    result: Schema.Struct({
+      findingId: tableIdSchema("findings"),
+      semanticKey: Schema.NonEmptyString,
+      scope: FindingScope,
+      currentRevisionId: tableIdSchema("findingRevisions"),
+      revisionCounter: RevisionCounter,
+      revisions: Schema.Array(
+        Schema.Struct({
+          revisionId: tableIdSchema("findingRevisions"),
+          revision: RevisionCounter,
+          value: FindingValue,
+          knowledgeState: KnowledgeState,
+          origin: Schema.Literals(["publication", "correction", "withdrawal_marking"]),
+          /** Why an explicit correction or withdrawal marking happened. */
+          reason: Schema.NullOr(Schema.String),
+          recordedByUserId: tableIdSchema("users"),
+          recordedAtMs: Schema.Number,
+          supersedesRevisionId: Schema.NullOr(tableIdSchema("findingRevisions")),
+          /** The evidence witnesses this revision rests on (provenance links). */
+          evidence: Schema.Array(
+            Schema.Struct({
+              sourceId: tableIdSchema("sources"),
+              fragmentId: Schema.NullOr(tableIdSchema("sourceFragments")),
+              supportKind: Schema.Literals([
+                "support",
+                "independent_corroboration",
+                "derivation",
+                "supersession",
+              ]),
+            }),
+          ),
+        }),
+      ),
+    }),
+    errorKinds: ["forbidden", "not_found"],
+  }),
+  /**
+   * H1 amendment (issue #49, additive, flagged on the B3 precedent): the
+   * boss-facing clarifications read. C2/E3 proved raising and resolving
+   * ("Sprawa do wyjaśnienia"), and `memory.resolveClarification` is a
+   * declared command, but no public read listed the open questions; the
+   * surface must display E3's sourced clarification and let a boss answer
+   * it. Read-only; each conflicting-evidence pointer dereferences to its
+   * canonical source so provenance stays inspectable.
+   */
+  "memory.readClarifications": operationEntry({
+    kind: "operation",
+    name: "memory.readClarifications",
+    input: Schema.Struct({ scope: FindingScope }),
+    result: Schema.Array(
+      Schema.Struct({
+        clarificationId: tableIdSchema("clarifications"),
+        question: Schema.NonEmptyString,
+        state: Schema.Literals(["open", "resolved"]),
+        raisedAtMs: Schema.Number,
+        resolvedByUserId: Schema.NullOr(tableIdSchema("users")),
+        resolutionNote: Schema.NullOr(Schema.String),
+        resolvedAtMs: Schema.NullOr(Schema.Number),
+        /** The sourced contradiction the question is about (E3's evidence). */
+        conflictingEvidence: Schema.Array(
+          Schema.Struct({
+            fragmentId: tableIdSchema("sourceFragments"),
+            sourceId: tableIdSchema("sources"),
+          }),
+        ),
+      }),
+    ),
+    errorKinds: ["forbidden", "not_found"],
+  }),
   "memory.correctFinding": operationEntry({
     kind: "operation",
     name: "memory.correctFinding",
