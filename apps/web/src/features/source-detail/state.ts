@@ -28,7 +28,7 @@ export { signInCopy };
 export const sourceDetailCopy = {
   title: "Źródło",
   intro:
-    "Jedna niestronowana wiadomość źródłowa: treść, zachowane materiały, transkrypcje i odczyty, ustalenia na niej oparte oraz pełna historia.",
+    "Niezmienne po wysłaniu: wpis użytkownika: treść, zachowane materiały, transkrypcje i odczyty, ustalenia na niej oparte oraz pełna historia.",
   checkingSession: "Sprawdzamy Twoją sesję…",
   noSourceHint:
     "Nie wskazano źródła. Otwórz wiadomość z rozmowy firmy lub wyszukaj na ekranie Szukaj.",

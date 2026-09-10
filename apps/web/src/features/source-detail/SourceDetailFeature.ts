@@ -48,6 +48,7 @@ import {
   SourceExpositionRow,
   SourceEvidencePage,
   type FragmentAnchor,
+  type SourceEvidenceRow,
   type SourceExpositionRow as ExpositionRow,
 } from "../../../../../convex/sources/read/exposition";
 import { useAppServices } from "../../app/providers";
@@ -902,7 +903,7 @@ function EvidenceSection({
   loadMore,
   row,
 }: {
-  readonly page: import("../../../../../convex/sources/read/exposition").SourceEvidencePage | null;
+  readonly page: SourceEvidencePage | null;
   readonly loading: boolean;
   readonly sessionEnded: boolean;
   readonly isDone: boolean;
@@ -945,7 +946,7 @@ function EvidenceRowView({
   entry,
   row,
 }: {
-  readonly entry: import("../../../../../convex/sources/read/exposition").SourceEvidenceRow;
+  readonly entry: SourceEvidenceRow;
   readonly row: ExpositionRow;
 }): ReactNode {
   const settled =
