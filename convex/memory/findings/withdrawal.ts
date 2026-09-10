@@ -26,7 +26,6 @@
 
 import { Schema } from "effect";
 import {
-  KnowledgeState,
   errorResult,
   events,
   okResult,
@@ -38,8 +37,7 @@ import type { MutationCtx } from "../../_generated/server";
 import type { Id, Doc } from "../../_generated/dataModel";
 import { publishEvent } from "../../platform/publish";
 import { normalizedCompany } from "./references";
-
-const encodeKnowledgeState = Schema.encodeSync(KnowledgeState);
+import { TEMPLATE_ID, encodeKnowledgeState } from "./semantics";
 
 /**
  * Marks findings affected by one withdrawn source. Runs entirely inside the
@@ -122,10 +120,9 @@ export async function performWithdrawalMarking(
   if (actorUserId === null) {
     return errorResult(validationError("actor_user_unresolved"));
   }
-  const templateId = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f";
   Schema.decodeUnknownSync(findingRevised.payload)({
-    findingId: templateId,
-    revisionId: templateId,
+    findingId: TEMPLATE_ID,
+    revisionId: TEMPLATE_ID,
     supersedesRevisionId: null,
   });
 
