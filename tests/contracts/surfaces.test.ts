@@ -53,9 +53,10 @@ describe("composed registry integrity", () => {
     // readFindingHistory and readClarifications exposition reads;
     // naive greps of `kind: "operation"` overcount by one because
     // registration.ts declares the interface field.)
-    // 72 since the H1 amendment added the two memory reads and F3 added
-    // attention.revokePushSubscription.
-    expect(operationNames).toHaveLength(72);
+    // 73 since the H1 amendment added the two memory reads, F3 added
+    // attention.revokePushSubscription and F4 added
+    // attention.evaluateDueReminders.
+    expect(operationNames).toHaveLength(73);
     expect(eventNames).toHaveLength(41);
     for (const name of operationNames) {
       expect(operations[name]?.name).toBe(name);
@@ -121,11 +122,11 @@ describe("composed registry integrity", () => {
   it("derives coherent features and rejects incoherent hand-written parts", () => {
     // One feature per executor; consumed edges and executed job kinds are
     // derived from the executor/consumer tables, never hand-written.
-    // 12 executors: platform.echo (A3) + B3 cleanup + E3 extract/analyze +
+    // 13 executors: platform.echo (A3) + B3 cleanup + E3 extract/analyze +
     // D5 normalize + D6 transcribe + C5 recompute + G3 calendar.reconcile +
-    // E4 join + F2 attention.evaluate + F3 attention.push (each lane's
-    // sanctioned append).
-    expect(features).toHaveLength(12);
+    // E4 join + F2 attention.evaluate + F3 attention.push + F4
+    // attention.reminders (each lane's sanctioned append).
+    expect(features).toHaveLength(13);
     expect(
       features.every((feature) => feature.providesOperations.length === 0),
     ).toBe(true);

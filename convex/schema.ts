@@ -45,6 +45,9 @@ import { deliveryTables } from "./attention/delivery/schema";
 // F3 append (flagged shared-file change, the sibling pattern): the web
 // push transport fragment (per-device delivery rows).
 import { pushTables } from "./attention/push/schema";
+// F4 amendment (flagged shared-file change, the F1/F2 precedent): the
+// task-reminder schedule anchors and personal snoozes.
+import { remindersTables } from "./attention/reminders/schema";
 import { calendarConnectionTables } from "./calendar/connection/schema";
 import { calendarProjectionTables } from "./calendar/projection/schema";
 // G3 append (flagged shared-file change, the G1/G2 precedent): the sync
@@ -74,6 +77,7 @@ const fragments: ReadonlyArray<Record<string, TableDefinition>> = [
   preferencesTables,
   deliveryTables,
   pushTables,
+  remindersTables,
   calendarConnectionTables,
   calendarProjectionTables,
   calendarSyncTables,
@@ -134,6 +138,7 @@ export default defineSchema({
   ...preferencesTables,
   ...deliveryTables,
   ...pushTables,
+  ...remindersTables,
   ...calendarConnectionTables,
   ...calendarProjectionTables,
   ...calendarSyncTables,

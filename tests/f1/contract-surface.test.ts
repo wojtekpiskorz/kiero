@@ -52,9 +52,12 @@ describe("the composed registry still carries exactly the attention surface", ()
   it("declares the six attention operations under their certified names", () => {
     // F3 amendment (issue #43): attention.revokePushSubscription joins the
     // certified surface (the sanctioned registry append).
+    // F4 append (issue #44, flagged): attention.evaluateDueReminders joins
+    // the certified five as this lane's evaluator entry.
     expect(Object.keys(attentionOperations).sort()).toEqual([
       "attention.changeNotificationPreferences",
       "attention.evaluateDueIntents",
+      "attention.evaluateDueReminders",
       "attention.markSourceRead",
       "attention.registerPushSubscription",
       "attention.revokePushSubscription",

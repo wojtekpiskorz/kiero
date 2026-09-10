@@ -115,6 +115,10 @@ export const TABLE_ID_NAMES = [
   // proof-only fake push service device store.
   "pushDeliveries",
   "pushProofDevices",
+  // attention/reminders (F4 amendment, flagged): the per-task schedule
+  // anchor and the personal per-task snoozes ("Odroczenie przypomnień").
+  "reminderSchedules",
+  "reminderSnoozes",
   // calendar/connection
   "calendarConnections",
   // calendar/projection

@@ -112,6 +112,17 @@ export const attentionOperations = {
     result: Schema.Struct({ evaluatedIntentIds: Schema.Array(tableIdSchema("notificationIntents")) }),
     errorKinds: ["forbidden"],
   }),
+  // F4 amendment (issue #44, flagged in the issue report): the task-reminder
+  // evaluator's checked entry. F2's evaluator deliberately leaves the
+  // `task_reminder` kind to this lane, so the reminder sweep is its own
+  // operation with the same shape as `attention.evaluateDueIntents`.
+  "attention.evaluateDueReminders": operationEntry({
+    kind: "operation",
+    name: "attention.evaluateDueReminders",
+    input: Schema.Struct({ nowMs: Schema.Number }),
+    result: Schema.Struct({ evaluatedIntentIds: Schema.Array(tableIdSchema("notificationIntents")) }),
+    errorKinds: ["forbidden"],
+  }),
 } as const;
 
 export const attentionEvents = {

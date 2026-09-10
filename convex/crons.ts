@@ -45,6 +45,16 @@ crons.cron(
   "* * * * *",
   internal.attention.delivery.evaluate.evaluateDueIntentsTick,
 );
+// F4 amendment (issue #44, flagged coordinated change - the drain/F2
+// precedent): the task-reminder evaluator's safety net at the drain's
+// once-every-five-minutes cadence (sparse by the quota guardrail; the
+// primary path is the atomic scheduled hop at each slot's due instant).
+// Idempotent through the pending-state index range.
+crons.cron(
+  "attention-reminder-safety-net",
+  "*/5 * * * *",
+  internal.attention.reminders.evaluate.evaluateDueRemindersTick,
+);
 
 // F3 amendment (issue #43, flagged coordinated change - the F2/I2 safety-net
 // precedent): the web-push transport's safety net. The fast path is the

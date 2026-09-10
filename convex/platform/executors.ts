@@ -52,6 +52,10 @@
  *   web-push transport executor - one bounded per-device delivery pass
  *   per delivered notification intent (the declared consumer proof of
  *   `attention.intentDelivered`).
+ * - `attention.schedule_task_reminders`
+ *   (../attention/reminders/executor.ts, F4): the durable task-reminder
+ *   scheduling reaction to the work task events and bound-deadline
+ *   revisions (the semantic slot recompute per task change).
  */
 
 import type { FunctionReference } from "convex/server";
@@ -68,6 +72,10 @@ import { normalizePhotoExecutor } from "../processing/images/executor";
 // E4 amendment (flagged coordinated change): the multimodal-join executor.
 import { joinMultimodalExecutor as e4JoinMultimodalExecutor } from "../processing/multimodal/join";
 import { attentionIntentsExecutor } from "../attention/delivery/executor";
+// F4 append (flagged shared-file change, the F2 precedent): the
+// task-reminder scheduling executor implementation lives in F4's owned
+// path; this registry entry is its composition point.
+import { taskRemindersExecutor } from "../attention/reminders/executor";
 
 // F3 append (flagged shared-file change, the G3 precedent): the web-push
 // transport executor implementation lives in F3's owned path; this
@@ -125,4 +133,5 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [attentionIntentsExecutor.jobKind]: attentionIntentsExecutor,
 
   [pushDeliveryExecutor.jobKind]: pushDeliveryExecutor,
+  [taskRemindersExecutor.jobKind]: taskRemindersExecutor,
 };

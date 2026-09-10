@@ -30,6 +30,10 @@ describe("convex executor composition", () => {
         // F2's sanctioned append (issue #42 owns the notification-intent
         // lane: the durable reaction to the three consumed events).
         "attention.evaluate_due_intents",
+        // F4's sanctioned append (issue #44 owns the task-reminder lane:
+        // the durable schedule recompute for the work task events and
+        // bound-deadline revisions).
+        "attention.schedule_task_reminders",
         // E3's sanctioned append (issue #37 owns the text-analysis lane:
         // the mechanical A3 analyze executor is replaced behind the same
         // seam by the real workflow, and the extract edge is implemented).

@@ -216,6 +216,23 @@ export const deliverPushInput = Schema.Struct({
   notificationIntentId: tableIdSchema("notificationIntents"),
 });
 
+// F4 amendment (issue #44, flagged coordinated change on the F2 precedent):
+// the task-reminder scheduling executor input. The drain projects the three
+// consumed events onto this shape; the nullable ids let every trigger
+// share one closed input. Both work events (`work.taskChanged` and
+// `work.taskStateChanged`) project onto the ONE `task_changed` trigger:
+// the recompute re-reads the live task row, so the state event needs no
+// reaction of its own (PR #102 review round 1 dropped the certified but
+// never-produced `task_state_changed` literal). The work events' dedup
+// identity already carries the task revision
+// (`work.<event>:<id>:<revision>`), so the projection rides the row's key
+// and every distinct change registers its own job while replays collapse.
+export const attentionRemindersInput = Schema.Struct({
+  trigger: Schema.Literals(["task_changed", "finding_revised"]),
+  taskId: Schema.NullOr(tableIdSchema("tasks")),
+  findingId: Schema.NullOr(tableIdSchema("findings")),
+});
+
 function decodeFeatureId(value: string): Schema.Schema.Type<typeof FeatureId> {
   return Schema.decodeUnknownSync(FeatureId)(value);
 }
@@ -319,6 +336,16 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "attention.deliver_push",
     input: deliverPushInput,
   }),
+  // F4 amendment (issue #44, flagged coordinated change): the durable
+  // task-reminder scheduling executor - the semantic slot recompute from
+  // the consumed work events and bound-deadline revisions
+  // (`convex/attention/reminders/executor.ts` implements it).
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("attention.reminders"),
+    jobKind: "attention.schedule_task_reminders",
+    input: attentionRemindersInput,
+  }),
 ];
 
 function consumer(
@@ -393,6 +420,16 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   // differently-keyed duplicate event collapses onto the same per-device
   // delivery rows (issue 43: semantic intent plus subscription).
   consumer("attention.intentDelivered", "attention.deliver_push"),
+  // F4 amendment (issue #44, flagged coordinated change): the task-reminder
+  // scheduling edges. Every task change (creation, deadline binding,
+  // coordinator, reopen) recomputes the semantic slots; a revision of a
+  // bound deadline finding recomputes every task bound to it (a date
+  // correction does not touch the task row). Each edge rides the row's
+  // revision-carrying dedup identity, so distinct changes register
+  // distinct jobs while replays collapse.
+  consumer("work.taskChanged", "attention.schedule_task_reminders"),
+  consumer("work.taskStateChanged", "attention.schedule_task_reminders"),
+  consumer("memory.findingRevised", "attention.schedule_task_reminders"),
 ];
 
 /**

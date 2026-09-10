@@ -108,10 +108,10 @@ describe("schema composition", () => {
     // D6 amendment added audioTranscripts and audioSegments (the resumable
     // long-audio STT fragment); 70 since the G3 amendment added
     // calendarSyncAttempts and calendarProofEvents (the sync attempt
-    // ledger and the proof-only fake-Google event store); 71 since the
-    // E4 amendment added visionOrders; 73 since the F3 amendment added
-    // pushDeliveries and the proof-only pushProofDevices.
-    expect(composed).toHaveLength(73);
+    // ledger and the proof-only fake-Google event store); 73 since the F3
+    // amendment added pushDeliveries and the proof-only pushProofDevices;
+    // 75 since the F4 amendment added reminderSchedules and reminderSnoozes.
+    expect(composed).toHaveLength(75);
   });
 
   it("gives the domain event envelope a durable outbox home", () => {
