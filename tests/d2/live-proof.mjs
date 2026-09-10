@@ -637,7 +637,7 @@ const garbageHeader = await fetch(`https://${DEPLOYMENT}.eu-west-1.convex.site/s
 });
 record(
   "V4 the boundary refuses a missing credential (401) and a garbage credential never resolves",
-  noHeader.status === 401 && (garbageHeader.status === 401 || garbageHeader.status === 400)
+  noHeader.status === 401 && garbageHeader.status === 401
     ? "PASS"
     : "FAIL",
   `missing=${noHeader.status} garbage=${garbageHeader.status}`,

@@ -97,7 +97,12 @@ export const probeRunStep = action({
 export const acceptSourceAsCaller = internalMutation({
   args: { envelope: v.any() },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const command = Schema.decodeUnknownSync(CommandEnvelope)(args.envelope);
+    let commandValue: typeof CommandEnvelope.Type;
+    try {
+      commandValue = Schema.decodeUnknownSync(CommandEnvelope)(args.envelope);
+    } catch {
+      return errorResult(forbiddenError("probe_malformed_envelope"));
+    }
     const context = await resolveAccessContextWithProvisioning(
       ctx.db,
       ctx.auth,
@@ -107,8 +112,13 @@ export const acceptSourceAsCaller = internalMutation({
     if (context === null) {
       return errorResult(unauthenticatedError());
     }
-    const input = Schema.decodeUnknownSync(acceptSourceEntry.input)(command.input);
-    return performAcceptance(ctx, context, input, command.idempotencyKey);
+    let inputValue: typeof acceptSourceEntry.input.Type;
+    try {
+      inputValue = Schema.decodeUnknownSync(acceptSourceEntry.input)(commandValue.input);
+    } catch {
+      return errorResult(forbiddenError("probe_malformed_input"));
+    }
+    return performAcceptance(ctx, context, inputValue, commandValue.idempotencyKey);
   },
 });
 
@@ -116,7 +126,12 @@ export const acceptSourceAsCaller = internalMutation({
 export const probeCrashAcceptSourceAsCaller = internalMutation({
   args: { envelope: v.any() },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const command = Schema.decodeUnknownSync(CommandEnvelope)(args.envelope);
+    let commandValue: typeof CommandEnvelope.Type;
+    try {
+      commandValue = Schema.decodeUnknownSync(CommandEnvelope)(args.envelope);
+    } catch {
+      return errorResult(forbiddenError("probe_malformed_envelope"));
+    }
     const context = await resolveAccessContextWithProvisioning(
       ctx.db,
       ctx.auth,
@@ -126,8 +141,13 @@ export const probeCrashAcceptSourceAsCaller = internalMutation({
     if (context === null) {
       return errorResult(unauthenticatedError());
     }
-    const input = Schema.decodeUnknownSync(acceptSourceEntry.input)(command.input);
-    const result = await performAcceptance(ctx, context, input, command.idempotencyKey);
+    let inputValue: typeof acceptSourceEntry.input.Type;
+    try {
+      inputValue = Schema.decodeUnknownSync(acceptSourceEntry.input)(commandValue.input);
+    } catch {
+      return errorResult(forbiddenError("probe_malformed_input"));
+    }
+    const result = await performAcceptance(ctx, context, inputValue, commandValue.idempotencyKey);
     if (result._tag === "error") {
       return result;
     }
