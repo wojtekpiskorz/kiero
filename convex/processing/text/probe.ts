@@ -50,6 +50,7 @@ import {
   OUTCOME_MARKER_BASE,
   failureMarkerArmed,
   outcomeMarkerArmed,
+  stepRow,
 } from "./journal";
 import { vWorkflowId } from "@convex-dev/workflow";
 
@@ -342,12 +343,7 @@ export const probeArmAnalysisOutcomeFailure = action({
 export const disarmAnalysisFailure = internalMutation({
   args: { runId: v.id("processingRuns"), sequence: v.number() },
   handler: async (ctx, args) => {
-    const marker = await ctx.db
-      .query("processingSteps")
-      .withIndex("by_run_sequence", (q) =>
-        q.eq("runId", args.runId).eq("sequence", FAILURE_MARKER_BASE + args.sequence),
-      )
-      .first();
+    const marker = await stepRow(ctx.db, args.runId, FAILURE_MARKER_BASE + args.sequence);
     if (marker !== null) {
       await ctx.db.delete(marker._id);
     }
