@@ -20,6 +20,9 @@ describe("convex executor composition", () => {
         // B3's sanctioned append (issue #22 owns the declared consumer
         // proof for the access-revocation edges).
         "access.cleanup_revocation",
+        // D5's sanctioned append (issue #33 owns the declared consumer
+        // proof for the accepted-photo normalization edge).
+        "processing.normalize_photo",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");

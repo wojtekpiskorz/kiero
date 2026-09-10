@@ -165,6 +165,22 @@ export class FakeDb {
     }
     return rows;
   }
+
+  /**
+   * `delete(id)` locates the row across tables like `get` and removes it.
+   * (D5 append: the images ledger's record step deletes the in-progress
+   * `processing` representation row once its successor exists.)
+   */
+  async delete(id: string): Promise<void> {
+    for (const rows of this.tables.values()) {
+      const index = rows.findIndex((row) => row._id === id);
+      if (index !== -1) {
+        rows.splice(index, 1);
+        return;
+      }
+    }
+    throw new Error(`delete: no row ${id}`);
+  }
 }
 
 /** The mutation-transaction context shape the ledger and acceptance use. */

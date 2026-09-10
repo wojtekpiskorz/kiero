@@ -14,7 +14,7 @@ import {
 } from "@kiero/runtime";
 import {
   CONSUMER_PROJECTION_MISSING,
-  projectEventToJobInput,
+  projectEventToJobInputs,
 } from "../../convex/platform/outbox";
 
 describe("publication idempotency", () => {
@@ -138,20 +138,35 @@ describe("delivery state machine", () => {
 
 describe("drain event projection (three-way)", () => {
   it("classifies projected, unconsumed and unprojected events", () => {
-    expect(projectEventToJobInput("platform.echoRequested", { message: "m" }, "dk")).toEqual({
-      kind: "job",
-      jobKind: "platform.echo_delivery",
-      input: { dedupKey: "dk", message: "m" },
-      dedupKey: "dk",
-    });
-    expect(projectEventToJobInput("operations.diagnosticEmitted", {}, "dk")).toEqual({
-      kind: "no_consumer",
-    });
-    // A registered edge without a projection reports itself loudly.
-    expect(projectEventToJobInput("sources.sourceAccepted", {}, "dk")).toEqual({
-      kind: "unprojected_edge",
-      jobKind: "processing.extract_fragments",
-    });
+    expect(projectEventToJobInputs("platform.echoRequested", { message: "m" }, "dk")).toEqual([
+      {
+        kind: "job",
+        jobKind: "platform.echo_delivery",
+        input: { dedupKey: "dk", message: "m" },
+        dedupKey: "dk",
+      },
+    ]);
+    expect(projectEventToJobInputs("operations.diagnosticEmitted", {}, "dk")).toEqual([
+      { kind: "no_consumer" },
+    ]);
+    // An event may carry SEVERAL edges (D5): sourceAccepted fans out to the
+    // extract seam (still unprojected until E3 — reports itself loudly) and
+    // the D5 normalize projection (payload-derived dedup, never the row's).
+    expect(
+      projectEventToJobInputs(
+        "sources.sourceAccepted",
+        { sourceId: "s1", attachmentIds: ["a1"] },
+        "dk",
+      ),
+    ).toEqual([
+      { kind: "unprojected_edge", jobKind: "processing.extract_fragments" },
+      {
+        kind: "job",
+        jobKind: "processing.normalize_photo",
+        input: { sourceId: "s1", attachmentIds: ["a1"] },
+        dedupKey: "processing.normalize_photo:s1",
+      },
+    ]);
     expect(CONSUMER_PROJECTION_MISSING).toBe("consumer_projection_missing");
   });
 });

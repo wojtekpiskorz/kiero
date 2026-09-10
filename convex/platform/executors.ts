@@ -17,6 +17,9 @@
  *   durable revocation fan-out the access lane owns (device-session
  *   revocation after membership removal; the declared consumer proof of
  *   `access.membershipRevoked` / `access.sessionRevoked`).
+ * - `processing.normalize_photo` (../processing/images/executor.ts, D5):
+ *   the accepted-photo normalization executor (architecture protocol step
+ *   4) with the echo-template uncertain-outcome semantics.
  */
 
 import type { FunctionReference } from "convex/server";
@@ -26,6 +29,7 @@ import type { Doc } from "../_generated/dataModel";
 import { echoExecutor } from "./echo";
 import { analyzeChangePlanExecutor } from "./pipeline";
 import { cleanupRevocationExecutor } from "../access/membership/cleanup";
+import { normalizePhotoExecutor } from "../processing/images/executor";
 
 /** One durable job row (the executable counterpart of an outbox event). */
 export type DurableJobDoc = Doc<"durableJobs">;
@@ -52,4 +56,5 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [echoExecutor.jobKind]: echoExecutor,
   [analyzeChangePlanExecutor.jobKind]: analyzeChangePlanExecutor,
   [cleanupRevocationExecutor.jobKind]: cleanupRevocationExecutor,
+  [normalizePhotoExecutor.jobKind]: normalizePhotoExecutor,
 };
