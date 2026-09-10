@@ -34,7 +34,7 @@ import { Schema } from "effect";
 import { ConvexAuthProvider, useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery_experimental as useQueryState } from "convex/react";
 import { Link } from "@tanstack/react-router";
-import { sourcesOperations } from "@kiero/contracts";
+import { parseTableId, sourcesOperations } from "@kiero/contracts";
 import { api } from "../../../../../convex/_generated/api";
 import { useAppServices } from "../../app/providers";
 import { createConvexClient } from "../sign-in/client";
@@ -43,6 +43,7 @@ import type { MembershipOverview } from "../../../../../convex/access/membership
 import { ConversationPage } from "../../../../../convex/sources/read/rows";
 import type { SourceConversationRow } from "../../../../../convex/sources/read/rows";
 import type { CurrentFindingWireRow } from "../../../../../convex/memory/findings/read";
+import type { ReadCurrentFindingsInput } from "../../../../../convex/memory/findings/semantics";
 import {
   coreTextCopy as copy,
   failureHint,
@@ -75,15 +76,23 @@ interface Notice {
 
 /**
  * A fresh idempotency key per logical message (regenerated after success).
- * The shape is the certified `idem_` + uuid pattern the command envelope's
- * idempotency-key schema requires.
+ * The shape is the certified `idem_` + v4-uuid pattern the command
+ * envelope's idempotency-key schema requires. The UUID always comes from
+ * getRandomValues — the baseline CSPRNG API every crypto context provides
+ * (randomUUID is the newer, narrower one) — so both branches of the old
+ * fallback are gone and every emitted key passes the schema.
  */
+function uuidV4(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40; // version 4
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80; // RFC 4122 variant
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 function freshKey(): string {
-  const uuid =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now().toString(16).padStart(12, "0")}-replace-me`;
-  return `idem_${uuid}`;
+  return `idem_${uuidV4()}`;
 }
 
 /** The typed result shapes of the two send commands (contract authority). */
@@ -268,10 +277,16 @@ function CoreTextMain({
         }))
       : [];
 
-  const memoryArgs =
-    memoryScope === "company"
+  // The memory scope the read decodes server-side through the operation's
+  // contract; parseTableId brands the selected id without a cast (the
+  // select's options are the projects overview's real ids, so a null brand
+  // would mean corrupted UI state — falling back to the company scope
+  // keeps the read well-formed even then).
+  const scopeProjectId = parseTableId("projects", memoryScope);
+  const memoryArgs: ReadCurrentFindingsInput =
+    memoryScope === "company" || scopeProjectId === null
       ? { scope: { _tag: "company" } }
-      : { scope: { _tag: "project", projectId: memoryScope } };
+      : { scope: { _tag: "project", projectId: scopeProjectId } };
 
   return createElement(
     "section",
@@ -428,11 +443,11 @@ function MemorySection({
   readonly projectViews: readonly { readonly projectId: string; readonly displayName: string }[];
   readonly memoryScope: string;
   readonly setMemoryScope: (scope: string) => void;
-  readonly memoryArgs: { readonly scope: { readonly _tag: string; readonly projectId?: string } };
+  readonly memoryArgs: ReadCurrentFindingsInput;
 }): ReactNode {
   const findings = useQueryState({
     query: api.memory.findings.functions.readCurrentFindings,
-    args: memoryArgs as never,
+    args: memoryArgs,
   });
   return createElement(
     "section",

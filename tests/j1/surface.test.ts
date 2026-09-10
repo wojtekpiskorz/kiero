@@ -73,7 +73,7 @@ describe("the text composition mount (J1's sanctioned conversation entry)", () =
   });
 });
 
-describe("the core-text renderers stay honest about precision", () => {
+describe("the core-text renderers stay precise about the contract", () => {
   it("renders a resolved day with its role and the original words", () => {
     expect(
       findingValueLabel({
@@ -132,11 +132,29 @@ describe("the core-text renderers stay honest about precision", () => {
     expect(label).toContain("netto");
   });
 
-  it("renders text notes verbatim and unknown shapes honestly", () => {
+  it("renders text notes verbatim", () => {
     expect(findingValueLabel({ _tag: "text_note", text: "serwis drukarki" })).toBe(
       "serwis drukarki",
     );
-    expect(findingValueLabel({ _tag: "mystery" })).toBe("wartość nieznanej postaci");
+  });
+
+  it("renders a zoned date/time through its instant's string form", () => {
+    const label = findingValueLabel({
+      _tag: "temporal",
+      temporal: {
+        shape: { _tag: "date_time", value: "2026-09-09T08:00:00.000+02:00[Europe/Warsaw]" },
+        originalExpression: "w środę rano",
+        role: "agreed",
+      },
+    });
+    expect(label).toContain("2026-09-09T08:00:00.000+02:00[Europe/Warsaw]");
+    expect(label).toContain("uzgodnione");
+  });
+
+  it("throws on values outside the contract instead of rendering a guess", () => {
+    expect(() => findingValueLabel({ _tag: "mystery" })).toThrow();
+    expect(() => findingValueLabel(42)).toThrow();
+    expect(() => knowledgeStateLabel({ _tag: "mystery" })).toThrow();
   });
 
   it("renders knowledge states with the conflict visible", () => {

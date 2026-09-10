@@ -3,18 +3,33 @@
  * current memory, and the closed-error classification for the first
  * text-to-memory surface.
  *
- * The renderers translate the ENCODED (wire) forms the public reads carry
- * (`convex/memory/findings/read.ts` returns encoded rows by contract) into
- * plain Polish product text. They render exactly what is there: no hour is
- * invented for a day, an estimate never becomes an exact figure, and
- * `not_specified` tax basis stays visible (the value contracts' rules, as
- * product copy).
+ * The renderers decode the ENCODED (wire) forms the public reads carry
+ * (`convex/memory/findings/read.ts` returns encoded rows by contract)
+ * through the exported contract schemas at the boundary, then switch over
+ * the DECODED values: the leaf schemas are the from-string variants, so the
+ * wire forms decode straight through, every switch is
+ * exhaustiveness-checked, and the label maps are typed by the contract's
+ * closed vocabularies — a vocabulary change fails the build instead of
+ * rendering a raw machine code. The copy renders exactly what is there: no
+ * hour is invented for a day, an estimate never becomes an exact figure,
+ * and `not_specified` tax basis stays visible.
  *
  * Operation results arrive as `ResultEnvelope`s; closed errors map to the
  * server's Polish message plus hints for the load-bearing machine codes,
  * exactly like the membership surface.
  */
 
+import { BigDecimal, Schema } from "effect";
+import {
+  FindingValue,
+  KnowledgeState,
+  MoneyCertainty,
+  MoneyRole,
+  TaxBasis,
+  TemporalRole,
+  type DateOnly,
+  type TemporalValue,
+} from "@kiero/contracts";
 import { signInCopy } from "../sign-in/state";
 import type { SourceProcessingState as SourceProcessingType } from "../../../../../convex/sources/read/rows";
 
@@ -106,19 +121,19 @@ export function failureHint(code: string, serverMessage: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Wire-value renderers (encoded shapes -> plain Polish)
+// Wire-value renderers (contract-decoded -> plain Polish)
 // ---------------------------------------------------------------------------
 
-/** Polish role names for temporal values (issue 8 vocabulary). */
-const temporalRoleLabels: Record<string, string> = {
+/** Polish role names for temporal values (the contract's closed vocabulary). */
+const temporalRoleLabels: Record<TemporalRole, string> = {
   proposed: "propozycja",
   internal: "plan wewnętrzny",
   agreed: "uzgodnione",
   actual: "stan faktyczny",
 };
 
-/** Polish role names for money values (issue 8 vocabulary). */
-const moneyRoleLabels: Record<string, string> = {
+/** Polish role names for money values (the contract's closed vocabulary). */
+const moneyRoleLabels: Record<MoneyRole, string> = {
   price_proposal: "wycena",
   agreed_price: "uzgodniona cena",
   material_cost: "koszt materiałów",
@@ -126,160 +141,101 @@ const moneyRoleLabels: Record<string, string> = {
   estimated_labor: "szacunek robocizny",
 };
 
-const taxBasisLabels: Record<string, string> = {
+const taxBasisLabels: Record<TaxBasis, string> = {
   net: "netto",
   gross: "brutto",
   not_specified: "podatek nieokreślony",
 };
 
-const certaintyLabels: Record<string, string> = {
+const certaintyLabels: Record<MoneyCertainty, string> = {
   exact: "kwota dokładna",
   estimate: "kwota szacunkowa",
 };
 
-/**
- * Narrows one untrusted wire object to a record; null otherwise. The public
- * reads carry `value`/`knowledgeState` as `unknown` (their wire forms are
- * the ENCODED contract shapes), so the renderers narrow at the boundary
- * instead of trusting a hand-declared structural type.
- */
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-/** The discriminant of one narrowed wire record, when it is a string. */
-function tagOf(value: Record<string, unknown>): string | null {
-  return typeof value._tag === "string" ? value._tag : null;
-}
-
-/** Renders one date-only wire bound; no component is invented. */
-function dateOnlyLabel(bound: unknown): string {
-  const shape = record(bound);
-  const tag = shape === null ? null : tagOf(shape);
-  if (shape === null || tag === null) {
-    return "nieznana data";
-  }
-  switch (tag) {
+/** Renders one decoded date-only bound; no component is invented. */
+function dateOnlyLabel(bound: DateOnly): string {
+  switch (bound._tag) {
     case "day":
-      return String(shape.day);
+      return bound.day;
     case "month":
-      return `${String(shape.month)} (do danego miesiąca)`;
+      return `${bound.month} (do danego miesiąca)`;
     case "year":
-      return `${String(shape.year)} (do danego roku)`;
-    default:
-      return "nieznana data";
+      return `${bound.year} (do danego roku)`;
   }
 }
 
-/** Renders a temporal wire value: resolved calendar facts plus the original words. */
-export function temporalValueLabel(wire: unknown): string {
-  const temporal = record(wire);
-  const shape = temporal === null ? null : record(temporal.shape);
-  if (
-    temporal === null ||
-    shape === null ||
-    typeof temporal.originalExpression !== "string" ||
-    typeof temporal.role !== "string"
-  ) {
-    return "wartość nieznanej postaci";
-  }
-  const shapeTag = tagOf(shape);
+/** Renders one decoded temporal value: calendar facts plus the original words. */
+function temporalValueLabel(temporal: TemporalValue): string {
   let when: string;
-  if (shapeTag === null) {
-    when = "nieznana data";
-  } else {
-    switch (shapeTag) {
-      case "day":
-      case "month":
-      case "year":
-        when = dateOnlyLabel(shape);
-        break;
-      case "date_time":
-        when = String(shape.value);
-        break;
-      case "range": {
-        const start = shape.start === null ? null : dateOnlyLabel(shape.start);
-        const end = shape.end === null ? null : dateOnlyLabel(shape.end);
-        when = start === null && end === null
+  switch (temporal.shape._tag) {
+    case "day":
+    case "month":
+    case "year":
+      when = dateOnlyLabel(temporal.shape);
+      break;
+    case "date_time":
+      when = temporal.shape.value.toString();
+      break;
+    case "range": {
+      const { start, end } = temporal.shape;
+      when =
+        start === null && end === null
           ? "zakres nieokreślony"
-          : `od ${start ?? "…"} do ${end ?? "…"}`;
-        break;
-      }
-      default:
-        when = "nieznana data";
+          : `od ${start === null ? "…" : dateOnlyLabel(start)} do ${end === null ? "…" : dateOnlyLabel(end)}`;
+      break;
     }
   }
-  const role = temporalRoleLabels[temporal.role] ?? temporal.role;
-  return `${when} (${role}; powiedziano: „${temporal.originalExpression}”)`;
+  return `${when} (${temporalRoleLabels[temporal.role]}; powiedziano: „${temporal.originalExpression}”)`;
 }
 
-/** Renders a money wire value; estimates and tax basis stay visible. */
-export function moneyValueLabel(wire: unknown): string {
-  const money = record(wire);
-  const amount = money === null ? null : record(money.amount);
-  if (
-    money === null ||
-    amount === null ||
-    tagOf(amount) === null ||
-    typeof money.currency !== "string" ||
-    typeof money.role !== "string" ||
-    typeof money.taxBasis !== "string" ||
-    typeof money.certainty !== "string"
-  ) {
-    return "wartość nieznanej postaci";
-  }
-  const exact = tagOf(amount) === "exact";
-  const rendered = exact
-    ? `${String(amount.value)} ${money.currency}`
-    : `od ${amount.min === null ? "…" : String(amount.min)} do ${
-        amount.max === null ? "…" : String(amount.max)
-      } ${money.currency}`;
-  const role = moneyRoleLabels[money.role] ?? money.role;
-  const tax = taxBasisLabels[money.taxBasis] ?? money.taxBasis;
-  const certainty = certaintyLabels[money.certainty] ?? money.certainty;
-  return `${role}: ${rendered}, ${tax}, ${certainty}`;
+/** Renders one decoded money value; estimates and tax basis stay visible. */
+function moneyValueLabel(
+  money: Extract<FindingValue, { _tag: "money" }>["money"],
+): string {
+  // BigDecimal.format is the plain decimal form (toString is a debug shape).
+  const amount =
+    money.amount._tag === "exact"
+      ? `${BigDecimal.format(money.amount.value)} ${money.currency}`
+      : `od ${money.amount.min === null ? "…" : BigDecimal.format(money.amount.min)} do ${
+          money.amount.max === null ? "…" : BigDecimal.format(money.amount.max)
+        } ${money.currency}`;
+  return `${moneyRoleLabels[money.role]}: ${amount}, ${taxBasisLabels[money.taxBasis]}, ${certaintyLabels[money.certainty]}`;
 }
 
-/** Renders one finding's ENCODED value (the public read's wire form). */
+/**
+ * Renders one finding's value. The wire form decodes through the contract's
+ * `FindingValue` first (the from-string leaf schemas accept the encoded
+ * shapes the public read carries); malformed values throw instead of
+ * rendering a guess.
+ */
 export function findingValueLabel(value: unknown): string {
-  const wire = record(value);
-  const tag = wire === null ? null : tagOf(wire);
-  if (wire === null || tag === null) {
-    return "wartość nieznanej postaci";
-  }
-  switch (tag) {
+  const decoded = Schema.decodeUnknownSync(FindingValue)(value);
+  switch (decoded._tag) {
     case "temporal":
-      return temporalValueLabel(wire.temporal);
+      return temporalValueLabel(decoded.temporal);
     case "money":
-      return moneyValueLabel(wire.money);
+      return moneyValueLabel(decoded.money);
     case "text_note":
-      return String(wire.text);
+      return decoded.text;
     case "extension":
-      return `dodatkowa informacja (${String(wire.definitionVersionId)})`;
-    default:
-      return "wartość nieznanej postaci";
+      return `dodatkowa informacja (${decoded.definitionVersionId})`;
   }
 }
 
-/** Renders one finding's ENCODED knowledge state. */
+/**
+ * Renders one finding's knowledge state; the wire form decodes through the
+ * contract's `KnowledgeState` first.
+ */
 export function knowledgeStateLabel(state: unknown): string {
-  const wire = record(state);
-  const tag = wire === null ? null : tagOf(wire);
-  if (wire === null || tag === null) {
-    return "stan nieznany";
-  }
-  switch (tag) {
+  const decoded = Schema.decodeUnknownSync(KnowledgeState)(state);
+  switch (decoded._tag) {
     case "known":
       return "ustalone";
     case "unknown":
-      return `nieustalone (${String(wire.reason)})`;
+      return `nieustalone (${decoded.reason})`;
     case "conflicted":
       return "sprzeczne — wymaga rozstrzygnięcia";
     case "not_applicable":
       return "nie dotyczy";
-    default:
-      return "stan nieznany";
   }
 }
