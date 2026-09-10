@@ -207,6 +207,21 @@ export const attentionIntentsInput = Schema.Struct({
   changeSetId: Schema.NullOr(tableIdSchema("changeSets")),
 });
 
+// E5 amendment (issue #39, flagged coordinated change on the B3/F2
+// precedent): the derived-search index executor input. `build` is the full
+// generation pass `search.startIndexGeneration` registers; the two refresh
+// modes are the drain's projections of the consumed lifecycle events
+// (withdrawal/purge drop a source's derived rows; a revised finding's rows
+// are rebuilt from its current revision). `generationId` is nullable so the
+// drain can register a refresh without naming a generation: null refreshes
+// every non-retired generation (the event payload carries no generation).
+export const searchIndexInput = Schema.Struct({
+  generationId: Schema.NullOr(tableIdSchema("searchIndexGenerations")),
+  mode: Schema.Literals(["build", "refresh_source", "refresh_finding"]),
+  sourceId: Schema.NullOr(tableIdSchema("sources")),
+  findingId: Schema.NullOr(tableIdSchema("findings")),
+});
+
 // F3 amendment (issue #43, flagged coordinated change - the F2 precedent):
 // the web-push delivery executor input. The drain projects the delivered
 // intent's own event onto this shape; the executor's prepare re-reads the
@@ -327,6 +342,16 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "attention.evaluate_due_intents",
     input: attentionIntentsInput,
   }),
+  // E5 amendment (issue #39, flagged coordinated change): the derived-search
+  // index executor (`convex/search/executor.ts` implements it). The
+  // versioned generation builds and the scoped lifecycle refreshes of the
+  // disposable index rows.
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("search.index"),
+    jobKind: "search.index_generation",
+    input: searchIndexInput,
+  }),
   // F3 amendment (issue #43, flagged coordinated change): the web-push
   // transport executor - the per-device delivery of one delivered intent
   // (`convex/attention/push/executor.ts` implements it).
@@ -414,6 +439,15 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceAccepted", "attention.evaluate_due_intents"),
   consumer("memory.clarificationRaised", "attention.evaluate_due_intents"),
   consumer("memory.changeSetPublished", "attention.evaluate_due_intents"),
+  // E5 amendment (issue #39, flagged coordinated change): derived search
+  // rows are refreshed through the same durable edges as every other
+  // derivative. Withdrawal and purge drop a source's index rows; a revised
+  // finding rebuilds its rows from the CURRENT revision. Hydration remains
+  // the authority even before these jobs run: query-time checks re-read the
+  // canonical records, so a stale derived row can never authorize an answer.
+  consumer("sources.sourceWithdrawn", "search.index_generation"),
+  consumer("sources.sourcePurged", "search.index_generation"),
+  consumer("memory.findingRevised", "search.index_generation"),
   // F3 amendment (issue #43, flagged coordinated change): every delivered
   // notification intent drains into the web-push transport. The projection
   // derives its dedup identity from the intent, so a replayed or

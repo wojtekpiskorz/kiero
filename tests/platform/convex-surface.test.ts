@@ -11,7 +11,7 @@ import { jobExecutors } from "../../convex/platform/executors";
 import { echoExecutor } from "../../convex/platform/echo";
 
 describe("convex executor composition", () => {
-  it("registers exactly the implemented executors (platform + B3 + C5 + D6 + E3/E4 lanes)", () => {
+  it("registers exactly the implemented executors (platform + B3 + C5 + D5 + D6 + E3/E4 + F2 + G3 + E5 lanes)", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
       [
         "platform.echo_delivery",
@@ -45,6 +45,10 @@ describe("convex executor composition", () => {
         // proof for the calendar.copyOutcomeRecorded edge).
         "calendar.reconcile_outcome",
 
+        // E5's sanctioned append (issue #39 owns the derived-search lane:
+        // versioned index generations plus the scoped lifecycle refreshes of
+        // the disposable search rows).
+        "search.index_generation",
         // E4's sanctioned append (issue #38 owns the multimodal join; the
         // contracts amendment registering the kind is flagged there).
         "processing.join_multimodal",

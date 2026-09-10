@@ -48,6 +48,10 @@
  *   events (acceptance creates source intents, a raised clarification
  *   creates the addressed agent-question intent, a published change set
  *   only wakes the evaluator).
+ * - `search.index_generation` (../search/executor.ts, E5): the versioned
+ *   derived-index executor. Full generation builds through E2's embedding
+ *   adapter plus the scoped lifecycle refreshes (withdrawal/purge drops a
+ *   source's rows; a revised finding rebuilds from its current revision).
  * - `attention.deliver_push` (../attention/push/executor.ts, F3): the
  *   web-push transport executor - one bounded per-device delivery pass
  *   per delivered notification intent (the declared consumer proof of
@@ -86,6 +90,11 @@ import { pushDeliveryExecutor } from "../attention/push/executor";
 // calendar.reconcile_outcome executor implementation lives in G3's owned
 // path; this registry entry is its composition point.
 import { reconcileOutcomeExecutor } from "../calendar/sync/executor";
+
+// E5 append (flagged shared-file change, the G3 precedent): the
+// search.index_generation executor implementation lives in E5's owned path
+// (convex/search/executor.ts); this registry entry is its composition point.
+import { searchIndexExecutor } from "../search/executor";
 
 /** One durable job row (the executable counterpart of an outbox event). */
 export type DurableJobDoc = Doc<"durableJobs">;
@@ -132,6 +141,8 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [reconcileOutcomeExecutor.jobKind]: reconcileOutcomeExecutor,
   [attentionIntentsExecutor.jobKind]: attentionIntentsExecutor,
 
+  // E5 append (flagged shared-file change): the derived-search executor.
+  [searchIndexExecutor.jobKind]: searchIndexExecutor,
   [pushDeliveryExecutor.jobKind]: pushDeliveryExecutor,
   [taskRemindersExecutor.jobKind]: taskRemindersExecutor,
 };

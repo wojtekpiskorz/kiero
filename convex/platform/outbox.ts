@@ -309,6 +309,40 @@ function projectOneEdge(
       dedupKey: `attention.evaluate_due_intents:changeset:${String(payload.changeSetId)}`,
     };
   }
+  // E5 registration (issue #39 owns these declared consumer proofs): the
+  // derived search rows' lifecycle refreshes. The dedup keys derive from each
+  // event's SUBJECT plus the refresh mode (the F2 precedent), never the
+  // outbox row: a withdrawal drops the source's index rows in every
+  // non-retired generation, a purge does the same, and a revised finding
+  // rebuilds its rows from the CURRENT revision. `generationId: null` is the
+  // drain's honest "no generation named" (the payloads carry none); the
+  // executor refreshes every non-retired generation.
+  if (jobKind === "search.index_generation") {
+    if (eventName === "sources.sourceWithdrawn" || eventName === "sources.sourcePurged") {
+      return {
+        kind: "job",
+        jobKind,
+        input: {
+          generationId: null,
+          mode: "refresh_source",
+          sourceId: payload.sourceId,
+          findingId: null,
+        },
+        dedupKey: `search.index_generation:refresh_source:${String(payload.sourceId)}`,
+      };
+    }
+    return {
+      kind: "job",
+      jobKind,
+      input: {
+        generationId: null,
+        mode: "refresh_finding",
+        sourceId: null,
+        findingId: payload.findingId,
+      },
+      dedupKey: `search.index_generation:refresh_finding:${String(payload.findingId)}`,
+    };
+  }
   // F3 registration (issue #43 owns this declared consumer proof): every
   // DELIVERED notification intent drains into the web-push transport.
   // The dedup identity is the intent itself, so a replayed or
