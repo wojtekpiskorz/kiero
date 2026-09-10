@@ -21,3 +21,7 @@ export * from "../work/index";
 // C3 coordinated addition (flagged): the extensions domain (versioned typed
 // extensions and catalog reuse) follows the same one-line pattern.
 export * from "../extensions/index";
+
+// G2 coordinated addition (flagged, the same one-line pattern): the
+// calendar projection domain owns its rules in packages/domain/calendar/**.
+export * from "../calendar/index";
