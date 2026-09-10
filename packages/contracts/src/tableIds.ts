@@ -65,7 +65,7 @@ export const TABLE_ID_NAMES = [
   "attachments",
   "mediaRepresentations",
   // processing/audio (D6 amendment, flagged in the issue report): the
-  // resumable long-audio STT fragment — transcript orders and per-segment
+  // resumable long-audio STT fragment - transcript orders and per-segment
   // checkpoints over accepted audio attachments.
   "audioTranscripts",
   "audioSegments",
@@ -86,7 +86,7 @@ export const TABLE_ID_NAMES = [
   "checklistItems",
   "events",
   // C4 amendment (flagged, I2 precedent): the immutable change history of
-  // tasks, checklist items and events — actor, time and evidence basis per
+  // tasks, checklist items and events - actor, time and evidence basis per
   // change (issue #27 acceptance: "immutable history").
   "workRevisions",
   // platform (durable execution + outbox)
@@ -110,6 +110,11 @@ export const TABLE_ID_NAMES = [
   "notificationIntents",
   "pushSubscriptions",
   "notificationAttempts",
+  // attention/push (F3 amendment, the G3 closed-inventory precedent): the
+  // per-device delivery rows of the web push transport, plus the guarded
+  // proof-only fake push service device store.
+  "pushDeliveries",
+  "pushProofDevices",
   // calendar/connection
   "calendarConnections",
   // calendar/projection
@@ -220,6 +225,7 @@ export type ChecklistItemId = TableId<"checklistItems">;
 export type WorkEventId = TableId<"events">;
 export type ProcessingRunId = TableId<"processingRuns">;
 export type NotificationIntentId = TableId<"notificationIntents">;
+export type PushDeliveryId = TableId<"pushDeliveries">;
 export type CalendarConnectionId = TableId<"calendarConnections">;
 export type CalendarCopyId = TableId<"calendarCopies">;
 export type ExportId = TableId<"exports">;

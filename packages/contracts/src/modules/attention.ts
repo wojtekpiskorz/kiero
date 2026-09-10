@@ -74,6 +74,13 @@ export const attentionOperations = {
     result: Schema.Struct({ taskId: tableIdSchema("tasks") }),
     errorKinds: ["forbidden", "not_found", "validation"],
   }),
+  // F3 amendment (issue #43, flagged in the sibling pattern - the F1
+  // input-shape precedent): the candidate input lacked the device label
+  // the settings screen shows ("To urządzenie" of each browser), so the
+  // optional `deviceLabel` joins additively; the subscription still binds
+  // to the RESOLVED actor (user, company, session), never to client
+  // assertions. Re-registering an existing endpoint is the browser's
+  // renewal path and refreshes keys in place.
   "attention.registerPushSubscription": operationEntry({
     kind: "operation",
     name: "attention.registerPushSubscription",
@@ -81,9 +88,22 @@ export const attentionOperations = {
       endpoint: Schema.NonEmptyString,
       p256dhKeyBase64: Schema.NonEmptyString,
       authKeyBase64: Schema.NonEmptyString,
+      deviceLabel: Schema.optionalKey(Schema.String),
     }),
     result: Schema.Struct({ pushSubscriptionId: tableIdSchema("pushSubscriptions") }),
     errorKinds: ["forbidden", "validation"],
+  }),
+  // F3 amendment (issue #43): removing this device's subscription. The
+  // screen offers enabling/removing THIS device; removal is idempotent and
+  // only ever touches the actor's OWN subscription row.
+  "attention.revokePushSubscription": operationEntry({
+    kind: "operation",
+    name: "attention.revokePushSubscription",
+    input: Schema.Struct({
+      pushSubscriptionId: tableIdSchema("pushSubscriptions"),
+    }),
+    result: Schema.Struct({ revoked: Schema.Literal("revoked") }),
+    errorKinds: ["forbidden", "not_found"],
   }),
   "attention.evaluateDueIntents": operationEntry({
     kind: "operation",

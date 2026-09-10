@@ -95,7 +95,7 @@ function memberLiterals(validator: GenericValidator, table: string): string[] {
 }
 
 describe("schema composition", () => {
-  it("composes exactly the closed table inventory (70 tables)", () => {
+  it("composes exactly the closed table inventory (72 tables)", () => {
     const composed = Object.keys(tables).sort();
     const inventory = [...TABLE_ID_NAMES].sort();
     expect(composed).toEqual(inventory);
@@ -109,9 +109,9 @@ describe("schema composition", () => {
     // long-audio STT fragment); 70 since the G3 amendment added
     // calendarSyncAttempts and calendarProofEvents (the sync attempt
     // ledger and the proof-only fake-Google event store); 71 since the
-    // E4 amendment added visionOrders (the multimodal-join vision
-    // extraction orders).
-    expect(composed).toHaveLength(71);
+    // E4 amendment added visionOrders; 73 since the F3 amendment added
+    // pushDeliveries and the proof-only pushProofDevices.
+    expect(composed).toHaveLength(73);
   });
 
   it("gives the domain event envelope a durable outbox home", () => {
@@ -449,7 +449,7 @@ describe("fragment vocabulary pins equal the contracts vocabularies", () => {
     }
 
     // The nested extension field-kind pin travels through the array element.
-    // (C3 amendment: definition FIELD kinds pin to DefinitionFieldKind — the
+    // (C3 amendment: definition FIELD kinds pin to DefinitionFieldKind - the
     // seven scalar kinds plus bounded lists; the value kind "object" stays in
     // ExtensionFieldKind but is not a legal field kind.)
     const fieldsField = fieldOf(

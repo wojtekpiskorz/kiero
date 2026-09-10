@@ -42,6 +42,9 @@ import { searchTables } from "./search/schema";
 import { readStateTables } from "./attention/read-state/schema";
 import { preferencesTables } from "./attention/preferences/schema";
 import { deliveryTables } from "./attention/delivery/schema";
+// F3 append (flagged shared-file change, the sibling pattern): the web
+// push transport fragment (per-device delivery rows).
+import { pushTables } from "./attention/push/schema";
 import { calendarConnectionTables } from "./calendar/connection/schema";
 import { calendarProjectionTables } from "./calendar/projection/schema";
 // G3 append (flagged shared-file change, the G1/G2 precedent): the sync
@@ -70,6 +73,7 @@ const fragments: ReadonlyArray<Record<string, TableDefinition>> = [
   readStateTables,
   preferencesTables,
   deliveryTables,
+  pushTables,
   calendarConnectionTables,
   calendarProjectionTables,
   calendarSyncTables,
@@ -129,6 +133,7 @@ export default defineSchema({
   ...readStateTables,
   ...preferencesTables,
   ...deliveryTables,
+  ...pushTables,
   ...calendarConnectionTables,
   ...calendarProjectionTables,
   ...calendarSyncTables,

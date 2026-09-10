@@ -89,8 +89,8 @@ describe("telemetry fragment tables", () => {
     // 55 at I2 integration (52 + 3); 61 after B1; 64 after B2; 65 after B4;
     // 66 after C4's workRevisions; 68 after D6's audioTranscripts/audioSegments;
     // 70 after G3's calendarSyncAttempts/calendarProofEvents; 71 after
-    // E4's visionOrders.
-    expect(TABLE_ID_NAMES).toHaveLength(71);
+    // E4's visionOrders; 73 after F3's pushDeliveries and pushProofDevices.
+    expect(TABLE_ID_NAMES).toHaveLength(73);
   });
 
   it("the table unions are pinned to the single model definitions", () => {

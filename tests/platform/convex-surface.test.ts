@@ -40,9 +40,14 @@ describe("convex executor composition", () => {
         // G3's sanctioned append (issue #47 owns the declared consumer
         // proof for the calendar.copyOutcomeRecorded edge).
         "calendar.reconcile_outcome",
+
         // E4's sanctioned append (issue #38 owns the multimodal join; the
         // contracts amendment registering the kind is flagged there).
         "processing.join_multimodal",
+        // F3's sanctioned append (issue #43 owns the web push transport:
+        // the declared consumer proof for the attention.intentDelivered
+        // edge).
+        "attention.deliver_push",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");

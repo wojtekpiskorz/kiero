@@ -12,19 +12,19 @@
  *
  * ROW SEMANTICS UNDER MULTI-EDGE FAN-OUT (the D5 decision, 2026-09-10): the
  * outbox row is the PUBLICATION RECORD, and the DRAIN owns its terminal
- * transition — `delivered` once every registered edge's reaction is
+ * transition - `delivered` once every registered edge's reaction is
  * registered. Per-reaction outcomes live on the `durableJobs` rows (state,
- * externalOutcome, attempts, finishedAtMs — the A3 round-2 outcome
+ * externalOutcome, attempts, finishedAtMs - the A3 round-2 outcome
  * carriers; H3 inspects those, not this row). No row waits `in_flight` for
  * a completing executor, because under fan-out one row cannot represent
  * several executors' outcomes. Executors whose projections carry the row's
- * dedup identity (echo, B3's cleanup) still flip their own row — those
+ * dedup identity (echo, B3's cleanup) still flip their own row - those
  * flips are idempotent writes on a row the drain already delivered. The
  * TERMINAL-failure path intentionally flips a delivered row to `failed`
  * as a loud per-reaction alert (the incident scan reads it); that is a
  * deliberate exception to drain-owned terminality, not an oversight. The
  * retryable-echo path may set a delivered row back to `pending`, after
- * which the drain re-runs, dedup-skips and re-delivers — bounded and
+ * which the drain re-runs, dedup-skips and re-delivers - bounded and
  * converging.
  *
  * An edge WITHOUT a projection fails LOUDLY: the row is marked failed with
@@ -182,7 +182,7 @@ function projectOneEdge(
   // transaction) already registered the job itself with the real actor
   // under the SAME dedup key, so this projection collapses onto that row.
   // AMPLIFICATION NOTE (for H3's incident scanning): the `memory.findingRevised`
-  // edge fires one durable walk per revision — including the cascade's own
+  // edge fires one durable walk per revision - including the cascade's own
   // markings, most of which no-op. Accepted for alpha volume; per-reaction
   // outcomes live on the durableJobs rows, and the walk is one bounded
   // indexed query per job.
@@ -215,7 +215,7 @@ function projectOneEdge(
         dedupKey: rowDedupKey,
       };
     }
-    // memory.findingRevised: the revalidation walk — registrations only
+    // memory.findingRevised: the revalidation walk - registrations only
     // when the revised basis became known again.
     return {
       kind: "job",
@@ -250,7 +250,7 @@ function projectOneEdge(
   }
   // G3 registration (issue #47 owns this declared consumer proof): a
   // recorded Calendar outcome change projects onto ONE bounded
-  // reconciliation of that copy — the durable observation that resolves
+  // reconciliation of that copy - the durable observation that resolves
   // unknown outcomes (never a blind retry; the executor's uncertain
   // failures re-block registration). The row's dedup identity is the
   // job's, so one outcome change registers one job.
@@ -265,7 +265,7 @@ function projectOneEdge(
   // F2 registration (issue #42 owns these edges' projections): the three
   // intent-source events project onto `attention.evaluate_due_intents`.
   // The dedup keys are derived from each event's SUBJECT (source,
-  // clarification, change set), never the outbox row — the acceptance row's
+  // clarification, change set), never the outbox row - the acceptance row's
   // key already carries the extract job, and a differently-keyed duplicate
   // event still collapses onto the same semantic intents. The
   // change-set-published payload carries no source id; the executor
@@ -307,6 +307,20 @@ function projectOneEdge(
         changeSetId: payload.changeSetId,
       },
       dedupKey: `attention.evaluate_due_intents:changeset:${String(payload.changeSetId)}`,
+    };
+  }
+  // F3 registration (issue #43 owns this declared consumer proof): every
+  // DELIVERED notification intent drains into the web-push transport.
+  // The dedup identity is the intent itself, so a replayed or
+  // differently-keyed duplicate event collapses onto the same per-device
+  // delivery rows (semantic intent plus subscription is the idempotency
+  // key; the executor's prepare re-reads everything at delivery time).
+  if (jobKind === "attention.deliver_push") {
+    return {
+      kind: "job",
+      jobKind,
+      input: { notificationIntentId: payload.notificationIntentId },
+      dedupKey: `attention.deliver_push:${String(payload.notificationIntentId)}`,
     };
   }
   return { kind: "unprojected_edge", jobKind };
