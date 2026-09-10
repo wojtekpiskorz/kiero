@@ -1,14 +1,31 @@
 /**
- * The outbox drain (A3): the bridge between published events and durable
- * consumer work.
+ * The outbox drain (A3; multi-edge row semantics decided by D5): the bridge
+ * between published events and durable consumer work.
  *
  * Drain runs as a scheduled internal mutation. For each pending outbox row
  * it looks up the registered consumer edges for that event name in the A2/A3
  * composed registry and registers the matching durable job (the reaction is
- * durable, never inline), then marks the row in_flight. A publisher that
- * already registered the work atomically in its own transaction (same dedup
- * key) is recognized and not double-registered. Events with no registered
- * consumer edge are marked delivered immediately (nothing awaits them).
+ * durable, never inline). A publisher that already registered the work
+ * atomically in its own transaction (same dedup key) is recognized and not
+ * double-registered. Events with no registered consumer edge are marked
+ * delivered immediately (nothing awaits them).
+ *
+ * ROW SEMANTICS UNDER MULTI-EDGE FAN-OUT (the D5 decision, 2026-09-10): the
+ * outbox row is the PUBLICATION RECORD, and the DRAIN owns its terminal
+ * transition — `delivered` once every registered edge's reaction is
+ * registered. Per-reaction outcomes live on the `durableJobs` rows (state,
+ * externalOutcome, attempts, finishedAtMs — the A3 round-2 outcome
+ * carriers; H3 inspects those, not this row). No row waits `in_flight` for
+ * a completing executor, because under fan-out one row cannot represent
+ * several executors' outcomes. Executors whose projections carry the row's
+ * dedup identity (echo, B3's cleanup) still flip their own row — those
+ * flips are idempotent writes on a row the drain already delivered. The
+ * TERMINAL-failure path intentionally flips a delivered row to `failed`
+ * as a loud per-reaction alert (the incident scan reads it); that is a
+ * deliberate exception to drain-owned terminality, not an oversight. The
+ * retryable-echo path may set a delivered row back to `pending`, after
+ * which the drain re-runs, dedup-skips and re-delivers — bounded and
+ * converging.
  *
  * An edge WITHOUT a projection fails LOUDLY: the row is marked failed with
  * `lastErrorKind: "consumer_projection_missing"` and the drain keeps
@@ -29,7 +46,9 @@ import { registerDurableJob } from "./publish";
 
 const BATCH_SIZE = 10;
 
-/** The three-way outcome of projecting one event onto its consumer edge. */
+/**
+ * The three-way outcome of projecting one event onto one consumer edge.
+ */
 export type EventProjection =
   | {
       readonly kind: "job";
@@ -43,26 +62,17 @@ export type EventProjection =
 /** Error kind recorded on rows whose consumer edge has no projection yet. */
 export const CONSUMER_PROJECTION_MISSING = "consumer_projection_missing";
 
-/**
- * Projects one event payload onto its registered consumer edge (a single
- * registry scan per call). The mechanically projectable edges in this
- * window are handled; every other registered edge reports itself as
- * `unprojected_edge` so the drain can fail it LOUDLY: its owning lane has
- * not registered a payload projection yet.
- */
-export function projectEventToJobInput(
+/** Projects one event payload onto ONE registered consumer edge. */
+function projectOneEdge(
   eventName: string,
+  jobKind: DurableJobKind,
   payload: Record<string, unknown>,
   rowDedupKey: string,
 ): EventProjection {
-  const edge = eventConsumers.find((consumer) => consumer.eventName === eventName);
-  if (edge === undefined) {
-    return { kind: "no_consumer" };
-  }
-  if (edge.jobKind === "processing.analyze_change_plan") {
+  if (jobKind === "processing.analyze_change_plan") {
     return {
       kind: "job",
-      jobKind: edge.jobKind,
+      jobKind,
       input: {
         sourceId: payload.sourceId,
         processingRunId: payload.newRunId,
@@ -77,10 +87,10 @@ export function projectEventToJobInput(
   // key), so the projection hands `null` and the executor resolves the
   // source's text extraction in-company; the registration collapses onto
   // the publisher's row through the shared dedup identity.
-  if (edge.jobKind === "processing.extract_fragments") {
+  if (jobKind === "processing.extract_fragments") {
     return {
       kind: "job",
-      jobKind: edge.jobKind,
+      jobKind,
       input: {
         sourceId: payload.sourceId,
         extractionId: payload.extractionId ?? null,
@@ -95,11 +105,11 @@ export function projectEventToJobInput(
   // executor. The row's dedup identity is also the job's, so a publisher
   // that already registered the cleanup atomically (revocation transaction,
   // convex/access/membership/operations.ts) collapses onto that row here.
-  if (edge.jobKind === "access.cleanup_revocation") {
+  if (jobKind === "access.cleanup_revocation") {
     if (eventName === "access.membershipRevoked") {
       return {
         kind: "job",
-        jobKind: edge.jobKind,
+        jobKind,
         input: {
           kind: "membership",
           membershipId: payload.membershipId,
@@ -111,8 +121,18 @@ export function projectEventToJobInput(
     }
     return {
       kind: "job",
-      jobKind: edge.jobKind,
+      jobKind,
       input: { kind: "session", membershipId: null, sessionId: payload.sessionId },
+      dedupKey: rowDedupKey,
+    };
+  }
+  if (jobKind === "platform.echo_delivery") {
+    // The outbox row's dedup identity anchors the delivery job; the payload
+    // itself carries only the message.
+    return {
+      kind: "job",
+      jobKind,
+      input: { dedupKey: rowDedupKey, message: payload.message },
       dedupKey: rowDedupKey,
     };
   }
@@ -121,11 +141,16 @@ export function projectEventToJobInput(
   // The withdrawal payload carries its reason; the publisher (the withdrawal
   // transaction) already registered the job itself with the real actor
   // under the SAME dedup key, so this projection collapses onto that row.
-  if (edge.jobKind === "memory.recompute_dependents") {
+  // AMPLIFICATION NOTE (for H3's incident scanning): the `memory.findingRevised`
+  // edge fires one durable walk per revision — including the cascade's own
+  // markings, most of which no-op. Accepted for alpha volume; per-reaction
+  // outcomes live on the durableJobs rows, and the walk is one bounded
+  // indexed query per job.
+  if (jobKind === "memory.recompute_dependents") {
     if (eventName === "sources.sourceWithdrawn") {
       return {
         kind: "job",
-        jobKind: edge.jobKind,
+        jobKind,
         input: {
           rootFindingId: null,
           sourceId: payload.sourceId,
@@ -139,7 +164,7 @@ export function projectEventToJobInput(
     if (eventName === "memory.dependentsMarkedStale") {
       return {
         kind: "job",
-        jobKind: edge.jobKind,
+        jobKind,
         input: {
           rootFindingId: payload.rootFindingId,
           sourceId: null,
@@ -154,7 +179,7 @@ export function projectEventToJobInput(
     // when the revised basis became known again.
     return {
       kind: "job",
-      jobKind: edge.jobKind,
+      jobKind,
       input: {
         rootFindingId: payload.findingId,
         sourceId: null,
@@ -165,17 +190,43 @@ export function projectEventToJobInput(
       dedupKey: rowDedupKey,
     };
   }
-  if (edge.jobKind === "platform.echo_delivery") {
-    // The outbox row's dedup identity anchors the delivery job; the payload
-    // itself carries only the message.
+  // D5 registration (issue #33 owns the declared consumer proof): the
+  // accepted-source payload projects onto `processing.normalize_photo`
+  // (architecture protocol step 4: normalize accepted photos before ordinary
+  // vision). The dedup key is derived from the PAYLOAD's source id, NOT the
+  // row's dedup identity: the acceptance transaction already registered the
+  // extract job under the row's key, and one dedup key may never carry two
+  // job kinds.
+  if (jobKind === "processing.normalize_photo") {
     return {
       kind: "job",
-      jobKind: edge.jobKind,
-      input: { dedupKey: rowDedupKey, message: payload.message },
-      dedupKey: rowDedupKey,
+      jobKind,
+      input: { sourceId: payload.sourceId, attachmentIds: payload.attachmentIds ?? [] },
+      dedupKey: `processing.normalize_photo:${String(payload.sourceId)}`,
     };
   }
-  return { kind: "unprojected_edge", jobKind: edge.jobKind };
+  return { kind: "unprojected_edge", jobKind };
+}
+
+/**
+ * Projects one event payload onto EVERY registered consumer edge of that
+ * event (one projection per edge; events without edges report themselves as
+ * `no_consumer`). D5 amendment: an event may now carry SEVERAL consumer
+ * edges (`sources.sourceAccepted` fans out to both extract and normalize);
+ * the drain registers each edge's durable reaction independently. Edges
+ * whose owning lane has not registered a projection yet still report
+ * themselves as `unprojected_edge` so the drain can fail them LOUDLY.
+ */
+export function projectEventToJobInputs(
+  eventName: string,
+  payload: Record<string, unknown>,
+  rowDedupKey: string,
+): EventProjection[] {
+  const edges = eventConsumers.filter((consumer) => consumer.eventName === eventName);
+  if (edges.length === 0) {
+    return [{ kind: "no_consumer" }];
+  }
+  return edges.map((edge) => projectOneEdge(eventName, edge.jobKind, payload, rowDedupKey));
 }
 
 /** Processes one batch of pending outbox rows. */
@@ -189,35 +240,49 @@ export async function drainBatch(ctx: MutationCtx): Promise<void> {
     .take(BATCH_SIZE);
   for (const row of pending) {
     const dedupKey = row.dedupKey ?? row.eventId;
-    const projection = projectEventToJobInput(
+    const projections = projectEventToJobInputs(
       row.eventName,
       decodePayload(row.envelopeJson),
       dedupKey,
     );
-    if (projection.kind === "job") {
-      await registerDurableJob(ctx, {
-        kind: projection.jobKind,
-        input: projection.input,
-        companyId: row.companyId,
-        policy: { maxAttempts: 3, backoffBaseMs: 2_000 },
-        jobKey: newDurableJobKey(),
-        ...(projection.dedupKey === undefined ? {} : { dedupKey: projection.dedupKey }),
-      });
-      // in_flight: the durable reaction is registered (or was already); the
-      // completing executor flips the row to delivered/failed.
-      await ctx.db.patch(row._id, { deliveryState: "in_flight" });
+    let registeredAny = false;
+    let sawConsumerEdge = false;
+    for (const projection of projections) {
+      if (projection.kind === "job") {
+        await registerDurableJob(ctx, {
+          kind: projection.jobKind,
+          input: projection.input,
+          companyId: row.companyId,
+          policy: { maxAttempts: 3, backoffBaseMs: 2_000 },
+          jobKey: newDurableJobKey(),
+          ...(projection.dedupKey === undefined ? {} : { dedupKey: projection.dedupKey }),
+        });
+        registeredAny = true;
+        sawConsumerEdge = true;
+        continue;
+      }
+      if (projection.kind === "unprojected_edge") {
+        // A registered edge without a projection: loud, per-edge, and the
+        // drain keeps going (the OTHER edges' reactions still register).
+        sawConsumerEdge = true;
+        console.error(
+          `outbox drain: consumer projection missing for ${row.eventName} -> ${projection.jobKind} (row ${row.eventId})`,
+        );
+      }
+    }
+    if (registeredAny) {
+      // The publication record is terminal: every registered edge's durable
+      // reaction is registered (per-reaction outcomes live on the job rows).
+      await ctx.db.patch(row._id, { deliveryState: "delivered" });
       continue;
     }
-    if (projection.kind === "no_consumer") {
+    if (!sawConsumerEdge) {
       // No registered edge awaits this event; publication is complete.
       await ctx.db.patch(row._id, { deliveryState: "delivered" });
       continue;
     }
-    // A registered edge without a projection: fail the row LOUDLY and keep
-    // draining. The error kind is machine-readable on the row.
-    console.error(
-      `outbox drain: consumer projection missing for ${row.eventName} -> ${projection.jobKind} (row ${row.eventId})`,
-    );
+    // Registered edges exist but NONE has a projection: fail the row LOUDLY.
+    // The error kind is machine-readable on the row.
     await ctx.db.patch(row._id, {
       deliveryState: "failed",
       lastErrorKind: CONSUMER_PROJECTION_MISSING,

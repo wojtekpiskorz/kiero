@@ -47,19 +47,31 @@ function newId(): string {
   return `k${counter}${"t".repeat(19)}`;
 }
 
+/**
+ * One accumulated index condition. (D5 append: `lte` with range semantics —
+ * the outbox drain's by_delivery range query needs it; equality-only could
+ * not express "pending with nextAttemptAtMs <= now".)
+ */
 interface IndexBuilder {
   eq(field: string, value: unknown): IndexBuilder;
+  lte(field: string, value: unknown): IndexBuilder;
 }
 
+type IndexCondition = { readonly field: string; readonly op: "eq" | "lte"; readonly value: unknown };
+
 class FakeQuery {
-  private conditions: [string, unknown][] = [];
+  private conditions: IndexCondition[] = [];
 
   constructor(private readonly rows: Row[]) {}
 
   withIndex(_name: string, fn: (q: IndexBuilder) => IndexBuilder): FakeQuery {
     const builder: IndexBuilder = {
       eq: (field: string, value: unknown): IndexBuilder => {
-        this.conditions.push([field, value]);
+        this.conditions.push({ field, op: "eq", value });
+        return builder;
+      },
+      lte: (field: string, value: unknown): IndexBuilder => {
+        this.conditions.push({ field, op: "lte", value });
         return builder;
       },
     };
@@ -84,9 +96,26 @@ class FakeQuery {
     return this.filtered();
   }
 
+  /** The take() Convex offers for bounded scans. */
+  async take(limit: number): Promise<Row[]> {
+    return this.filtered().slice(0, limit);
+  }
+
   private filtered(): Row[] {
     return this.rows.filter((row) =>
-      this.conditions.every(([field, value]) => row[field] === value),
+      this.conditions.every(({ field, op, value }) => {
+        if (op === "eq") {
+          return row[field] === value;
+        }
+        const current = row[field];
+        // lte over the number/string fields the ledger's range queries use.
+        return (
+          current !== undefined &&
+          typeof current === typeof value &&
+          (typeof current === "number" || typeof current === "string") &&
+          current <= (value as typeof current)
+        );
+      }),
     );
   }
 }
@@ -164,6 +193,22 @@ export class FakeDb {
       throw new Error(`unknown table ${table}`);
     }
     return rows;
+  }
+
+  /**
+   * `delete(id)` locates the row across tables like `get` and removes it.
+   * (D5 append: the images ledger's record step deletes the in-progress
+   * `processing` representation row once its successor exists.)
+   */
+  async delete(id: string): Promise<void> {
+    for (const rows of this.tables.values()) {
+      const index = rows.findIndex((row) => row._id === id);
+      if (index !== -1) {
+        rows.splice(index, 1);
+        return;
+      }
+    }
+    throw new Error(`delete: no row ${id}`);
   }
 }
 

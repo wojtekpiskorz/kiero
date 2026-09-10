@@ -22,6 +22,7 @@ export assembly). Configuration skeletons:
 | `R2_MEDIA_ACCESS_KEY_ID` | Access key id of the R2 API token scoped to the MEDIA bucket only | per-bucket R2 API token from the Cloudflare dashboard (R2 > Manage API Tokens); value delivered to the Container runtime env by its owning deploy flow | PENDING (D5/D6) |
 | `R2_MEDIA_SECRET_ACCESS_KEY` | Secret access key paired with the id above | same token, same delivery | PENDING (D5/D6) |
 | `AXIOM_API_TOKEN` | Redacted diagnostics ingestion | worker/container deploy flow (same value family as gateway) | PENDING (I2) |
+| `MEDIA_SEGMENT_TOKEN` | Bearer credential Convex's workflow actions present to the media executor's `/probe` and `/segment` routes (D6); the matching reader value lives on the Convex deployment as `KIERO_MEDIA_WORKER_TOKEN` | `wrangler secret put` on the media worker; forwarded into the container env by the `MediaWorkerContainer` class | SET on dev (D6 live proof; value never in the repo) |
 
 ## Notes
 

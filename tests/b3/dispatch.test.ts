@@ -30,7 +30,7 @@ import {
 } from "@kiero/runtime";
 import { membershipHandlers, } from "../../convex/access/membership/dispatch";
 import { membershipLanePolicy } from "../../convex/access/membership/policy";
-import { projectEventToJobInput } from "../../convex/platform/outbox";
+import { projectEventToJobInputs } from "../../convex/platform/outbox";
 import { membershipTables } from "../../convex/access/membership/schema";
 
 function contextFixture(role: "admin" | "member"): RequestContext {
@@ -260,7 +260,7 @@ describe("the declared consumer edge (access revocation drains durably)", () => 
   const sessionId = parseTableId("sessions", "s1");
 
   it("projects access.membershipRevoked onto the cleanup job with the successor-policy payload", () => {
-    const projection = projectEventToJobInput(
+    const [projection] = projectEventToJobInputs(
       "access.membershipRevoked",
       { membershipId, userId, revokedAtMs: 123, successorUserId: null },
       "dedup-1",
@@ -280,7 +280,7 @@ describe("the declared consumer edge (access revocation drains durably)", () => 
   });
 
   it("projects access.sessionRevoked onto the session-kind cleanup job (no timestamp in B1's payload)", () => {
-    const projection = projectEventToJobInput(
+    const [projection] = projectEventToJobInputs(
       "access.sessionRevoked",
       { sessionId },
       "dedup-2",
@@ -299,12 +299,14 @@ describe("the declared consumer edge (access revocation drains durably)", () => 
   });
 
   it("leaves events without a registered edge undelivered by consumers", () => {
-    // E3 owns the sources.sourceAccepted projection; C5 (issue #28) now
-    // owns the three recomputation-edge projections. The still-unprojected
-    // example is the permanent-deletion seam (I4's lane).
-    expect(projectEventToJobInput("sources.sourcePurged", { sourceId: "s1" }, "d")).toEqual({
-      kind: "unprojected_edge",
-      jobKind: "deletion.purge_source",
-    });
+    // E3 owns the extract projection and D5 the normalize projection;
+    // both edges fan out from sources.sourceAccepted. C5 (issue #28) now
+    // owns the three recomputation-edge projections, so the still-
+    // unprojected example is the permanent-deletion seam (I4's lane).
+    const projections = projectEventToJobInputs("sources.sourceAccepted", {}, "d");
+    expect(projections.map((projection) => projection.kind)).toEqual(["job", "job"]);
+    expect(projectEventToJobInputs("sources.sourcePurged", { sourceId: "s1" }, "d")).toEqual([
+      { kind: "unprojected_edge", jobKind: "deletion.purge_source" },
+    ]);
   });
 });

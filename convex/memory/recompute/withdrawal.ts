@@ -21,9 +21,12 @@
  *   reaction can never be lost, and a replay never double-registers.
  *
  * The marking of affected findings does NOT run inline: the registered
- * executor (./executor.ts) calls C2's `performWithdrawalMarking` in its own
- * transaction — marking follows withdrawal, never ahead of it (C2's rule),
- * and the whole reaction is durable, retryable and inspectable.
+ * executor (./executor.ts) performs the witness-based marking in its own
+ * transaction — the same pure decision C2's `performWithdrawalMarking`
+ * runs, taken tenant+actor directly so the deferred reaction cannot die on
+ * live-session availability (review round 1, MAJOR 2). Marking follows
+ * withdrawal, never ahead of it (C2's rule), and the whole reaction is
+ * durable, retryable and inspectable.
  */
 
 import { Schema } from "effect";

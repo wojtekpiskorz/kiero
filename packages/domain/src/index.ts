@@ -27,3 +27,7 @@ export * from "../extensions/index";
 // packages/domain/provenance/** (dependency traversal, updating-until-
 // revalidated state, bounded recomputation grouping).
 export * from "../provenance/index";
+
+// G2 coordinated addition (flagged, the same one-line pattern): the
+// calendar projection domain owns its rules in packages/domain/calendar/**.
+export * from "../calendar/index";

@@ -17,7 +17,7 @@ import {
   parseTableId,
   recomputeDependentsInput,
 } from "@kiero/contracts";
-import { projectEventToJobInput } from "../../convex/platform/outbox";
+import { projectEventToJobInputs } from "../../convex/platform/outbox";
 import { jobExecutors } from "../../convex/platform/executors";
 import { sourcesHandlers } from "../../convex/sources/accept/dispatch";
 import { recomputeDependentsExecutor } from "../../convex/memory/recompute/executor";
@@ -37,7 +37,7 @@ describe("the executor composition (one implementation per registered kind)", ()
 
 describe("the three declared consumer edges drain into recomputation", () => {
   it("projects sources.sourceWithdrawn onto the source_withdrawn job with the reason", () => {
-    const projection = projectEventToJobInput(
+    const [projection] = projectEventToJobInputs(
       "sources.sourceWithdrawn",
       { sourceId, reason: "wysłane przez pomyłkę" },
       "dedup-w",
@@ -62,7 +62,7 @@ describe("the three declared consumer edges drain into recomputation", () => {
   });
 
   it("projects memory.dependentsMarkedStale onto the cascade carrier job", () => {
-    const projection = projectEventToJobInput(
+    const [projection] = projectEventToJobInputs(
       "memory.dependentsMarkedStale",
       { rootFindingId: findingId, dependentFindingIds: [findingId], withdrawnByUserId: userId },
       "dedup-s",
@@ -87,7 +87,7 @@ describe("the three declared consumer edges drain into recomputation", () => {
   });
 
   it("projects memory.findingRevised onto the revalidation walk job", () => {
-    const projection = projectEventToJobInput(
+    const [projection] = projectEventToJobInputs(
       "memory.findingRevised",
       { findingId, revisionId: parseTableId("findingRevisions", "r1"), supersedesRevisionId: null },
       "dedup-r",
