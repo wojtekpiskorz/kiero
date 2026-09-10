@@ -40,25 +40,33 @@
 import {
   createElement,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ChangeEvent,
   type ReactNode,
 } from "react";
 import { Schema } from "effect";
-import { ConvexAuthProvider, useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery_experimental as useQueryState } from "convex/react";
-import { Link } from "@tanstack/react-router";
 import { parseTableId, sourcesOperations } from "@kiero/contracts";
 import { api } from "../../../../../convex/_generated/api";
-import { useAppServices } from "../../app/providers";
-import { createConvexClient } from "../sign-in/client";
-import { AuthenticatedGate } from "../sign-in/SignInGate";
-import type { MembershipOverview } from "../../../../../convex/access/membership/functions";
 import type { MemberView } from "../../../../../convex/access/membership/functions";
 import { ConversationPage, SourceConversationRow } from "../../../../../convex/sources/read/rows";
 import type { SourceConversationRow as SourceConversationRowType } from "../../../../../convex/sources/read/rows";
+import {
+  CompanyFeatureGate,
+  SessionEnded,
+  envelopeOf,
+  type MemberOverview,
+  type Notice,
+  type SubmitEvent,
+} from "../company/CompanyGate";
+import { asConvexId } from "../company/convex-ids";
+import {
+  PROJECT_PARAM,
+  SOURCE_PARAM,
+  searchParam,
+  writeScopeParam,
+} from "../company/route-params";
 import {
   ReadStateProjection,
   conversationCopy as copy,
@@ -68,7 +76,6 @@ import {
   justSentNotice,
   lifecycleLabels,
   processingStateLabels,
-  signInCopy,
 } from "./state";
 
 /** How many rows one page of the conversation view requests. */
@@ -76,22 +83,6 @@ const PAGE_SIZE = 30;
 
 /** The growth cap (four pages): the unread projection stays bounded. */
 const MAX_PAGE_SIZE = 120;
-
-/** One command envelope (the checked dispatch input shape). */
-function envelopeOf(operation: string, input: unknown) {
-  return { operation, input, expectedRevisions: [] };
-}
-
-/** The submit-event surface the handlers consume (preventDefault only). */
-interface SubmitEvent {
-  preventDefault(): void;
-}
-
-/** The result notice every surface shows (server Polish copy or a hint). */
-interface Notice {
-  readonly kind: "ok" | "error";
-  readonly text: string;
-}
 
 /**
  * A fresh idempotency key per logical message (regenerated after success).
@@ -116,103 +107,16 @@ function freshKey(): string {
 const prepareUploadResult = sourcesOperations["sources.prepareUpload"].result;
 const acceptSourceResult = sourcesOperations["sources.acceptSource"].result;
 
-/** The query-param deep-link keys (stable route contract for F3/G2/UX). */
-const PROJECT_PARAM = "projekt";
-const SOURCE_PARAM = "zrodlo";
-
-/** Reads one string search param (the last value wins). */
-function searchParam(name: string): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const value = new URLSearchParams(window.location.search).get(name);
-  return value === null || value.length === 0 ? null : value;
-}
-
-/** Keeps the URL in step with the selected scope (deep-linkable). */
-function writeScopeParam(projectId: string | null): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-  const url = new URL(window.location.href);
-  if (projectId === null) {
-    url.searchParams.delete(PROJECT_PARAM);
-  } else {
-    url.searchParams.set(PROJECT_PARAM, projectId);
-  }
-  window.history.pushState({}, "", url);
-}
-
 // ---------------------------------------------------------------------------
-// Root: connection gate + auth provider
+// Root: the shared company-feature gate around this surface
 // ---------------------------------------------------------------------------
 
 /** The feature root: mounted by the host entry at "/" (conversation.company). */
 export function ConversationFeature(): ReactNode {
-  const { config } = useAppServices();
-  if (config.connection.state === "unconfigured") {
-    return createElement("section", null, createElement("h1", null, copy.title), createElement("p", null, copy.connectionUnconfigured));
-  }
-  if (config.connection.state === "misconfigured") {
-    return createElement("section", null, createElement("h1", null, copy.title), createElement("p", null, copy.connectionMisconfigured));
-  }
-  return createElement(ConvexConnectedRoot, { convexUrl: config.connection.convexUrl });
-}
-
-function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): ReactNode {
-  const client = useMemo(() => createConvexClient(convexUrl), [convexUrl]);
-  return createElement(ConvexAuthProvider, {
-    client,
-    children: createElement(ConversationGate),
+  return createElement(CompanyFeatureGate, {
+    title: copy.title,
+    member: (overview: MemberOverview) => createElement(ConversationMain, { overview }),
   });
-}
-
-/** Authentication gate: B1's shared sign-in walk; members continue here. */
-function ConversationGate(): ReactNode {
-  return createElement(AuthenticatedGate, { continuation: () => createElement(ConversationSurface) });
-}
-
-// ---------------------------------------------------------------------------
-// The surface: membership gate, then the conversation
-// ---------------------------------------------------------------------------
-
-function ConversationSurface(): ReactNode {
-  const overview = useQueryState({
-    query: api.access.membership.functions.membershipOverview,
-    args: {},
-  });
-
-  if (overview.status === "error") {
-    return createElement(SessionEnded);
-  }
-  if (overview.status !== "success") {
-    return createElement("p", { role: "status" }, copy.checkingSession);
-  }
-  if (overview.data.state === "no_company") {
-    return createElement(
-      "section",
-      null,
-      createElement("h1", null, copy.title),
-      createElement("h2", null, copy.noCompanyHeading),
-      createElement("p", null, copy.noCompanyIntro),
-      createElement("p", null, createElement(Link, { to: "/firma" }, copy.noCompanyLink)),
-    );
-  }
-  return createElement(ConversationMain, { overview: overview.data });
-}
-
-function SessionEnded(): ReactNode {
-  const { signOut } = useAuthActions();
-  return createElement(
-    "div",
-    { role: "alert" },
-    createElement("p", null, signInCopy.sessionEndedNotice),
-    createElement(
-      "button",
-      { type: "button", onClick: () => void signOut() },
-      signInCopy.signInAgain,
-    ),
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +126,7 @@ function SessionEnded(): ReactNode {
 function ConversationMain({
   overview,
 }: {
-  readonly overview: Extract<MembershipOverview, { state: "member" }>;
+  readonly overview: MemberOverview;
 }): ReactNode {
   const projects = useQueryState({ query: api.projects.functions.projectsOverview, args: {} });
 
@@ -270,9 +174,9 @@ function ConversationMain({
 
   // Two typed subscriptions, one active: the company history or the
   // project projection of the same entries ("skip" unsubscribes the idle
-  // one). Rows decode through D1's own page schema at the untrusted
-  // boundary, so a drift in the view's shape fails here instead of
-  // rendering undefined.
+  // one). Both queries return the same wire shape, so the active one
+  // decodes ONCE through D1's own page schema at the untrusted boundary —
+  // a drift in the view's shape fails here instead of rendering undefined.
   const scopeBrand = knownProject === null ? null : parseTableId("projects", knownProject);
   const companyConversation = useQueryState({
     query: api.sources.read.views.companyConversation,
@@ -289,29 +193,19 @@ function ConversationMain({
         : {
             // parseTableId brands the contract's table-id form; the query
             // wants the generated Id form of the SAME value.
-            projectId: scopeBrand as unknown as import(
-              "../../../../../convex/_generated/dataModel"
-            ).Id<"projects">,
+            projectId: asConvexId("projects", scopeBrand),
             paginationOpts: { numItems: pageSize, cursor: null },
           },
   });
   const conversation =
     scopeBrand === null ? companyConversation : projectConversation;
 
-  const companyPage =
-    companyConversation.status === "success" && companyConversation.data._tag === "ok"
-      ? Schema.decodeUnknownSync(ConversationPage)(companyConversation.data.value)
+  const page =
+    conversation.status === "success" && conversation.data._tag === "ok"
+      ? Schema.decodeUnknownSync(ConversationPage)(conversation.data.value)
       : null;
-  const projectPage =
-    projectConversation.status === "success" && projectConversation.data._tag === "ok"
-      ? Schema.decodeUnknownSync(ConversationPage)(projectConversation.data.value)
-      : null;
-  const rows: readonly SourceConversationRowType[] =
-    scopeBrand === null
-      ? companyPage?.page ?? []
-      : projectPage?.page ?? [];
-  const isDone =
-    scopeBrand === null ? companyPage?.isDone ?? true : projectPage?.isDone ?? true;
+  const rows: readonly SourceConversationRowType[] = page?.page ?? [];
+  const isDone = page?.isDone ?? true;
   const sentRow = sentSourceId === null ? null : rows.find((row) => row.sourceId === sentSourceId) ?? null;
   // A deep-linked source below the loaded page stays invisible without this:
   // the notice names why "load older" matters (the canonical URL must open
@@ -326,13 +220,8 @@ function ConversationMain({
     query: api.attention.read_state.queries.readStateForSources,
     args: {
       // The row ids ARE sources-table ids (decoded from D1's own row
-      // schema); this converts between the two brandings of one value.
-      sourceIds: rows
-        .map(
-          (row) =>
-            row.sourceId as unknown as import("../../../../../convex/_generated/dataModel").Id<"sources">,
-        )
-        .slice(0, 256),
+      // schema); asConvexId converts between the two brandings of one value.
+      sourceIds: rows.map((row) => asConvexId("sources", row.sourceId)).slice(0, 256),
     },
   });
   const readBySource = new Map<string, boolean>();
@@ -748,9 +637,9 @@ function SourceDetailPanel({
   const detail = useQueryState({
     query: api.sources.read.views.sourceDetail,
     args: {
-      // The id comes from a decoded D1 row of the same table; this converts
-      // between the two brandings of one value.
-      sourceId: sourceId as unknown as import("../../../../../convex/_generated/dataModel").Id<"sources">,
+      // The id comes from a decoded D1 row of the same table; asConvexId
+      // converts between the two brandings of one value.
+      sourceId: asConvexId("sources", sourceId),
     },
   });
   const markRead = useMutation(api.attention.read_state.commands.markSourceReadCommand);
@@ -766,7 +655,7 @@ function SourceDetailPanel({
     markedFor.current = sourceId;
     void markRead({
       envelope: envelopeOf("attention.markSourceRead", {
-        sourceId: sourceId as unknown as import("../../../../../convex/_generated/dataModel").Id<"sources">,
+        sourceId: asConvexId("sources", sourceId),
         read: true,
       }),
     })

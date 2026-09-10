@@ -136,19 +136,6 @@ const isErr = (r, kind, code) =>
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Polls a run to a terminal state (bounded wait). */
-async function waitForRun(runId, timeoutMs = 900_000, sessionId) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const state = await analysisState(runId, sessionId);
-    if (state._tag === "ok" && state.value.run.state !== "running") {
-      return state.value;
-    }
-    await sleep(2_000);
-  }
-  throw new Error(`run ${runId} did not finish within ${timeoutMs}ms`);
-}
-
 /** Restarts a failed run's workflow from a named stage (guarded probe). */
 async function restartRun(runId, from, sessionId) {
   const state = await analysisState(runId, sessionId);

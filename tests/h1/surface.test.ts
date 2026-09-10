@@ -6,8 +6,9 @@
  * - the mount/composition seam: the conversation entry (H1's replacement of
  *   J1's core-text mount, same proved send commands + F1 read marking) and
  *   the new memory route, both validated through the real host registry;
- * - view-projection consistency: one mixed source decodes identically as a
- *   company row and a project row (one source id, one author, no copy);
+ * - view-projection consistency: a firm-knowledge row and a mixed
+ *   project-linked row decode through the one row schema both views share
+ *   (one source id, one author, no copy);
  * - unread wiring: the F1 projection decodes at the boundary and absence of
  *   an entry means unread (the badge rule);
  * - correction history visibility: the H1-flagged history read's contract
@@ -35,10 +36,12 @@ import { projectReadState } from "../../convex/attention/read_state/state";
 import {
   ReadStateProjection,
   correctionPrefill,
+} from "../../apps/web/src/features/conversation/state";
+import {
   isSettledKnowledgeState,
   knowledgeStateLabel,
   memoryCopy,
-} from "../../apps/web/src/features/conversation/state";
+} from "../../apps/web/src/features/memory/state";
 import { appFeatures } from "../../apps/web/src/app/app-features";
 import { conversationFeatureEntry } from "../../apps/web/src/app/features/conversation/entry";
 import { memoryFeatureEntry } from "../../apps/web/src/app/features/memory/entry";
@@ -46,6 +49,8 @@ import { memoryFeatureEntry } from "../../apps/web/src/app/features/memory/entry
 /** Representative table ids (the wire pattern the reads carry). */
 const SOURCE_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f";
 const AUTHOR_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2u";
+const FIRM_SOURCE_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2m";
+const FIRM_AUTHOR_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2w";
 const PROJECT_1 = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2p";
 const PROJECT_2 = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2q";
 const REVISION_ID_1 = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2r";
@@ -65,6 +70,23 @@ const mixedSourceWire = {
   lifecycle: "active",
   processingState: "processed",
   projectIds: [PROJECT_1, PROJECT_2],
+};
+
+/**
+ * One firm-knowledge source: a DIFFERENT author, text, send time and no
+ * project links (wiedza ogólna firmy) — a row only the company view lists
+ * but the SAME schema decodes.
+ */
+const firmKnowledgeWire = {
+  sourceId: FIRM_SOURCE_ID,
+  authorUserId: FIRM_AUTHOR_ID,
+  authorText: "Zmieniamy dostawcę płytek na cały sezon: od października dowozi Kaczmarek.",
+  sentAtMs: Date.parse("2026-09-08T15:00:00.000Z"),
+  sentAtTimezone: "Europe/Warsaw",
+  fullyAcceptedAtMs: Date.parse("2026-09-08T15:00:02.000Z"),
+  lifecycle: "active",
+  processingState: "processed",
+  projectIds: [] as const,
 };
 
 describe("the H1 mounts (conversation replacement + memory route)", () => {
@@ -105,20 +127,31 @@ describe("the H1 mounts (conversation replacement + memory route)", () => {
 });
 
 describe("one mixed source appears consistently in both scopes", () => {
-  it("decodes the same row identically as a company row and a project row", () => {
-    // The projection rule: BOTH views decode through the ONE row schema, so
-    // the mixed source keeps a single source id, one author and one
-    // original text wherever it is read. The project view is the same row,
-    // narrowed by the link — never a copy.
-    const companyRow = Schema.decodeUnknownSync(SourceConversationRow)(mixedSourceWire);
+  it("decodes a firm-knowledge row and a project-linked row through the one row schema both views share", () => {
+    // The projection rule: BOTH views decode through the ONE row schema,
+    // whichever row each one lists. The company view also carries
+    // firm-knowledge rows (no project links, wiedza ogólna firmy); the
+    // project view carries the same mixed row narrowed by the link — never
+    // a copy. Two meaningfully different fixtures pin that the schema
+    // serves both views without a scope-dependent shape.
+    const companyRow = Schema.decodeUnknownSync(SourceConversationRow)(firmKnowledgeWire);
     const projectRow = Schema.decodeUnknownSync(SourceConversationRow)(mixedSourceWire);
-    expect(companyRow).toEqual(projectRow);
-    expect(companyRow.projectIds).toHaveLength(2);
-    expect(companyRow.sourceId).toBe(projectRow.sourceId);
-    expect(companyRow.authorText).toBe(projectRow.authorText);
+    expect(companyRow.sourceId).toBe(FIRM_SOURCE_ID);
+    expect(companyRow.authorUserId).toBe(FIRM_AUTHOR_ID);
+    expect(companyRow.authorText).toBe(firmKnowledgeWire.authorText);
+    expect(companyRow.projectIds).toHaveLength(0);
+    expect(projectRow.sourceId).toBe(SOURCE_ID);
+    expect(projectRow.authorUserId).toBe(AUTHOR_ID);
+    expect(projectRow.projectIds).toEqual([PROJECT_1, PROJECT_2]);
+    // The two rows stay themselves: different source ids, authors, texts
+    // and link counts through the SAME schema.
+    expect(companyRow.sourceId).not.toBe(projectRow.sourceId);
+    expect(companyRow.authorUserId).not.toBe(projectRow.authorUserId);
+    expect(companyRow.authorText).not.toBe(projectRow.authorText);
+    expect(companyRow.projectIds).not.toEqual(projectRow.projectIds);
 
     const companyPage = Schema.decodeUnknownSync(ConversationPage)({
-      page: [mixedSourceWire],
+      page: [firmKnowledgeWire],
       isDone: true,
       continueCursor: "",
     });
@@ -127,7 +160,9 @@ describe("one mixed source appears consistently in both scopes", () => {
       isDone: false,
       continueCursor: "cursor",
     });
-    expect(companyPage.page[0]?.sourceId).toBe(projectPage.page[0]?.sourceId);
+    expect(companyPage.page[0]?.sourceId).toBe(FIRM_SOURCE_ID);
+    expect(projectPage.page[0]?.sourceId).toBe(SOURCE_ID);
+    expect(companyPage.page[0]?.sourceId).not.toBe(projectPage.page[0]?.sourceId);
   });
 
   it("keeps every processing state decodable in either scope (honest states, incl. partial)", () => {

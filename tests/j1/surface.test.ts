@@ -27,12 +27,8 @@ import { resolveFeatureScreen } from "../../apps/web/src/app/feature-pending";
 import { AppServicesProvider } from "../../apps/web/src/app/providers";
 import { loadAppConfig } from "../../apps/web/src/app/config";
 import { conversationFeatureEntry } from "../../apps/web/src/app/features/conversation/entry";
-import {
-  findingValueLabel,
-  justSentNotice,
-  knowledgeStateLabel,
-  processingStateLabels,
-} from "../../apps/web/src/features/conversation/state";
+import { justSentNotice, processingStateLabels } from "../../apps/web/src/features/conversation/state";
+import { findingValueLabel, knowledgeStateLabel } from "../../apps/web/src/features/memory/state";
 
 /** A representative uploads id (the table-id wire pattern). */
 const TEMPLATE_UPLOAD_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f";

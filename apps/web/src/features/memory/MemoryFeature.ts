@@ -29,147 +29,56 @@
 
 import {
   createElement,
-  useMemo,
   useState,
   type ChangeEvent,
   type ReactNode,
 } from "react";
-import { ConvexAuthProvider, useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery_experimental as useQueryState } from "convex/react";
-import { Link } from "@tanstack/react-router";
 import { parseTableId } from "@kiero/contracts";
 import { api } from "../../../../../convex/_generated/api";
-import { useAppServices } from "../../app/providers";
-import { createConvexClient } from "../sign-in/client";
-import { AuthenticatedGate } from "../sign-in/SignInGate";
-import type {
-  MemberView,
-  MembershipOverview,
-} from "../../../../../convex/access/membership/functions";
+import type { MemberView } from "../../../../../convex/access/membership/functions";
 import type { CurrentFindingWireRow } from "../../../../../convex/memory/findings/read";
 import type {
   ClarificationWireRow,
   FindingHistoryWireRow,
 } from "../../../../../convex/memory/findings/exposition";
 import type { ReadCurrentFindingsInput } from "../../../../../convex/memory/findings/semantics";
+import { instantLabel } from "../conversation/state";
 import {
-  conversationCopy,
+  CompanyFeatureGate,
+  SessionEnded,
+  envelopeOf,
+  type MemberOverview,
+  type Notice,
+  type SubmitEvent,
+} from "../company/CompanyGate";
+import { asConvexId } from "../company/convex-ids";
+import { PROJECT_PARAM, SOURCE_PARAM, searchParam } from "../company/route-params";
+import {
   failureHint,
   findingValueLabel,
-  instantLabel,
   isSettledKnowledgeState,
   knowledgeStateLabel,
   memoryCopy as copy,
   signInCopy,
-} from "../conversation/state";
-
-/** The query-param deep-link key (shared with the conversation feature). */
-const PROJECT_PARAM = "projekt";
-
-/** The canonical source deep link (the conversation feature owns the route). */
-const SOURCE_PARAM = "zrodlo";
-
-/** One command envelope (the checked dispatch input shape). */
-function envelopeOf(operation: string, input: unknown) {
-  return { operation, input, expectedRevisions: [] };
-}
-
-/** The submit-event surface the handlers consume (preventDefault only). */
-interface SubmitEvent {
-  preventDefault(): void;
-}
-
-/** The result notice every surface shows (server Polish copy or a hint). */
-interface Notice {
-  readonly kind: "ok" | "error";
-  readonly text: string;
-}
-
-/** Reads one string search param (the last value wins). */
-function searchParam(name: string): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  const value = new URLSearchParams(window.location.search).get(name);
-  return value === null || value.length === 0 ? null : value;
-}
+} from "./state";
 
 // ---------------------------------------------------------------------------
-// Root: connection gate + auth provider
+// Root: the shared company-feature gate around this surface
 // ---------------------------------------------------------------------------
 
 /** The feature root: mounted by the host entry at "/pamiec" (memory.project). */
 export function MemoryFeature(): ReactNode {
-  const { config } = useAppServices();
-  if (config.connection.state === "unconfigured") {
-    return createElement("section", null, createElement("h1", null, copy.title), createElement("p", null, conversationCopy.connectionUnconfigured));
-  }
-  if (config.connection.state === "misconfigured") {
-    return createElement("section", null, createElement("h1", null, copy.title), createElement("p", null, conversationCopy.connectionMisconfigured));
-  }
-  return createElement(ConvexConnectedRoot, { convexUrl: config.connection.convexUrl });
-}
-
-function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): ReactNode {
-  const client = useMemo(() => createConvexClient(convexUrl), [convexUrl]);
-  return createElement(ConvexAuthProvider, {
-    client,
-    children: createElement(MemoryGate),
+  return createElement(CompanyFeatureGate, {
+    title: copy.title,
+    member: (overview: MemberOverview) => createElement(MemoryMain, { overview }),
   });
-}
-
-/** Authentication gate: B1's shared sign-in walk; members continue here. */
-function MemoryGate(): ReactNode {
-  return createElement(AuthenticatedGate, { continuation: () => createElement(MemorySurface) });
-}
-
-// ---------------------------------------------------------------------------
-// The surface: membership gate, then the memory views
-// ---------------------------------------------------------------------------
-
-function MemorySurface(): ReactNode {
-  const overview = useQueryState({
-    query: api.access.membership.functions.membershipOverview,
-    args: {},
-  });
-
-  if (overview.status === "error") {
-    return createElement(SessionEnded);
-  }
-  if (overview.status !== "success") {
-    return createElement("p", { role: "status" }, signInCopy.verifying);
-  }
-  if (overview.data.state === "no_company") {
-    return createElement(
-      "section",
-      null,
-      createElement("h1", null, copy.title),
-      createElement("h2", null, conversationCopy.noCompanyHeading),
-      createElement("p", null, conversationCopy.noCompanyIntro),
-      createElement("p", null, createElement(Link, { to: "/firma" }, conversationCopy.noCompanyLink)),
-    );
-  }
-  return createElement(MemoryMain, { overview: overview.data });
-}
-
-function SessionEnded(): ReactNode {
-  const { signOut } = useAuthActions();
-  return createElement(
-    "div",
-    { role: "alert" },
-    createElement("p", null, signInCopy.sessionEndedNotice),
-    createElement(
-      "button",
-      { type: "button", onClick: () => void signOut() },
-      signInCopy.signInAgain,
-    ),
-  );
 }
 
 function MemoryMain({
   overview,
 }: {
-  readonly overview: Extract<MembershipOverview, { state: "member" }>;
+  readonly overview: MemberOverview;
 }): ReactNode {
   const projects = useQueryState({ query: api.projects.functions.projectsOverview, args: {} });
   const [memoryScope, setMemoryScope] = useState<string>(() => searchParam(PROJECT_PARAM) ?? "company");
@@ -243,7 +152,7 @@ function FindingsSection({
     return createElement(SessionEnded);
   }
   if (findings.status !== "success") {
-    return createElement("p", { role: "status" }, signInCopy.verifying);
+    return createElement("p", { role: "status" }, copy.checkingSession);
   }
   if (findings.data.length === 0) {
     return createElement("p", null, copy.noFindings);
@@ -313,9 +222,9 @@ function FindingHistoryPanel({
   const history = useQueryState({
     query: api.memory.findings.functions.readFindingHistory,
     args: {
-      // The id comes from the current-findings read of the same table; this
-      // converts between the two brandings of one value.
-      findingId: findingId as unknown as import("../../../../../convex/_generated/dataModel").Id<"findings">,
+      // The id comes from the current-findings read of the same table;
+      // asConvexId converts between the two brandings of one value.
+      findingId: asConvexId("findings", findingId),
     },
   });
   const [correcting, setCorrecting] = useState(false);
@@ -324,7 +233,7 @@ function FindingHistoryPanel({
     return createElement(SessionEnded);
   }
   if (history.status !== "success") {
-    return createElement("p", { role: "status" }, signInCopy.verifying);
+    return createElement("p", { role: "status" }, copy.checkingSession);
   }
   const row: FindingHistoryWireRow = history.data;
   return createElement(
@@ -529,7 +438,7 @@ function ClarificationsSection({
     return createElement(SessionEnded);
   }
   if (clarifications.status !== "success") {
-    return createElement("p", { role: "status" }, signInCopy.verifying);
+    return createElement("p", { role: "status" }, copy.checkingSession);
   }
   const rows: readonly ClarificationWireRow[] = clarifications.data;
   const open = rows.filter((row) => row.state === "open");
