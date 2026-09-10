@@ -104,8 +104,13 @@ export type SendProgress =
 
 export interface SendHooks {
   onProgress(progress: SendProgress): void;
-  /** Called once prepare returns, so the draft survives a crash mid-upload. */
-  onSession(session: { readonly uploadId: string; readonly attachments: readonly SessionAttachment[] }): void;
+  /**
+   * Reports the begun session once prepare returns (an observer hook for
+   * progress UIs and the deterministic tests). Recoverability does NOT
+   * depend on it: the stable draftId re-prepares into the same session,
+   * and the draft record deliberately mirrors nothing (round 2).
+   */
+  onSession?(session: { readonly uploadId: string; readonly attachments: readonly SessionAttachment[] }): void;
 }
 
 /** The local material of one logical message (blobs from the draft store). */
@@ -197,7 +202,7 @@ export async function runSend(
   } catch (cause) {
     return failed(asStepError(cause), "gateway");
   }
-  hooks.onSession({ uploadId: prepared.uploadId, attachments: prepared.attachments });
+  hooks.onSession?.({ uploadId: prepared.uploadId, attachments: prepared.attachments });
 
   // A previously finalized upload (crash between finalize and accept) goes
   // straight to acceptance on the SAME durable objects.

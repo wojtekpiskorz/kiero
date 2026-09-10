@@ -220,6 +220,21 @@ describe("runSend: the happy path (text + recording + photo)", () => {
     expect(fake.calls.parts).toEqual([]);
     expect(fake.calls.finalizes).toEqual(["up1"]);
   });
+
+  it("runs with only the progress hook (the session observer is optional; the record mirrors nothing)", async () => {
+    const fake = fakeGateway();
+    const accept = fakeAccept();
+    const progress: string[] = [];
+    const outcome = await runSend(
+      material(),
+      fake.gateway,
+      accept.port,
+      { onProgress: (update) => progress.push(update.phase) },
+      retry3,
+    );
+    expect(outcome.ok).toBe(true);
+    expect(progress).toEqual(["preparing", "finalizing", "accepting"]);
+  });
 });
 
 describe("runSend: resume semantics (the recoverable draft)", () => {

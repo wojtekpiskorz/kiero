@@ -36,21 +36,6 @@
 /** Local phases of the one logical draft. "sent" requires a server receipt. */
 export type DraftPhase = "composing" | "uploading" | "accepting" | "sent";
 
-/** One server-side upload session mirrored locally for crash recovery. */
-export interface DraftSession {
-  /** The D2 ledger upload id (stable across retries of the same draft). */
-  readonly uploadId: string;
-  /**
-   * The begun attachments in declaration order (audio first, then photos):
-   * the gateway-minted ids the resume path needs.
-   */
-  readonly attachments: readonly {
-    readonly attachmentId: string;
-    readonly kind: "audio" | "image";
-    readonly objectKey: string;
-  }[];
-}
-
 /** The recoverable recording fragment (chunks live under their own keys). */
 export interface DraftRecording {
   readonly mimeType: string;
@@ -69,7 +54,14 @@ export interface DraftPhoto {
   readonly bytes: number;
 }
 
-/** The draft metadata record (JSON-safe; blobs are separate keys). */
+/**
+ * The draft metadata record (JSON-safe; blobs are separate keys).
+ *
+ * Crash recovery of an interrupted SEND reads nothing but the stable
+ * `draftId`: the resume path re-prepares with it and trusts the server's
+ * own session answer, so the record deliberately carries NO mirrored
+ * upload session (round 2: a mirror with no production reader).
+ */
 export interface DraftRecord {
   readonly userId: string;
   /** Stable per logical message: the prepare draftId AND the acceptance idempotency key. */
@@ -87,8 +79,6 @@ export interface DraftRecord {
   readonly recording: DraftRecording | null;
   readonly photos: readonly DraftPhoto[];
   readonly phase: DraftPhase;
-  /** The mirrored upload session once prepare/begin succeeded. */
-  readonly session: DraftSession | null;
   /** The last honest failure (typed code + server/hint message), if any. */
   readonly lastError: { readonly code: string; readonly message: string } | null;
   /** True when a storage write failed mid-draft: send may work, recovery is NOT promised. */
@@ -110,7 +100,6 @@ export function freshDraft(userId: string, draftId: string, nowMs: number): Draf
     recording: null,
     photos: [],
     phase: "composing",
-    session: null,
     lastError: null,
     storageDegraded: false,
     sentSourceId: null,

@@ -12,8 +12,14 @@
  *   creation sites no longer diverge);
  * - recording chunks land in the store as MediaRecorder emits them; text
  *   flushes on a short debounce and on pagehide;
- * - the send reads the record, mirrors the upload session into it, and on
- *   a confirmed receipt clears honestly and starts the next scoped draft.
+ * - every record mutation with an await inside (chunk appends, flag sets,
+ *   photo writes, the debounced text flush) is serialized on ONE promise
+ *   queue, so no mutation can overwrite the record with a stale snapshot
+ *   (review round 2's lost-update class);
+ * - the send reads the record and, on a confirmed receipt, clears
+ *   honestly and starts the next scoped draft. The record mirrors NO
+ *   upload session: recoverability is the stable draftId, which the
+ *   resume path re-prepares with (the server's answer is the truth).
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -26,6 +32,7 @@ import type { Notice } from "../company/CompanyGate";
 import { asConvexId } from "../company/convex-ids";
 import { PROJECT_PARAM, searchParam } from "../company/route-params";
 import { useAppServices } from "../../app/providers";
+import { createMutationQueue } from "./mutation-queue";
 import { MAX_ATTACHMENTS } from "./planner";
 import { VoiceRecorder, browserMediaBoundary, type RecorderFailure } from "./recorder";
 import {
@@ -141,13 +148,26 @@ export function useCaptureComposer(userId: string): CaptureComposer {
       return store.saveDraft(next).catch((cause: unknown) => {
         const classified = classifyStorageFailure(cause);
         setStoreError(classified);
-        draftRef.current = { ...next, storageDegraded: true };
+        // The catch fires after an await: overlay the flag on the LIVE
+        // record, never on the `next` snapshot captured before the save
+        // (which could revert a concurrent mutation's write).
+        const live = draftRef.current;
+        draftRef.current = live === null ? null : { ...live, storageDegraded: true };
         setDraft(draftRef.current);
         return Promise.resolve();
       });
     },
     [],
   );
+
+  // ONE serialized queue over the record mutations (review round 2):
+  // appends, flag sets, stop/start persists, photo writes and the
+  // debounced text flush all read the record when their turn comes, so
+  // last-writer-wins can never overwrite a newer mutation with a stale
+  // snapshot. The synchronous text keystroke and the pagehide flush stay
+  // OUTSIDE: the first owns the record only between turns, the second
+  // must fire before the page closes (queueing it could drop the flush).
+  const serializeRecord = useMemo(() => createMutationQueue(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,20 +248,26 @@ export function useCaptureComposer(userId: string): CaptureComposer {
     }
     const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
       textFlushRef.current = null;
-      const store = storeRef.current;
-      const current = draftRef.current;
-      if (store !== null && current !== null && current.text === value) {
-        void store.saveDraft(current).catch((cause: unknown) => {
-          setStoreError(classifyStorageFailure(cause));
-        });
-      }
+      // The flush rides the record queue: it reads the record (and saves
+      // it) when its turn comes, so it can never persist a snapshot older
+      // than an in-flight chunk append.
+      void serializeRecord(async () => {
+        const store = storeRef.current;
+        const current = draftRef.current;
+        if (store !== null && current !== null && current.text === value) {
+          await store.saveDraft(current).catch((cause: unknown) => {
+            setStoreError(classifyStorageFailure(cause));
+          });
+        }
+      });
     }, 400);
     textFlushRef.current = () => clearTimeout(timer);
   }
 
   // Preserve the draft before a safe PWA update / tab close: chunks and
   // records are already durable (incremental writes); the only lagging
-  // piece is debounced text, which flushes now.
+  // piece is debounced text, which flushes now. Deliberately NOT queued:
+  // the page may close before a queued turn would run.
   useEffect(() => {
     const flush = () => {
       if (textFlushRef.current !== null) {
@@ -285,59 +311,79 @@ export function useCaptureComposer(userId: string): CaptureComposer {
       return;
     }
     const recorder = new VoiceRecorder(media, {
-      onChunk: (seq, chunk) => {
-        const current = draftRef.current;
-        const currentStore = storeRef.current;
-        if (current === null || currentStore === null) {
-          return Promise.resolve();
-        }
-        return currentStore.appendRecordingChunk(current, seq, chunk).then((next) => {
-          draftRef.current = next;
-          setDraft(next);
+      onChunk: (seq, chunk) =>
+        serializeRecord(async () => {
+          const current = draftRef.current;
+          const currentStore = storeRef.current;
+          if (current === null || currentStore === null) {
+            return;
+          }
+          const next = await currentStore.appendRecordingChunk(current, seq, chunk);
+          // The append owns `recording` only: overlay it on the LIVE record
+          // so anything written while the chunk was in flight (typed text)
+          // survives. A rejection propagates to the recorder, which reports
+          // the honest storage_degraded flag.
+          const live = draftRef.current;
+          if (live !== null) {
+            draftRef.current = { ...live, recording: next.recording };
+            setDraft(draftRef.current);
+          }
+        }),
+      onRecordingStart: (mimeType, startedAtMs) => {
+        void serializeRecord(async () => {
+          const current = draftRef.current;
+          if (current === null) {
+            return;
+          }
+          await persist({
+            ...current,
+            recording: { mimeType, chunkCount: 0, totalBytes: 0, startedAtMs, durationMs: 0 },
+          });
         });
       },
-      onRecordingStart: (mimeType, startedAtMs) => {
-        const current = draftRef.current;
-        if (current === null) {
-          return;
-        }
-        const next: DraftRecord = {
-          ...current,
-          recording: { mimeType, chunkCount: 0, totalBytes: 0, startedAtMs, durationMs: 0 },
-        };
-        void persist(next);
-      },
       onRecordingStop: (totalDurationMs) => {
-        const current = draftRef.current;
         setRecordingActive(false);
-        if (current === null || current.recording === null) {
-          return;
-        }
-        void persist({ ...current, recording: { ...current.recording, durationMs: totalDurationMs } });
-        const store2 = storeRef.current;
-        if (store2 !== null && current.recording.chunkCount > 0) {
-          void store2
-            .readRecording(draftRef.current ?? current)
-            .then((blob) => {
-              if (blob !== null) {
-                setListenUrl((old) => {
-                  if (old !== null) {
-                    URL.revokeObjectURL(old);
-                  }
-                  return URL.createObjectURL(blob);
-                });
-              }
-            })
-            .catch(() => setStoreError({ kind: "corrupt" }));
-        }
+        void serializeRecord(async () => {
+          const current = draftRef.current;
+          if (current === null || current.recording === null) {
+            return;
+          }
+          await persist({ ...current, recording: { ...current.recording, durationMs: totalDurationMs } });
+          // The listen URL reads the fragment AFTER the final chunk's
+          // append settled (the queue orders it so): exactly what a
+          // reopened tab would recover.
+          const store2 = storeRef.current;
+          const settled = draftRef.current;
+          if (
+            store2 !== null &&
+            settled !== null &&
+            settled.recording !== null &&
+            settled.recording.chunkCount > 0
+          ) {
+            const blob = await store2.readRecording(settled).catch(() => {
+              setStoreError({ kind: "corrupt" }); // a gap in the fragment: say so loudly
+              return null;
+            });
+            if (blob !== null) {
+              setListenUrl((old) => {
+                if (old !== null) {
+                  URL.revokeObjectURL(old);
+                }
+                return URL.createObjectURL(blob);
+              });
+            }
+          }
+        });
       },
       onFailure: (failure: RecorderFailure) => {
         setNotice({ kind: "error", text: recorderFailureCopy(failure) });
         if (failure.kind === "storage_degraded") {
-          const current = draftRef.current;
-          if (current !== null) {
-            void persist({ ...current, storageDegraded: true });
-          }
+          void serializeRecord(async () => {
+            const current = draftRef.current;
+            if (current !== null) {
+              await persist({ ...current, storageDegraded: true });
+            }
+          });
         }
         if (failure.kind === "permission_denied" || failure.kind === "mic_unavailable" || failure.kind === "recorder_unsupported") {
           setRecordingActive(false);
@@ -358,8 +404,6 @@ export function useCaptureComposer(userId: string): CaptureComposer {
   }
 
   async function discardRecording(): Promise<void> {
-    const record = draftRef.current;
-    const store = storeRef.current;
     recorderRef.current?.release();
     recorderRef.current = null;
     setRecordingActive(false);
@@ -369,23 +413,31 @@ export function useCaptureComposer(userId: string): CaptureComposer {
       }
       return null;
     });
-    if (record === null || store === null || record.recording === null) {
-      return;
-    }
-    try {
-      const next = await store.discardRecording(record);
-      draftRef.current = next;
-      setDraft(next);
-    } catch (cause) {
-      setStoreError(classifyStorageFailure(cause));
-    }
+    await serializeRecord(async () => {
+      const current = draftRef.current;
+      const store = storeRef.current;
+      if (current === null || store === null || current.recording === null) {
+        return;
+      }
+      try {
+        const next = await store.discardRecording(current);
+        // The discard owns `recording` only: overlay on the live record.
+        const live = draftRef.current;
+        if (live !== null) {
+          draftRef.current = { ...live, recording: next.recording };
+          setDraft(draftRef.current);
+        }
+      } catch (cause) {
+        setStoreError(classifyStorageFailure(cause));
+      }
+    });
   }
 
   // --- photos -----------------------------------------------------------------
 
   async function addPhotos(files: readonly File[]): Promise<void> {
-    const record = draftRef.current;
     const store = storeRef.current;
+    const record = draftRef.current;
     if (record === null || store === null || files.length === 0) {
       return;
     }
@@ -398,40 +450,58 @@ export function useCaptureComposer(userId: string): CaptureComposer {
     if (files.length > room) {
       setNotice({ kind: "error", text: copy.attachmentsTooMany });
     }
-    let current = record;
-    try {
-      for (const file of files.slice(0, room)) {
-        current = await store.addPhoto(
-          current,
-          {
-            photoId: `ph_${uuidV4()}`,
-            name: file.name,
-            mimeType: file.type === "" ? "application/octet-stream" : file.type,
-            bytes: file.size,
-          },
-          file,
-        );
+    await serializeRecord(async () => {
+      try {
+        for (const file of files.slice(0, room)) {
+          const current = draftRef.current;
+          if (current === null) {
+            return;
+          }
+          const next = await store.addPhoto(
+            current,
+            {
+              photoId: `ph_${uuidV4()}`,
+              name: file.name,
+              mimeType: file.type === "" ? "application/octet-stream" : file.type,
+              bytes: file.size,
+            },
+            file,
+          );
+          // The add owns `photos` only: overlay on the live record.
+          const live = draftRef.current;
+          if (live !== null) {
+            draftRef.current = { ...live, photos: next.photos };
+            setDraft(draftRef.current);
+          }
+        }
+      } catch (cause) {
+        setStoreError(classifyStorageFailure(cause));
       }
-      draftRef.current = current;
-      setDraft(current);
-    } catch (cause) {
-      setStoreError(classifyStorageFailure(cause));
-    }
+    });
   }
 
   async function removePhoto(photoId: string): Promise<void> {
-    const record = draftRef.current;
     const store = storeRef.current;
-    if (record === null || store === null) {
+    if (store === null) {
       return;
     }
-    try {
-      const next = await store.removePhoto(record, photoId);
-      draftRef.current = next;
-      setDraft(next);
-    } catch (cause) {
-      setStoreError(classifyStorageFailure(cause));
-    }
+    await serializeRecord(async () => {
+      const current = draftRef.current;
+      if (current === null) {
+        return;
+      }
+      try {
+        const next = await store.removePhoto(current, photoId);
+        // The removal owns `photos` only: overlay on the live record.
+        const live = draftRef.current;
+        if (live !== null) {
+          draftRef.current = { ...live, photos: next.photos };
+          setDraft(draftRef.current);
+        }
+      } catch (cause) {
+        setStoreError(classifyStorageFailure(cause));
+      }
+    });
   }
 
   // --- send (explicit Send begins the upload) -----------------------------------
@@ -523,22 +593,9 @@ export function useCaptureComposer(userId: string): CaptureComposer {
               }
             }
           },
-          onSession: (session) => {
-            const current = draftRef.current;
-            if (current !== null) {
-              void persist({
-                ...current,
-                session: {
-                  uploadId: session.uploadId,
-                  attachments: session.attachments.map((attachment) => ({
-                    attachmentId: attachment.attachmentId,
-                    kind: attachment.kind,
-                    objectKey: attachment.objectKey,
-                  })),
-                },
-              });
-            }
-          },
+          // No onSession: the record deliberately mirrors NO upload
+          // session (round 2). Recoverability is the stable draftId; the
+          // resume path re-prepares with it and trusts the server's answer.
         },
       );
       if (outcome.ok) {

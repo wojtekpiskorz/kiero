@@ -348,15 +348,23 @@ record(
   `panel=${panelVisible} listen=${listen2} idbEntries=${draftRow}`,
 );
 const interruptedRecord = await readDraftMeta(page2);
+// The record mirrors NO upload session (review round 2): the stable
+// draftId is the whole resume identity. The server's ledger maps it to
+// the upload row (probeUploadsState rows carry draftId).
+const killLedger = await person.action("sources/uploads/probe:probeUploadsState", {});
+const killUploadRow = killLedger.value.uploads.find(
+  (u) => u.draftId === interruptedRecord?.draftId,
+);
+const killUploadId = killUploadRow?.uploadId;
 record(
-  "L2c the persisted draft phase is honestly mid-send with the mirrored upload session",
-  interruptedRecord?.phase === "uploading" && interruptedRecord?.session?.uploadId ? "PASS" : "FAIL",
-  `phase=${interruptedRecord?.phase} uploadId=${interruptedRecord?.session?.uploadId?.slice(0, 6)}`,
+  "L2c the persisted draft phase is honestly mid-send and the ledger holds the upload for the stable draft id",
+  interruptedRecord?.phase === "uploading" && killUploadId !== undefined ? "PASS" : "FAIL",
+  `phase=${interruptedRecord?.phase} uploadId=${String(killUploadId).slice(0, 6)}`,
 );
 
 // What did the server record before the kill? (the resume baseline)
 const killSession = await gw(
-  `/uploads/${interruptedRecord.session.uploadId}/session`,
+  `/uploads/${killUploadId}/session`,
 );
 const audioManifest = killSession.body?.value?.attachments?.find((a) => a.kind === "audio")?.parts
   ?.length;
@@ -414,10 +422,10 @@ record(
 // Server-side truth: ONE source for the acceptance key, bound upload.
 const ledger = await person.action("sources/uploads/probe:probeUploadsState", {});
 const uploadRow = ledger.value.uploads.find(
-  (u) => u.uploadId === interruptedRecord.session.uploadId,
+  (u) => u.draftId === interruptedRecord?.draftId,
 );
 const boundAttachments = ledger.value.attachments.filter(
-  (a) => a.uploadId === interruptedRecord.session.uploadId && a.sourceId,
+  (a) => a.uploadId === killUploadId && a.sourceId,
 );
 // The probe's rows are caller-company-scoped; the acceptance key IS the
 // stable draft id, so "one row per key" is exactly "no duplicate message".
