@@ -70,9 +70,14 @@ describe("the certified sources.acceptSource contract surface", () => {
 });
 
 describe("sources handler registration (one write operation, nothing else)", () => {
-  it("registers acceptance as the only sources lane write", () => {
+  it("registers acceptance as the only D1 sources lane write", () => {
     const handlers = sourcesHandlers();
-    expect(Object.keys(handlers).sort()).toEqual(["sources.acceptSource"]);
+    // C5's sanctioned append (issue #28 owns the withdrawal operation's
+    // implementation; D1 owns only acceptance here).
+    expect(Object.keys(handlers).sort()).toEqual([
+      "sources.acceptSource",
+      "sources.withdrawSource",
+    ]);
     expect(handlers["sources.acceptSource"]?.intent).toBe("write");
   });
 });

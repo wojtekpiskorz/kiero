@@ -27,11 +27,32 @@ import {
   type HandlerRegistry,
   type RequestContext,
 } from "@kiero/runtime";
-import { bridgeIdentity, identityFromConvexAuth, resolveRequestContext } from "../../platform/context";
+import {
+  bridgeIdentity,
+  resolveRequestContext,
+} from "../../platform/context";
+import {
+  DEFAULT_DEVICE_LABEL,
+  resolveAccessContextWithProvisioning,
+} from "../../access/identity/resolution";
 import type { MutationCtx } from "../../_generated/server";
 import { acceptSourceEntry, performAcceptance } from "./acceptance";
+import {
+  performWithdrawSource,
+  withdrawSourceEntry,
+  type WithdrawSourceInput,
+} from "../../memory/recompute/withdrawal";
 
-/** Handler table for sources mutation-transaction dispatches (exported for tests). */
+/**
+ * Handler table for sources mutation-transaction dispatches (exported for tests).
+ *
+ * C5 registration (additive, flagged on the C3 merged-table precedent): the
+ * withdrawal operation `sources.withdrawSource` implements the declared
+ * sources contract entry from the recomputation lane's own module — the
+ * lifecycle transition, the canonical event and the durable recompute
+ * registration commit atomically there; this table only wires the checked
+ * path to it.
+ */
 export function sourcesHandlers(): HandlerRegistry<MutationCtx> {
   return {
     "sources.acceptSource": {
@@ -39,6 +60,13 @@ export function sourcesHandlers(): HandlerRegistry<MutationCtx> {
       run: async (tx, context, input, meta) => {
         const decoded = Schema.decodeUnknownSync(acceptSourceEntry.input)(input);
         return performAcceptance(tx, context, decoded, meta.idempotencyKey);
+      },
+    },
+    "sources.withdrawSource": {
+      intent: "write",
+      run: (tx, context, input) => {
+        const decoded = Schema.decodeUnknownSync(withdrawSourceEntry.input)(input);
+        return performWithdrawSource(tx, context, decoded as WithdrawSourceInput);
       },
     },
   };
@@ -49,6 +77,15 @@ export function sourcesHandlers(): HandlerRegistry<MutationCtx> {
  * The optional `serviceSessionId` marks the service-bridge path (identity
  * verified before this point); without it, Convex Auth is the only identity
  * source. Unimplemented sources operations fail closed `unsupported`.
+ *
+ * J1 prerequisite repair (same defect C4 flagged on C2's public entries):
+ * the user path resolves through B1's live-session chain
+ * (`resolveAccessContextWithProvisioning` — the B3 projects-dispatch
+ * pattern), because the platform-generic `identityFromConvexAuth` subject
+ * (`<userId>|<authSessions id>`) is not a sessions-registry id and
+ * ordinary user tokens failed `no_verified_identity` on this public
+ * entry, blocking the app-driven send path the first text checkpoint
+ * proves.
  */
 export async function dispatchSourcesCommand(
   ctx: MutationCtx,
@@ -56,11 +93,10 @@ export async function dispatchSourcesCommand(
   serviceSessionId: string | undefined,
 ): Promise<ResultEnvelope> {
   const resolveContext = async (tx: MutationCtx): Promise<RequestContext | null> => {
-    const identity =
-      serviceSessionId === undefined
-        ? await identityFromConvexAuth(tx.auth, Date.now())
-        : bridgeIdentity(serviceSessionId, Date.now());
-    return resolveRequestContext(tx.db, identity);
+    if (serviceSessionId !== undefined) {
+      return resolveRequestContext(tx.db, bridgeIdentity(serviceSessionId, Date.now()));
+    }
+    return resolveAccessContextWithProvisioning(tx.db, tx.auth, Date.now(), DEFAULT_DEVICE_LABEL);
   };
   const deps: CommandDeps<MutationCtx> = {
     resolveContext,

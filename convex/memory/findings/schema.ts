@@ -121,6 +121,13 @@ export const findingsTables = {
     provenance: v.optional(shared.provenance),
     /** Why an explicit correction or withdrawal marking happened. */
     reason: v.optional(v.string()),
+    /**
+     * C5 amendment (additive, flagged): the source whose withdrawal a
+     * marking revision belongs to. Attribution is by SOURCE ID, never by
+     * reason text (two withdrawals may share wording); recomputation
+     * adopts only the roots of its own withdrawal.
+     */
+    withdrawnSourceId: v.optional(shared.sourceId),
     recordedByUserId: shared.userId,
     recordedAtMs: shared.tsMs,
   }).index("by_finding_revision", ["findingId", "revision"]),
