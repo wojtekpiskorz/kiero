@@ -12,19 +12,19 @@
  *   executor with uncertain-outcome recording and reconciliation.
  * - `processing.analyze_change_plan` (../processing/text/analyze.ts, E3):
  *   the real text-analysis workflow over processingRuns/processingSteps
- *   through @convex-dev/workflow — the bounded agent loop, clarifications
+ *   through @convex-dev/workflow - the bounded agent loop, clarifications
  *   and checked per-group publication (replaces the A3 mechanical proof
  *   executor behind the same seam; pipeline.ts keeps the mechanical proof
  *   workflow itself for its own crash/restart evidence).
  * - `processing.extract_fragments` (../processing/text/extract.ts, E3): the
- *   durable reaction to `sources.sourceAccepted` — deterministic text
+ *   durable reaction to `sources.sourceAccepted` - deterministic text
  *   extraction bookkeeping plus the follow-on analysis registration.
  * - `access.cleanup_revocation` (../access/membership/cleanup.ts, B3): the
  *   durable revocation fan-out the access lane owns (device-session
  *   revocation after membership removal; the declared consumer proof of
  *   `access.membershipRevoked` / `access.sessionRevoked`).
  * - `memory.recompute_dependents` (../memory/recompute/executor.ts, C5):
- *   the durable withdrawal-recomputation executor — the withdrawal marking
+ *   the durable withdrawal-recomputation executor - the withdrawal marking
  *   plus the dependency-aware updating cascade and the linked re-analysis
  *   registrations (the declared consumer proof of `sources.sourceWithdrawn`,
  *   `memory.dependentsMarkedStale` and `memory.findingRevised`).
@@ -48,6 +48,18 @@
  *   events (acceptance creates source intents, a raised clarification
  *   creates the addressed agent-question intent, a published change set
  *   only wakes the evaluator).
+ * - `search.index_generation` (../search/executor.ts, E5): the versioned
+ *   derived-index executor. Full generation builds through E2's embedding
+ *   adapter plus the scoped lifecycle refreshes (withdrawal/purge drops a
+ *   source's rows; a revised finding rebuilds from its current revision).
+ * - `attention.deliver_push` (../attention/push/executor.ts, F3): the
+ *   web-push transport executor - one bounded per-device delivery pass
+ *   per delivered notification intent (the declared consumer proof of
+ *   `attention.intentDelivered`).
+ * - `attention.schedule_task_reminders`
+ *   (../attention/reminders/executor.ts, F4): the durable task-reminder
+ *   scheduling reaction to the work task events and bound-deadline
+ *   revisions (the semantic slot recompute per task change).
  */
 
 import type { FunctionReference } from "convex/server";
@@ -64,11 +76,25 @@ import { normalizePhotoExecutor } from "../processing/images/executor";
 // E4 amendment (flagged coordinated change): the multimodal-join executor.
 import { joinMultimodalExecutor as e4JoinMultimodalExecutor } from "../processing/multimodal/join";
 import { attentionIntentsExecutor } from "../attention/delivery/executor";
+// F4 append (flagged shared-file change, the F2 precedent): the
+// task-reminder scheduling executor implementation lives in F4's owned
+// path; this registry entry is its composition point.
+import { taskRemindersExecutor } from "../attention/reminders/executor";
+
+// F3 append (flagged shared-file change, the G3 precedent): the web-push
+// transport executor implementation lives in F3's owned path; this
+// registry entry is its composition point.
+import { pushDeliveryExecutor } from "../attention/push/executor";
 
 // G3 append (flagged shared-file change, the D5/D6 precedent): the
 // calendar.reconcile_outcome executor implementation lives in G3's owned
 // path; this registry entry is its composition point.
 import { reconcileOutcomeExecutor } from "../calendar/sync/executor";
+
+// E5 append (flagged shared-file change, the G3 precedent): the
+// search.index_generation executor implementation lives in E5's owned path
+// (convex/search/executor.ts); this registry entry is its composition point.
+import { searchIndexExecutor } from "../search/executor";
 
 /** One durable job row (the executable counterpart of an outbox event). */
 export type DurableJobDoc = Doc<"durableJobs">;
@@ -114,4 +140,9 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [e4JoinMultimodalExecutor.jobKind]: e4JoinMultimodalExecutor,
   [reconcileOutcomeExecutor.jobKind]: reconcileOutcomeExecutor,
   [attentionIntentsExecutor.jobKind]: attentionIntentsExecutor,
+
+  // E5 append (flagged shared-file change): the derived-search executor.
+  [searchIndexExecutor.jobKind]: searchIndexExecutor,
+  [pushDeliveryExecutor.jobKind]: pushDeliveryExecutor,
+  [taskRemindersExecutor.jobKind]: taskRemindersExecutor,
 };

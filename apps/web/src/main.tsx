@@ -7,6 +7,9 @@ import { createAppConnections } from "./app/connections";
 import { AppServicesProvider } from "./app/providers";
 import { createAppRouter } from "./app/router";
 import { composePwaEntries, registerPwa } from "./app/pwa/composition";
+// F3's sanctioned composition attach (the prepared seam's rule: the push
+// module joins together with the service worker script that owns it).
+import { webPushEntry } from "./pwa/push";
 
 /**
  * Bootstrap entry for the Kiero PWA host (A4).
@@ -14,9 +17,11 @@ import { composePwaEntries, registerPwa } from "./app/pwa/composition";
  * Wires React 19 + TanStack Router + TanStack Query with the Convex
  * React-Query adapter exactly as A3 proved it, reads the typed config seam
  * once, mounts the application host and prepares the PWA entry
- * composition (a no-op until F3/I7 ship their modules). Without a
- * configured backend the app still runs and renders the disconnected
- * state without faking a connection.
+ * composition. F3 attaches the push-owning service worker (`/sw.js`: push
+ * presentation + click-through only, no fetch/cache - protected data stays
+ * behind live authorized queries); I7 later adds the update module.
+ * Without a configured backend the app still runs and renders the
+ * disconnected state without faking a connection.
  */
 
 const config = loadAppConfig(import.meta.env);
@@ -38,5 +43,9 @@ createRoot(container).render(
   </StrictMode>,
 );
 
-// Prepared seam only: registers nothing while no service worker is shipped.
-void registerPwa(composePwaEntries());
+// F3 attaches the push-owning service worker through the composition (the
+// only registration path); the push module's own hook stays passive (see
+// apps/web/src/pwa/push.ts).
+void registerPwa(
+  composePwaEntries({ serviceWorkerScript: "/sw.js", push: webPushEntry }),
+);
