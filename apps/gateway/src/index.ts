@@ -31,14 +31,77 @@ import type { MediaEnv } from "./media/r2";
 import type { TelemetryEnv } from "./telemetry/emit";
 import type { NormalizerEnv } from "./images/normalizer";
 
+/**
+ * D4 append (minimal, flagged to the coordinator): browser CORS for the
+ * upload channel. D4's composer is the FIRST cross-origin consumer of the
+ * gateway (D2's proofs drove the Worker from node, where CORS does not
+ * apply): the browser's part/complete/finalize fetches carry Authorization
+ * and non-simple content types, so every request preflights.
+ *
+ * The policy is deliberately closed by default: CORS headers are emitted
+ * ONLY when the request's Origin is listed in the ALLOWED_APP_ORIGINS
+ * worker var (comma-separated full origins; set per deployment, e.g.
+ * http://localhost:5173 for dev). Without the var the gateway behaves
+ * exactly as before (no headers, browsers refuse) — no open reflector.
+ */
+interface CorsEnv {
+  readonly ALLOWED_APP_ORIGINS?: string;
+}
+
 /** The Worker bindings the gateway routes consume (see platform/bridge.ts). */
-export type Env = BridgeEnv & TelemetryEnv & UploadsEnv & MediaEnv & NormalizerEnv;
+export type Env = BridgeEnv & TelemetryEnv & UploadsEnv & MediaEnv & NormalizerEnv & CorsEnv;
+
+function corsHeaders(request: Request, env: Env): Record<string, string> {
+  const origin = request.headers.get("origin");
+  if (origin === null || origin.length === 0) {
+    return {};
+  }
+  const configured = env.ALLOWED_APP_ORIGINS ?? "";
+  const allowed = configured
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  if (!allowed.includes(origin)) {
+    return {};
+  }
+  return {
+    "access-control-allow-origin": origin,
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "authorization, content-type",
+    "access-control-max-age": "86400",
+  };
+}
+
+function withCors(response: Response, headers: Record<string, string>): Response {
+  if (Object.keys(headers).length === 0) {
+    return response;
+  }
+  const merged = new Headers(response.headers);
+  for (const [key, value] of Object.entries(headers)) {
+    merged.set(key, value);
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: merged,
+  });
+}
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     // Telemetry is scheduled through ctx.waitUntil: never on the critical path.
     return withGatewayTelemetry(env, ctx, url.pathname, async () => {
+      const cors = corsHeaders(request, env);
+      if (
+        request.method === "OPTIONS" &&
+        (url.pathname.startsWith("/uploads/") ||
+          url.pathname.startsWith("/media/") ||
+          url.pathname.startsWith("/images/"))
+      ) {
+        // Preflight: answered without touching any route or Convex/R2.
+        return withCors(new Response(null, { status: 204 }), cors);
+      }
       if (
         url.pathname.startsWith("/platform/") ||
         url.pathname.startsWith("/uploads/") ||
@@ -47,9 +110,9 @@ export default {
       ) {
         const route = matchRoute(request.method, url.pathname);
         if (route === undefined) {
-          return unsupportedRoute(url.pathname);
+          return withCors(unsupportedRoute(url.pathname), cors);
         }
-        return route.handle(request, env);
+        return withCors(await route.handle(request, env), cors);
       }
 
       return new Response(

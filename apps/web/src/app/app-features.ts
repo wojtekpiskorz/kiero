@@ -17,9 +17,10 @@ import { calendarFeatureEntry } from "./features/calendar/entry";
 import { gmAccessFeatureEntry } from "./features/gm/entry";
 // F3's sanctioned host mount: the Polish web push settings screen.
 import { notificationsFeatureEntry } from "./features/notifications/entry";
-// H4's sanctioned host mount: the audited GM processing inspector (entry
-// file owns the shape, this line the wiring).
+// H4's sanctioned host mount: the audited GM processing inspector.
 import { gmProcessingFeatureEntry } from "./features/gm/processing-entry";
+// D4's sanctioned host mount: the capture composer at /wpis.
+import { captureFeatureEntry } from "./features/capture/entry";
 
 /** Every registered host feature, in navigation order. The first entry ("/") is the default route. */
 export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
@@ -44,4 +45,6 @@ export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
   // F3's sanctioned host mount: the web push settings screen (device
   // registration, permission/subscription state, recovery guidance).
   notificationsFeatureEntry,
+  // D4's sanctioned host mount: the capture composer ("Nowy wpis").
+  captureFeatureEntry,
 ]);
