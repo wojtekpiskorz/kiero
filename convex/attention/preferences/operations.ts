@@ -41,32 +41,6 @@ export type ChangePreferencesResult = Schema.Schema.Type<typeof changePreference
 /** Bounded preference: at most this many distinct muted projects. */
 export const MAX_MUTED_PROJECTS = 256;
 
-/** The stored fields the evaluation and round-trip reads consume. */
-export interface StoredPreferences {
-  readonly mutedProjectIds: string[];
-  readonly companyEntriesMuted: boolean;
-  readonly taskRemindersMuted: boolean;
-  readonly hidePreviewContent: boolean;
-  readonly quietHours: QuietHoursWindow | null;
-}
-
-/** Reads one stored row into the evaluation shape (null when absent). */
-export function storedPreferencesOf(row: Doc<"notificationPreferences">): StoredPreferences {
-  return {
-    mutedProjectIds: [...row.mutedProjectIds],
-    companyEntriesMuted: row.companyEntriesMuted,
-    taskRemindersMuted: row.taskRemindersMuted,
-    hidePreviewContent: row.hidePreviewContent,
-    quietHours:
-      row.quietHoursStartMinute !== undefined && row.quietHoursEndMinute !== undefined
-        ? {
-            startMinuteOfDay: row.quietHoursStartMinute,
-            endMinuteOfDay: row.quietHoursEndMinute,
-          }
-        : null,
-  };
-}
-
 /** Order-preserving de-duplication of muted project ids. */
 export function dedupeProjectIds(projectIds: readonly string[]): string[] {
   const seen = new Set<string>();
@@ -80,8 +54,12 @@ export function dedupeProjectIds(projectIds: readonly string[]): string[] {
   return out;
 }
 
-/** The row's write shape (Convex Ids for the muted projects). */
-interface PreferenceWrite {
+/**
+ * The decoded stored settings: Convex Ids for the muted projects, exactly
+ * the shape insert/patch consume (and assignable to every read/evaluation
+ * shape, which only widen the id element type to string).
+ */
+export interface PreferenceWrite {
   readonly mutedProjectIds: Id<"projects">[];
   readonly companyEntriesMuted: boolean;
   readonly taskRemindersMuted: boolean;
@@ -90,8 +68,10 @@ interface PreferenceWrite {
 }
 
 /**
- * The ONE row-to-write mapping: a stored row (or null for a first change)
- * becomes the carry-over base in exactly the shape insert/patch consume.
+ * The ONE row decoder, serving the write path AND the read/evaluation
+ * path: a stored row (or null for no row yet) becomes the settings in
+ * exactly the shape insert/patch consume, with the neutral defaults for
+ * absent rows/columns. A sixth control means one place to update.
  */
 export function preferenceWriteOf(row: Doc<"notificationPreferences"> | null): PreferenceWrite {
   if (row === null) {

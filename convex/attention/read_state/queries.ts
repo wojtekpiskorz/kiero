@@ -35,6 +35,7 @@ import { internalQuery, query } from "../../_generated/server";
 import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { decideGmCompanyAccess, openGrantOfUser } from "../../access/gm/cores";
+import { gmStore } from "../../access/gm/storeAdapter";
 import {
   bridgeIdentity,
   identityFromConvexAuth,
@@ -141,9 +142,13 @@ export const readStateForSourcesFor = internalQuery({
  * no activity counter, no event. Authority resolution mirrors the B4 GM
  * dispatch gate (live session -> user -> OPEN grant; membership is
  * deliberately NOT consulted — GM is separate from company membership,
- * CONTEXT.md "GM"), and the per-company access is the B4 decision
- * (open grant + existing company + open alpha activation), re-decided
- * here inside the read.
+ * CONTEXT.md "GM"), and BOTH the store reads and the per-company decision
+ * come through the B4 surfaces themselves: `gmStore` (the exported
+ * generated-ctx adapter) for grants/company/activation, `openGrantOfUser`
+ * and `decideGmCompanyAccess` for the decision. `openActivationOf` keeps
+ * the newest OPEN activation even for a company that ended and re-entered
+ * alpha participation — a hand-rolled `.first()` could hand the decision
+ * an ended row while an open one exists.
  */
 export const gmReadStateOverview = internalQuery({
   args: { gmSessionId: v.string(), companyId: v.id("companies") },
@@ -156,43 +161,21 @@ export const gmReadStateOverview = internalQuery({
     if (session === null || session.revokedAtMs !== undefined) {
       return errorResult(forbiddenError("no_verified_identity"));
     }
-    const grants = await ctx.db
-      .query("gmAccessGrants")
-      .withIndex("by_user_open", (q) => q.eq("userId", session.userId))
-      .collect();
-    const grant = openGrantOfUser(
-      grants.map((row) => ({
-        id: row._id,
-        userId: row.userId,
-        reason: row.reason,
-        enteredAtMs: row.enteredAtMs,
-        closedAtMs: row.closedAtMs ?? null,
-      })),
-    );
-    const companyId = ctx.db.normalizeId("companies", args.companyId);
-    if (companyId === null) {
-      return errorResult(forbiddenError("company_not_found", "companies"));
-    }
-    const company = await ctx.db.get(companyId);
-    const activation = await ctx.db
-      .query("gmCompanyActivations")
-      .withIndex("by_company_open", (q) => q.eq("companyId", companyId))
-      .first();
+    const store = gmStore(ctx.db);
+    const grant = openGrantOfUser(await store.grantsOfUser(session.userId));
+    const company = await store.companyById(args.companyId);
+    const activation = await store.openActivationOf(args.companyId);
     const access = decideGmCompanyAccess({
       grantOpen: grant !== null,
       companyExists: company !== null,
-      activation:
-        activation === null
-          ? null
-          : {
-              id: activation._id,
-              companyId: activation.companyId,
-              activatedAtMs: activation.activatedAtMs,
-              endedAtMs: activation.endedAtMs ?? null,
-            },
+      activation,
     });
     if (!access.ok) {
       return errorResult(forbiddenError(access.code, "gm"));
+    }
+    const companyId = ctx.db.normalizeId("companies", args.companyId);
+    if (companyId === null) {
+      return errorResult(forbiddenError("company_not_found", "companies"));
     }
     const rows = await ctx.db
       .query("readStates")

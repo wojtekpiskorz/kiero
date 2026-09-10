@@ -40,7 +40,7 @@ import {
   type DeliveryDecisionInput,
   type PersonalNotificationSettings,
 } from "./evaluation";
-import { storedPreferencesOf } from "./operations";
+import { preferenceWriteOf } from "./operations";
 
 /** The effective personal settings every consumer resolves identically. */
 export interface EffectivePreferences {
@@ -100,17 +100,18 @@ async function effectivePreferences(
     .query("notificationPreferences")
     .withIndex("by_company_user", (q) => q.eq("companyId", companyId).eq("userId", userId))
     .first();
-  const stored = row === null ? null : storedPreferencesOf(row);
+  // The ONE row decoder: absent row/columns resolve the neutral defaults,
+  // and an absent quiet-hours override means the company default applies.
+  const stored = preferenceWriteOf(row);
   const window = effectiveQuietHours(stored);
   return okResult({
     userId,
-    mutedProjectIds: stored?.mutedProjectIds ?? [],
-    companyEntriesMuted: stored?.companyEntriesMuted ?? false,
-    taskRemindersMuted: stored?.taskRemindersMuted ?? false,
-    hidePreviewContent: stored?.hidePreviewContent ?? false,
+    mutedProjectIds: stored.mutedProjectIds,
+    companyEntriesMuted: stored.companyEntriesMuted,
+    taskRemindersMuted: stored.taskRemindersMuted,
+    hidePreviewContent: stored.hidePreviewContent,
     quietHours: { startMinuteOfDay: window.startMinuteOfDay, endMinuteOfDay: window.endMinuteOfDay },
-    quietHoursSource:
-      stored === null || stored.quietHours === null ? "company_default" : "personal",
+    quietHoursSource: stored.quietHours === null ? "company_default" : "personal",
   } satisfies EffectivePreferences);
 }
 
@@ -132,7 +133,7 @@ async function resolveEvaluationInputs(
     .first();
   return {
     ok: true,
-    settings: row === null ? null : storedPreferencesOf(row),
+    settings: preferenceWriteOf(row),
     companyTimezone: company.timezone,
   };
 }
