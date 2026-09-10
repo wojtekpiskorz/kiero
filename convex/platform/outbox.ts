@@ -151,6 +151,20 @@ function projectOneEdge(
       dedupKey: `processing.normalize_photo:${String(payload.sourceId)}`,
     };
   }
+  // G3 registration (issue #47 owns this declared consumer proof): a
+  // recorded Calendar outcome change projects onto ONE bounded
+  // reconciliation of that copy — the durable observation that resolves
+  // unknown outcomes (never a blind retry; the executor's uncertain
+  // failures re-block registration). The row's dedup identity is the
+  // job's, so one outcome change registers one job.
+  if (jobKind === "calendar.reconcile_outcome") {
+    return {
+      kind: "job",
+      jobKind,
+      input: { copyId: payload.copyId, lastKnownOutcome: payload.outcome },
+      dedupKey: rowDedupKey,
+    };
+  }
   return { kind: "unprojected_edge", jobKind };
 }
 

@@ -31,6 +31,10 @@ describe("convex executor composition", () => {
         // the mechanical A3 analyze executor is replaced behind the same
         // seam by the real workflow, and the extract edge is implemented).
         "processing.extract_fragments",
+
+        // G3's sanctioned append (issue #47 owns the declared consumer
+        // proof for the calendar.copyOutcomeRecorded edge).
+        "calendar.reconcile_outcome",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");

@@ -44,6 +44,18 @@ import {
   proofRefreshHandler,
   proofStateHandler,
 } from "./calendar/connection/proofHttp";
+// G3 append (flagged shared-file change, the sanctioned per-lane pattern):
+// the fake Google Calendar EVENTS API, its user-action simulator and the
+// sync-state evidence read.
+import {
+  proofFakeEventCreate,
+  proofFakeEventList,
+  proofFakeEventGet,
+  proofFakeEventPatch,
+  proofFakeEventDelete,
+  proofFakeAdminEvent,
+  proofSyncStateHandler,
+} from "./calendar/sync/proofHttp";
 
 const http = httpRouter();
 
@@ -84,5 +96,42 @@ http.route({
 });
 http.route({ path: "/calendar/oauth/proof/refresh", method: "POST", handler: proofRefreshHandler });
 http.route({ path: "/calendar/oauth/proof/state", method: "POST", handler: proofStateHandler });
+
+// G3 append: the fake Calendar events surface (guarded, dev proof only).
+http.route({
+  path: "/calendar/oauth/proof/fake-google/api/calendars/kiero-proof-calendar/events",
+  method: "POST",
+  handler: proofFakeEventCreate,
+});
+http.route({
+  path: "/calendar/oauth/proof/fake-google/api/calendars/kiero-proof-calendar/events",
+  method: "GET",
+  handler: proofFakeEventList,
+});
+http.route({
+  pathPrefix: "/calendar/oauth/proof/fake-google/api/calendars/kiero-proof-calendar/events/",
+  method: "GET",
+  handler: proofFakeEventGet,
+});
+http.route({
+  pathPrefix: "/calendar/oauth/proof/fake-google/api/calendars/kiero-proof-calendar/events/",
+  method: "PATCH",
+  handler: proofFakeEventPatch,
+});
+http.route({
+  pathPrefix: "/calendar/oauth/proof/fake-google/api/calendars/kiero-proof-calendar/events/",
+  method: "DELETE",
+  handler: proofFakeEventDelete,
+});
+http.route({
+  path: "/calendar/oauth/proof/fake-google/admin/event",
+  method: "POST",
+  handler: proofFakeAdminEvent,
+});
+http.route({
+  path: "/calendar/oauth/proof/sync-state",
+  method: "POST",
+  handler: proofSyncStateHandler,
+});
 
 export default http;
