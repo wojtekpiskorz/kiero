@@ -26,6 +26,13 @@ export type ConnectionConfig =
 /** The whole client-side application configuration. */
 export interface AppConfig {
   readonly connection: ConnectionConfig;
+  /**
+   * D4 append (minimal, flagged): the media gateway Worker's base URL
+   * (VITE_GATEWAY_URL), or null when unset/invalid. The gateway is only
+   * the capture surface's dependency, so an invalid value degrades that
+   * one surface honestly instead of the whole connection state.
+   */
+  readonly gatewayUrl: string | null;
 }
 
 /**
@@ -35,6 +42,8 @@ export interface AppConfig {
 export interface AppEnvSource {
   readonly [key: string]: unknown;
   readonly VITE_CONVEX_URL?: unknown;
+  /** D4 append: public media-gateway base URL (no secret ever). */
+  readonly VITE_GATEWAY_URL?: unknown;
 }
 
 /**
@@ -57,8 +66,12 @@ function parseBackendUrl(raw: string): string | null {
 /** Reads the environment once and produces the typed application config. */
 export function loadAppConfig(env: AppEnvSource): AppConfig {
   const raw = typeof env.VITE_CONVEX_URL === "string" ? env.VITE_CONVEX_URL.trim() : "";
+  // D4 append: the gateway URL stays optional (null when unset/invalid);
+  // only the capture surface consumes it and renders its own honest note.
+  const gatewayRaw = typeof env.VITE_GATEWAY_URL === "string" ? env.VITE_GATEWAY_URL.trim() : "";
+  const gatewayUrl = gatewayRaw === "" ? null : parseBackendUrl(gatewayRaw);
   if (raw === "") {
-    return { connection: { state: "unconfigured" } };
+    return { connection: { state: "unconfigured" }, gatewayUrl };
   }
   const convexUrl = parseBackendUrl(raw);
   if (convexUrl === null) {
@@ -67,7 +80,8 @@ export function loadAppConfig(env: AppEnvSource): AppConfig {
         state: "misconfigured",
         problem: "nieprawidłowy adres backendu (VITE_CONVEX_URL)",
       },
+      gatewayUrl,
     };
   }
-  return { connection: { state: "configured", convexUrl } };
+  return { connection: { state: "configured", convexUrl }, gatewayUrl };
 }

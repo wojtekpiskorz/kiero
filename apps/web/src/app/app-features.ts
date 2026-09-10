@@ -15,6 +15,10 @@ import { projectsFeatureEntry } from "./features/projects/entry";
 import { membershipFeatureEntry } from "./features/membership/entry";
 import { calendarFeatureEntry } from "./features/calendar/entry";
 import { gmAccessFeatureEntry } from "./features/gm/entry";
+// D4's sanctioned host mount (sibling pattern): the mobile capture
+// composer (voice/photo/text + recoverable drafts) until J2 folds the
+// capture modes into the conversation surface.
+import { captureFeatureEntry } from "./features/capture/entry";
 
 /** Every registered host feature, in navigation order. The first entry ("/") is the default route. */
 export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
@@ -33,4 +37,6 @@ export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
   // G1's sanctioned host mount: the optional personal Calendar connection
   // (sign-in gate reused; connection lifecycle only, never identity).
   calendarFeatureEntry,
+  // D4's sanctioned host mount: the capture composer ("Nowy wpis").
+  captureFeatureEntry,
 ]);
