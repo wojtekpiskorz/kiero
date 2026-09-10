@@ -33,6 +33,7 @@ import type { RouteCallResult } from "@kiero/providers";
 import {
   assembleTranscriptTransaction,
   ensureManifestTransaction,
+  providerCallOutcome,
   recordSegmentOutcomeTransaction,
   type SegmentAttemptOutcome,
 } from "../../convex/processing/audio/executor";
@@ -244,6 +245,8 @@ describe("outcome checkpoints", () => {
     });
     let segment = ctx.db.rows("audioSegments").find((row) => row.segmentIndex === 1);
     expect(segment).toMatchObject({ state: "failed", attempts: 1, lastErrorKind: "probe_armed_segment_failure" });
+    let step = ctx.db.rows("processingSteps").find((row) => row.stepKind === "stt_segment");
+    expect(step).toMatchObject({ state: "failed", outputRef: "probe_armed_segment_failure" });
     // Resume: the SAME segment succeeds on a later pass (attempts grow —
     // both passes were real provider passes).
     await recordSegmentOutcomeTransaction(asTx(ctx), {
@@ -253,6 +256,18 @@ describe("outcome checkpoints", () => {
     });
     segment = ctx.db.rows("audioSegments").find((row) => row.segmentIndex === 1);
     expect(segment).toMatchObject({ state: "succeeded", attempts: 2, text: "tu Wojtek" });
+    // Round-2 finding 1: the step row must NOT freeze at the first
+    // (failed) outcome — the platform step reflects the completed truth.
+    step = ctx.db.rows("processingSteps").find((row) => row.stepKind === "stt_segment");
+    expect(step).toMatchObject({ state: "succeeded", outputRef: "transcribed" });
+    // And a succeeded row never regresses on later no-op replays.
+    await recordSegmentOutcomeTransaction(asTx(ctx), {
+      transcriptId: transcriptId as never,
+      segmentIndex: 1,
+      outcome: { kind: "already_succeeded" },
+    });
+    step = ctx.db.rows("processingSteps").find((row) => row.stepKind === "stt_segment");
+    expect(step).toMatchObject({ state: "succeeded" });
   });
 
   it("the transcript stays partial while any required segment is missing", async () => {
@@ -535,15 +550,17 @@ describe("review round-1 wiring: pins and attempt history", () => {
   it("provider attempts number sequentially within a pass (no duplicate attempt:1)", async () => {
     const transcriptId = await seedProofTranscript(1_200);
     await ensureManifestTransaction(asTx(ctx), transcriptId as never);
-    const fallbackOutcome: SegmentAttemptOutcome = {
-      kind: "succeeded",
-      text: "x",
-      servedModels: ["microsoft/mai-transcribe-2", "openai/whisper-large-v3"],
-      providerAttempts: [
-        { model: "microsoft/mai-transcribe-2", outcome: "failed", errorKind: "provider_unavailable", startedAtMs: 0, finishedAtMs: 1 },
-        { model: "openai/whisper-large-v3", outcome: "succeeded", startedAtMs: 1, finishedAtMs: 2 },
-      ],
-    };
+    const fallbackOutcome: SegmentAttemptOutcome = providerCallOutcome({
+      outcome: { outcome: "succeeded", value: { text: "x" } },
+      record: {
+        routeId: "speech_to_text",
+        routingConfigVersion: "e2.0",
+        attempts: [
+          { routeId: "speech_to_text", routingConfigVersion: "e2.0", requestedModel: "microsoft/mai-transcribe-2", outcome: "failed", failureKind: "provider_unavailable", fallbackEligible: true, startedAtMs: 0, finishedAtMs: 1 },
+          { routeId: "speech_to_text", routingConfigVersion: "e2.0", requestedModel: "openai/whisper-large-v3", outcome: "succeeded", startedAtMs: 1, finishedAtMs: 2 },
+        ],
+      },
+    });
     await recordSegmentOutcomeTransaction(asTx(ctx), {
       transcriptId: transcriptId as never,
       segmentIndex: 0,
@@ -555,5 +572,53 @@ describe("review round-1 wiring: pins and attempt history", () => {
       .filter((row) => row.stepId === stepId)
       .map((row) => row.attempt);
     expect(numbers).toEqual([1, 2]);
+    // Round-2 finding b: the segment's serving record lists ONLY the model
+    // whose attempt succeeded; the failed fallback position stays on the
+    // attempt history rows above.
+    const segment = ctx.db.rows("audioSegments").find((row) => row.segmentIndex === 0);
+    expect(segment?.servedModels).toEqual(["openai/whisper-large-v3"]);
+  });
+});
+
+describe("review round-2: the provider-call mapping", () => {
+  it("servedModels lists ONLY the models that actually served", () => {
+    const mapped = providerCallOutcome({
+      outcome: { outcome: "succeeded", value: { text: "tekst", usage: { seconds: 1.2, cost: 0.001 } } },
+      record: {
+        routeId: "speech_to_text",
+        routingConfigVersion: "e2.0",
+        attempts: [
+          { routeId: "speech_to_text", routingConfigVersion: "e2.0", requestedModel: "microsoft/mai-transcribe-2", outcome: "failed", failureKind: "provider_unavailable", fallbackEligible: true, startedAtMs: 0, finishedAtMs: 10 },
+          { routeId: "speech_to_text", routingConfigVersion: "e2.0", requestedModel: "openai/whisper-large-v3", outcome: "succeeded", startedAtMs: 10, finishedAtMs: 210 },
+        ],
+      },
+    });
+    expect(mapped.kind).toBe("succeeded");
+    if (mapped.kind !== "succeeded") {
+      return;
+    }
+    expect(mapped.servedModels).toEqual(["openai/whisper-large-v3"]);
+    expect(mapped.latencyMs).toBe(200);
+    expect(mapped.audioSeconds).toBe(1.2);
+    // Both route positions stay on the attempt history (requested + failed
+    // fallback first, serving backup second).
+    expect(mapped.providerAttempts).toEqual([
+      { model: "microsoft/mai-transcribe-2", outcome: "failed", errorKind: "provider_unavailable", startedAtMs: 0, finishedAtMs: 10 },
+      { model: "openai/whisper-large-v3", outcome: "succeeded", startedAtMs: 10, finishedAtMs: 210 },
+    ]);
+  });
+
+  it("uncertain provider failures carry the sanitized unknown vocabulary", () => {
+    const mapped = providerCallOutcome({
+      outcome: { outcome: "failed", failure: { kind: "deadline_exceeded", fallbackEligible: false } },
+      record: {
+        routeId: "speech_to_text",
+        routingConfigVersion: "e2.0",
+        attempts: [
+          { routeId: "speech_to_text", routingConfigVersion: "e2.0", requestedModel: "microsoft/mai-transcribe-2", outcome: "failed", failureKind: "deadline_exceeded", fallbackEligible: false, startedAtMs: 0, finishedAtMs: 55_000 },
+        ],
+      },
+    });
+    expect(mapped).toMatchObject({ kind: "failed", errorKind: "deadline_exceeded", uncertain: true });
   });
 });

@@ -136,25 +136,18 @@ export function s3ObjectReader(env: {
   return {
     ok: true,
     read: async (objectKey, range) => {
-      // HEAD first: a missing object must answer null, not a body error.
-      let response: Response;
+      // ONE signed request (round-2 finding c): the GET alone answers
+      // 404/403 for missing/unreadable objects — a HEAD-first probe would
+      // double every segment's signed-request count for no information.
       try {
-        response = await signedFetch(config, objectKey, { method: "HEAD" });
-      } catch {
-        return null;
-      }
-      if (response.status === 404 || response.status === 403) {
-        return null;
-      }
-      try {
-        const get = await signedFetch(config, objectKey, {
+        const response = await signedFetch(config, objectKey, {
           method: "GET",
           ...(range === undefined ? {} : { range }),
         });
-        if (get.status !== 200 && get.status !== 206) {
+        if (response.status !== 200 && response.status !== 206) {
           return null;
         }
-        return new Uint8Array(await get.arrayBuffer());
+        return new Uint8Array(await response.arrayBuffer());
       } catch {
         return null;
       }

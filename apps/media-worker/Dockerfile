@@ -5,9 +5,12 @@
 #   PCM WAV slicing exact and FFmpeg conversion arriving with the container
 #   follow-up (non-WAV answers `format_requires_container` until then).
 # - No credentials are baked in: R2 media S3 keys and the segment bearer
-#   token arrive as container runtime env, never as image layers.
-# - Deploying requires the Containers runtime (Workers Paid enablement —
-#   BLOCKED owner action recorded in the D6 evidence).
+#   token arrive as container runtime env (forwarded by the DO class),
+#   never as image layers.
+# - Deploy state (observed live by D6): this image builds for linux/amd64,
+#   deploys and serves under the EU jurisdiction constraints on the current
+#   account — the preflight's Workers-Paid assumption did not materialize.
+#   The only pending owner action is the R2 media S3 token (dashboard).
 
 # linux/amd64 explicitly: local docker on arm64 Macs would otherwise build
 # an arm64 image the Cloudflare Container VM cannot run (requirement:

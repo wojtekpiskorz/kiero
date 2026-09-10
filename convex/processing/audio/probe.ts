@@ -339,14 +339,3 @@ export const probeTranscriptState = action({
     return ctx.runQuery(internal.processing.audio.probe.transcriptInspection, args);
   },
 });
-
-/** TEMPORARY D6 diagnostic (removed before handover): env visibility. */
-export const d6DebugEnv = action({
-  args: {},
-  handler: async (): Promise<ResultEnvelope> =>
-    okResult({
-      probe: process.env.KIERO_PROBE_ENABLED === "1",
-      b1: process.env.KIERO_B1_PROBE_ENABLED === "1",
-      mediaUrlSet: process.env.KIERO_MEDIA_WORKER_URL !== undefined,
-    }),
-});

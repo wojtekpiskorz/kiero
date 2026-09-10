@@ -11,14 +11,17 @@
 // docs/evidence/environment/preflight-2026-09.md (that table stays the
 // single ownership source).
 //
-// Deploy blockers recorded by D6 (owner actions, not code):
-// - Containers runtime needs Workers Paid enablement; `wrangler deploy`
-//   refuses until the plan is enabled. Evidence: BLOCKED rows in the D6
-//   issue report.
-// - R2 media S3 credentials (`R2_MEDIA_ACCESS_KEY_ID` /
-//   `R2_MEDIA_SECRET_ACCESS_KEY`, dashboard-issued media-bucket token) are
-//   injected by the owning deploy flow; until then the entry answers every
-//   byte operation with the typed `s3_not_configured` refusal.
+// Deploy state recorded by D6 (observed live, 2026-09-10):
+// - The Containers runtime DEPLOYED AND SERVED on this account with the EU
+//   jurisdiction constraints active — the preflight's assumed Workers-Paid
+//   blocker did NOT materialize (the pre-flight assumption is disproven;
+//   `kiero-dev-media-worker.<subdomain>.workers.dev` served /healthz and
+//   the guarded protocol from the real container). No plan action pending.
+// - The ONE remaining owner action: the R2 media S3 credentials
+//   (`R2_MEDIA_ACCESS_KEY_ID` / `R2_MEDIA_SECRET_ACCESS_KEY`,
+//   dashboard-issued media-bucket token). Until they are injected, every
+//   byte operation answers the typed `not_configured` refusal — honest
+//   pending, never a fabricated read.
 //
 // Media bytes live in the eu-jurisdiction R2 bucket (gateway binding); this
 // container addresses it via S3 credentials (see

@@ -14,8 +14,9 @@
  *   + port forwarding) and injects the Worker's secret names into the
  *   container process env — values never live in the repo.
  *
- * What honestly does NOT exist yet (owner actions, recorded in the D6
- * evidence):
+ * Deploy state (observed live by D6): the container builds, deploys and
+ * serves on the current account — no Workers-Paid blocker exists. What
+ * honestly does NOT exist yet:
  * - the media-bucket S3 API token (dashboard-issued) — until the values are
  *   injected, every byte operation answers the typed `not_configured`
  *   refusal, never a fake success;

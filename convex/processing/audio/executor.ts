@@ -33,7 +33,12 @@
 import { v } from "convex/values";
 import { Schema } from "effect";
 import { start, vResultValidator } from "@convex-dev/workflow";
-import { runTranscription, type OpenRouterCredentials } from "@kiero/providers";
+import {
+  runTranscription,
+  type OpenRouterCredentials,
+  type RouteCallResult,
+  type SttTranscription,
+} from "@kiero/providers";
 import { transcribeSegmentInput } from "@kiero/contracts";
 import { internal } from "../../_generated/api";
 import { internalAction, internalMutation, internalQuery } from "../../_generated/server";
@@ -309,6 +314,62 @@ export const segmentWork = internalQuery({
   },
 });
 
+/**
+ * Maps one E2 adapter call record onto the journal outcome (round-2
+ * finding b: `servedModels` lists ONLY the models whose attempts actually
+ * served; requested-but-failed fallback positions stay on the per-attempt
+ * history rows). Pure: unit-tested directly over runner-record shapes.
+ */
+export function providerCallOutcome(
+  call: RouteCallResult<SttTranscription>,
+): SegmentAttemptOutcome {
+  const providerAttempts = call.record.attempts.map((attempt) => ({
+    model: attempt.requestedModel,
+    outcome:
+      attempt.outcome === "succeeded"
+        ? ("succeeded" as const)
+        : UNCERTAIN_FAILURE_KINDS.has(attempt.failureKind ?? "")
+          ? ("unknown" as const)
+          : ("failed" as const),
+    ...(attempt.failureKind === undefined ? {} : { errorKind: attempt.failureKind }),
+    startedAtMs: attempt.startedAtMs,
+    finishedAtMs: attempt.finishedAtMs,
+  }));
+  if (call.outcome.outcome === "failed") {
+    const kind = call.outcome.failure.kind;
+    return {
+      kind: "failed",
+      errorKind: kind,
+      uncertain: UNCERTAIN_FAILURE_KINDS.has(kind),
+      providerAttempts,
+    };
+  }
+  const value = call.outcome.value;
+  const serving = call.record.attempts[call.record.attempts.length - 1];
+  const latencyMs = serving === undefined ? undefined : serving.finishedAtMs - serving.startedAtMs;
+  return {
+    kind: "succeeded",
+    text: value.text,
+    servedModels: [
+      ...call.record.attempts
+        .filter((attempt) => attempt.outcome === "succeeded")
+        .map((attempt) => attempt.requestedModel),
+    ],
+    ...(call.record.routingConfigVersion === undefined
+      ? {}
+      : { routingConfigVersion: call.record.routingConfigVersion }),
+    ...(latencyMs === undefined ? {} : { latencyMs }),
+    ...(value.usage === undefined
+      ? {}
+      : {
+          ...(value.usage.totalTokens === undefined ? {} : { usageTokens: value.usage.totalTokens }),
+          ...(value.usage.seconds === undefined ? {} : { audioSeconds: value.usage.seconds }),
+          ...(value.usage.cost === undefined ? {} : { costUsd: value.usage.cost }),
+        }),
+    providerAttempts,
+  };
+}
+
 export const attemptSegment = internalAction({
   args: { transcriptId: v.id("audioTranscripts"), segmentIndex: v.float64() },
   handler: async (ctx, args): Promise<SegmentAttemptOutcome> => {
@@ -364,54 +425,15 @@ export const attemptSegment = internalAction({
       return { kind: "failed", errorKind: "provider_key_not_configured" };
     }
     // The accepted STT route order (mai -> whisper) lives INSIDE E2's
-    // adapter; this call is one segment's bounded pass over that route.
-    const call = await runTranscription(credentials, {
-      audioBase64: bytes.audioBase64,
-      audioFormat: "wav",
-      language: "pl",
-    });
-    const providerAttempts = call.record.attempts.map((attempt) => ({
-      model: attempt.requestedModel,
-      outcome:
-        attempt.outcome === "succeeded"
-          ? ("succeeded" as const)
-          : UNCERTAIN_FAILURE_KINDS.has(attempt.failureKind ?? "")
-            ? ("unknown" as const)
-            : ("failed" as const),
-      ...(attempt.failureKind === undefined ? {} : { errorKind: attempt.failureKind }),
-      startedAtMs: attempt.startedAtMs,
-      finishedAtMs: attempt.finishedAtMs,
-    }));
-    if (call.outcome.outcome === "failed") {
-      const kind = call.outcome.failure.kind;
-      return {
-        kind: "failed",
-        errorKind: kind,
-        uncertain: UNCERTAIN_FAILURE_KINDS.has(kind),
-        providerAttempts,
-      };
-    }
-    const value = call.outcome.value;
-    const serving = call.record.attempts[call.record.attempts.length - 1];
-    const latencyMs =
-      serving === undefined ? undefined : serving.finishedAtMs - serving.startedAtMs;
-    return {
-      kind: "succeeded",
-      text: value.text,
-      servedModels: [...call.record.attempts.map((attempt) => attempt.requestedModel)],
-      ...(call.record.routingConfigVersion === undefined
-        ? {}
-        : { routingConfigVersion: call.record.routingConfigVersion }),
-      ...(latencyMs === undefined ? {} : { latencyMs }),
-      ...(value.usage === undefined
-        ? {}
-        : {
-            ...(value.usage.totalTokens === undefined ? {} : { usageTokens: value.usage.totalTokens }),
-            ...(value.usage.seconds === undefined ? {} : { audioSeconds: value.usage.seconds }),
-            ...(value.usage.cost === undefined ? {} : { costUsd: value.usage.cost }),
-          }),
-      providerAttempts,
-    };
+    // adapter; this call is one segment's bounded pass over that route, and
+    // the pure mapping owns every recorded field.
+    return providerCallOutcome(
+      await runTranscription(credentials, {
+        audioBase64: bytes.audioBase64,
+        audioFormat: "wav",
+        language: "pl",
+      }),
+    );
   },
 });
 
@@ -568,6 +590,19 @@ async function ensureStepRow(
     .collect();
   const ours = existing.find((row) => row.stepKind === SEGMENT_STEP_KIND);
   if (ours !== undefined) {
+    // The step row must reflect the LATEST pass, not freeze at the first
+    // outcome (round-2 finding 1: the fail-then-succeed resume — the
+    // interrupt fixture's exact case — left a failed STT step under a
+    // completed transcript forever). Like E3's recordStep, a non-terminal
+    // or superseded row is patched; a succeeded row never regresses (the
+    // segment checkpoint makes later failures on it unreachable).
+    if (outcome.kind === "succeeded" && ours.state !== "succeeded") {
+      await ctx.db.patch(ours._id, {
+        state: "succeeded",
+        outputRef: "transcribed",
+        finishedAtMs: Date.now(),
+      });
+    }
     return ours._id;
   }
   return ctx.db.insert("processingSteps", {

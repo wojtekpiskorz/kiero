@@ -431,6 +431,15 @@ record(
   `state=${completeRow?.state} target=${resumedTarget?.state}:${resumedTarget?.attempts} others=${resumedOthers.map((row) => `${row.segmentIndex}:${row.attempts}`).join(",")}`,
 );
 const manifestAfter = finalSegments.map((row) => [row.startMs, row.endMs]);
+const sttStepsAfterResume = (completeRow?.sttSteps ?? []).filter((step) => step.sequence >= 1_000_000);
+record(
+  "L3f2 the resumed segment's PLATFORM STEP row reflects the completed truth (no frozen failed STT step under a complete transcript)",
+  sttStepsAfterResume.length === finalSegments.length &&
+    sttStepsAfterResume.every((step) => step.state === "succeeded")
+    ? "PASS"
+    : "FAIL",
+  sttStepsAfterResume.map((step) => `${step.sequence}:${step.state}:${step.outputRef}`).join(","),
+);
 record(
   "L3g original-time offsets are STABLE across the interrupt/resume (manifest immutable)",
   JSON.stringify(manifestBefore) === JSON.stringify(manifestAfter) ? "PASS" : "FAIL",
