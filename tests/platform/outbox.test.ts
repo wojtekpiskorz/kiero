@@ -147,10 +147,15 @@ describe("drain event projection (three-way)", () => {
     expect(projectEventToJobInput("operations.diagnosticEmitted", {}, "dk")).toEqual({
       kind: "no_consumer",
     });
-    // A registered edge without a projection reports itself loudly.
-    expect(projectEventToJobInput("sources.sourceAccepted", {}, "dk")).toEqual({
-      kind: "unprojected_edge",
+    // E3 owns this edge's projection: an accepted source drains into the
+    // extract executor, which resolves the text extraction in-company when
+    // the payload cannot name it (D1's publisher registered the real job
+    // atomically under the same dedup key).
+    expect(projectEventToJobInput("sources.sourceAccepted", { sourceId: "s1" }, "dk")).toEqual({
+      kind: "job",
       jobKind: "processing.extract_fragments",
+      input: { sourceId: "s1", extractionId: null },
+      dedupKey: "dk",
     });
     expect(CONSUMER_PROJECTION_MISSING).toBe("consumer_projection_missing");
   });

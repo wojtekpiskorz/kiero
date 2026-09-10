@@ -9,10 +9,9 @@ import { Schema } from "effect";
 import { DateRange, executors } from "@kiero/contracts";
 import { jobExecutors } from "../../convex/platform/executors";
 import { echoExecutor } from "../../convex/platform/echo";
-import { analyzeChangePlanExecutor } from "../../convex/platform/pipeline";
 
 describe("convex executor composition", () => {
-  it("registers exactly the platform mechanical executors plus the B3 access cleanup", () => {
+  it("registers exactly the implemented executors (platform + B3 + E3 text lane)", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
       [
         "platform.echo_delivery",
@@ -20,10 +19,13 @@ describe("convex executor composition", () => {
         // B3's sanctioned append (issue #22 owns the declared consumer
         // proof for the access-revocation edges).
         "access.cleanup_revocation",
+        // E3's sanctioned append (issue #37 owns the text-analysis lane:
+        // the mechanical A3 analyze executor is replaced behind the same
+        // seam by the real workflow, and the extract edge is implemented).
+        "processing.extract_fragments",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");
-    expect(analyzeChangePlanExecutor.jobKind).toBe("processing.analyze_change_plan");
   });
 
   it("every registered kind exists in the A2/A3 registry executor table", () => {
