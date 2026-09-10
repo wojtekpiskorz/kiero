@@ -21,6 +21,10 @@ export const DurableJobKind = Schema.Literals([
   "processing.extract_fragments",
   "processing.analyze_change_plan",
   "processing.normalize_photo",
+  // E4 amendment (flagged coordinated change, the D6 precedent): the
+  // multimodal-join executor over one mixed source's extraction outcomes
+  // (issue #38).
+  "processing.join_multimodal",
   "memory.publish_change_set",
   "memory.recompute_dependents",
   // A3 certification rename (one concept, one name): the module surface is
