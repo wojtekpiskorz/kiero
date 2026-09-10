@@ -1,8 +1,8 @@
 /**
- * Pure withdrawal-recomputation rules (C5): the dependency traversal that
- * locates affected findings and the revalidation-state decisions that decide
- * what happens to them — the "Źródło wycofane" half C2's marking core does
- * not cover (derivation-only dependents located through findingDependencies).
+ * Pure withdrawal-recomputation rules (C5): the revalidation-state decisions
+ * that decide what happens to affected findings — the "Źródło wycofane"
+ * half C2's marking core does not cover (derivation-only dependents located
+ * through findingDependencies).
  *
  * Protocol step 8 (architecture design): "Dependent inferred conclusions
  * become updating until revalidated and cannot drive automation; unrelated
@@ -11,6 +11,13 @@
  * finding is excluded from automation (work dueness gates on anything not
  * `known`), and the marking is replaced only by a newer publication or an
  * explicit correction — revalidation.
+ *
+ * Deliberately NO traversal lives here (review round 2): the durable
+ * cascade's mechanism is marking idempotence — a finding is marked at most
+ * once, so the walk terminates without a visited set, and cycle safety is
+ * pinned where the graph invariant is enforced (findings/provenance's
+ * `wouldCreateCycle`, checked at prepare and publish). Graph walks for
+ * later consumers (E5 search reindexing, I4 purge) arrive with those lanes.
  *
  * Everything here is pure (no I/O, no Convex); the durable executor in
  * convex/memory/recompute runs these decisions inside its own transaction
@@ -55,92 +62,6 @@ export interface KnowledgeTagLike {
  */
 export function isUpdatingKnowledgeState(state: KnowledgeTagLike): boolean {
   return state._tag === "updating";
-}
-
-/**
- * Whether a finding's current revision has been revalidated after an
- * updating marking: the marking is a `withdrawal_marking` revision, so any
- * NEWER origin (a source-backed publication or an explicit correction)
- * replaced it. Precedence stays with meaning, never with arrival time.
- */
-export function isRevalidated(revisionOrigin: string, knowledgeTag: string): boolean {
-  if (isUpdatingKnowledgeState({ _tag: knowledgeTag })) {
-    return false;
-  }
-  return revisionOrigin === "publication" || revisionOrigin === "correction";
-}
-
-// ---------------------------------------------------------------------------
-// The dependency traversal (tenant edges are supplied by the caller; the
-// tenant scope itself is the transaction layer's job). The durable executor
-// realizes this walk ONE bounded level per transaction (the cascade through
-// memory.dependentsMarkedStale); these pure functions are its model and the
-// later graph consumers' (E5 search reindexing, I4 purge) reusable core.
-// ---------------------------------------------------------------------------
-
-/**
- * One direct-dependents batch of a resumable walk: the dependents of the
- * current frontier that were not visited yet. Pure and deterministic, so a
- * crashed walk replays to the same batches (the committed marking revisions
- * and the published events are the durable checkpoints between them).
- * All three dependency causes traverse; the per-cause decision happens at
- * marking time (decideDependentRecomputation).
- */
-export function nextDependentsBatch(
-  edges: readonly DependencyEdge[],
-  visited: ReadonlySet<string>,
-  frontier: readonly string[],
-): { readonly batch: string[]; readonly visited: ReadonlySet<string> } {
-  const nextVisited = new Set(visited);
-  for (const root of frontier) {
-    nextVisited.add(root);
-  }
-  const frontierSet = new Set(frontier);
-  const batch: string[] = [];
-  for (const edge of edges) {
-    if (!frontierSet.has(edge.dependsOn)) {
-      continue;
-    }
-    if (!batch.includes(edge.dependent) && !visited.has(edge.dependent)) {
-      batch.push(edge.dependent);
-    }
-  }
-  for (const id of batch) {
-    nextVisited.add(id);
-  }
-  return { batch, visited: nextVisited };
-}
-
-/**
- * The full cycle-safe dependents walk from a set of root findings (breadth
- * first, every finding at most once). Acyclicity is a graph INVARIANT
- * (checked at prepare and publish), but corrupted or concurrently-built
- * graphs must not hang the walk: the visited set terminates any cycle.
- * Used by tests to pin diamond merges, deep chains and cycle safety; the
- * executor consumes the per-level batches instead so each level is one
- * bounded durable transaction.
- */
-export function traverseDependents(
-  edges: readonly DependencyEdge[],
-  roots: readonly string[],
-): { readonly levels: string[][]; readonly visited: readonly string[] } {
-  const visited = new Set<string>();
-  const levels: string[][] = [];
-  let frontier = [...new Set(roots)];
-  for (const root of frontier) {
-    visited.add(root);
-  }
-  while (frontier.length > 0) {
-    const { batch, visited: nextVisited } = nextDependentsBatch(edges, visited, frontier);
-    for (const id of nextVisited) {
-      visited.add(id);
-    }
-    if (batch.length > 0) {
-      levels.push(batch);
-    }
-    frontier = batch;
-  }
-  return { levels, visited: [...visited] };
 }
 
 /** The direct dependents of one finding, deduplicated, order-stable. */
@@ -189,9 +110,10 @@ export interface DependentRecomputationInput {
  *   automation, NOT discarded);
  * - `retain`: the dependent stands on its own — an explicit correction keeps
  *   its authority, an own live witness survives ("independent evidence
- *   survives"), an already-marked finding is not marked twice (idempotence),
- *   and a non-derivation edge (shared evidence, assignment) is judged by the
- *   witness-based marking core instead, which already ran;
+ *   survives"), an already-marked finding is not marked twice (idempotence,
+ *   and the cascade's termination guarantee), and a non-derivation edge
+ *   (shared evidence, assignment) is judged by the witness-based marking
+ *   core instead, which already ran;
  * - `gone`: the dependent (or its revision) no longer exists — nothing to do.
  */
 export type DependentRecomputationDecision =

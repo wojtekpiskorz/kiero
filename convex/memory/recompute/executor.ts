@@ -45,14 +45,14 @@
  * between the withdrawal transaction and this reaction, and an
  * `actor_session_unavailable` retry exhausts in seconds, leaving a
  * withdrawn source whose findings stay known and automation-eligible.
- * The marking here is therefore IDENTITY-INDEPENDENT: it runs the SAME
- * pure decision C2's marking core uses (`decideWithdrawalMarking`) and
- * writes the SAME revision shape, but takes the tenant and the recording
- * user directly — the withdrawal's actor (fallback: the source's author),
- * both real user rows recorded honestly as the marking's author, with the
- * system-driven nature explicit in the revision's reason and origin. C2's
- * `performWithdrawalMarking` stays the session-backed entry for callers
- * that have one (its guarded probe); the pure decision cannot drift.
+ * The marking here is therefore IDENTITY-INDEPENDENT: it calls the ONE
+ * parameterized core (`markWithdrawnSupport`, ../findings/withdrawal.ts)
+ * with the tenant and the recording user as arguments — the withdrawal's
+ * actor (fallback: the source's author), both real user rows recorded
+ * honestly as the marking's author, with the system-driven nature explicit
+ * in the revision's reason and origin. C2's `performWithdrawalMarking` is
+ * the same core behind the RequestContext-backed entry; the revision row,
+ * projection patch and event payload exist exactly once.
  *
  * Recompute = linked re-analysis that cannot overwrite a newer correction:
  *   E3's publish re-checks the analysis's input revisions against CURRENT
@@ -70,23 +70,20 @@
 import { Schema } from "effect";
 import { events, executors } from "@kiero/contracts";
 import {
-  decideWithdrawalMarking,
   dependentUpdatingReason,
   directDependents,
-  explicitUnknown,
   explicitUpdating,
   groupRecomputeBatches,
   decideDependentRecomputation,
-  sourceWithdrawnReason,
   updatingUntilRevalidatedReason,
-  type EvidenceSupportRef,
   type RecomputeTarget,
 } from "@kiero/domain";
 import { publishEvent, registerDurableJob } from "../../platform/publish";
 import type { JobExecutor } from "../../platform/executors";
 import type { MutationCtx } from "../../_generated/server";
 import type { Id, Doc } from "../../_generated/dataModel";
-import { encodeKnowledgeState } from "../findings/semantics";
+import { markWithdrawnSupport } from "../findings/withdrawal";
+import { encodeKnowledgeState, knowledgeTagOf } from "../findings/semantics";
 import { RECOMPUTE_PIPELINE_VERSION } from "./withdrawal";
 
 /** The decoded shape of this executor's input (registry schema authority). */
@@ -102,114 +99,6 @@ interface RecomputeInput {
 const ANALYSIS_RETRY_POLICY = { maxAttempts: 3, backoffBaseMs: 2_000 } as const;
 
 // ---------------------------------------------------------------------------
-// The witness-based marking (identity-independent; C2's pure decision).
-// ---------------------------------------------------------------------------
-
-/**
- * Marks the findings whose CURRENT revision was a publication supported
- * only by the withdrawn source: an explicit `unknown` with the withdrawal
- * reason, as a NEW revision (origin `withdrawal_marking`) whose value and
- * full history stay intact. Current revisions that stand on their own keep
- * standing (a second witness survives; an explicit correction is its own
- * resolution; an already-marked finding is not marked twice). Exactly
- * C2's `performWithdrawalMarking` semantics, driven by the same pure
- * `decideWithdrawalMarking`, but tenant+actor are parameters — the durable
- * reaction cannot depend on a live session existing (see the header).
- */
-async function markWithdrawnSupport(
-  tx: MutationCtx,
-  args: {
-    companyId: Id<"companies">;
-    actorUserId: Id<"users">;
-    sourceId: Id<"sources">;
-    reason: string;
-  },
-): Promise<void> {
-  const links = await tx.db
-    .query("evidenceLinks")
-    .withIndex("by_source", (q) => q.eq("sourceId", args.sourceId))
-    .collect();
-  const affectedRevisionIds = [
-    ...new Set(links.map((link) => link.findingRevisionId)),
-  ];
-  interface MarkingPlan {
-    readonly finding: Doc<"findings">;
-    readonly currentRevision: Doc<"findingRevisions">;
-  }
-  const markings: MarkingPlan[] = [];
-  for (const revisionId of affectedRevisionIds) {
-    const revision = await tx.db.get(revisionId);
-    if (revision === null) {
-      continue;
-    }
-    const finding = await tx.db.get(revision.findingId);
-    if (finding === null || finding.companyId !== args.companyId) {
-      continue; // tenant scope: foreign rows are never marked
-    }
-    // Only the CURRENT revision matters: older revisions are history.
-    if (finding.currentRevisionId !== revision._id) {
-      continue;
-    }
-    const currentLinks = await tx.db
-      .query("evidenceLinks")
-      .withIndex("by_revision", (q) => q.eq("findingRevisionId", revision._id))
-      .collect();
-    const evidence: EvidenceSupportRef[] = currentLinks.map((link) => ({
-      sourceId: link.sourceId,
-      supportKind: link.supportKind,
-    }));
-    const decision = decideWithdrawalMarking({
-      currentRevisionOrigin: revision.origin,
-      currentEvidence: evidence,
-      withdrawnSourceId: args.sourceId,
-    });
-    if (decision.decision === "mark_unknown") {
-      markings.push({ finding, currentRevision: revision });
-    }
-  }
-
-  const findingRevised = events["memory.findingRevised"];
-  if (findingRevised === undefined) {
-    throw new Error("recompute: memory.findingRevised missing from the registry");
-  }
-
-  const nowMs = Date.now();
-  for (const marking of markings) {
-    const markedKnowledge = encodeKnowledgeState(
-      explicitUnknown(sourceWithdrawnReason(args.reason)),
-    );
-    const revisionId = await tx.db.insert("findingRevisions", {
-      findingId: marking.finding._id,
-      revision: marking.finding.revisionCounter + 1,
-      // The value is preserved verbatim; only its epistemic state changes.
-      value: marking.currentRevision.value,
-      knowledgeState: markedKnowledge,
-      supersedesRevisionId: marking.currentRevision._id,
-      origin: "withdrawal_marking",
-      reason: args.reason,
-      recordedByUserId: args.actorUserId,
-      recordedAtMs: nowMs,
-    });
-    await tx.db.patch(marking.finding._id, {
-      currentRevisionId: revisionId,
-      knowledgeState: markedKnowledge,
-      revisionCounter: marking.finding.revisionCounter + 1,
-      updatedAtMs: nowMs,
-    });
-    await publishEvent(tx, {
-      companyId: args.companyId,
-      eventName: "memory.findingRevised",
-      payload: {
-        findingId: marking.finding._id,
-        revisionId,
-        supersedesRevisionId: marking.currentRevision._id,
-      },
-      dedupKey: `memory.findingRevised:${revisionId}`,
-    });
-  }
-}
-
-// ---------------------------------------------------------------------------
 // The roots: which findings did one withdrawal remove support from.
 // ---------------------------------------------------------------------------
 
@@ -217,9 +106,9 @@ async function markWithdrawnSupport(
  * The findings whose CURRENT revision is a withdrawal marking of THIS
  * withdrawal: the marking revision itself carries no evidence links (they
  * stay on the superseded revision it preserves verbatim), so the walk
- * resolves each source-linked revision to its FINDING and checks that
- * finding's current origin AND that the marking's reason equals this
- * withdrawal's reason — a marking left by a DIFFERENT withdrawal is never
+ * resolves each source-linked revision to its FINDING and matches the
+ * marking revision's `withdrawnSourceId` — attribution by SOURCE ID, never
+ * by reason text, so a marking left by a DIFFERENT withdrawal is never
  * adopted (its own reaction owns it). Fresh and prior markings of this
  * withdrawal alike, so a replayed or retried job derives the same root set
  * from committed state.
@@ -228,7 +117,6 @@ async function withdrawnRootFindings(
   db: MutationCtx["db"],
   companyId: Id<"companies">,
   sourceId: Id<"sources">,
-  reason: string,
 ): Promise<Id<"findings">[]> {
   const links = await db
     .query("evidenceLinks")
@@ -254,7 +142,7 @@ async function withdrawnRootFindings(
     if (
       currentRevision !== null &&
       currentRevision.origin === "withdrawal_marking" &&
-      currentRevision.reason === reason
+      currentRevision.withdrawnSourceId === sourceId
     ) {
       roots.push(finding._id);
     }
@@ -455,7 +343,7 @@ async function markStaleDependents(
     const decision = decideDependentRecomputation({
       cause: edge.cause,
       currentRevisionOrigin: currentRevision.origin,
-      currentKnowledgeTag: decodeKnowledgeTag(currentRevision.knowledgeState),
+      currentKnowledgeTag: knowledgeTagOf(currentRevision.knowledgeState),
       currentWitnesses: witnesses,
     });
     if (decision.decision === "mark_updating") {
@@ -525,15 +413,6 @@ async function markStaleDependents(
   await registerReanalysisGroups(tx, companyId, targets, args.triggerKey);
 }
 
-/** The `_tag` of an encoded knowledge state (the only field decisions read). */
-function decodeKnowledgeTag(encoded: unknown): string | null {
-  if (typeof encoded === "object" && encoded !== null && "_tag" in encoded) {
-    const tag = (encoded as { _tag: unknown })._tag;
-    return typeof tag === "string" ? tag : null;
-  }
-  return null;
-}
-
 // ---------------------------------------------------------------------------
 // The revalidation path: a basis became known again.
 // ---------------------------------------------------------------------------
@@ -570,7 +449,7 @@ async function revalidateUpdatingDependents(
     if (currentRevision === null) {
       continue;
     }
-    if (decodeKnowledgeTag(currentRevision.knowledgeState) !== "updating") {
+    if (knowledgeTagOf(currentRevision.knowledgeState) !== "updating") {
       continue;
     }
     if (currentRevision.provenance === undefined) {
@@ -637,16 +516,24 @@ export const recomputeDependentsExecutor: JobExecutor = {
       if (actorUserId === null) {
         return { outcome: "failed", errorKind: "actor_unresolved", retryable: false };
       }
-      // The marking is identity-independent (see the header): it never
-      // waits for a live session, so the reaction cannot die on identity
-      // availability after a withdrawal already committed.
-      await markWithdrawnSupport(ctx, {
+      // The marking is identity-independent (see the header): the shared
+      // core takes tenant + recording user directly, so the reaction never
+      // waits for a live session and cannot die on identity availability
+      // after a withdrawal already committed.
+      const marking = await markWithdrawnSupport(ctx, {
         companyId,
         actorUserId,
         sourceId: source._id,
         reason,
       });
-      const roots = await withdrawnRootFindings(ctx.db, companyId, source._id, reason);
+      if (marking._tag === "error") {
+        return {
+          outcome: "failed",
+          errorKind: `withdrawal_marking_refused:${marking.error.code}`,
+          retryable: false,
+        };
+      }
+      const roots = await withdrawnRootFindings(ctx.db, companyId, source._id);
       // Hand EVERY root (freshly marked here, or marked by an earlier
       // attempt of this same withdrawal — the carrier's revision-unique
       // dedup collapses the replay) to the cascade: the carrier jobs own
@@ -708,7 +595,7 @@ export const recomputeDependentsExecutor: JobExecutor = {
       const currentRevision = await ctx.db.get(root.currentRevisionId);
       if (
         currentRevision !== null &&
-        decodeKnowledgeTag(currentRevision.knowledgeState) === "known"
+        knowledgeTagOf(currentRevision.knowledgeState) === "known"
       ) {
         await revalidateUpdatingDependents(ctx, { companyId, rootFindingId, triggerKey });
       }

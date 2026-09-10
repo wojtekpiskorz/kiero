@@ -40,6 +40,7 @@ import {
   serviceIdentityUnavailable,
 } from "../../sources/probe_shared";
 import { dispatchSourcesCommand } from "../../sources/accept/dispatch";
+import { knowledgeTagOf } from "../findings/semantics";
 
 const PROOF_TZ = "Europe/Warsaw";
 const PROOF_SENT_AT_MS = Date.parse("2026-09-08T16:30:00.000Z"); // 18:30 Warsaw
@@ -330,14 +331,6 @@ export const probeWithdrawSource = action({
 
 // --- inspection -------------------------------------------------------------------
 
-function knowledgeTagOf(encoded: unknown): string | null {
-  if (typeof encoded === "object" && encoded !== null && "_tag" in encoded) {
-    const tag = (encoded as { _tag: unknown })._tag;
-    return typeof tag === "string" ? tag : null;
-  }
-  return null;
-}
-
 /** Tenant-scoped recomputation state for the evidence script (guarded read). */
 export const recomputeState = internalQuery({
   args: { serviceSessionId: v.string() },
@@ -376,6 +369,7 @@ export const recomputeState = internalQuery({
           origin: revision.origin,
           reason: revision.reason ?? null,
           provenanceSourceId: revision.provenance?.sourceId ?? null,
+          withdrawnSourceId: revision.withdrawnSourceId ?? null,
           recordedByUserId: revision.recordedByUserId,
           supersedesRevisionId: revision.supersedesRevisionId ?? null,
         });

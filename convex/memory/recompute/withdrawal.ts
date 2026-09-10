@@ -45,7 +45,6 @@ import {
   type RequestContext,
 } from "@kiero/runtime";
 import type { MutationCtx } from "../../_generated/server";
-import type { Id } from "../../_generated/dataModel";
 import { publishEvent, registerDurableJob } from "../../platform/publish";
 import { normalizedActor, normalizedCompany, requireSource } from "../findings/references";
 
@@ -172,11 +171,4 @@ export async function performWithdrawSource(
     dedupKey,
   });
   return okResult({ withdrawnAtMs: nowMs });
-}
-
-/** Narrow row shape other modules may need from a withdrawn source. */
-export interface WithdrawnSourceRow {
-  readonly _id: Id<"sources">;
-  readonly companyId: Id<"companies">;
-  readonly withdrawnReason?: string | undefined;
 }

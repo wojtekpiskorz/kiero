@@ -12,72 +12,13 @@ import { KnowledgeState } from "@kiero/contracts";
 import {
   decidePublish,
   deriveTaskDueness,
-  directDependents,
   decideDependentRecomputation,
   explicitUpdating,
   groupRecomputeBatches,
-  isRevalidated,
   isUpdatingKnowledgeState,
-  nextDependentsBatch,
-  traverseDependents,
   updatingUntilRevalidatedReason,
   dependentUpdatingReason,
-  type DependencyEdge,
 } from "@kiero/domain";
-
-const edge = (dependent: string, dependsOn: string): DependencyEdge => ({
-  dependent,
-  dependsOn,
-});
-
-describe("the dependency traversal (tenant edges supplied by the caller)", () => {
-  it("walks a dependent chain level by level from one root", () => {
-    const edges = [edge("d1", "root"), edge("d2", "d1"), edge("d3", "d2")];
-    const walk = traverseDependents(edges, ["root"]);
-    expect(walk.levels).toEqual([["d1"], ["d2"], ["d3"]]);
-    expect([...walk.visited].sort()).toEqual(["d1", "d2", "d3", "root"]);
-  });
-
-  it("merges diamonds without visiting a finding twice", () => {
-    // root -> a, root -> b, a -> c, b -> c.
-    const edges = [edge("a", "root"), edge("b", "root"), edge("c", "a"), edge("c", "b")];
-    const walk = traverseDependents(edges, ["root"]);
-    expect(walk.levels[0]?.sort()).toEqual(["a", "b"]);
-    expect(walk.levels[1]).toEqual(["c"]);
-    expect(walk.visited.filter((id) => id === "c")).toHaveLength(1);
-  });
-
-  it("is cycle-safe even on a graph that violates the acyclicity invariant", () => {
-    // x -> y -> z -> x plus a tail off z. The visited set must terminate it.
-    const cyclic = [edge("y", "x"), edge("z", "y"), edge("x", "z"), edge("t", "z")];
-    const walk = traverseDependents(cyclic, ["x"]);
-    expect([...walk.visited].sort()).toEqual(["t", "x", "y", "z"]);
-  });
-
-  it("never crosses into findings outside the supplied edges (tenant scope is the caller's)", () => {
-    const edges = [edge("d1", "root"), edge("foreign", "other")];
-    const walk = traverseDependents(edges, ["root"]);
-    expect(walk.levels).toEqual([["d1"]]);
-    expect(walk.visited).not.toContain("foreign");
-  });
-
-  it("resumes from a durable checkpoint: already-visited findings are skipped", () => {
-    const edges = [edge("d1", "root"), edge("d2", "d1"), edge("d3", "d2")];
-    // The first level committed and checkpointed {root, d1}.
-    const first = nextDependentsBatch(edges, new Set(["root"]), ["root"]);
-    expect(first.batch).toEqual(["d1"]);
-    const resumed = nextDependentsBatch(edges, new Set(["root", "d1"]), ["d1"]);
-    expect(resumed.batch).toEqual(["d2"]);
-    // Replaying the same checkpoint returns the same batch (idempotent).
-    expect(nextDependentsBatch(edges, new Set(["root", "d1"]), ["d1"]).batch).toEqual(["d2"]);
-  });
-
-  it("directDependents is stable and deduplicated", () => {
-    const edges = [edge("a", "root"), edge("a", "root"), edge("b", "root")];
-    expect(directDependents(edges, "root")).toEqual(["a", "b"]);
-    expect(directDependents(edges, "other")).toEqual([]);
-  });
-});
 
 describe("the dependent-marking decision", () => {
   const derivationArgs = {
@@ -175,15 +116,6 @@ describe("the updating-until-revalidated state", () => {
     expect(isUpdatingKnowledgeState({ _tag: "updating" })).toBe(true);
     expect(isUpdatingKnowledgeState({ _tag: "known" })).toBe(false);
     expect(isUpdatingKnowledgeState({ _tag: "unknown" })).toBe(false);
-  });
-
-  it("revalidation = a newer publication or correction replaced the marking", () => {
-    expect(isRevalidated("publication", "known")).toBe(true);
-    expect(isRevalidated("correction", "known")).toBe(true);
-    // The marking itself is not revalidation...
-    expect(isRevalidated("withdrawal_marking", "updating")).toBe(false);
-    // ...and even a publication-tagged revision still updating is not.
-    expect(isRevalidated("publication", "updating")).toBe(false);
   });
 
   it("excludes updating findings from automation exactly like C4's dueness gate", () => {
