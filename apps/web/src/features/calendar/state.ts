@@ -181,6 +181,8 @@ export const settingsCopy = {
   hideCopy: "Ukryj osobiście",
   restoreCopy: "Przywróć w kalendarzu",
   checkCopy: "Sprawdź teraz",
+  checkNowHint:
+    "Są pozycje wymagające doprowadzenia do porządku: użyj przycisku „Sprawdź teraz” przy pozycjach poniżej.",
   actionsUnavailableNote:
     "Działania na kopiach są teraz niedostępne, bo kalendarz nie jest połączony. Połącz kalendarz ponownie, żeby nimi zarządzać.",
   hideDone: "Kopia ukryta. Zadanie lub zdarzenie w Kiero pozostaje bez zmian.",
@@ -207,10 +209,9 @@ export interface StatusLine {
  */
 export function syncStatusLines(overview: SyncOverviewView): readonly StatusLine[] {
   if (overview.reconnectNeeded) {
-    return [
-      { role: "alert", text: reasonText(overview.reconnectReason) },
-      { role: "status", text: settingsCopy.reconnectPointer },
-    ];
+    // The recovery POINTER lives with the next-actions copy (the section
+    // renders it from syncNextActions); the alert states WHY work stopped.
+    return [{ role: "alert", text: reasonText(overview.reconnectReason) }];
   }
   const lines: StatusLine[] = [];
   if (overview.copies.pending > 0) {

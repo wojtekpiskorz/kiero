@@ -31,6 +31,7 @@ import {
   copyStatusLabel,
   settingsCopy,
   subjectHref,
+  syncNextActions,
   syncStatusLines,
   type CopyRowView,
   type ProjectionOverviewView,
@@ -62,21 +63,14 @@ export function CalendarSettings({ actionsEnabled }: { readonly actionsEnabled: 
   const projectionView: ProjectionOverviewView = projection.data;
   // Without the actor's own connection row there is nothing to operate on;
   // the connection panel above already explains those states. The lean
-  // read branches carry only `state`, so the field check is the honest
-  // runtime narrowing before the one documented cast below.
-  const raw = sync.data as Partial<SyncOverviewView>;
-  if (
-    typeof raw.reconnectNeeded !== "boolean" ||
-    typeof raw.copies !== "object" ||
-    raw.copies === null ||
-    typeof raw.attempts !== "object" ||
-    raw.attempts === null
-  ) {
+  // read branches carry only `state`, so the full branch's discriminator
+  // is the honest narrowing: `reconnectNeeded` exists on the full branch
+  // alone, and the assignment below turns server-side shape drift into a
+  // compile error instead of a silently blanked section.
+  if (!("reconnectNeeded" in sync.data) || typeof sync.data.reconnectNeeded !== "boolean") {
     return null;
   }
-  // The single documented cast (the convex-ids.ts pattern): the query's
-  // full branch and SyncOverviewView are the same wire shape.
-  const overview: SyncOverviewView = raw as SyncOverviewView;
+  const overview: SyncOverviewView = sync.data;
   const children: ReactNode[] = [
     createElement(DiagnosticsSection, {
       overview,
@@ -115,6 +109,19 @@ export function DiagnosticsSection({
   for (const line of syncStatusLines(overview)) {
     children.push(createElement("p", { role: line.role }, line.text));
   }
+  // The RECOVERY copy renders from syncNextActions (the same model the
+  // surface tests assert): one home decides which recoveries the screen
+  // honestly offers, never a blind recreate.
+  const actions = syncNextActions(overview);
+  for (const action of actions) {
+    if (action === "reconnect") {
+      children.push(createElement("p", { role: "status" }, settingsCopy.reconnectPointer));
+    } else if (action === "check_now") {
+      children.push(createElement("p", { role: "status" }, settingsCopy.checkNowHint));
+    } else {
+      children.push(createElement("p", { role: "note" }, settingsCopy.cleanupResidueNote));
+    }
+  }
   children.push(
     createElement(
       "p",
@@ -124,9 +131,6 @@ export function DiagnosticsSection({
         : settingsCopy.lastSyncedAt(overview.lastConfirmedAtMs),
     ),
   );
-  if (overview.cleanupRemains) {
-    children.push(createElement("p", { role: "note" }, settingsCopy.cleanupResidueNote));
-  }
   return createElement("section", null, ...children);
 }
 
@@ -226,7 +230,7 @@ export function CopiesSection({
             createElement(CopyRow, {
               copy,
               actionsEnabled,
-              busy: busyCopyId === copy.copyId,
+              busy: busyCopyId !== null,
               onHide: () => void run("hide", copy),
               onRestore: () => void run("restore", copy),
               onCheck: () => void run("check", copy),
