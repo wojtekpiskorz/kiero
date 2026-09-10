@@ -120,6 +120,13 @@ import type * as memory_findings_withdrawal from "../memory/findings/withdrawal.
 import type * as memory_recompute_executor from "../memory/recompute/executor.js";
 import type * as memory_recompute_probe from "../memory/recompute/probe.js";
 import type * as memory_recompute_withdrawal from "../memory/recompute/withdrawal.js";
+import type * as operations_processing_cores from "../operations/processing/cores.js";
+import type * as operations_processing_dispatch from "../operations/processing/dispatch.js";
+import type * as operations_processing_functions from "../operations/processing/functions.js";
+import type * as operations_processing_operations from "../operations/processing/operations.js";
+import type * as operations_processing_probe from "../operations/processing/probe.js";
+import type * as operations_processing_store from "../operations/processing/store.js";
+import type * as operations_processing_storeAdapter from "../operations/processing/storeAdapter.js";
 import type * as operations_telemetry_costs from "../operations/telemetry/costs.js";
 import type * as operations_telemetry_cron from "../operations/telemetry/cron.js";
 import type * as operations_telemetry_emit from "../operations/telemetry/emit.js";
@@ -313,6 +320,13 @@ declare const fullApi: ApiFromModules<{
   "memory/recompute/executor": typeof memory_recompute_executor;
   "memory/recompute/probe": typeof memory_recompute_probe;
   "memory/recompute/withdrawal": typeof memory_recompute_withdrawal;
+  "operations/processing/cores": typeof operations_processing_cores;
+  "operations/processing/dispatch": typeof operations_processing_dispatch;
+  "operations/processing/functions": typeof operations_processing_functions;
+  "operations/processing/operations": typeof operations_processing_operations;
+  "operations/processing/probe": typeof operations_processing_probe;
+  "operations/processing/store": typeof operations_processing_store;
+  "operations/processing/storeAdapter": typeof operations_processing_storeAdapter;
   "operations/telemetry/costs": typeof operations_telemetry_costs;
   "operations/telemetry/cron": typeof operations_telemetry_cron;
   "operations/telemetry/emit": typeof operations_telemetry_emit;
