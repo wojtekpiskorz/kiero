@@ -153,8 +153,56 @@ const latestRun = (sourceId) =>
   anon().action("processing/text/probe:probeLatestRunForSource", { sourceId });
 
 /**
+ * Polls the PUBLIC conversation view until the source's row reaches a
+ * terminal derived state (or the budget ends; null then). The optional
+ * callback observes every distinct state, so callers can record the
+ * transition timeline. One helper for every wait in this proof.
+ */
+async function waitForTerminal(client, sourceId, timeoutMs, onState) {
+  const deadline = Date.now() + timeoutMs;
+  let last = null;
+  while (Date.now() < deadline) {
+    const page = await conversation(client);
+    const found = isOk(page) ? page.value.page.find((entry) => entry.sourceId === sourceId) : undefined;
+    const state = found === undefined ? null : found.processingState;
+    if (state !== null && state !== last) {
+      last = state;
+      if (onState !== undefined) {
+        onState(state);
+      }
+    }
+    if (found !== undefined && state !== "accepted" && state !== "processing") {
+      return found;
+    }
+    await sleep(2_000);
+  }
+  return null;
+}
+
+/**
+ * The durable processing footprint of one source: the latest run's identity
+ * and state plus its published change-set count — exactly the rows a
+ * duplicate registration would have to grow. Comparing snapshots around a
+ * replay window is what makes the no-duplicate-processing claim falsifiable.
+ */
+async function sourceProcessingSnapshot(sourceId, sessionId) {
+  const latest = await latestRun(sourceId);
+  if (!isOk(latest)) throw new Error(`no processing run for ${sourceId}`);
+  const state = await analysisState(latest.value.runId, sessionId);
+  if (!isOk(state)) throw new Error(`inspection read failed for ${sourceId}`);
+  return {
+    runId: latest.value.runId,
+    runState: state.value.run.state,
+    steps: state.value.steps.length,
+    publishedChangeSets: state.value.changeSets.filter(
+      (changeSet) => changeSet.sourceId === sourceId && changeSet.state === "published",
+    ).length,
+  };
+}
+
+/**
  * Sends one logical source through the PUBLIC path and waits for its
- * conversation row to reach a terminal derived state. Records the honest
+ * conversation row to reach a terminal derived state. Records the observed
  * state transitions, accept latency and total processing latency.
  */
 async function sendAndWait(client, sessionId, authorText, projectHints, sentAtIso, idempotencyKey, label) {
@@ -178,24 +226,13 @@ async function sendAndWait(client, sessionId, authorText, projectHints, sentAtIs
   note(`[${label}] accepted in ${acceptLatencyMs}ms (source ${sourceId})`);
 
   const transitions = [];
-  const deadline = Date.now() + 12 * 60 * 1000;
-  let row = null;
-  while (Date.now() < deadline) {
-    const page = await conversation(client);
-    const found = isOk(page) ? page.value.page.find((entry) => entry.sourceId === sourceId) : undefined;
-    if (found !== undefined && found.processingState !== transitions.at(-1)) {
-      transitions.push(found.processingState);
-      note(`[${label}] processing state: ${found.processingState} (+${Date.now() - t0}ms)`);
-    }
-    row = found ?? null;
-    if (row !== null && row.processingState !== "accepted" && row.processingState !== "processing") {
-      break;
-    }
-    await sleep(2_000);
-  }
+  let row = await waitForTerminal(client, sourceId, 12 * 60 * 1000, (state) => {
+    transitions.push(state);
+    note(`[${label}] processing state: ${state} (+${Date.now() - t0}ms)`);
+  });
   let totalMs = Date.now() - t0;
   if (row === null || row.processingState === "accepted" || row.processingState === "processing") {
-    // An honest stall window (E3 observed provider stalls too): inspect the
+    // A stall window (E3 observed provider stalls too): inspect the
     // durable run and record exactly where it stands, then recover through
     // the sanctioned mechanisms only — a never-started job gets the drain
     // kick (the cron safety net's synchronous twin); a provider-failed run
@@ -210,16 +247,7 @@ async function sendAndWait(client, sessionId, authorText, projectHints, sentAtIs
     if (runState === "running" && inspect.state.steps.length === 0) {
       note(`[${label}] the job never started (no steps): kicking the outbox drain (the safety net's synchronous twin)`);
       await anon().action("platform/probe:probeDrainNow", {});
-      const extraDeadline = Date.now() + 5 * 60 * 1000;
-      while (Date.now() < extraDeadline) {
-        const page = await conversation(client);
-        const found = isOk(page) ? page.value.page.find((entry) => entry.sourceId === sourceId) : undefined;
-        if (found !== undefined && found.processingState !== "accepted" && found.processingState !== "processing") {
-          row = found;
-          break;
-        }
-        await sleep(2_000);
-      }
+      row = await waitForTerminal(client, sourceId, 5 * 60 * 1000);
       totalMs = Date.now() - t0;
       note(`[${label}] post-drain state: ${row?.processingState ?? "still processing"} at +${totalMs}ms`);
     }
@@ -227,16 +255,7 @@ async function sendAndWait(client, sessionId, authorText, projectHints, sentAtIs
       note(`[${label}] run failed inside the window: bounded model-stage restart, then re-watch`);
       const recovered = await inspectRun(sourceId, sessionId, label, 2);
       note(`[${label}] recovery outcome: ${recovered.state.run.state}`);
-      const extraDeadline = Date.now() + 5 * 60 * 1000;
-      while (Date.now() < extraDeadline) {
-        const page = await conversation(client);
-        const found = isOk(page) ? page.value.page.find((entry) => entry.sourceId === sourceId) : undefined;
-        if (found !== undefined && found.processingState !== "accepted" && found.processingState !== "processing") {
-          row = found;
-          break;
-        }
-        await sleep(2_000);
-      }
+      row = await waitForTerminal(client, sourceId, 5 * 60 * 1000);
       totalMs = Date.now() - t0;
       note(`[${label}] post-restart state: ${row?.processingState ?? "still processing"} at +${totalMs}ms`);
     }
@@ -463,28 +482,50 @@ let bananScope = null;
 // Phase 4: the idempotency windows — duplicate submit and unknown response.
 // ---------------------------------------------------------------------------
 {
-  // The lost-response retry: the SAME envelope and idempotency key re-sent
-  // after a confirmed acceptance (the unknown-response window's recovery).
+  // The idempotency windows, exercised so they CAN fail: the durable
+  // processing footprint (latest run identity + state + published
+  // change-set count) is snapshotted BEFORE the window, then the SAME
+  // logical source — same idempotency key, same upload (prepare replays its
+  // draft) — is accepted twice CONCURRENTLY (the duplicate-submit race) and
+  // once more sequentially (the lost-response replay). D1's key-idempotent
+  // acceptance must return the SAME source receipt from all three and grow
+  // none of the footprint rows; a broken idempotency path fails these
+  // checks with a second source, a conflict envelope or a grown snapshot.
+  const before = await sourceProcessingSnapshot(a.sourceId, A.sessionId);
   const prepared = await prepareUpload(A.client, A_KEY);
-  const replay = await acceptSource(
-    A.client,
-    {
-      uploadId: value(prepared).uploadId,
-      authorText: A_TEXT,
-      intendedSentAtIso: A_SENT_AT,
-      timezoneSnapshot: "Europe/Warsaw",
-      projectHints: [BANAN],
-    },
-    A_KEY,
+  const acceptInput = {
+    uploadId: value(prepared).uploadId,
+    authorText: A_TEXT,
+    intendedSentAtIso: A_SENT_AT,
+    timezoneSnapshot: "Europe/Warsaw",
+    projectHints: [BANAN],
+  };
+  const [racing1, racing2] = await Promise.all([
+    acceptSource(A.client, acceptInput, A_KEY),
+    acceptSource(A.client, acceptInput, A_KEY),
+  ]);
+  const replay = await acceptSource(A.client, acceptInput, A_KEY);
+  check(
+    "P4/duplicate-submit-and-replay-collapse",
+    isOk(racing1) && isOk(racing2) && isOk(replay) &&
+      value(racing1)?.sourceId === a.sourceId &&
+      value(racing2)?.sourceId === a.sourceId &&
+      value(replay)?.sourceId === a.sourceId,
+    `race ${errCode(racing1)}/${errCode(racing2)}, replay ${errCode(replay)}`,
   );
-  check("P4/lost-response-replay-ok", isOk(replay) && value(replay).sourceId === a.sourceId, errCode(replay));
   const page = await conversation(A.client);
   const count = isOk(page) ? page.value.page.filter((entry) => entry.sourceId === a.sourceId).length : 0;
   check("P4/no-duplicate-source", count === 1, `${count} rows for the logical source`);
-  const runs = await latestRun(a.sourceId);
-  const runIdBefore = runs?.value?.runId;
-  const after = await latestRun(a.sourceId);
-  check("P4/no-duplicate-processing", after?.value?.runId === runIdBefore, `single run ${runIdBefore}`);
+  const after = await sourceProcessingSnapshot(a.sourceId, A.sessionId);
+  check(
+    "P4/no-duplicate-processing",
+    after.runId === before.runId &&
+      after.runState === before.runState &&
+      after.steps === before.steps &&
+      after.publishedChangeSets === before.publishedChangeSets &&
+      before.publishedChangeSets >= 1,
+    `run ${before.runId} -> ${after.runId} (${after.runState}), steps ${before.steps} -> ${after.steps}, published change sets ${before.publishedChangeSets} -> ${after.publishedChangeSets}`,
+  );
 }
 
 // ---------------------------------------------------------------------------

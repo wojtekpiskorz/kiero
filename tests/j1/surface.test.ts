@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
 import { sourcesOperations } from "@kiero/contracts";
 import { PrepareInput } from "../../convex/sources/uploads/protocol";
+import { SourceProcessingState } from "../../convex/sources/read/rows";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { appFeatures } from "../../apps/web/src/app/app-features";
@@ -147,15 +148,20 @@ describe("the core-text renderers stay honest about precision", () => {
   });
 });
 
-describe("the derived processing-state vocabulary (the honest watch)", () => {
-  it("covers exactly the states the conversation view can derive", () => {
-    expect(Object.keys(processingStateLabels).sort()).toEqual([
-      "accepted",
-      "failed",
-      "partial",
-      "processed",
-      "processing",
-    ]);
+describe("the derived processing-state vocabulary (the watch surface)", () => {
+  it("labels only states D1's schema can derive (authority flows from the schema)", () => {
+    // The label map is TYPED Record<SourceProcessingState, string> (a
+    // vocabulary change fails the build); this runtime half checks every
+    // labeled key decodes through the producing schema itself.
+    for (const key of Object.keys(processingStateLabels)) {
+      expect(() => Schema.decodeUnknownSync(SourceProcessingState)(key)).not.toThrow();
+    }
+  });
+
+  it("labels every schema state (a new state without copy fails the build)", () => {
+    for (const state of ["accepted", "processing", "partial", "processed", "failed"] as const) {
+      expect(processingStateLabels[state]).toBeTypeOf("string");
+    }
   });
 });
 

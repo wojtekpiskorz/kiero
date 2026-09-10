@@ -40,6 +40,9 @@ import { useAppServices } from "../../app/providers";
 import { createConvexClient } from "../sign-in/client";
 import { AuthenticatedGate } from "../sign-in/SignInGate";
 import type { MembershipOverview } from "../../../../../convex/access/membership/functions";
+import { ConversationPage } from "../../../../../convex/sources/read/rows";
+import type { SourceConversationRow } from "../../../../../convex/sources/read/rows";
+import type { CurrentFindingWireRow } from "../../../../../convex/memory/findings/read";
 import {
   coreTextCopy as copy,
   failureHint,
@@ -68,26 +71,6 @@ interface SubmitEvent {
 interface Notice {
   readonly kind: "ok" | "error";
   readonly text: string;
-}
-
-/** One conversation row as the public view returns it (decoded page). */
-interface ConversationRow {
-  readonly sourceId: string;
-  readonly authorText: string;
-  readonly sentAtMs: number;
-  readonly sentAtTimezone: string;
-  readonly lifecycle: string;
-  readonly processingState: keyof typeof processingStateLabels;
-  readonly projectIds: readonly string[];
-}
-
-/** One current-findings row as the public query returns it (wire form). */
-interface FindingRow {
-  readonly findingId: string;
-  readonly semanticKey: string;
-  readonly value: { readonly _tag: string } & Record<string, unknown>;
-  readonly knowledgeState: { readonly _tag: string } & Record<string, unknown>;
-  readonly currentRevisionId: string;
 }
 
 /**
@@ -203,10 +186,12 @@ function CoreTextMain({
   const timezone =
     typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "Europe/Warsaw";
 
-  // The honest watch: the just-sent source's DERIVED processing state.
-  const rows: readonly ConversationRow[] =
+  // The watch surface: the just-sent source's DERIVED processing state.
+  // The page decodes through D1's own row schema at the untrusted boundary,
+  // so a drift in the view's shape fails here instead of rendering undefined.
+  const rows: readonly SourceConversationRow[] =
     conversation.status === "success" && conversation.data._tag === "ok"
-      ? (conversation.data.value as { page: readonly ConversationRow[] }).page
+      ? Schema.decodeUnknownSync(ConversationPage)(conversation.data.value).page
       : [];
   const sentRow = sentSourceId === null ? null : rows.find((row) => row.sourceId === sentSourceId) ?? null;
 
@@ -227,7 +212,7 @@ function CoreTextMain({
         }),
       });
       if (prepared._tag === "error") {
-        setNotice({ kind: "error", text: failureText(prepared.error.code, prepared.error.message) });
+        setNotice({ kind: "error", text: failureHint(prepared.error.code, prepared.error.message) });
         return;
       }
       const upload = Schema.decodeUnknownSync(prepareUploadResult)(prepared.value);
@@ -244,7 +229,7 @@ function CoreTextMain({
         ),
       });
       if (accepted._tag === "error") {
-        setNotice({ kind: "error", text: failureText(accepted.error.code, accepted.error.message) });
+        setNotice({ kind: "error", text: failureHint(accepted.error.code, accepted.error.message) });
         return;
       }
       const receipt = Schema.decodeUnknownSync(acceptSourceResult)(accepted.value);
@@ -329,7 +314,7 @@ function CoreTextMain({
       : conversation.status !== "success"
         ? createElement("p", { role: "status" }, copy.checkingSession)
         : conversation.data._tag === "error"
-          ? createElement("p", { role: "alert" }, failureText(conversation.data.error.code, conversation.data.error.message))
+          ? createElement("p", { role: "alert" }, failureHint(conversation.data.error.code, conversation.data.error.message))
           : createElement(ConversationList, { rows }),
     createElement(MemorySection, {
       projectViews,
@@ -338,10 +323,6 @@ function CoreTextMain({
       memoryArgs,
     }),
   );
-}
-
-function failureText(code: string, serverMessage: string): string {
-  return failureHint(code, serverMessage);
 }
 
 // ---------------------------------------------------------------------------
@@ -406,10 +387,10 @@ function SendForm({
 }
 
 // ---------------------------------------------------------------------------
-// Conversation list (the honest derived states)
+// Conversation list (states derived from durable rows, never stored)
 // ---------------------------------------------------------------------------
 
-function ConversationList({ rows }: { readonly rows: readonly ConversationRow[] }): ReactNode {
+function ConversationList({ rows }: { readonly rows: readonly SourceConversationRow[] }): ReactNode {
   if (rows.length === 0) {
     return createElement("p", null, copy.noMessages);
   }
@@ -475,11 +456,11 @@ function MemorySection({
       ? createElement("p", { role: "alert" }, signInCopy.sessionEndedNotice)
       : findings.status !== "success"
         ? createElement("p", { role: "status" }, copy.checkingSession)
-        : createElement(FindingsList, { rows: findings.data as readonly FindingRow[] }),
+        : createElement(FindingsList, { rows: findings.data }),
   );
 }
 
-function FindingsList({ rows }: { readonly rows: readonly FindingRow[] }): ReactNode {
+function FindingsList({ rows }: { readonly rows: readonly CurrentFindingWireRow[] }): ReactNode {
   if (rows.length === 0) {
     return createElement("p", null, copy.noFindings);
   }

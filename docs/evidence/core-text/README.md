@@ -58,9 +58,9 @@ NOTE | [A] public company-scope rows: []
 [PASS] A/finding-revision-recorded :: rev1
 [PASS] A/both-bosses-same-memory :: project scope identical for both bosses
 [PASS] A/both-bosses-see-source
-[PASS] P4/lost-response-replay-ok :: ok
+[PASS] P4/duplicate-submit-and-replay-collapse :: race ok/ok, replay ok   (*)
 [PASS] P4/no-duplicate-source :: 1 rows for the logical source
-[PASS] P4/no-duplicate-processing :: single run r177z1s68ptx4sna41qj5n9za18e4q80
+[PASS] P4/no-duplicate-processing :: run r175xdvzfrjq0k0ptty5qan4gh8e426f -> r175xdvzfrjq0k0ptty5qan4gh8e426f (succeeded), steps 4 -> 4, published change sets 1 -> 1   (*)
 NOTE | [C1] accepted in 363ms (source sn77vqxvq7vfbx10vwfhae1gr98e4pdy)
 NOTE | [C1] processing state: processing (+496ms)
 NOTE | [C1] processing state: failed (+148071ms)
@@ -81,6 +81,8 @@ NOTE | [C] attempt 2 run: succeeded; model: [{"provider":"openrouter","model":"z
 Summary: {"PASS":32} of 32 checks
 ```
 
+(*) The P4 rows are from the post-review re-run (run `mtv3eqec`, 2026-09-10T05:34:35Z, 32/32 PASS) after the round-1 review replaced the unfalsifiable no-duplicate-processing check. The fixed window snapshots the source's durable processing footprint (latest run identity + state + step count + published change-set count), then accepts the SAME logical source — same idempotency key, same replayed upload draft — twice CONCURRENTLY (the duplicate-submit race) and once sequentially (the lost-response replay); all three return the same source receipt and the footprint is unchanged. The original transcript's corresponding rows (`P4/lost-response-replay-ok` etc.) covered only the sequential replay.
+
 The Polish source texts sent (synthetic material, sent through the PUBLIC `sources.prepareUpload` + `sources.acceptSource` mutations as the signed-in bosses):
 
 - A (boss A, Tuesday 18:30 Warsaw snapshot, project hint Banan): "Projekt Banan: dowóz płytek na Buniewice w środę rano. Odbiór potwierdził u nas klient Kaczmarek. Do wyceny doliczamy około 10 tysięcy."
@@ -88,15 +90,15 @@ The Polish source texts sent (synthetic material, sent through the PUBLIC `sourc
 
 ## Model observations (latency)
 
-- Run A (2 model turns): 65,956 ms + 2,489 ms; total durable acceptance -> processed 75,655 ms (single source; within the alpha 60 s target's honest neighborhood for this deployment — see failure windows).
+- Run A (2 model turns): 65,956 ms + 2,489 ms; total durable acceptance -> processed 75,655 ms. The alpha 60 s processing target is met on fast runs and exceeded on slow ones (see the repeatability paragraph and the failure windows).
 - Run C2 (2 model turns): 11,874 ms + 2,926 ms; total 22,716 ms.
 - Accept (public mutation) latency: 330-420 ms wall-clock.
 - Observed model on every attempt: `z-ai/glm-5.3-flash` via `openrouter` (the configured first route).
 
-## Honest failure windows (recorded, not retried into fake success)
+## Failure windows (recorded, not retried into fake success)
 
-- **Run `mtv1e6ml` C1 (2026-09-10 ~04:41)**: the first correction source's run ended `failed` 148,071 ms after acceptance (provider window; the source stayed durably accepted, nothing was duplicated). The boss's honest retry action — a fresh correcting source (C2) — succeeded in 22,716 ms and produced the supersession. No restart was needed.
-- **Run `mtv0ww08` A (2026-09-10 ~04:25, earlier script revision)**: a 720,717 ms stall window with the conversation row pinned at `processing` and no terminal state — the E3-observed provider-stall class. That script revision had no stall recovery; the run was abandoned and the window recorded here. The final script handles stalls honestly (bounded drain kick for never-started jobs, bounded model-stage restart for provider-failed runs, printed inspection) — no window is retried into fake success.
+- **Run `mtv1e6ml` C1 (2026-09-10 ~04:41)**: the first correction source's run ended `failed` 148,071 ms after acceptance (provider window; the source stayed durably accepted, nothing was duplicated). The boss's retry action — a fresh correcting source (C2) — succeeded in 22,716 ms and produced the supersession. No restart was needed.
+- **Run `mtv0ww08` A (2026-09-10 ~04:25, earlier script revision)**: a 720,717 ms stall window with the conversation row pinned at `processing` and no terminal state — the E3-observed provider-stall class. That script revision had no stall recovery; the run was abandoned and the window recorded here. The final script handles stalls with a bounded drain kick (never-started jobs) or a bounded model-stage restart (provider-failed runs), printing the inspection — no window is retried into fake success.
 
 ## Acceptance-criteria mapping
 
@@ -105,13 +107,15 @@ The Polish source texts sent (synthetic material, sent through the PUBLIC `sourc
 | Real development Convex + server-owned OpenRouter, synthetic Polish material, distinct states + provider metadata in protected evidence | PASS | Lease `dev/j1`; observed route/model above; sending/saved/processing/result states in the transcript and in the mounted feature's controls. |
 | Mixed text source -> company/project information, one original and real author; both bosses see the same canonical result | PASS | Three project-scope findings (money + temporal + text note) from one source authored by boss A; `A/both-bosses-same-memory`, `A/both-bosses-see-source`. |
 | Clear correction as a new source -> new current value + previous history; early path uses direct structured queries where tools are absent | PASS | `C/*`: rev2 Friday current, revisionCounter 2, original immutable, correction is a separate source. |
-| AI failure leaves the accepted source, permits later retry; lost response/retry creates no second source or duplicate mutation; every committed change has valid provenance | PASS | C1 failure window (source stayed accepted; fresh retry succeeded); `P4/*` replay idempotency; `A/provenance-fragments-located`, `A/change-set-published-once`. |
+| AI failure leaves the accepted source, permits later retry; lost response/retry creates no second source or duplicate mutation; every committed change has valid provenance | PASS | C1 failure window (source stayed accepted; fresh retry succeeded); `P4/*` concurrent duplicate-submit + replay idempotency with durable footprint snapshots (post-review re-run); `A/provenance-fragments-located`, `A/change-set-published-once`. |
 | Repeatable smoke + immutable evidence; missing runtime registration fixed or tracked; no mock-only route | PASS | The repeatable command above; this file; the registration repairs listed; the real model route throughout. |
 | Browser plus real backend: one project, two bosses, send/read/correct + refresh/reconnect persistence | PASS (scripted browser-client surface) | The proof drives the same public functions the mounted feature calls (Convex browser client); `P6/reconnect-persists`. See NOT-RUN for a human-driven browser pass. |
 | Provider failure, duplicate submit/unknown response, newer correction against delayed old plan | PASS / PASS / covered by E3 | Failure window recorded; `P4/*`; the delayed-old-plan engine semantics were proven live by E3's evidence (scenario D) and are not re-proved here — J1's correction path exercises the user-visible invariant. |
 | Inspect DB/current query, revision history and original source identity against independent expectations | PASS | Guarded tenant-scoped inspection under the bosses' own sessions (`probeAnalysisState` with the user's session id — the C4-precedent pattern): run states, steps, attempts, change sets, fragments, revision counters; public reads cross-checked against them. |
 
 ## Repeatability
+
+The post-review re-run (`mtv3eqec`, 2026-09-10T05:34:35Z) reached `{"PASS":32} of 32` with the falsifiable P4 window above (A processed in 175,608 ms that run — 3 model turns; the correction superseded on attempt 1 in 33,536 ms, rev2, history retained).
 
 A second full run (`mtv1ldct`, 2026-09-10T04:43:46Z) also reached `{"PASS":32} of 32 checks`: A processed in 109,716 ms (3 model turns: 32,403 + 39,720 + 26,704 ms), the correction superseded on attempt 1 (15,471 ms total; role read as `internal`/`piątek` this time — model phrasing variance, same resolved day 2026-09-11, rev2, history retained). The per-run model-turn count and latency vary (2-3 turns, 1.8 s - 66 s per turn); every committed fact was identical in structure and provenance across runs.
 
@@ -121,7 +125,7 @@ A second full run (`mtv1ldct`, 2026-09-10T04:43:46Z) also reached `{"PASS":32} o
 - **PWA install/refresh behavior** on physical devices (alpha readiness track).
 - **The AI-entry 50-case corpus** (complete core qualification owns it).
 - **`convex/platform/dispatch.ts` echo-dispatch identity repair** — same defect class, no J1 consumer; left for its owning lane.
-- **Provider-failure injection** (e.g. wrong key/bad route) — not performed: never touch the real credential; failure windows were observed honestly instead.
+- **Provider-failure injection** (e.g. wrong key/bad route) — not performed: never touch the real credential; failure windows were observed in the wild instead.
 
 ## Cost note
 
