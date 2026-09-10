@@ -464,13 +464,13 @@ let connectionId = null;
   const foreign = await setSelection(B.client, { mode: "explicit", projectIds: [foreignProject] });
   check(
     "G5-6a another firm's project id is not_found (no existence leak)",
-    !isOk(foreign) && /not_found/.test(errCode(foreign)),
+    !isOk(foreign) && foreign?.error?._tag === "not_found",
     errCode(foreign),
   );
   const malformed = await setSelection(B.client, { mode: "explicit", projectIds: ["not-a-convex-id"] });
   check(
     "G5-6b a malformed project id is not_found",
-    !isOk(malformed) && /not_found/.test(errCode(malformed)),
+    !isOk(malformed) && malformed?.error?._tag === "not_found",
     errCode(malformed),
   );
   const duplicated = await setSelection(B.client, {
@@ -493,7 +493,7 @@ let connectionId = null;
   const noConnection = await setSelection(A.client, { mode: "all_projects" });
   check(
     "G5-7a a boss without a connection row cannot scope anything (not_found)",
-    !isOk(noConnection) && /not_found/.test(errCode(noConnection)),
+    !isOk(noConnection) && noConnection?.error?._tag === "not_found",
     errCode(noConnection),
   );
 

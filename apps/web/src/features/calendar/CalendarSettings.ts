@@ -67,22 +67,21 @@ export function CalendarSettings({ actionsEnabled }: { readonly actionsEnabled: 
   // the connection panel above already explains those states. The lean
   // read branches carry `selection: null` (no own connection means no
   // scope to read), so the non-null selection is the full branch's honest
-  // discriminator (the same rule the sync read's `reconnectNeeded`
-  // follows); the assignment below turns server-side shape drift into a
+  // discriminator for the sync read alone (`reconnectNeeded` exists on the
+  // full branch only). The projection read's selection gate lives below the
+  // view annotations; both assignments turn server-side shape drift into a
   // compile error instead of a silently blanked section.
   if (
     !("reconnectNeeded" in sync.data) ||
-    typeof sync.data.reconnectNeeded !== "boolean" ||
-    !("selection" in projectionData) ||
-    projectionData.selection === null
+    typeof sync.data.reconnectNeeded !== "boolean"
   ) {
     return null;
   }
   const projectionView: ProjectionOverviewView = projectionData;
   const overview: SyncOverviewView = sync.data;
-  // One gate, after the view annotations: every projectionOverview branch
-  // carries `selection` (null on the lean ones), so a plain null check is
-  // the whole discriminator here.
+  // The ONE selection gate, after the view annotations: every
+  // projectionOverview branch carries `selection` (null on the lean ones),
+  // so a plain null check is the whole discriminator here.
   if (projectionView.selection === null) {
     return null;
   }
