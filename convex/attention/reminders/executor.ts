@@ -13,6 +13,9 @@
  *   binding moved (creation included) - recompute its schedule.
  * - `work.taskStateChanged`: the task closed or reopened - recompute
  *   (closing removes future reminders; reopening re-derives the slots).
+ *   The drain projects BOTH work events onto the one `task_changed`
+ *   trigger: the recompute re-reads the live task row, so the state event
+ *   needs no reaction vocabulary of its own.
  * - `memory.findingRevised`: the bound deadline finding's CURRENT value
  *   moved (a date correction does not touch the task row) - recompute
  *   every task of that finding's company bound to it; the due-time
@@ -32,7 +35,7 @@ const FINDING_SCAN_LIMIT = 50;
 
 /** The decoded input of one reminder-scheduling job (single typed reader). */
 export interface TaskRemindersJobInput {
-  readonly trigger: "task_changed" | "task_state_changed" | "finding_revised";
+  readonly trigger: "task_changed" | "finding_revised";
   readonly taskId: string | null;
   readonly findingId: string | null;
 }

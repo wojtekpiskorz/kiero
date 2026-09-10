@@ -29,16 +29,20 @@
  * - Undated tasks remain only in Co teraz: no reminder slot exists for a
  *   missing or unusable term, and a reminder for a contested date stays
  *   suspended (the dueness `term_unusable` outcomes, C4's rule verbatim).
- * - A newly created or assigned task whose reminder time already passed
- *   gets ONE prompt as soon as quiet hours permit, without replaying every
- *   missed alert: an ideal instant in the past clamps to the recompute
- *   instant (the quiet-hours deferral is F1's seam, applied later).
+ * - A newly created, re-dated or reassigned task whose reminder time
+ *   already passed gets ONE prompt as soon as quiet hours permit, without
+ *   replaying every missed alert: an ideal instant in the past clamps to
+ *   the recompute instant (the quiet-hours deferral is F1's seam, applied
+ *   later). An edit that leaves the term and the recipients unchanged
+ *   never re-prompts: its slots keep their identity, so the clamp only
+ *   ever applies to a schedule that is genuinely fresh.
  */
 
 import type { TaskState } from "@kiero/contracts";
 import {
   addDays,
   deriveTaskDueness,
+  instantOfLocalMinute,
   localDateOfInstant,
   type DueMoment,
   type TemporalBindingView,
@@ -85,93 +89,6 @@ export type ReminderIntentSuppressedReason =
   | "already_read"
   | "muted_project"
   | "muted_company_entries";
-
-// ---------------------------------------------------------------------------
-// Company-timezone wall-clock arithmetic (DST-correct through Intl).
-// ---------------------------------------------------------------------------
-
-/**
- * Parts of one wall-clock time, as produced by Intl in a timezone (the F1
- * `preferences/evaluation.ts` technique, spelled here because that module
- * keeps its formatter private to its own seam).
- */
-interface WallTimeParts {
-  readonly year: number;
-  readonly month: number; // 1-12
-  readonly day: number; // 1-31
-  readonly minuteOfDay: number;
-}
-
-const wallTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
-
-function wallTimeFormatter(timeZone: string): Intl.DateTimeFormat {
-  const cached = wallTimeFormatterCache.get(timeZone);
-  if (cached !== undefined) {
-    return cached;
-  }
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  wallTimeFormatterCache.set(timeZone, formatter);
-  return formatter;
-}
-
-function wallTimeAt(instantMs: number, timeZone: string): WallTimeParts {
-  const parts = wallTimeFormatter(timeZone).formatToParts(new Date(instantMs));
-  const get = (type: string): number => {
-    const part = parts.find((candidate) => candidate.type === type);
-    if (part === undefined) {
-      // Unreachable for the part types requested above; fail loudly.
-      throw new Error(`reminders model: missing ${type} part`);
-    }
-    return Number(part.value);
-  };
-  return {
-    year: get("year"),
-    month: get("month"),
-    day: get("day"),
-    minuteOfDay: get("hour") * 60 + get("minute"),
-  };
-}
-
-/** The UTC offset of one timezone at one instant, in milliseconds. */
-function timezoneOffsetMs(instantMs: number, timeZone: string): number {
-  const wall = wallTimeAt(instantMs, timeZone);
-  const wallAsUtc = Date.UTC(wall.year, wall.month - 1, wall.day, 0, wall.minuteOfDay);
-  return wallAsUtc - (instantMs - (instantMs % 60_000));
-}
-
-/**
- * The instant of one wall-clock minute on one calendar day in a timezone.
- * Two-pass (guess the offset, correct, re-check) so a minute inside or
- * beside a DST transition resolves the way schedulers expect - the same
- * algorithm F1's quiet-hours end resolution uses.
- */
-export function instantOfLocalMinute(
-  day: string,
-  minuteOfDay: number,
-  timeZone: string,
-): number {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
-  if (match === null) {
-    throw new Error(`reminders model: not a calendar day: ${day}`);
-  }
-  const wallAsUtc = Date.UTC(
-    Number(match[1]),
-    Number(match[2]) - 1,
-    Number(match[3]),
-    0,
-    minuteOfDay,
-  );
-  const firstGuess = wallAsUtc - timezoneOffsetMs(wallAsUtc, timeZone);
-  return wallAsUtc - timezoneOffsetMs(firstGuess, timeZone);
-}
 
 // ---------------------------------------------------------------------------
 // Reminder slots.
@@ -347,21 +264,24 @@ export function deriveReminderSchedule(input: ReminderScheduleInput): ReminderSc
 
 /**
  * The semantic dedup identity of one reminder slot: task, recipient, slot
- * kind, the task revision the schedule was derived at, and (overdue) the
- * local day the slot identifies. The revision component makes a
- * re-derivation after a task change a FRESH identity, so a recipient
- * removed and later restored gets new reminders while replayed recomputes
- * at the same revision collapse onto the same rows.
+ * kind, the SCHEDULE EPOCH the slot belongs to, and (overdue) the local
+ * day the slot identifies. The epoch is the schedule's identity counter,
+ * NOT the task revision: it moves exactly when the schedule's meaning
+ * does (the term anchor, the bound finding, the effective coordinator, or
+ * a return to a scheduled state after closure, suspension or a missing
+ * term). A recipient removed and later restored, or a task re-dated,
+ * therefore gets FRESH slots, while a title-only edit (which bumps the
+ * task revision) collapses onto the same rows and never re-prompts.
  */
 export function reminderDedupKey(
   taskId: string,
   userId: string,
   reminderKind: ReminderSlotKind,
-  revision: number,
+  scheduleEpoch: number,
   slotDay: string | null,
 ): string {
   const dayPart = slotDay === null ? "" : `:${slotDay}`;
-  return `task_reminder:${reminderKind}:${taskId}:${userId}:r${revision}${dayPart}`;
+  return `task_reminder:${reminderKind}:${taskId}:${userId}:e${scheduleEpoch}${dayPart}`;
 }
 
 /** The durable payload one task-reminder intent carries. */
@@ -376,8 +296,12 @@ export interface ReminderPayload {
   readonly deadlineFindingId: string | null;
   /** The stable term anchor at derivation time. */
   readonly termAnchor: string;
-  /** The task revision the schedule was derived at. */
-  readonly revision: number;
+  /**
+   * The schedule epoch this slot belongs to (the schedule's identity
+   * counter at mint time; the due-time re-check compares it with the
+   * anchor's live epoch, never with the task revision).
+   */
+  readonly scheduleEpoch: number;
   /** The company-local day an overdue slot identifies (else null). */
   readonly slotDay: string | null;
   /** The un-clamped ideal instant (delivery metadata, never a task time). */

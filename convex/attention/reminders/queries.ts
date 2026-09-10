@@ -45,11 +45,34 @@ function scheduleView(anchor: Doc<"reminderSchedules">) {
     coordinatorMembershipId: anchor.coordinatorMembershipId ?? null,
     deadlineFindingId: anchor.deadlineFindingId ?? null,
     termAnchor: anchor.termAnchor ?? null,
+    scheduleEpoch: anchor.scheduleEpoch ?? 0,
     status: anchor.status,
     pendingKeys: [...anchor.pendingKeys],
     revision: anchor.revision,
     updatedAtMs: anchor.updatedAtMs,
   };
+}
+
+/**
+ * One lifecycle state's bounded slice of the caller's task-reminder
+ * intents. Each state queries the `by_recipient_state` index with `state`
+ * BOUND (the index's second field exists for exactly this): nothing prunes
+ * `notificationIntents`, and the index orders states lexicographically, so
+ * a recipient-prefix-only window fills with delivered history (`delivered`
+ * sorts before `pending`) and the pending queue would go silently empty
+ * (PR #102 review round 1, finding 4). Per-state windows keep the pending
+ * slice complete no matter how much history accumulates.
+ */
+async function remindersInState(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  state: "pending" | "delivered" | "suppressed",
+) {
+  const rows = await ctx.db
+    .query("notificationIntents")
+    .withIndex("by_recipient_state", (q) => q.eq("recipientUserId", userId).eq("state", state))
+    .take(200);
+  return rows.filter((row) => row.semanticKind === "task_reminder").map(reminderIntentView);
 }
 
 /**
@@ -63,18 +86,17 @@ export const myTaskReminders = query({
     if (scope === null) {
       return errorResult(unauthenticatedError());
     }
-    const intents = (
-      await ctx.db
-        .query("notificationIntents")
-        .withIndex("by_recipient_state", (q) => q.eq("recipientUserId", scope.userId))
-        .take(200)
-    ).filter((row) => row.semanticKind === "task_reminder");
+    const [pending, delivered, suppressed] = await Promise.all([
+      remindersInState(ctx, scope.userId, "pending"),
+      remindersInState(ctx, scope.userId, "delivered"),
+      remindersInState(ctx, scope.userId, "suppressed"),
+    ]);
     const snoozes = await ctx.db
       .query("reminderSnoozes")
       .withIndex("by_user_task", (q) => q.eq("userId", scope.userId))
       .take(200);
     return okResult({
-      intents: intents.map(reminderIntentView),
+      intents: [...pending, ...delivered, ...suppressed],
       snoozes: snoozes.map((row) => ({
         taskId: row.taskId,
         untilMs: row.untilMs,

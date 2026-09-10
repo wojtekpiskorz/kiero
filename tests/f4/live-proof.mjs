@@ -234,10 +234,17 @@ async function main() {
   }
   const s4Anchor = s4State.schedules.find((s) => s.taskId === s1Task);
   const s4Intents = intentsFor(s4State, coordUser).filter((i) => i.taskId === s1Task);
+  // PR #102 review round 1 (finding 3) changed this expectation: the
+  // schedule identity is the term, not the task revision, so a date
+  // correction mints BOTH fresh slots of the new term (pre_due and the
+  // first overdue). The revision-keyed identity collapsed the new pre_due
+  // onto the old delivered row and silently dropped it; two pending is
+  // the corrected shape (the old pending overdue dies suppressed, the old
+  // pre_due stays delivered).
   record(
     "S4b the finding-revised job recomputed the schedule at the new term",
     s4Anchor?.termAnchor === `day:${s4Day}` &&
-      s4Intents.filter((i) => i.state === "pending").length === 1 &&
+      s4Intents.filter((i) => i.state === "pending").length === 2 &&
       s4Intents.filter((i) => i.state === "suppressed").length === 1,
     `anchor=${s4Anchor?.termAnchor} intents=${s4Intents.map((i) => `${i.state}/${i.suppressedReason ?? ""}`).join(",")}`,
   );

@@ -107,7 +107,7 @@ export const revokedAccessCleanupInput = Schema.Struct({
  * amendment on the B3 input-shape precedent (additive, flagged): `reason`
  * and `withdrawnByUserId` join the certified shape as NULLABLE fields so
  * the drain can project event payloads that do not carry them, while the
- * withdrawal transaction registers the job with the real values - the
+ * withdrawal transaction registers the job with the real values — the
  * marking revisions record the withdrawal's reason and actor.
  */
 export const recomputeDependentsInput = Schema.Struct({
@@ -165,7 +165,7 @@ export const echoDeliveryInput = Schema.Struct({
 });
 
 // D6 amendment (flagged coordinated change, the B3 precedent): the first
-// model-call job kind gets its executor registration - the prerequisite E2's
+// model-call job kind gets its executor registration — the prerequisite E2's
 // dispatch named. Per-segment STT executes through the durable path; the
 // transcript row is the order the workflow owns.
 export const transcribeSegmentInput = Schema.Struct({
@@ -188,12 +188,16 @@ export const attentionIntentsInput = Schema.Struct({
 // F4 amendment (issue #44, flagged coordinated change on the F2 precedent):
 // the task-reminder scheduling executor input. The drain projects the three
 // consumed events onto this shape; the nullable ids let every trigger
-// share one closed input. The work events' dedup identity already carries
-// the task revision (`work.<event>:<id>:<revision>`), so the projection
-// rides the row's key and every distinct change registers its own job
-// while replays collapse.
+// share one closed input. Both work events (`work.taskChanged` and
+// `work.taskStateChanged`) project onto the ONE `task_changed` trigger:
+// the recompute re-reads the live task row, so the state event needs no
+// reaction of its own (PR #102 review round 1 dropped the certified but
+// never-produced `task_state_changed` literal). The work events' dedup
+// identity already carries the task revision
+// (`work.<event>:<id>:<revision>`), so the projection rides the row's key
+// and every distinct change registers its own job while replays collapse.
 export const attentionRemindersInput = Schema.Struct({
-  trigger: Schema.Literals(["task_changed", "task_state_changed", "finding_revised"]),
+  trigger: Schema.Literals(["task_changed", "finding_revised"]),
   taskId: Schema.NullOr(tableIdSchema("tasks")),
   findingId: Schema.NullOr(tableIdSchema("findings")),
 });
@@ -246,7 +250,7 @@ export const executors: readonly ExecutorEntry[] = [
     input: analyzeChangePlanInput,
   }),
   // D5 amendment (issue #33): the accepted-photo normalization executor
-  // (architecture protocol step 4 - normalize before ordinary vision). It
+  // (architecture protocol step 4 — normalize before ordinary vision). It
   // consumes `sources.sourceAccepted` through its own edge; the extraction
   // job the acceptance transaction registers stays E3's.
   executorEntry({
@@ -273,7 +277,7 @@ export const executors: readonly ExecutorEntry[] = [
     input: transcribeSegmentInput,
   }),
   // F2 amendment (issue #42, flagged coordinated change): the durable
-  // notification-intent executor - intent creation from the consumed
+  // notification-intent executor — intent creation from the consumed
   // events plus the due-time evaluator kick
   // (`convex/attention/delivery/executor.ts` implements it).
   executorEntry({
@@ -313,7 +317,7 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceWithdrawn", "memory.recompute_dependents"),
   consumer("memory.dependentsMarkedStale", "memory.recompute_dependents"),
   // C5 registration (issue #28 owns the revalidation half of this edge):
-  // every revised finding drains into one bounded dependent walk - a basis
+  // every revised finding drains into one bounded dependent walk — a basis
   // that became non-known propagates updating markings through the
   // dependentsMarkedStale cascade; a basis that became known again
   // revalidates its updating dependents by registering their linked

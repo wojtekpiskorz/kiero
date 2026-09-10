@@ -50,6 +50,16 @@ export const remindersTables = {
     deadlineFindingId: v.optional(shared.findingId),
     /** Stable anchor of the bound term (local day or instant) at derivation. */
     termAnchor: v.optional(v.string()),
+    /**
+     * The schedule's identity counter: it moves exactly when the schedule's
+     * meaning does (term anchor, bound finding, effective coordinator, or
+     * a return to a scheduled state), never on a mere task revision bump.
+     * Slot dedup keys embed it, so unchanged-schedule recomputes collapse
+     * onto the same rows while term or recipient movement mints fresh
+     * slots. Optional because rows written before the counter existed
+     * belong to their first epoch (read as 0).
+     */
+    scheduleEpoch: v.optional(shared.counter),
     status: scheduleStatus,
     /** The dedup keys this schedule last ensured (the next recompute's kill list). */
     pendingKeys: v.array(v.string()),

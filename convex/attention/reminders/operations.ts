@@ -14,12 +14,13 @@
  *   intents of the superseded schedule, and CLEARS prior snoozes when the
  *   due date or the coordinator changed (or the task closed).
  * - `performEvaluateDueReminders` - the evaluator: at due time it
- *   re-reads the task (state, coordinator, deadline anchor, revision) so
- *   the FINAL recipient and state decide, re-arms the next daily overdue
- *   slot, applies the personal snooze, then hands the batch to F1's
- *   `decidePersonalDelivery` seam (mute suppresses; quiet hours defer)
- *   and delivers ONE collapsed current summary per recipient. Reading a
- *   source changes nothing here: task reminders never consult read state.
+ *   re-reads the task (state, coordinator, deadline anchor, schedule
+ *   epoch) so the FINAL recipient and state decide, re-arms the next
+ *   daily overdue slot, applies the personal snooze, then hands the batch
+ *   to F1's `decidePersonalDelivery` seam (mute suppresses; quiet hours
+ *   defer) and delivers ONE collapsed current summary per recipient.
+ *   Reading a source changes nothing here: task reminders never consult
+ *   read state.
  * - `performSnoozeTaskReminders` - the personal snooze command: one row
  *   per user and task until a chosen instant; the shared deadline and
  *   other bosses' reminders are never touched.
@@ -50,18 +51,34 @@ import type { Id, Doc } from "../../_generated/dataModel";
 import { internal } from "../../_generated/api";
 import { publishEvent } from "../../platform/publish";
 import { decidePersonalDelivery, isValidTimezone } from "../preferences/evaluation";
-import { preferenceWriteOf } from "../preferences/operations";
+import {
+  activeMemberIds,
+  deferIntent,
+  ensureIntentByDedup,
+  scheduleEvaluationAt,
+  scheduleNextPendingHop,
+  settleIntent,
+  settingsOf,
+  sweepDueIntents,
+} from "../intents_shared";
 import {
   MAX_SNOOZE_AHEAD_MS,
   deriveReminderSchedule,
   nextOverdueSlotAfter,
   reminderDedupKey,
   type ReminderBatchSummary,
-  type ReminderIntentSuppressedReason,
   type ReminderPayload,
   type ReminderSlot,
   type TaskReminderSuppressedReason,
 } from "./model";
+
+/** The reminder evaluator's own scheduled hop (shared chain helper target). */
+const reminderHop = internal.attention.reminders.evaluate.evaluateDueReminders;
+
+/** Schedules this lane's evaluator hop at (or slightly after) `atMs`. */
+function scheduleReminderHop(tx: MutationCtx, atMs: number): Promise<void> {
+  return scheduleEvaluationAt(tx, atMs, reminderHop, { nowMs: atMs });
+}
 
 /** The contract entries this lane implements (decode/typed authority). */
 export const evaluateDueRemindersOperation =
@@ -74,9 +91,6 @@ export const snoozeTaskRemindersOperation =
 export type SnoozeTaskRemindersInput = Schema.Schema.Type<
   typeof snoozeTaskRemindersOperation.input
 >;
-
-/** How many due intents one evaluator sweep processes (bounded batch). */
-const SWEEP_LIMIT = 128;
 
 /** The bound deadline finding's current knowledge state and temporal value. */
 interface DeadlineBinding {
@@ -103,71 +117,8 @@ async function readDeadlineBinding(
   return { knowledgeState: revision.knowledgeState, temporal: temporalValueOf(revision.value) };
 }
 
-/** Schedules one evaluator hop at (or slightly after) the given instant. */
-async function scheduleEvaluationAt(tx: MutationCtx, atMs: number): Promise<void> {
-  const delay = Math.max(0, atMs - Date.now());
-  await tx.scheduler.runAfter(delay, internal.attention.reminders.evaluate.evaluateDueReminders, {
-    nowMs: atMs,
-  });
-}
-
-/** The active members of one company, enumerated through the composite prefix. */
-async function activeMemberIds(tx: MutationCtx, companyId: Id<"companies">): Promise<Id<"users">[]> {
-  const rows = await tx.db
-    .query("memberships")
-    .withIndex("by_company_user", (q) => q.eq("companyId", companyId))
-    .filter((q) => q.eq(q.field("state"), "active"))
-    .collect();
-  return rows.map((row) => row.userId);
-}
-
-/** Reads one recipient's current personal settings (defaults when no row). */
-async function settingsOf(tx: MutationCtx, companyId: Id<"companies">, userId: Id<"users">) {
-  const row = await tx.db
-    .query("notificationPreferences")
-    .withIndex("by_company_user", (q) => q.eq("companyId", companyId).eq("userId", userId))
-    .first();
-  return preferenceWriteOf(row ?? null);
-}
-
 /** One pending task-reminder intent row. */
 type ReminderIntent = Doc<"notificationIntents">;
-
-/** Records one terminal intent decision and publishes its canonical event. */
-async function settleIntent(
-  tx: MutationCtx,
-  intent: ReminderIntent,
-  decision:
-    | { state: "suppressed"; reason: ReminderIntentSuppressedReason }
-    | { state: "delivered"; deliveryJson: string },
-  nowMs: number,
-): Promise<void> {
-  await tx.db.patch(intent._id, {
-    state: decision.state,
-    lastEvaluatedAtMs: nowMs,
-    ...(decision.state === "delivered"
-      ? { deliveryJson: decision.deliveryJson, deliveredAtMs: nowMs }
-      : { suppressedReason: decision.reason }),
-  });
-  await publishEvent(tx, {
-    companyId: intent.companyId,
-    eventName: "attention.intentDelivered",
-    payload: {
-      notificationIntentId: intent._id,
-      outcome: decision.state === "delivered" ? "delivered" : "suppressed",
-    },
-  });
-}
-
-/** Defers one intent to a later instant (snooze / quiet hours). */
-async function deferIntent(
-  tx: MutationCtx,
-  intent: ReminderIntent,
-  dueAtMs: number,
-  nowMs: number,
-): Promise<void> {
-  await tx.db.patch(intent._id, { dueAtMs, lastEvaluatedAtMs: nowMs });
-}
 
 /** The task facts every reminder decision is derived from. */
 interface TaskScheduleRead {
@@ -236,27 +187,15 @@ async function ensureReminderIntent(
     payload: ReminderPayload;
   },
 ): Promise<Id<"notificationIntents"> | null> {
-  const existing = await tx.db
-    .query("notificationIntents")
-    .withIndex("by_dedup", (q) => q.eq("dedupKey", intent.dedupKey))
-    .first();
-  if (existing !== null) {
-    // Duplicate suppression by semantic identity: a replayed event, a
-    // retried worker or a duplicate registration collapses onto the row
-    // (a snoozed row keeps its deferral; first write wins).
-    return null;
-  }
   const taskId = tx.db.normalizeId("tasks", intent.payload.taskId);
-  return tx.db.insert("notificationIntents", {
+  return ensureIntentByDedup(tx, {
     companyId: intent.companyId,
     recipientUserId: intent.recipientUserId,
     semanticKind: "task_reminder",
     ...(taskId !== null ? { taskId } : {}),
     dedupKey: intent.dedupKey,
-    state: "pending",
     dueAtMs: intent.dueAtMs,
     payloadJson: JSON.stringify(intent.payload),
-    createdAtMs: Date.now(),
   });
 }
 
@@ -294,7 +233,10 @@ function scheduleOf(read: TaskScheduleRead, nowMs: number) {
  * Recomputes one task's reminder schedule at `nowMs`: derives the CURRENT
  * semantic slots, ensures the recipients' intents, kills the superseded
  * schedule's pending intents and clears snoozes when the due date or the
- * coordinator changed (or the task closed). Idempotent at one revision.
+ * coordinator changed (or the task closed). Idempotent at one schedule
+ * epoch: recomputes that change nothing collapse onto the same rows, so a
+ * task edit that leaves the term and the recipients alone (a title-only
+ * edit, which still bumps the task revision) never re-prompts.
  */
 export async function performRecomputeTaskReminders(
   tx: MutationCtx,
@@ -335,6 +277,28 @@ export async function performRecomputeTaskReminders(
     }
   }
 
+  // --- the schedule epoch: fresh slot identity ONLY on real movement ------
+  // The dedup identity binds this counter, never the task revision: a
+  // title-only edit bumps the revision but leaves the term and recipients
+  // alone, so its recompute collapses onto the same rows and never
+  // re-prompts (PR #102 review round 1, finding 3). The epoch moves
+  // exactly when the schedule's meaning does: the term anchor, the bound
+  // finding, the effective coordinator, or a return to a scheduled state
+  // after closure, suspension or a missing term (which is all the
+  // restore-after-removal case needs to mint fresh reminders).
+  const epochMoves =
+    anchor === null ||
+    (anchor.coordinatorMembershipId ?? null) !== currentCoordinator ||
+    (anchor.deadlineFindingId ?? null) !== (task.deadlineFindingId ?? null) ||
+    (anchor.termAnchor ?? null) !== currentTermAnchor ||
+    (anchor.status !== "scheduled" && schedule.kind === "scheduled");
+  const scheduleEpoch =
+    anchor === null
+      ? 0
+      : epochMoves
+        ? (anchor.scheduleEpoch ?? 0) + 1
+        : (anchor.scheduleEpoch ?? 0);
+
   // --- the desired slot set per recipient ------------------------------------
   const recipients: Id<"users">[] =
     coordinatorUserId !== null ? [coordinatorUserId] : await activeMemberIds(tx, companyId);
@@ -348,7 +312,7 @@ export async function performRecomputeTaskReminders(
           task._id,
           userId,
           slot.reminderKind,
-          task.revisionCounter,
+          scheduleEpoch,
           slot.slotDay,
         );
         desiredKeys.add(key);
@@ -365,7 +329,7 @@ export async function performRecomputeTaskReminders(
             coordinatorMembershipId: currentCoordinator,
             deadlineFindingId: task.deadlineFindingId ?? null,
             termAnchor: schedule.termAnchor,
-            revision: task.revisionCounter,
+            scheduleEpoch,
             slotDay: slot.slotDay,
             idealAtMs: slot.idealAtMs,
           },
@@ -378,7 +342,14 @@ export async function performRecomputeTaskReminders(
   }
 
   // --- kill the superseded schedule's pending intents (point lookups) -------
+  // A key survives when it is still desired OR its row belongs to the
+  // CURRENT epoch: the daily roll's chained slots are not in the desired
+  // set (the recompute derives the first overdue day, the roll owns the
+  // later ones), but they are the same schedule and must live on through
+  // edits that changed nothing. Everything else pending belongs to the
+  // superseded schedule and dies.
   const suppressedIntentIds: Id<"notificationIntents">[] = [];
+  const keptKeys: string[] = [];
   const reason = staleReasonOf(schedule.kind);
   for (const key of anchor?.pendingKeys ?? []) {
     if (desiredKeys.has(key)) {
@@ -388,35 +359,60 @@ export async function performRecomputeTaskReminders(
       .query("notificationIntents")
       .withIndex("by_dedup", (q) => q.eq("dedupKey", key))
       .first();
-    if (stale !== null && stale.state === "pending") {
+    if (stale === null) {
+      continue;
+    }
+    const stalePayload = JSON.parse(stale.payloadJson) as ReminderPayload;
+    if (stale.state === "pending" && stalePayload.scheduleEpoch === scheduleEpoch) {
+      keptKeys.push(key);
+      continue;
+    }
+    if (stale.state === "pending") {
       await settleIntent(tx, stale, { state: "suppressed", reason }, nowMs);
       suppressedIntentIds.push(stale._id);
     }
   }
 
   // --- the anchor upsert ------------------------------------------------------
-  const anchorFields = {
-    companyId,
-    ...(currentCoordinator !== null ? { coordinatorMembershipId: currentCoordinator } : {}),
-    ...(task.deadlineFindingId !== undefined ? { deadlineFindingId: task.deadlineFindingId } : {}),
-    ...(currentTermAnchor !== null ? { termAnchor: currentTermAnchor } : {}),
-    status: schedule.kind,
-    pendingKeys: [...desiredKeys],
-    revision: task.revisionCounter,
-    updatedAtMs: nowMs,
-  };
+  // The identity fields are written EXPLICITLY on the patch, undefined
+  // included: Convex patches delete undefined keys, so an unassigned
+  // coordinator, an unbound finding or a suspended term clears the stored
+  // value instead of leaving a stale one behind (a stale value would make
+  // a remove-and-restore round trip compare equal and skip the fresh
+  // epoch). The insert spells the optional keys conditionally instead,
+  // because inserts reject explicit undefined values.
   if (anchor === null) {
     await tx.db.insert("reminderSchedules", {
       taskId: task._id,
-      ...anchorFields,
+      companyId,
+      ...(currentCoordinator !== null ? { coordinatorMembershipId: currentCoordinator } : {}),
+      ...(task.deadlineFindingId !== undefined ? { deadlineFindingId: task.deadlineFindingId } : {}),
+      ...(currentTermAnchor !== null ? { termAnchor: currentTermAnchor } : {}),
+      scheduleEpoch,
+      status: schedule.kind,
+      pendingKeys: [...desiredKeys, ...keptKeys],
+      revision: task.revisionCounter,
+      updatedAtMs: nowMs,
     });
   } else {
-    await tx.db.patch(anchor._id, anchorFields);
+    await tx.db.patch(anchor._id, {
+      coordinatorMembershipId: currentCoordinator ?? undefined,
+      deadlineFindingId: task.deadlineFindingId,
+      termAnchor: currentTermAnchor ?? undefined,
+      scheduleEpoch,
+      status: schedule.kind,
+      pendingKeys: [...desiredKeys, ...keptKeys],
+      revision: task.revisionCounter,
+      updatedAtMs: nowMs,
+    });
   }
 
   // --- the durable chain: one hop at the earliest due ------------------------
   // A CLAMPED slot (due == now) schedules the hop at delay 0, so the
-  // one-prompt-now policy needs no cron sweep to converge.
+  // one-prompt-now policy needs no cron sweep to converge. The clamp only
+  // ever reaches a FRESH row (the epoch identity collapses unchanged
+  // schedules onto their existing rows), which is exactly the accepted
+  // "newly created or assigned task" scope of the missed-slot policy.
   let earliestDue: number | null = null;
   for (const slot of slots) {
     if (earliestDue === null || slot.dueAtMs < earliestDue) {
@@ -424,7 +420,7 @@ export async function performRecomputeTaskReminders(
     }
   }
   if (earliestDue !== null) {
-    await scheduleEvaluationAt(tx, Math.max(earliestDue, nowMs));
+    await scheduleReminderHop(tx, Math.max(earliestDue, nowMs));
   }
 
   return okResult({
@@ -447,9 +443,9 @@ type TaskRecheck =
   | { readonly outcome: "pass"; readonly read: TaskScheduleRead };
 
 /**
- * THE due-time re-check: the FINAL recipient, state, revision and term
- * decide, never the payload's snapshot (issue 44's race acceptance: the
- * assignee or state changed while the reminder sat due).
+ * THE due-time re-check: the FINAL recipient, state, term and schedule
+ * epoch decide, never the payload's snapshot (issue 44's race acceptance:
+ * the assignee or state changed while the reminder sat due).
  */
 async function recheckTaskAtDue(
   tx: MutationCtx,
@@ -470,9 +466,17 @@ async function recheckTaskAtDue(
     // source alone never did anything here (read state is never read).
     return { outcome: "die", reason: "task_closed" };
   }
-  if (payload.revision !== task.revisionCounter) {
-    // A newer revision exists: this slot belongs to the superseded
-    // schedule; the incoming recompute owns the fresh slots.
+  // The slot's schedule epoch must still be the anchor's CURRENT one: a
+  // term, recipient or reopen movement re-minted the schedule and this
+  // slot belongs to the superseded one. The task revision alone no longer
+  // kills a slot (a title edit suppresses nothing; the termAnchor and
+  // coordinator comparisons below catch real movement even before the
+  // recompute job runs).
+  const anchor = await tx.db
+    .query("reminderSchedules")
+    .withIndex("by_task", (q) => q.eq("taskId", taskId))
+    .first();
+  if (anchor === null || (anchor.scheduleEpoch ?? 0) !== payload.scheduleEpoch) {
     return { outcome: "die", reason: "schedule_changed" };
   }
   // nowMs 0 only separates usable terms from unusable ones here (the
@@ -516,7 +520,6 @@ async function rearmNextOverdueSlot(
     readonly recipientUserId: Id<"users">;
     readonly payload: ReminderPayload;
     readonly companyTimezone: string;
-    readonly revision: number;
     readonly nowMs: number;
   },
 ): Promise<void> {
@@ -526,11 +529,15 @@ async function rearmNextOverdueSlot(
   }
   const next = nextOverdueSlotAfter(payload.slotDay, args.companyTimezone);
   const dueAtMs = next.atMs > args.nowMs ? next.atMs : args.nowMs;
+  // The roll keeps the slot's schedule epoch (the due-time re-check already
+  // matched it against the anchor's live one): the chained slot is the SAME
+  // schedule, so a later recompute that changes nothing collapses onto it
+  // instead of killing the daily chain.
   const key = reminderDedupKey(
     payload.taskId,
     args.recipientUserId,
     "overdue",
-    args.revision,
+    payload.scheduleEpoch,
     next.day,
   );
   await ensureReminderIntent(tx, {
@@ -541,7 +548,6 @@ async function rearmNextOverdueSlot(
     payload: {
       ...payload,
       reminderKind: "overdue",
-      revision: args.revision,
       slotDay: next.day,
       idealAtMs: next.atMs,
     },
@@ -580,10 +586,7 @@ export async function performEvaluateDueReminders(
   input: EvaluateDueRemindersInput,
 ): Promise<ResultEnvelope> {
   const nowMs = input.nowMs;
-  const due = await tx.db
-    .query("notificationIntents")
-    .withIndex("by_due", (q) => q.eq("state", "pending").lte("dueAtMs", nowMs))
-    .take(SWEEP_LIMIT);
+  const due = await sweepDueIntents(tx, nowMs);
 
   const buckets = new Map<string, ReminderBucket>();
   const touched: Id<"notificationIntents">[] = [];
@@ -610,7 +613,6 @@ export async function performEvaluateDueReminders(
       recipientUserId: intent.recipientUserId,
       payload,
       companyTimezone: read.companyTimezone,
-      revision: read.task.revisionCounter,
       nowMs,
     });
 
@@ -645,17 +647,12 @@ export async function performEvaluateDueReminders(
   }
 
   for (const bucket of buckets.values()) {
-    const company = await tx.db.get(bucket.companyId);
-    if (company === null || !isValidTimezone(company.timezone)) {
-      for (const intent of bucket.intents) {
-        await tx.db.patch(intent._id, {
-          state: "failed",
-          lastEvaluatedAtMs: nowMs,
-          suppressedReason: "company_unresolvable",
-        });
-      }
-      continue;
-    }
+    // Every bucket member passed the due-time re-check, which resolved this
+    // company and validated its timezone in THIS transaction, so no
+    // failed-arm company read exists here (PR #102 review round 1: the
+    // old `company_unresolvable` branch was unreachable and, unlike F2's
+    // failed arm, published no event; it is gone).
+    const company = (await tx.db.get(bucket.companyId))!;
 
     // The personal delivery decision (F1's seam, the shared gate): the
     // task-reminder mute suppresses; quiet hours defer. Read state is
@@ -707,18 +704,7 @@ export async function performEvaluateDueReminders(
   const evaluatedIntentIds = [...new Set(touched)];
 
   // The durable chain: one scheduled hop at the earliest future due time.
-  const remaining = await tx.db
-    .query("notificationIntents")
-    .withIndex("by_due", (q) => q.eq("state", "pending"))
-    .take(SWEEP_LIMIT);
-  if (remaining.length > 0) {
-    const nextPending = remaining.reduce((first, candidate) =>
-      candidate.dueAtMs < first.dueAtMs ? candidate : first,
-    );
-    if (nextPending.dueAtMs > nowMs) {
-      await scheduleEvaluationAt(tx, nextPending.dueAtMs);
-    }
-  }
+  await scheduleNextPendingHop(tx, nowMs, (atMs) => scheduleReminderHop(tx, atMs));
 
   return okResult(
     Schema.decodeUnknownSync(evaluateDueRemindersOperation.result)({
@@ -792,7 +778,7 @@ export async function performSnoozeTaskReminders(
       await tx.db.patch(intent._id, { dueAtMs: input.untilMs });
     }
   }
-  await scheduleEvaluationAt(tx, input.untilMs);
+  await scheduleReminderHop(tx, input.untilMs);
 
   await publishEvent(tx, {
     companyId,
