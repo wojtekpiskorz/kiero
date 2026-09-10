@@ -299,12 +299,13 @@ describe("the declared consumer edge (access revocation drains durably)", () => 
   });
 
   it("leaves events without a registered edge undelivered by consumers", () => {
-    // E3 owns the extract projection and D5 the normalize projection;
-    // both edges fan out from sources.sourceAccepted. C5 (issue #28) now
-    // owns the three recomputation-edge projections, so the still-
-    // unprojected example is the permanent-deletion seam (I4's lane).
+    // E3 owns the extract projection, D5 the normalize projection and
+    // F2 (issue #42, flagged coordinated append) the notification-intent
+    // projection; all three edges fan out from sources.sourceAccepted.
+    // C5 (issue #28) owns the recomputation-edge projections, so the
+    // still-unprojected example is the permanent-deletion seam (I4's lane).
     const projections = projectEventToJobInputs("sources.sourceAccepted", {}, "d");
-    expect(projections.map((projection) => projection.kind)).toEqual(["job", "job"]);
+    expect(projections.map((projection) => projection.kind)).toEqual(["job", "job", "job"]);
     expect(projectEventToJobInputs("sources.sourcePurged", { sourceId: "s1" }, "d")).toEqual([
       { kind: "unprojected_edge", jobKind: "deletion.purge_source" },
     ]);

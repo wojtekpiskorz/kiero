@@ -6,6 +6,31 @@
  * freshness and business state are rechecked before sending. Semantic
  * deduplication identity prevents duplicate publication after timeout.
  *
+ * F2 amendment (issue #42, flagged on the F1 precedent): the certified A2
+ * candidate carried only clarification/task_reminder/confirmation intents,
+ * but the accepted notification decision (issue 7 resolution) makes the
+ * ORDINARY source-entry notification the primary durable intent: it starts
+ * at durable all-attachment acceptance, waits for the terminal assignment
+ * classification, batches per recipient and scope for 60 seconds from
+ * acceptance, and dies on revocation/read/mute re-checks at due time.
+ * Additive changes:
+ *
+ * - `semanticKind` gains `source_entry`; `confirmation` stays in the union
+ *   but this lane NEVER creates it ("zwykłe potwierdzenia porządkowania
+ *   przez agenta nie tworzą dodatkowych pushy" — ordinary agent
+ *   confirmations produce no push intent, so no row may carry the kind).
+ * - `sourceId`: the logical source a `source_entry` (or an addressed
+ *   `clarification`) intent is about.
+ * - `suppressedReason`: the machine-readable death reason the due-time
+ *   re-checks record (revocation, read, mute, business invalidity).
+ * - `deliveryJson`: the COLLAPSED current summary the recipient was told
+ *   about at delivery (one summary per recipient and scope bucket, never a
+ *   replay of stale items); absent until the intent reaches `delivered`.
+ * - `deliveredAtMs`: when the due delivery decision handed the intent to
+ *   the delivery adapter seam (F3 owns what happens after).
+ * - `by_source` index: the per-source intent listing the probes and F3's
+ *   export read.
+ *
  * Tables: notificationIntents, pushSubscriptions, notificationAttempts.
  */
 
@@ -19,10 +44,13 @@ export const deliveryTables = {
     companyId: shared.companyId,
     recipientUserId: shared.userId,
     semanticKind: v.union(
+      v.literal("source_entry"),
       v.literal("clarification"),
       v.literal("task_reminder"),
       v.literal("confirmation"),
     ),
+    /** The logical source this intent is about (source entries, addressed clarifications). */
+    sourceId: v.optional(shared.sourceId),
     taskId: v.optional(shared.taskId),
     clarificationId: v.optional(shared.clarificationId),
     /** Stable semantic identity: identical meaning collapses, not identical text. */
@@ -36,12 +64,18 @@ export const deliveryTables = {
     ),
     dueAtMs: shared.tsMs,
     lastEvaluatedAtMs: v.optional(shared.tsMs),
+    /** The due-time re-check's machine-readable death reason, when suppressed. */
+    suppressedReason: v.optional(v.string()),
+    /** The collapsed current summary handed to the delivery adapter, when delivered. */
+    deliveryJson: v.optional(v.string()),
+    deliveredAtMs: v.optional(shared.tsMs),
     payloadJson: v.string(),
     createdAtMs: shared.tsMs,
   })
     .index("by_due", ["state", "dueAtMs"])
     .index("by_recipient_state", ["recipientUserId", "state"])
-    .index("by_dedup", ["dedupKey"]),
+    .index("by_dedup", ["dedupKey"])
+    .index("by_source", ["sourceId"]),
 
   /** Current device subscription of one user for web push. */
   pushSubscriptions: defineTable({
