@@ -33,6 +33,7 @@ import { decideCorrection } from "@kiero/domain";
 import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { publishEvent } from "../../platform/publish";
+import { checkExtensionFindingValue, recordExtensionValueUsage } from "../extensions/validate";
 import {
   normalizedActor,
   normalizedCompany,
@@ -83,12 +84,25 @@ export async function performCorrectFinding(
     supersedesRevisionId: null,
   });
 
+  // C3 seam (additive, flagged): a correction's value validates against the
+  // exact stored definition version before anything is written, and the
+  // committed-usage counter moves with the revision that carries it.
+  const encodedCorrectionValue = encodeFindingValue(input.value);
+  const extensionCheck = await checkExtensionFindingValue(
+    tx.db,
+    companyId,
+    encodedCorrectionValue,
+  );
+  if (extensionCheck !== null && !extensionCheck.ok) {
+    return errorResult(validationError(extensionCheck.code));
+  }
+
   const nowMs = Date.now();
   const revisionNumber = finding.revisionCounter + 1;
   const revisionId = await tx.db.insert("findingRevisions", {
     findingId: finding._id,
     revision: revisionNumber,
-    value: encodeFindingValue(input.value),
+    value: encodedCorrectionValue,
     knowledgeState: encodeKnowledgeState(input.knowledgeState),
     ...(finding.currentRevisionId === undefined
       ? {}
@@ -98,6 +112,7 @@ export async function performCorrectFinding(
     recordedByUserId: actorUserId,
     recordedAtMs: nowMs,
   });
+  await recordExtensionValueUsage(tx.db, companyId, encodedCorrectionValue, nowMs);
   await tx.db.patch(finding._id, {
     currentRevisionId: revisionId,
     knowledgeState: encodeKnowledgeState(input.knowledgeState),

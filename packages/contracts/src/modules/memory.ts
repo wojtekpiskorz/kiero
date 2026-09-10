@@ -9,24 +9,43 @@
  * or a knowledge-state change writes a new revision with its own actor and
  * recorded time; reprocessing an older source cannot overwrite a newer
  * explicit correction (issue 8).
+ *
+ * C3 completed the extension operations this surface declared as candidates
+ * (define, version, catalog search, validate-value) and added the definition
+ * version reference to the extension finding value (all additive, flagged).
  */
 
 import { Schema } from "effect";
 import { tableIdSchema } from "../tableIds";
 import { RevisionCounter } from "../actor";
 import { KnowledgeState } from "../values/knowledge";
-import { ExtensionFieldId, ExtensionFieldKind } from "../values/extension";
+import {
+  MAX_OBJECT_FIELDS,
+  boundedMutableArray,
+  ExtensionFieldShape,
+  ExtensionValue,
+} from "../values/extension";
 import { MoneyValue } from "../values/money";
 import { TemporalValue } from "../values/temporal";
-import { ExtensionValue } from "../values/extension";
 import { PublicationState } from "../media";
 import { operationEntry, eventEntry } from "./registration";
 
-/** The value of one finding: exactly one payload shape plus its knowledge state. */
+/**
+ * The value of one finding: exactly one payload shape plus its knowledge state.
+ *
+ * C3 amendment (additive, flagged on the B3/C2 precedent): the extension
+ * branch carries the `extensionVersions` row the value validates against.
+ * The version reference is atomic with the payload, so every historic
+ * revision stays interpretable under its original definition version after
+ * labels, optional fields or newer versions appear.
+ */
 export const FindingValue = Schema.TaggedUnion({
   temporal: { temporal: TemporalValue },
   money: { money: MoneyValue },
-  extension: { extensionValue: ExtensionValue },
+  extension: {
+    definitionVersionId: tableIdSchema("extensionVersions"),
+    extensionValue: ExtensionValue,
+  },
   text_note: { text: Schema.NonEmptyString },
 });
 export type FindingValue = Schema.Schema.Type<typeof FindingValue>;
@@ -150,30 +169,108 @@ export const memoryOperations = {
     result: Schema.Struct({ clarificationId: tableIdSchema("clarifications") }),
     errorKinds: ["forbidden", "not_found", "conflict"],
   }),
+  /**
+   * C3 completion (the owning lane finishes the A2 candidate). Creates a
+   * FIRM-scoped definition with its immutable version 1, or idempotently
+   * reuses the existing definition when an equivalent one (same normalized
+   * name, compatible structure) already exists in the firm catalog or the
+   * shared catalog. A same-named but structurally INCOMPATIBLE definition
+   * refuses `conflict`: the catalog never silently reuses a different
+   * meaning. Shared definitions are published only by product code; this
+   * operation has no shared-creation path at all.
+   */
   "memory.defineExtension": operationEntry({
     kind: "operation",
     name: "memory.defineExtension",
     input: Schema.Struct({
       name: Schema.NonEmptyString,
-      fields: Schema.Array(
-        Schema.Struct({
-          fieldId: ExtensionFieldId,
-          label: Schema.NonEmptyString,
-          kind: ExtensionFieldKind,
-        }),
-      ),
+      fields: boundedMutableArray(ExtensionFieldShape, MAX_OBJECT_FIELDS),
     }),
-    result: Schema.Struct({ definitionId: tableIdSchema("extensionDefinitions") }),
+    result: Schema.Struct({
+      definitionId: tableIdSchema("extensionDefinitions"),
+      versionId: tableIdSchema("extensionVersions"),
+      /** false when an equivalent definition was reused (idempotent define). */
+      created: Schema.Boolean,
+    }),
     errorKinds: ["forbidden", "validation", "conflict"],
   }),
+  /**
+   * C3 completion (the owning lane finishes the A2 candidate). Appends the
+   * NEXT immutable version of a definition: additions and label changes are
+   * compatible; removals, kind/unit/itemKind changes and enum-option removals
+   * refuse `conflict` — those need a new definition or an explicit migration.
+   * Existing version rows are never rewritten, so historic values keep the
+   * version they were written against.
+   */
   "memory.versionExtensionDefinition": operationEntry({
     kind: "operation",
     name: "memory.versionExtensionDefinition",
     input: Schema.Struct({
       definitionId: tableIdSchema("extensionDefinitions"),
       changeNote: Schema.NonEmptyString,
+      fields: boundedMutableArray(ExtensionFieldShape, MAX_OBJECT_FIELDS),
     }),
-    result: Schema.Struct({ versionId: tableIdSchema("extensionVersions") }),
+    result: Schema.Struct({
+      versionId: tableIdSchema("extensionVersions"),
+      version: Schema.Number.pipe(Schema.check(Schema.isInt())),
+    }),
+    errorKinds: ["forbidden", "not_found", "validation", "conflict"],
+  }),
+  /**
+   * C3: catalog lookup with similarity candidates. Called BEFORE creating a
+   * definition; each candidate carries a typed verdict — `reuse_candidate`
+   * (near name AND compatible structure), `name_conflict` (near name,
+   * incompatible meaning/type: create a distinct definition, never a silent
+   * reuse) or `distinct` — plus this firm's committed usage statistics.
+   */
+  "memory.searchExtensionCatalog": operationEntry({
+    kind: "operation",
+    name: "memory.searchExtensionCatalog",
+    input: Schema.Struct({
+      name: Schema.NonEmptyString,
+      /** Optional draft structure: with it, verdicts are typed compatibility outcomes. */
+      fields: Schema.optionalKey(boundedMutableArray(ExtensionFieldShape, MAX_OBJECT_FIELDS)),
+    }),
+    result: Schema.Struct({
+      candidates: Schema.Array(
+        Schema.Struct({
+          definitionId: tableIdSchema("extensionDefinitions"),
+          versionId: tableIdSchema("extensionVersions"),
+          version: Schema.Number,
+          name: Schema.NonEmptyString,
+          fields: boundedMutableArray(ExtensionFieldShape, MAX_OBJECT_FIELDS),
+          /** true for product-owned shared definitions, false for firm-owned. */
+          shared: Schema.Boolean,
+          usageCount: Schema.Number,
+          lastUsedAtMs: Schema.NullOr(Schema.Number),
+          similarity: Schema.Struct({
+            score: Schema.Number,
+            verdict: Schema.Literals(["reuse_candidate", "name_conflict", "distinct"]),
+            /** null when no draft structure was provided (name-level lookup). */
+            structureCompatible: Schema.NullOr(Schema.Boolean),
+          }),
+        }),
+      ),
+    }),
+    errorKinds: ["forbidden"],
+  }),
+  /**
+   * C3: the validate-value operation for E6 tools and the publish seam. One
+   * extension value against ONE stored definition version: shape derivation,
+   * kind/unit/option membership, bounded sizes, required-versus-optional
+   * fields. The transaction layer adds the tenant checks for entity refs.
+   */
+  "memory.validateExtensionValue": operationEntry({
+    kind: "operation",
+    name: "memory.validateExtensionValue",
+    input: Schema.Struct({
+      versionId: tableIdSchema("extensionVersions"),
+      value: ExtensionValue,
+    }),
+    result: Schema.Struct({
+      definitionId: tableIdSchema("extensionDefinitions"),
+      version: Schema.Number,
+    }),
     errorKinds: ["forbidden", "not_found", "validation"],
   }),
 } as const;

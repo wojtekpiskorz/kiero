@@ -157,7 +157,14 @@ const findingValueValidator: ValueValidator<Encoded<typeof FindingValue>> =
   v.union(
     v.object({ _tag: v.literal("temporal"), temporal: temporalValueValidator }),
     v.object({ _tag: v.literal("money"), money: moneyValueValidator }),
-    v.object({ _tag: v.literal("extension"), extensionValue: extensionValueValidator }),
+    // C3 amendment (additive, flagged): the extension branch carries the
+    // extensionVersions row it validates against — pinned to the contracts
+    // Encoded type, so the two sides cannot drift.
+    v.object({
+      _tag: v.literal("extension"),
+      definitionVersionId: v.id("extensionVersions"),
+      extensionValue: extensionValueValidator,
+    }),
     v.object({ _tag: v.literal("text_note"), text: v.string() }),
   );
 
