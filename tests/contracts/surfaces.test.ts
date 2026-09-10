@@ -49,10 +49,11 @@ describe("composed registry integrity", () => {
     // (recoverAccount, gmInspectCompany, gmOnboardCompany, gmActivateCompany,
     // gmRestoreAdministrator, gmEndCompanyAlpha); 68/40 since the C3
     // amendment added the catalog and validate-value operations; 69/41 with
-    // C4's work.promoteChecklistItem and work.eventChanged;
+    // C4's work.promoteChecklistItem and work.eventChanged; 71/41 with H1's
+    // readFindingHistory and readClarifications exposition reads;
     // naive greps of `kind: "operation"` overcount by one because
     // registration.ts declares the interface field.)
-    expect(operationNames).toHaveLength(69);
+    expect(operationNames).toHaveLength(71);
     expect(eventNames).toHaveLength(41);
     for (const name of operationNames) {
       expect(operations[name]?.name).toBe(name);

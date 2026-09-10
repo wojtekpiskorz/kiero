@@ -23,6 +23,9 @@ import {
 // ---------------------------------------------------------------------------
 
 export const readCurrentFindingsEntry = memoryOperations["memory.readCurrentFindings"];
+// H1 amendment (additive, flagged): the boss-facing exposition reads.
+export const readFindingHistoryEntry = memoryOperations["memory.readFindingHistory"];
+export const readClarificationsEntry = memoryOperations["memory.readClarifications"];
 export const prepareChangeSetEntry = memoryOperations["memory.prepareChangeSet"];
 export const publishChangeSetEntry = memoryOperations["memory.publishChangeSet"];
 export const correctFindingEntry = memoryOperations["memory.correctFinding"];
@@ -38,6 +41,12 @@ export type ResolveClarificationInput = Schema.Schema.Type<
 >;
 export type ReadCurrentFindingsInput = Schema.Schema.Type<
   typeof readCurrentFindingsEntry.input
+>;
+export type ReadFindingHistoryInput = Schema.Schema.Type<
+  typeof readFindingHistoryEntry.input
+>;
+export type ReadClarificationsInput = Schema.Schema.Type<
+  typeof readClarificationsEntry.input
 >;
 
 // ---------------------------------------------------------------------------

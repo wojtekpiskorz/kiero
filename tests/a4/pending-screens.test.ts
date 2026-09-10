@@ -38,19 +38,26 @@ describe("pending feature screens render without fake data", () => {
   it("renders the default company conversation screen with the disconnected state", () => {
     const html = renderScreen(0);
     expect(html).toContain("Rozmowa firmy");
-    // J1's sanctioned mount: the conversation entry is no longer pending —
-    // the core-text feature owns it now. The honest disconnected state is
-    // the feature's own connection gate (no fake entries either way).
+    // J1's mount graduated into H1's conversation feature: the entry stays
+    // mounted and its own connection gate is the honest disconnected state
+    // (no fake entries either way).
     expect(html).toContain("Aplikacja nie jest połączona z backendem");
     // The disconnected explanation names the missing config seam.
     expect(html).toContain("VITE_CONVEX_URL");
   });
 
+  it("renders the H1 memory screen with the same honest disconnected gate", () => {
+    const html = renderScreen(1);
+    expect(html).toContain("Pamięć");
+    expect(html).toContain("Aplikacja nie jest połączona z backendem");
+    expect(html).not.toContain("<li>");
+  });
+
   it("renders Co teraz and projects context through the shared placeholder screen", () => {
-    const coTeraz = renderScreen(1);
+    const coTeraz = renderScreen(2);
     expect(coTeraz).toContain("Co teraz");
     expect(coTeraz).toContain("W przygotowaniu.");
-    const projects = renderScreen(2);
+    const projects = renderScreen(3);
     expect(projects).toContain("Projekty");
     expect(projects).toContain("W przygotowaniu.");
     expect(projects).toContain("projects.identifyProject");
