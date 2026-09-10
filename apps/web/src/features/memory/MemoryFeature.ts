@@ -53,7 +53,7 @@ import {
   type SubmitEvent,
 } from "../company/CompanyGate";
 import { asConvexId } from "../company/convex-ids";
-import { PROJECT_PARAM, SOURCE_PARAM, searchParam } from "../company/route-params";
+import { PROJECT_PARAM, SOURCE_PARAM, searchParam, writeScopeParam } from "../company/route-params";
 import {
   failureHint,
   findingValueLabel,
@@ -119,7 +119,14 @@ function MemoryMain({
       {
         id: "memory-scope",
         value: memoryScope,
-        onChange: (event: ChangeEvent<HTMLSelectElement>) => setMemoryScope(event.target.value),
+        onChange: (event: ChangeEvent<HTMLSelectElement>) => {
+          // Keep the URL in step with the select (the conversation route's
+          // selectScope discipline): a stale ?projekt= must not re-scope
+          // the view on refresh.
+          const next = event.target.value;
+          writeScopeParam(next === "company" ? null : next);
+          setMemoryScope(next);
+        },
       },
       createElement("option", { value: "company" }, copy.scopeCompany),
       ...projectViews.map((project) =>

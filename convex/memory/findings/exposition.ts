@@ -117,11 +117,17 @@ export async function readFindingHistoryRows(
     // read skips such rows too, so a boss never reaches this id from the UI.
     return { ok: false, error: notFoundError("findings") };
   }
-  const revisionDocs = await db
-    .query("findingRevisions")
-    .withIndex("by_finding_revision", (q) => q.eq("findingId", finding._id))
-    .order("asc")
-    .take(MAX_REVISION_ROWS);
+  // Newest MAX_REVISION_ROWS, restored to oldest-first for display: the
+  // live end (the revision the "aktualne" badge marks) must never fall off
+  // the truncation, and past the cap the oldest history is the safe end to
+  // drop (round-2 ride-along).
+  const revisionDocs = (
+    await db
+      .query("findingRevisions")
+      .withIndex("by_finding_revision", (q) => q.eq("findingId", finding._id))
+      .order("desc")
+      .take(MAX_REVISION_ROWS)
+  ).reverse();
   const revisions: RevisionWireRow[] = [];
   for (const revision of revisionDocs) {
     revisions.push({
