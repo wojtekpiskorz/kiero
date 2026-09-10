@@ -104,8 +104,13 @@ export const PrepareInput = Schema.Struct({
     Schema.check(Schema.isGreaterThan(0)),
     Schema.check(Schema.isLessThanOrEqualTo(MAX_PARTS)),
   ),
+  // J1 prerequisite repair: a TEXT-ONLY source prepares with mediaKinds: []
+  // (attachmentCount 0, no attachment references — D1's documented text-only
+  // acceptance semantics; the certified contract's array has no minimum).
+  // The previous isMinLength(1) made the PUBLIC prepare command unusable
+  // for the one capture mode the first text checkpoint proves; media
+  // uploads keep the MAX_ATTACHMENTS bound.
   mediaKinds: Schema.Array(MediaKind).pipe(
-    Schema.check(Schema.isMinLength(1)),
     Schema.check(Schema.isMaxLength(MAX_ATTACHMENTS)),
   ),
 });

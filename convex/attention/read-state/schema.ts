@@ -8,6 +8,13 @@
  * state and does not create a second notification.
  *
  * Tables: readStates.
+ *
+ * Layout note (F1, flagged): Convex rejects hyphenated path components for
+ * FUNCTION modules ("Path component read-state can only contain
+ * alphanumeric characters, underscores, or periods"), so this lane's
+ * callable modules live in the sibling `convex/attention/read_state/`
+ * directory; only schema fragments (exempt from module path validation)
+ * live here, keeping the A3-certified composition import unchanged.
  */
 
 import { defineTable } from "convex/server";
@@ -24,5 +31,11 @@ export const readStateTables = {
     readAtMs: shared.tsMs,
   })
     .index("by_user_source", ["userId", "sourceId"])
-    .index("by_source", ["sourceId"]),
+    // Future consumer (no reader yet): the per-source "who has read this
+    // entry" listing F2's recipient re-checks / a later H view need; kept so
+    // the index ships with the schema instead of a migration later.
+    .index("by_source", ["sourceId"])
+    // F1: the audited-GM inspection read lists one company's read states
+    // without touching any boss's row (issue 41: GM reads never write).
+    .index("by_company", ["companyId"]),
 } as const;

@@ -1,6 +1,12 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src/**/*.ts", "findings/**/*.ts", "work/**/*.ts", "calendar/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "findings/**/*.ts",
+    "work/**/*.ts",
+    "provenance/**/*.ts",
+    "calendar/**/*.ts"
+  ],
   "compilerOptions": {
     "types": ["node"]
   }

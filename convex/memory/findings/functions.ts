@@ -31,9 +31,11 @@ import {
 } from "@kiero/runtime";
 import {
   bridgeIdentity,
-  identityFromConvexAuth,
   resolveRequestContext,
 } from "../../platform/context";
+import {
+  resolveAccessContextFromConvexAuth,
+} from "../../access/identity/resolution";
 import { internalMutation, mutation, query } from "../../_generated/server";
 import { dispatchMemoryCommand } from "./dispatch";
 import { readCurrentFindingsEntry } from "./semantics";
@@ -61,8 +63,12 @@ export const dispatchMemoryTransaction = internalMutation({
 export const readCurrentFindings = query({
   args: { scope: v.any() },
   handler: async (ctx, args) => {
-    const identity = await identityFromConvexAuth(ctx.auth, Date.now());
-    const context = await resolveRequestContext(ctx.db, identity);
+    // J1 prerequisite repair (the C4 flag): the read path resolves through
+    // B1's live-session chain (no provisioning — queries never write), the
+    // same pattern B3's public reads use. The platform-generic subject is
+    // not a sessions-registry id, so ordinary user tokens previously failed
+    // `no_verified_identity` here.
+    const context = await resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
     if (context === null) {
       throw new ConvexError(unauthenticatedError("no_verified_identity"));
     }

@@ -21,7 +21,14 @@ import {
   type HandlerRegistry,
   type RequestContext,
 } from "@kiero/runtime";
-import { bridgeIdentity, identityFromConvexAuth, resolveRequestContext } from "../../platform/context";
+import {
+  bridgeIdentity,
+  resolveRequestContext,
+} from "../../platform/context";
+import {
+  DEFAULT_DEVICE_LABEL,
+  resolveAccessContextWithProvisioning,
+} from "../../access/identity/resolution";
 import { extensionHandlers } from "../extensions/dispatch";
 import type { MutationCtx } from "../../_generated/server";
 import { performPrepareChangeSet } from "./prepare";
@@ -111,6 +118,14 @@ export function memoryHandlers(): HandlerRegistry<MutationCtx> {
  * transaction. The optional `serviceSessionId` marks the service-bridge
  * path (identity verified before this point); without it, Convex Auth is
  * the only identity source.
+ *
+ * J1 prerequisite repair (the C4 flag): the user path resolves through
+ * B1's live-session chain (`resolveAccessContextWithProvisioning` — the
+ * B3 projects-dispatch pattern), because the platform-generic
+ * `identityFromConvexAuth` subject (`<userId>|<authSessions id>`) is not a
+ * sessions-registry id and ordinary user tokens failed
+ * `no_verified_identity`. Provisioning keeps the first command after a
+ * registry gap working (the sign-in bootstrap's idempotent twin).
  */
 export async function dispatchMemoryCommand(
   ctx: MutationCtx,
@@ -118,11 +133,10 @@ export async function dispatchMemoryCommand(
   serviceSessionId: string | undefined,
 ): Promise<ResultEnvelope> {
   const resolveContext = async (tx: MutationCtx): Promise<RequestContext | null> => {
-    const identity =
-      serviceSessionId === undefined
-        ? await identityFromConvexAuth(tx.auth, Date.now())
-        : bridgeIdentity(serviceSessionId, Date.now());
-    return resolveRequestContext(tx.db, identity);
+    if (serviceSessionId !== undefined) {
+      return resolveRequestContext(tx.db, bridgeIdentity(serviceSessionId, Date.now()));
+    }
+    return resolveAccessContextWithProvisioning(tx.db, tx.auth, Date.now(), DEFAULT_DEVICE_LABEL);
   };
   const deps: CommandDeps<MutationCtx> = {
     resolveContext,

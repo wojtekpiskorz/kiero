@@ -23,11 +23,15 @@
  *   durable revocation fan-out the access lane owns (device-session
  *   revocation after membership removal; the declared consumer proof of
  *   `access.membershipRevoked` / `access.sessionRevoked`).
+ * - `memory.recompute_dependents` (../memory/recompute/executor.ts, C5):
+ *   the durable withdrawal-recomputation executor — the withdrawal marking
+ *   plus the dependency-aware updating cascade and the linked re-analysis
+ *   registrations (the declared consumer proof of `sources.sourceWithdrawn`,
+ *   `memory.dependentsMarkedStale` and `memory.findingRevised`).
  * - `processing.transcribe_segment` (../processing/audio/executor.ts, D6):
  *   the resumable per-segment STT workflow over one audio transcript order
  *   (the first model-call executor; the contracts amendment E2 named as
  *   its prerequisite, registered in @kiero/contracts by D6, flagged).
-
  * - `processing.normalize_photo` (../processing/images/executor.ts, D5):
  *   the accepted-photo normalization executor (architecture protocol step
  *   4) with the echo-template uncertain-outcome semantics.
@@ -44,8 +48,8 @@ import { echoExecutor } from "./echo";
 import { analyzeChangePlanExecutor as e3AnalyzeChangePlanExecutor } from "../processing/text/analyze";
 import { extractFragmentsExecutor } from "../processing/text/extract";
 import { cleanupRevocationExecutor } from "../access/membership/cleanup";
+import { recomputeDependentsExecutor } from "../memory/recompute/executor";
 import { transcribeSegmentExecutor } from "../processing/audio/executor";
-
 import { normalizePhotoExecutor } from "../processing/images/executor";
 
 // G3 append (flagged shared-file change, the D5/D6 precedent): the
@@ -79,8 +83,8 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [e3AnalyzeChangePlanExecutor.jobKind]: e3AnalyzeChangePlanExecutor,
   [extractFragmentsExecutor.jobKind]: extractFragmentsExecutor,
   [cleanupRevocationExecutor.jobKind]: cleanupRevocationExecutor,
+  [recomputeDependentsExecutor.jobKind]: recomputeDependentsExecutor,
   [transcribeSegmentExecutor.jobKind]: transcribeSegmentExecutor,
-
   [normalizePhotoExecutor.jobKind]: normalizePhotoExecutor,
 
   [reconcileOutcomeExecutor.jobKind]: reconcileOutcomeExecutor,

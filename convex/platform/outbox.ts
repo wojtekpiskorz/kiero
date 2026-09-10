@@ -136,6 +136,60 @@ function projectOneEdge(
       dedupKey: rowDedupKey,
     };
   }
+  // C5 registration (issue #28 owns these edges' projections): withdrawal
+  // and every finding revision drain into `memory.recompute_dependents`.
+  // The withdrawal payload carries its reason; the publisher (the withdrawal
+  // transaction) already registered the job itself with the real actor
+  // under the SAME dedup key, so this projection collapses onto that row.
+  // AMPLIFICATION NOTE (for H3's incident scanning): the `memory.findingRevised`
+  // edge fires one durable walk per revision — including the cascade's own
+  // markings, most of which no-op. Accepted for alpha volume; per-reaction
+  // outcomes live on the durableJobs rows, and the walk is one bounded
+  // indexed query per job.
+  if (jobKind === "memory.recompute_dependents") {
+    if (eventName === "sources.sourceWithdrawn") {
+      return {
+        kind: "job",
+        jobKind,
+        input: {
+          rootFindingId: null,
+          sourceId: payload.sourceId,
+          cause: "source_withdrawn",
+          reason: payload.reason,
+          withdrawnByUserId: null,
+        },
+        dedupKey: rowDedupKey,
+      };
+    }
+    if (eventName === "memory.dependentsMarkedStale") {
+      return {
+        kind: "job",
+        jobKind,
+        input: {
+          rootFindingId: payload.rootFindingId,
+          sourceId: null,
+          cause: "dependent_stale",
+          reason: null,
+          withdrawnByUserId: payload.withdrawnByUserId ?? null,
+        },
+        dedupKey: rowDedupKey,
+      };
+    }
+    // memory.findingRevised: the revalidation walk — registrations only
+    // when the revised basis became known again.
+    return {
+      kind: "job",
+      jobKind,
+      input: {
+        rootFindingId: payload.findingId,
+        sourceId: null,
+        cause: "reanalysis",
+        reason: null,
+        withdrawnByUserId: null,
+      },
+      dedupKey: rowDedupKey,
+    };
+  }
   // D5 registration (issue #33 owns the declared consumer proof): the
   // accepted-source payload projects onto `processing.normalize_photo`
   // (architecture protocol step 4: normalize accepted photos before ordinary
