@@ -14,7 +14,7 @@
  *   intent PLUS the subscription ("Do urządzenia" once), so a retried
  *   job or a concurrent sweep can never double-deliver.
  * - The preview carries project or Firma, the author and a short
- *   fragment, or the Głosówka/photo count; hide-preview replaces all
+ *   fragment, or the nagranie/photo count; hide-preview replaces all
  *   content with a neutral notice while keeping the semantic routing
  *   ids (ids are not content).
  * - Payloads are composed from data re-read at delivery time; a
@@ -113,7 +113,10 @@ export function scopeNameOf(scope: ScopeView): string {
 export function sourcePreviewLine(source: SourcePreview): string {
   const media: string[] = [];
   if (source.audioCount > 0) {
-    media.push("Głosówka");
+    // The glossary names the medium of a Wiadomość źródłowa "nagranie"
+    // (może łączyć tekst, nagranie i zdjęcia); the photo line below uses
+    // the same glossary vocabulary.
+    media.push(source.audioCount === 1 ? "Nagranie" : `Nagrania: ${source.audioCount}`);
   }
   if (source.photoCount > 0) {
     media.push(source.photoCount === 1 ? "Zdjęcie" : `Zdjęcia: ${source.photoCount}`);
@@ -158,17 +161,22 @@ export function composePushPayload(inputs: PayloadInputs): PushNotificationPaylo
     return {
       v: 1,
       kind: "clarification",
-      title: `Pytanie agenta: ${scopeNameOf(inputs.scope)}`,
+      // The glossary and H1's surface name this concept "Sprawa do
+      // wyjaśnienia"; the notification voice uses the same name.
+      title: `Sprawa do wyjaśnienia: ${scopeNameOf(inputs.scope)}`,
       body: `${fragmentOf(first.question)}${more}`,
       data: routingDataOf(summary),
     };
   }
-  // source_entry: the collapsed current batch of entries.
+  // source_entry (and, when F4 creates them, task_reminder): the collapsed
+  // current batch of entries. The payload kind mirrors the summary's
+  // semantic kind on every path (kindOf), so hide-preview and normal
+  // previews never disagree about what the notification is.
   const live = inputs.sources.filter((source) => source.stillActive);
   if (live.length === 0) {
     return {
       v: 1,
-      kind: "source_entry",
+      kind: kindOf(summary),
       title: "Nowe powiadomienie",
       body: "Otwórz Kiero, żeby zobaczyć.",
       data: routingDataOf(summary),
@@ -178,7 +186,7 @@ export function composePushPayload(inputs: PayloadInputs): PushNotificationPaylo
   if (ordered.length === 1) {
     return {
       v: 1,
-      kind: "source_entry",
+      kind: kindOf(summary),
       title: `Nowy wpis: ${scopeNameOf(inputs.scope)}`,
       body: sourcePreviewLine(ordered[0]!),
       data: routingDataOf(summary),
@@ -188,7 +196,7 @@ export function composePushPayload(inputs: PayloadInputs): PushNotificationPaylo
   const authorsLabel = fragmentOf(authors.join(", "));
   return {
     v: 1,
-    kind: "source_entry",
+    kind: kindOf(summary),
     title: `Nowe wpisy (${ordered.length}): ${scopeNameOf(inputs.scope)}`,
     body:
       authors.length === 1
@@ -221,33 +229,24 @@ export function ttlSecondsOf(): number {
 }
 
 // ---------------------------------------------------------------------------
-// Leg outcome settlement (the pure half of ./operations.ts).
+// Leg outcome settlement (the pure half of ./operations.ts; the
+// transaction carriers PreparedLeg/LegResult live there, where the Id
+// types are).
 // ---------------------------------------------------------------------------
-
-/** What one prepared per-subscription delivery row carries. */
-export interface PreparedLeg {
-  readonly deliveryId: string;
-  readonly subscriptionId: string;
-  readonly endpoint: string;
-  readonly p256dhKeyBase64: string;
-  readonly authKeyBase64: string;
-  readonly payloadJson: string;
-  readonly attempts: number;
-}
-
-/** One leg's settled outcome for the completing transaction. */
-export interface LegResult {
-  readonly deliveryId: string;
-  readonly subscriptionId: string;
-  readonly report: PushLegReport;
-}
 
 /** How many transport attempts one per-device delivery may take. */
 export const MAX_LEG_ATTEMPTS = 3;
 
-/** The settled row state one leg outcome implies (pure). */
+/**
+ * The settled row state one leg outcome implies, given the attempts count
+ * AFTER this attempt (one decision, one place). A `retry_later` answer
+ * with attempts left keeps the row `pending` for the next bounded sweep;
+ * the same answer with none left settles `failed` as
+ * `push_attempts_exhausted`. Uncertain answers are never retried.
+ */
 export function settleLegOutcome(
-  result: LegResult,
+  report: PushLegReport,
+  attemptsAfter: number,
 ): {
   readonly state: "delivered" | "failed" | "unknown" | "pending";
   readonly errorKind: string | null;
@@ -256,7 +255,7 @@ export function settleLegOutcome(
   /** The notificationAttempts vocabulary for this leg (terminal-only). */
   readonly attemptOutcome: "delivered" | "failed" | "suppressed" | "unknown";
 } {
-  switch (result.report.kind) {
+  switch (report.kind) {
     case "delivered":
       return { state: "delivered", errorKind: null, revokeSubscription: false, attemptOutcome: "delivered" };
     case "gone":
@@ -282,26 +281,25 @@ export function settleLegOutcome(
         attemptOutcome: "failed",
       };
     case "retry_later":
-      return {
-        state: "pending",
-        errorKind: "push_retry_later",
-        revokeSubscription: false,
-        attemptOutcome: "failed",
-      };
+      return attemptsAfter < MAX_LEG_ATTEMPTS
+        ? {
+            state: "pending",
+            errorKind: "push_retry_later",
+            revokeSubscription: false,
+            attemptOutcome: "failed",
+          }
+        : {
+            state: "failed",
+            errorKind: "push_attempts_exhausted",
+            revokeSubscription: false,
+            attemptOutcome: "failed",
+          };
     case "unknown":
       return {
         state: "unknown",
-        errorKind: result.report.cause === "timeout" ? "push_timeout_after_send" : "push_outcome_unknown",
+        errorKind: report.cause === "timeout" ? "push_timeout_after_send" : "push_outcome_unknown",
         revokeSubscription: false,
         attemptOutcome: "unknown",
       };
   }
-}
-
-/**
- * Whether a retry_later leg still has attempts left (the caller keeps the
- * row pending for the next bounded sweep only while this is true).
- */
-export function legMayRetry(attempts: number, report: PushLegReport): boolean {
-  return report.kind === "retry_later" && attempts < MAX_LEG_ATTEMPTS;
 }

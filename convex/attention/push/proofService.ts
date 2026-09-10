@@ -352,8 +352,6 @@ async function decryptForDevice(
   }
 }
 
-/** One device row by its public token. */
-
 /** The fake push endpoint the real transport POSTs to. */
 export const proofPushServiceHandler = httpAction(async (ctx, request): Promise<Response> => {
   if (!pushProofEnabled(process.env)) {

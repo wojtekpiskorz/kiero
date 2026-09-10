@@ -130,7 +130,8 @@ function PushPanel({ state }: { readonly state: PushStateView }): ReactNode {
           endpoint: outcome.subscription.endpoint,
           p256dhKeyBase64: outcome.subscription.p256dhKeyBase64,
           authKeyBase64: outcome.subscription.authKeyBase64,
-          deviceLabel: "To urządzenie",
+          // No label: the server owns the "To urządzenie" fallback for an
+          // insert (a renewal keeps the stored label).
         }),
       });
       setBusy(false);

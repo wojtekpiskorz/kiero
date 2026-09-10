@@ -26,7 +26,7 @@ import { shared } from "../../schema/shared";
 export const pushTables = {
   /**
    * One per-device delivery of one delivered notification intent.
-   * `pending` rows await/d repeat a transport leg; `delivered` and
+   * `pending` rows await or repeat a transport leg; `delivered` and
    * `failed` are terminal; `unknown` is the echo/G3 uncertain state
    * (timeout-after-send): it blocks blind re-sends because the device
    * may already have shown the notification.

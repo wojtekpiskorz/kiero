@@ -29,13 +29,15 @@ import {
   runtimeCrypto,
   vapidKeysOf,
   PUSH_HTTP_TIMEOUT_MS,
+  type PushLegReport,
 } from "./protocol";
-import { ttlSecondsOf, type LegResult } from "./model";
+import { ttlSecondsOf } from "./model";
 import {
   performPreparePushDelivery,
   performCompletePushLegs,
   performPushHygiene,
   performStalePendingIntentIds,
+  type LegResult,
 } from "./operations";
 
 /** The deployment's VAPID key material, or null when not configured. */
@@ -86,7 +88,7 @@ export const completePushLegs = internalMutation({
 function normalizeReport(report: {
   kind: string;
   cause?: string;
-}): LegResult["report"] {
+}): PushLegReport {
   switch (report.kind) {
     case "delivered":
     case "gone":
@@ -208,24 +210,29 @@ async function deliverOneIntent(ctx: ActionCtx, intentId: Id<"notificationIntent
     return { succeeded: false, errorKind: "vapid_keys_missing", retryable: false };
   }
   const nowMs = Date.now();
-  const results: LegResult[] = [];
-  for (const leg of prepared.legs) {
-    const report = await deliverOneWebPush(runtimeCrypto(), {
-      endpoint: leg.endpoint,
-      p256dhBase64Url: leg.p256dhKeyBase64,
-      authBase64Url: leg.authKeyBase64,
-      payloadJson: leg.payloadJson,
-      ttlSeconds: ttlSecondsOf(),
-      keys,
-      nowMs,
-      timeoutMs: PUSH_HTTP_TIMEOUT_MS,
-    });
-    results.push({ deliveryId: leg.deliveryId as Id<"pushDeliveries">, subscriptionId: leg.subscriptionId as Id<"pushSubscriptions">, report });
-  }
+  // Independent legs: deliverOneWebPush never throws, generates its own
+  // ephemeral keypair and salt per call, and shares no mutable state, so
+  // the legs run concurrently and one slow/429 device cannot head-of-line
+  // block a device that would answer in milliseconds.
+  const results = await Promise.all(
+    prepared.legs.map(async (leg): Promise<LegResult> => {
+      const report = await deliverOneWebPush(runtimeCrypto(), {
+        endpoint: leg.endpoint,
+        p256dhBase64Url: leg.p256dhKeyBase64,
+        authBase64Url: leg.authKeyBase64,
+        payloadJson: leg.payloadJson,
+        ttlSeconds: ttlSecondsOf(),
+        keys,
+        nowMs,
+        timeoutMs: PUSH_HTTP_TIMEOUT_MS,
+      });
+      return { deliveryId: leg.deliveryId, subscriptionId: leg.subscriptionId, report };
+    }),
+  );
   const completion = await ctx.runMutation(internal.attention.push.functions.completePushLegs, {
     results: results.map((result) => ({
-      deliveryId: result.deliveryId as Id<"pushDeliveries">,
-      subscriptionId: result.subscriptionId as Id<"pushSubscriptions">,
+      deliveryId: result.deliveryId,
+      subscriptionId: result.subscriptionId,
       report:
         result.report.kind === "unknown"
           ? { kind: result.report.kind, ...(result.report.cause === undefined ? {} : { cause: result.report.cause }) }

@@ -36,6 +36,11 @@
  * comment); F3's per-device delivery rows live in its own fragment
  * (`convex/attention/push/schema.ts`, pushDeliveries).
  *
+ * F3 review repair (PR #104 round 1, flagged append): `by_revoked` over
+ * `revokedAtMs` lets the hygiene sweep query the not-yet-revoked range, so
+ * disabled rows leave the swept window and the bounded pass converges
+ * (the F2 `by_due` precedent: rows exit the queried range as they settle).
+ *
  * Tables: notificationIntents, pushSubscriptions, notificationAttempts.
  */
 
@@ -104,7 +109,11 @@ export const deliveryTables = {
     revokedAtMs: v.optional(shared.tsMs),
   })
     .index("by_user", ["userId"])
-    .index("by_endpoint", ["endpoint"]),
+    .index("by_endpoint", ["endpoint"])
+    // The hygiene sweep's drained discriminator: it queries the rows whose
+    // revokedAtMs is still undefined, and patching that field moves the row
+    // out of the swept range (see the F3 review repair note above).
+    .index("by_revoked", ["revokedAtMs"]),
 
   /** External delivery attempt history with known/unknown outcomes. */
   notificationAttempts: defineTable({

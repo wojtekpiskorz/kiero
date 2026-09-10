@@ -1,7 +1,7 @@
 /**
  * F3 model tests: the pure payload-composition and leg-settlement rules
  * (issue 43's focused verification), Polish copy included - the preview
- * matrix (project or Firma, author, fragment, Głosówka/photo counts,
+ * matrix (project or Firma, author, fragment, nagranie/photo counts,
  * hide-preview), the once-per-device idempotency decisions and the
  * outcome vocabulary mapping.
  */
@@ -11,7 +11,6 @@ import {
   MAX_LEG_ATTEMPTS,
   composePushPayload,
   fragmentOf,
-  legMayRetry,
   scopeNameOf,
   settleLegOutcome,
   sourcePreviewLine,
@@ -72,9 +71,12 @@ describe("the preview matrix", () => {
     expect(payload.title).toBe("Nowy wpis: Banan, Kaczmarek");
   });
 
-  it("shows the Głosówka and photo counts when there is no text", () => {
+  it("shows the nagranie and photo counts when there is no text (the glossary media names)", () => {
     const line = sourcePreviewLine(source({ authorText: "", audioCount: 1, photoCount: 3 }));
-    expect(line).toBe("Anna: Głosówka i Zdjęcia: 3");
+    expect(line).toBe("Anna: Nagranie i Zdjęcia: 3");
+    expect(
+      sourcePreviewLine(source({ authorText: "", audioCount: 2, photoCount: 0 })),
+    ).toBe("Anna: Nagrania: 2");
     expect(
       sourcePreviewLine(source({ authorText: "", audioCount: 0, photoCount: 1 })),
     ).toBe("Anna: Zdjęcie");
@@ -138,7 +140,7 @@ describe("the preview matrix", () => {
     expect(allDead.title).toBe("Nowe powiadomienie");
   });
 
-  it("previews an open clarification with the agent-question shape", () => {
+  it("previews an open clarification with the glossary name (Sprawa do wyjaśnienia)", () => {
     const clarification: ClarificationPreview = {
       clarificationId: "k9999999999999999999999",
       question: "Który termin betonowania jest właściwy?",
@@ -158,59 +160,94 @@ describe("the preview matrix", () => {
       clarifications: [clarification],
       hidePreview: false,
     });
-    expect(payload.title).toBe("Pytanie agenta: Firma");
+    expect(payload.title).toBe("Sprawa do wyjaśnienia: Firma");
     expect(payload.body).toBe("Który termin betonowania jest właściwy?");
     expect(payload.data.clarificationIds).toEqual([clarification.clarificationId]);
+  });
+
+  it("labels a task_reminder summary task_reminder in BOTH preview paths", () => {
+    const taskSummary: DeliveredSummary = {
+      semanticKind: "task_reminder",
+      bucket: "task:k1111111111111111111111",
+      scope: { kind: "company", projectIds: [] },
+      sourceIds: ["k1111111111111111111111"],
+      clarificationIds: [],
+      deliveredAtMs: T0,
+    };
+    const visible = composePushPayload({
+      summary: taskSummary,
+      scope: companyScope,
+      sources: [source()],
+      clarifications: [],
+      hidePreview: false,
+    });
+    const hidden = composePushPayload({
+      summary: taskSummary,
+      scope: companyScope,
+      sources: [source()],
+      clarifications: [],
+      hidePreview: true,
+    });
+    // One kind value for both paths (the payload kind mirrors the
+    // summary's semantic kind); the source-entry copy matrix is what F4
+    // inherits and narrows.
+    expect(visible.kind).toBe("task_reminder");
+    expect(hidden.kind).toBe("task_reminder");
   });
 });
 
 describe("leg settlement", () => {
-  const base = { deliveryId: "d1", subscriptionId: "s1" };
-
   it("maps every provider answer to the honest per-device state", () => {
-    expect(settleLegOutcome({ ...base, report: { kind: "delivered" } })).toMatchObject({
+    expect(settleLegOutcome({ kind: "delivered" }, 1)).toMatchObject({
       state: "delivered",
       attemptOutcome: "delivered",
       revokeSubscription: false,
     });
-    expect(settleLegOutcome({ ...base, report: { kind: "gone" } })).toMatchObject({
+    expect(settleLegOutcome({ kind: "gone" }, 1)).toMatchObject({
       state: "failed",
       errorKind: "push_subscription_gone",
       revokeSubscription: true,
       attemptOutcome: "failed",
     });
-    expect(settleLegOutcome({ ...base, report: { kind: "rejected" } })).toMatchObject({
+    expect(settleLegOutcome({ kind: "rejected" }, 1)).toMatchObject({
       state: "failed",
       errorKind: "push_payload_rejected",
       revokeSubscription: false,
     });
-    expect(settleLegOutcome({ ...base, report: { kind: "unauthorized" } })).toMatchObject({
+    expect(settleLegOutcome({ kind: "unauthorized" }, 1)).toMatchObject({
       state: "failed",
       errorKind: "push_unauthorized",
       revokeSubscription: false,
     });
-    expect(settleLegOutcome({ ...base, report: { kind: "retry_later" } })).toMatchObject({
-      state: "pending",
-      errorKind: "push_retry_later",
-      revokeSubscription: false,
-    });
-    expect(settleLegOutcome({ ...base, report: { kind: "unknown", cause: "timeout" } })).toMatchObject({
+    expect(settleLegOutcome({ kind: "unknown", cause: "timeout" }, 1)).toMatchObject({
       state: "unknown",
       errorKind: "push_timeout_after_send",
       attemptOutcome: "unknown",
     });
-    expect(settleLegOutcome({ ...base, report: { kind: "unknown" } })).toMatchObject({
+    expect(settleLegOutcome({ kind: "unknown" }, 1)).toMatchObject({
       state: "unknown",
       errorKind: "push_outcome_unknown",
     });
   });
 
-  it("bounds retry_later legs and never retries uncertain ones", () => {
-    expect(legMayRetry(0, { kind: "retry_later" })).toBe(true);
-    expect(legMayRetry(MAX_LEG_ATTEMPTS - 1, { kind: "retry_later" })).toBe(true);
-    expect(legMayRetry(MAX_LEG_ATTEMPTS, { kind: "retry_later" })).toBe(false);
-    expect(legMayRetry(0, { kind: "unknown" })).toBe(false);
-    expect(legMayRetry(0, { kind: "delivered" })).toBe(false);
+  it("keeps retry_later legs pending only while attempts remain, then exhausts them", () => {
+    expect(settleLegOutcome({ kind: "retry_later" }, 1)).toMatchObject({
+      state: "pending",
+      errorKind: "push_retry_later",
+      attemptOutcome: "failed",
+    });
+    expect(settleLegOutcome({ kind: "retry_later" }, MAX_LEG_ATTEMPTS - 1)).toMatchObject({
+      state: "pending",
+      errorKind: "push_retry_later",
+    });
+    expect(settleLegOutcome({ kind: "retry_later" }, MAX_LEG_ATTEMPTS)).toMatchObject({
+      state: "failed",
+      errorKind: "push_attempts_exhausted",
+      attemptOutcome: "failed",
+    });
+    // Uncertain and terminal answers never retry, whatever the count.
+    expect(settleLegOutcome({ kind: "unknown" }, MAX_LEG_ATTEMPTS).state).toBe("unknown");
+    expect(settleLegOutcome({ kind: "delivered" }, MAX_LEG_ATTEMPTS).state).toBe("delivered");
   });
 });
 

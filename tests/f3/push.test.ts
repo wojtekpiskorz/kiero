@@ -23,10 +23,17 @@ import {
   performPushHygiene,
   performStalePendingIntentIds,
   registrationIssue,
+  type PreparedLeg,
 } from "../../convex/attention/push/operations";
+import { base64UrlEncode } from "../../convex/attention/push/protocol";
 import { projectEventToJobInputs } from "../../convex/platform/outbox";
 import { pushDeliveryExecutor } from "../../convex/attention/push/executor";
 import type { RequestContext } from "@kiero/runtime";
+
+/** RFC 8291-shaped fixture keys: 65-byte 0x04-prefixed point, 16-byte auth. */
+const VALID_P256DH =
+  "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4";
+const VALID_AUTH = "BTBZMqHH6r4Tts7J_aSIgg";
 
 const TABLES = [
   "companies",
@@ -155,8 +162,8 @@ async function seedSubscription(
     companyId: overrides.companyId ?? firm.companyId,
     ...(overrides.sessionId === null ? {} : { sessionId: overrides.sessionId ?? firm.sessionId }),
     endpoint: overrides.endpoint ?? "https://push.example.net/p/f3-1",
-    p256dhKeyBase64: "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
-    authKeyBase64: "BTBZMqHH6r4Tts7J_aSIgg",
+    p256dhKeyBase64: VALID_P256DH,
+    authKeyBase64: VALID_AUTH,
     deviceLabel: "telefon Anny",
     createdAtMs: T0,
     ...(overrides.revokedAtMs === undefined ? {} : { revokedAtMs: overrides.revokedAtMs }),
@@ -248,8 +255,8 @@ describe("device registration", () => {
         actorOf(firm.bossId, firm.companyId, firm.sessionId),
         {
           endpoint: "https://push.example.net/p/new-device",
-          p256dhKeyBase64: "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
-          authKeyBase64: "BTBZMqHH6r4Tts7J_aSIgg",
+          p256dhKeyBase64: VALID_P256DH,
+          authKeyBase64: VALID_AUTH,
           deviceLabel: "telefon Anny",
         },
       ),
@@ -267,14 +274,20 @@ describe("device registration", () => {
 
   it("renews an existing endpoint in place (same row, refreshed keys)", async () => {
     const firm = await seedFirm();
+    // Two distinct but RFC 8291-shaped key pairs (65-byte 0x04-prefixed
+    // p256dh, 16-byte auth): renewal must accept and store the new pair.
+    const firstP256dh = base64UrlEncode(new Uint8Array([0x04, ...new Uint8Array(64)]));
+    const firstAuth = base64UrlEncode(new Uint8Array(16));
+    const secondP256dh = base64UrlEncode(new Uint8Array([0x04, ...new Uint8Array(63), 0x01]));
+    const secondAuth = base64UrlEncode(new Uint8Array([1, ...new Uint8Array(15)]));
     const first = valueOf(
       await performRegisterPushSubscription(
         tx(),
         actorOf(firm.bossId, firm.companyId, firm.sessionId),
         {
           endpoint: "https://push.example.net/p/renew",
-          p256dhKeyBase64: "AAA",
-          authKeyBase64: "BBB",
+          p256dhKeyBase64: firstP256dh,
+          authKeyBase64: firstAuth,
           deviceLabel: "telefon",
         },
       ),
@@ -285,8 +298,8 @@ describe("device registration", () => {
         actorOf(firm.bossId, firm.companyId, firm.secondDeviceSessionId),
         {
           endpoint: "https://push.example.net/p/renew",
-          p256dhKeyBase64: "CCC",
-          authKeyBase64: "DDD",
+          p256dhKeyBase64: secondP256dh,
+          authKeyBase64: secondAuth,
         },
       ),
     );
@@ -294,35 +307,75 @@ describe("device registration", () => {
     expect(ctx.db.rows("pushSubscriptions")).toHaveLength(1);
     expect(ctx.db.rows("pushSubscriptions")[0]).toMatchObject({
       sessionId: firm.secondDeviceSessionId,
-      p256dhKeyBase64: "CCC",
+      p256dhKeyBase64: secondP256dh,
+      authKeyBase64: secondAuth,
     });
   });
 
   it("applies the endpoint policy (https, or loopback http for dev proofs)", () => {
     expect(registrationIssue({
       endpoint: "https://push.example.net/p/x",
-      p256dhKeyBase64: "AAA",
-      authKeyBase64: "BBB",
+      p256dhKeyBase64: VALID_P256DH,
+      authKeyBase64: VALID_AUTH,
       deviceLabel: "telefon",
     })).toBeNull();
     expect(registrationIssue({
       endpoint: "http://127.0.0.1:8787/probe",
-      p256dhKeyBase64: "AAA",
-      authKeyBase64: "BBB",
+      p256dhKeyBase64: VALID_P256DH,
+      authKeyBase64: VALID_AUTH,
       deviceLabel: "telefon",
     })).toBeNull();
     expect(registrationIssue({
       endpoint: "http://evil.example.net/p/x",
-      p256dhKeyBase64: "AAA",
-      authKeyBase64: "BBB",
+      p256dhKeyBase64: VALID_P256DH,
+      authKeyBase64: VALID_AUTH,
       deviceLabel: "telefon",
     })).toBe("endpoint_not_https");
     expect(registrationIssue({
       endpoint: "https://push.example.net/p/x",
       p256dhKeyBase64: "has spaces!",
-      authKeyBase64: "BBB",
+      authKeyBase64: VALID_AUTH,
       deviceLabel: "telefon",
     })).toBe("subscription_keys_not_base64url");
+  });
+
+  it("rejects structurally invalid subscription keys (RFC 8291 shapes)", () => {
+    const shapeIssue = (p256dh: Uint8Array, auth: Uint8Array): string | null =>
+      registrationIssue({
+        endpoint: "https://push.example.net/p/x",
+        p256dhKeyBase64: base64UrlEncode(p256dh),
+        authKeyBase64: base64UrlEncode(auth),
+        deviceLabel: "telefon",
+      });
+    const validP256dh = new Uint8Array(65);
+    validP256dh[0] = 0x04;
+    const validAuth = new Uint8Array(16);
+    expect(shapeIssue(validP256dh, validAuth)).toBeNull();
+    // p256dh must be the 65-byte uncompressed point (0x04 || x || y).
+    const wrongLength = validP256dh.slice(0, 64);
+    expect(shapeIssue(wrongLength, validAuth)).toBe("subscription_keys_invalid_shape");
+    const notUncompressed = new Uint8Array(65);
+    notUncompressed[0] = 0x02;
+    expect(shapeIssue(notUncompressed, validAuth)).toBe("subscription_keys_invalid_shape");
+    // auth must be the 16-byte secret.
+    expect(shapeIssue(validP256dh, new Uint8Array(15))).toBe("subscription_keys_invalid_shape");
+    expect(shapeIssue(validP256dh, new Uint8Array(17))).toBe("subscription_keys_invalid_shape");
+  });
+
+  it("refuses to register structurally invalid keys (no healthy-looking dead row)", async () => {
+    const firm = await seedFirm();
+    const result = await performRegisterPushSubscription(
+      tx(),
+      actorOf(firm.bossId, firm.companyId, firm.sessionId),
+      {
+        endpoint: "https://push.example.net/p/bad-keys",
+        p256dhKeyBase64: "AAA",
+        authKeyBase64: VALID_AUTH,
+        deviceLabel: "telefon",
+      },
+    );
+    expect(errorOf(result).code).toBe("subscription_keys_invalid_shape");
+    expect(ctx.db.rows("pushSubscriptions")).toHaveLength(0);
   });
 
   it("removes only the actor's OWN subscription, idempotently", async () => {
@@ -487,7 +540,7 @@ describe("delivery prepare", () => {
     }
     expect(JSON.parse(prepared.legs[0]!.payloadJson)).toMatchObject({
       title: "Nowy wpis: Banan",
-      body: "Autor: Głosówka i Zdjęcia: 2",
+      body: "Autor: Nagranie i Zdjęcia: 2",
     });
   });
 
@@ -519,7 +572,7 @@ describe("delivery prepare", () => {
 // ---------------------------------------------------------------------------
 
 describe("leg completion", () => {
-  async function preparedLeg(firm: Firm): Promise<{ deliveryId: string; subscriptionId: string }> {
+  async function preparedLeg(firm: Firm): Promise<PreparedLeg> {
     await seedSubscription(firm);
     const intentId = await seedDeliveredIntent(firm);
     const prepared = await performPreparePushDelivery(tx(), intentId as never);
@@ -633,6 +686,27 @@ describe("revocation hygiene and the safety net", () => {
     const firm = await seedFirm();
     await seedSubscription(firm);
     expect(await performPushHygiene(tx())).toEqual({ disabled: 0 });
+  });
+
+  it("converges past the 200-row window: disabled rows leave the swept range", async () => {
+    const firm = await seedFirm();
+    await ctx.db.patch(firm.sessionId, { revokedAtMs: T0 });
+    // One MORE dead subscription than a bounded pass inspects
+    // (HYGIENE_LIMIT is 200). A table scan would re-read the same oldest
+    // 200 forever; the by_revoked sweep must disable the next window on
+    // every pass until the table drains.
+    for (let index = 0; index < 201; index += 1) {
+      await seedSubscription(firm, { endpoint: `https://push.example.net/p/f3-sweep-${index}` });
+    }
+    const first = await performPushHygiene(tx());
+    const second = await performPushHygiene(tx());
+    const third = await performPushHygiene(tx());
+    expect(first.disabled).toBe(200);
+    expect(second.disabled).toBe(1);
+    expect(third.disabled).toBe(0);
+    for (const row of ctx.db.rows("pushSubscriptions")) {
+      expect(row.revokedAtMs).toBeDefined();
+    }
   });
 
   it("surfaces stale pending intents as the cron safety net's input", async () => {

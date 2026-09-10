@@ -36,14 +36,11 @@ import { forbiddenError, notFoundError, validationError, type RequestContext } f
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { preferenceWriteOf } from "../preferences/operations";
-import { isBase64Url } from "./protocol";
+import { isBase64Url, base64UrlDecode, type PushLegReport } from "./protocol";
 import {
   composePushPayload,
   settleLegOutcome,
-  legMayRetry,
   type DeliveredSummary,
-  type PreparedLeg,
-  type LegResult,
   type PushNotificationPayload,
 } from "./model";
 
@@ -91,6 +88,22 @@ export function registrationIssue(input: RegisterPushInput): string | null {
   }
   if (!isBase64Url(input.p256dhKeyBase64) || !isBase64Url(input.authKeyBase64)) {
     return "subscription_keys_not_base64url";
+  }
+  // Shape-check the keys the way ./protocol.ts checks its own VAPID
+  // material (vapidKeysOf): RFC 8291 fixes p256dh as the 65-byte
+  // uncompressed P-256 point (0x04 || x || y) and auth as the 16-byte
+  // secret. A structurally invalid key can never be sent to, so reject it
+  // at the registration boundary instead of failing every delivery later.
+  let p256dh: Uint8Array;
+  let auth: Uint8Array;
+  try {
+    p256dh = base64UrlDecode(input.p256dhKeyBase64);
+    auth = base64UrlDecode(input.authKeyBase64);
+  } catch {
+    return "subscription_keys_not_base64url";
+  }
+  if (p256dh.length !== 65 || p256dh[0] !== 0x04 || auth.length !== 16) {
+    return "subscription_keys_invalid_shape";
   }
   // An absent label is the honest case: an insert falls back to the
   // default "To urządzenie"; a renewal keeps the stored label.
@@ -184,6 +197,28 @@ export async function performRevokePushSubscription(
 // ---------------------------------------------------------------------------
 // Delivery prepare: live re-checks, payload composition, row idempotency.
 // ---------------------------------------------------------------------------
+
+/**
+ * What one prepared per-subscription delivery row carries to the transport
+ * (a transaction carrier, so it lives here with the Id types; the pure
+ * decisions over legs live in ./model.ts).
+ */
+export interface PreparedLeg {
+  readonly deliveryId: Id<"pushDeliveries">;
+  readonly subscriptionId: Id<"pushSubscriptions">;
+  readonly endpoint: string;
+  readonly p256dhKeyBase64: string;
+  readonly authKeyBase64: string;
+  readonly payloadJson: string;
+  readonly attempts: number;
+}
+
+/** One leg's settled outcome for the completing transaction. */
+export interface LegResult {
+  readonly deliveryId: Id<"pushDeliveries">;
+  readonly subscriptionId: Id<"pushSubscriptions">;
+  readonly report: PushLegReport;
+}
 
 /** What the prepare found for one intent. */
 export type PrepareOutcome =
@@ -421,22 +456,18 @@ export async function performCompletePushLegs(
   let pendingRemaining = 0;
   let revokedSubscriptions = 0;
   for (const result of results) {
-    const row = await tx.db.get(result.deliveryId as Id<"pushDeliveries">);
+    const row = await tx.db.get(result.deliveryId);
     if (row === null || row.state !== "pending") {
       continue; // concurrently settled: the per-device row is the authority
     }
-    const settled = settleLegOutcome(result);
     const attempts = row.attempts + 1;
-    const mayRetry = legMayRetry(attempts, result.report);
-    const state = settled.state === "pending" && mayRetry ? "pending" : settled.state === "pending" ? "failed" : settled.state;
-    const errorKind =
-      state === "failed" && settled.state === "pending" ? "push_attempts_exhausted" : settled.errorKind;
+    const settled = settleLegOutcome(result.report, attempts);
     await tx.db.patch(row._id, {
-      state,
+      state: settled.state,
       attempts,
-      ...(errorKind === null ? { lastErrorKind: undefined } : { lastErrorKind: errorKind }),
+      ...(settled.errorKind === null ? { lastErrorKind: undefined } : { lastErrorKind: settled.errorKind }),
       updatedAtMs: nowMs,
-      ...(state === "pending" ? {} : { finishedAtMs: nowMs }),
+      ...(settled.state === "pending" ? {} : { finishedAtMs: nowMs }),
     });
     // The shared external-attempt ledger (F2's notificationAttempts; this
     // lane's export read per the fragment's schema comment).
@@ -448,13 +479,13 @@ export async function performCompletePushLegs(
       atMs: nowMs,
     });
     if (settled.revokeSubscription) {
-      const subscription = await tx.db.get(result.subscriptionId as Id<"pushSubscriptions">);
+      const subscription = await tx.db.get(result.subscriptionId);
       if (subscription !== null && subscription.revokedAtMs === undefined) {
         await tx.db.patch(subscription._id, { revokedAtMs: nowMs });
         revokedSubscriptions += 1;
       }
     }
-    if (state === "pending") {
+    if (settled.state === "pending") {
       pendingRemaining += 1;
     }
   }
@@ -474,15 +505,20 @@ const HYGIENE_LIMIT = 200;
  * the bound company. Delivery already denies both structurally (the
  * prepare re-check); this pass persists the honest disabled state so a
  * settings screen never shows a dead device as enabled.
+ *
+ * The sweep drains (the F2 by_due precedent): it queries the
+ * NOT-yet-revoked range through `by_revoked`, and patching revokedAtMs
+ * moves a row OUT of that range, so each bounded pass inspects the next
+ * window instead of re-reading the same oldest rows forever.
  */
 export async function performPushHygiene(tx: MutationCtx): Promise<{ disabled: number }> {
   const nowMs = Date.now();
-  const rows = await tx.db.query("pushSubscriptions").take(HYGIENE_LIMIT);
+  const rows = await tx.db
+    .query("pushSubscriptions")
+    .withIndex("by_revoked", (q) => q.eq("revokedAtMs", undefined))
+    .take(HYGIENE_LIMIT);
   let disabled = 0;
   for (const row of rows) {
-    if (row.revokedAtMs !== undefined) {
-      continue;
-    }
     let dead = false;
     if (row.sessionId !== undefined) {
       const session = await tx.db.get(row.sessionId);
