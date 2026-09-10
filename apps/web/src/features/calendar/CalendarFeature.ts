@@ -1,6 +1,7 @@
 /**
- * The barebones Calendar connection feature (G1): the Polish entry point
- * for the optional personal Google calendar ("Kalendarz Kiero w Google").
+ * The barebones Calendar feature: G1's connection lifecycle plus G4's
+ * settings and sync diagnostics, the Polish entry point for the optional
+ * personal Google calendar ("Kalendarz Kiero w Google").
  *
  * JSX-free on purpose (createElement only): the host feature registry
  * chain is imported by the node test programs, which compile without a
@@ -11,6 +12,12 @@
  * confirmed deletion, and disconnect. Nothing here touches Kiero identity:
  * disconnect is a stop of the connection, never of the sign-in.
  *
+ * G4 appends ./CalendarSettings.ts under the connection panel: the sync
+ * diagnostics and personal copy management over G2/G3's reads and the
+ * certified `calendar.setCopyHidden` / `calendar.reconcileCopy` commands.
+ * The shared dispatch envelope and the session-ended fallback come from
+ * H1's company gate module (the lane-by-lane migration it invites).
+ *
  * The authorization start runs server-side (the `startAuthorization`
  * mutation over the same checked decision core as the gateway's route);
  * the browser then follows the returned Google URL. No styling, semantic
@@ -20,19 +27,15 @@
 import { createElement, useMemo, useState, type ReactNode } from "react";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { useMutation, useQuery_experimental as useQueryState } from "convex/react";
-import { signInCopy } from "../sign-in/state";
 import { AuthenticatedGate } from "../sign-in/SignInGate";
+import { SessionEnded, envelopeOf } from "../company/CompanyGate";
 import { useAppServices } from "../../app/providers";
 import { createConvexClient } from "../sign-in/client";
 import { api } from "../../../../../convex/_generated/api";
 import type { CalendarConnectionStatus } from "../../../../../convex/calendar/connection/functions";
 import type { ResultEnvelope } from "@kiero/contracts";
 import { calendarCopy, reasonText } from "./state";
-
-/** One command envelope (the checked dispatch input shape). */
-function envelopeOf(operation: string, input: unknown) {
-  return { operation, input, expectedRevisions: [] };
-}
+import { CalendarSettings } from "./CalendarSettings";
 
 /** One start mode, derived from the action the server offers. */
 type StartMode = "connect" | "switch" | "recreate";
@@ -82,16 +85,31 @@ function CalendarSurface(): ReactNode {
   });
   if (status.status === "error") {
     // The session stopped resolving (revocation, upstream sign-out,
-    // inactivity): the honest fallback is the session-ended state.
-    return createElement("div", { role: "alert" }, createElement("p", null, signInCopy.sessionEndedNotice));
+    // inactivity): the shared session-ended fallback with the way back
+    // to sign-in (H1's company gate module).
+    return createElement(SessionEnded);
   }
   if (status.status !== "success") {
     return createElement("p", { role: "status" }, calendarCopy.checkingSession);
   }
-  return createElement(ConnectionPanel, { status: status.data });
+  return createElement(
+    ConnectionPanel,
+    { status: status.data },
+    // The G4 settings ride along whenever the actor's connection row
+    // exists (its own reads decide what to render inside); copy commands
+    // are served only while G1 reports a healthy connected row.
+    createElement(CalendarSettings, { actionsEnabled: status.data.state === "connected" }),
+  );
 }
 
-function ConnectionPanel({ status }: { readonly status: CalendarConnectionStatus }): ReactNode {
+export function ConnectionPanel({
+  status,
+  children,
+}: {
+  readonly status: CalendarConnectionStatus;
+  /** The settings continuation (G4), rendered under the lifecycle panel. */
+  readonly children?: ReactNode;
+}): ReactNode {
   const start = useMutation(api.calendar.connection.functions.startAuthorization);
   const dispatch = useMutation(api.calendar.connection.functions.dispatchCalendar);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -148,45 +166,48 @@ function ConnectionPanel({ status }: { readonly status: CalendarConnectionStatus
     }
   }
 
-  const children: ReactNode[] = [
+  const body: ReactNode[] = [
     createElement("h1", null, calendarCopy.title),
     createElement("p", null, calendarCopy.intro),
   ];
 
   if (!status.providerConfigured) {
-    children.push(createElement("p", { role: "note" }, calendarCopy.providerNotConfigured));
+    body.push(createElement("p", { role: "note" }, calendarCopy.providerNotConfigured));
   }
 
   // The honest state description.
   switch (status.state) {
     case "unavailable_no_company":
-      children.push(createElement("p", null, calendarCopy.noCompanyScope));
+      body.push(createElement("p", null, calendarCopy.noCompanyScope));
       break;
     case "pending_authorization":
-      children.push(createElement("p", { role: "status" }, calendarCopy.statePending));
+      body.push(createElement("p", { role: "status" }, calendarCopy.statePending));
       break;
     case "connected":
-      children.push(
+      body.push(
         createElement("p", { role: "status" }, calendarCopy.stateConnected(status.googleAccountEmail)),
       );
+      // The dedicated calendar fact (G4): Kiero never writes into the
+      // boss's main Google calendar.
+      body.push(createElement("p", null, calendarCopy.dedicatedCalendar));
       if (status.connectedAtMs !== null) {
-        children.push(createElement("p", null, calendarCopy.connectedAt(status.connectedAtMs)));
+        body.push(createElement("p", null, calendarCopy.connectedAt(status.connectedAtMs)));
       }
       if (status.cleanupStatus === "unconfirmed") {
-        children.push(createElement("p", { role: "note" }, calendarCopy.cleanupUnconfirmed));
+        body.push(createElement("p", { role: "note" }, calendarCopy.cleanupUnconfirmed));
       }
       break;
     case "disconnected":
-      children.push(createElement("p", null, calendarCopy.stateDisconnected));
+      body.push(createElement("p", null, calendarCopy.stateDisconnected));
       break;
     case "error":
-      children.push(createElement("p", { role: "alert" }, reasonText(status.reconnectReason)));
+      body.push(createElement("p", { role: "alert" }, reasonText(status.reconnectReason)));
       break;
   }
 
   // The explicit acknowledgement gate after an unknown creation outcome.
   if (unresolvedCreation) {
-    children.push(
+    body.push(
       createElement("label", null,
         createElement("input", {
           type: "checkbox",
@@ -217,12 +238,16 @@ function ConnectionPanel({ status }: { readonly status: CalendarConnectionStatus
     controls.push(createElement("button", { type: "button", disabled: busy, onClick: () => void runDisconnect() }, calendarCopy.disconnect));
   }
   if (controls.length > 0) {
-    children.push(createElement("div", { role: "group" }, ...controls));
+    body.push(createElement("div", { role: "group" }, ...controls));
   }
 
   if (notice !== null) {
-    children.push(createElement("p", { role: notice.kind === "error" ? "alert" : "status" }, notice.text));
+    body.push(createElement("p", { role: notice.kind === "error" ? "alert" : "status" }, notice.text));
   }
 
-  return createElement("section", null, ...children);
+  if (children !== undefined) {
+    body.push(children);
+  }
+
+  return createElement("section", null, ...body);
 }

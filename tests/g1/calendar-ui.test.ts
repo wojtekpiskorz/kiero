@@ -45,10 +45,14 @@ describe("the calendar feature registration (A4 composition)", () => {
     expect(calendarEntry?.screenHeading).toBe("Kalendarz Kiero w Google");
   });
 
-  it("consumes exactly the two certified connection operations", () => {
+  it("consumes exactly the certified calendar operations (G1's two, plus G4's copy commands)", () => {
+    // G4 (issue #48) appended the settings surface's copy commands to the
+    // SAME entry G1 registered: the minimal flagged amendment of this pin.
     expect(calendarEntry?.consumedOperations).toEqual([
       "calendar.connectCalendar",
       "calendar.disconnectCalendar",
+      "calendar.setCopyHidden",
+      "calendar.reconcileCopy",
     ]);
   });
 });
