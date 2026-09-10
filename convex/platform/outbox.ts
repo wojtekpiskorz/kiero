@@ -277,6 +277,29 @@ function projectOneEdge(
       dedupKey: `attention.evaluate_due_intents:changeset:${String(payload.changeSetId)}`,
     };
   }
+  // F4 registration (issue #44 owns these edges' projections): the task and
+  // bound-deadline events project onto `attention.schedule_task_reminders`.
+  // The work dedup keys ride the ROW's identity (the work lane's canonical
+  // key carries the task revision, so every DISTINCT change registers its
+  // own job while event replays collapse); the finding-revised key is
+  // payload-derived instead, because that event fans out to C5's recompute
+  // walk too and one dedup key may never carry two job kinds.
+  if (jobKind === "attention.schedule_task_reminders") {
+    if (eventName === "memory.findingRevised") {
+      return {
+        kind: "job",
+        jobKind,
+        input: { trigger: "finding_revised", taskId: null, findingId: payload.findingId },
+        dedupKey: `attention.schedule_task_reminders:finding:${String(payload.findingId)}:${String(payload.revisionId)}`,
+      };
+    }
+    return {
+      kind: "job",
+      jobKind,
+      input: { trigger: "task_changed", taskId: payload.taskId, findingId: null },
+      dedupKey: rowDedupKey,
+    };
+  }
   return { kind: "unprojected_edge", jobKind };
 }
 

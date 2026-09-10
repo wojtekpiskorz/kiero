@@ -43,6 +43,10 @@
  *   events (acceptance creates source intents, a raised clarification
  *   creates the addressed agent-question intent, a published change set
  *   only wakes the evaluator).
+ * - `attention.schedule_task_reminders`
+ *   (../attention/reminders/executor.ts, F4): the durable task-reminder
+ *   scheduling reaction to the work task events and bound-deadline
+ *   revisions (the semantic slot recompute per task change).
  */
 
 import type { FunctionReference } from "convex/server";
@@ -57,6 +61,10 @@ import { recomputeDependentsExecutor } from "../memory/recompute/executor";
 import { transcribeSegmentExecutor } from "../processing/audio/executor";
 import { normalizePhotoExecutor } from "../processing/images/executor";
 import { attentionIntentsExecutor } from "../attention/delivery/executor";
+// F4 append (flagged shared-file change, the F2 precedent): the
+// task-reminder scheduling executor implementation lives in F4's owned
+// path; this registry entry is its composition point.
+import { taskRemindersExecutor } from "../attention/reminders/executor";
 
 // G3 append (flagged shared-file change, the D5/D6 precedent): the
 // calendar.reconcile_outcome executor implementation lives in G3's owned
@@ -106,4 +114,5 @@ export const jobExecutors: Record<string, JobExecutor> = {
 
   [reconcileOutcomeExecutor.jobKind]: reconcileOutcomeExecutor,
   [attentionIntentsExecutor.jobKind]: attentionIntentsExecutor,
+  [taskRemindersExecutor.jobKind]: taskRemindersExecutor,
 };

@@ -45,6 +45,10 @@ const durableJobKind: ValueValidator<Encoded<typeof DurableJobKind>> = v.union(
   v.literal("memory.publish_change_set"),
   v.literal("memory.recompute_dependents"),
   v.literal("attention.evaluate_due_intents"),
+  // F4 amendment (flagged shared-file change): the task-reminder scheduling
+  // job kind joins the closed union (the contracts DurableJobKind is the
+  // authority; the typecheck pins equality).
+  v.literal("attention.schedule_task_reminders"),
   v.literal("attention.deliver_push"),
   v.literal("calendar.project_copy"),
   v.literal("calendar.reconcile_outcome"),

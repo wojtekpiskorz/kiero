@@ -49,10 +49,13 @@ const row = Schema.decodeUnknownSync(SourceConversationRow)({
 });
 
 describe("the composed registry still carries exactly the attention surface", () => {
-  it("declares the five attention operations under their certified names", () => {
+  it("declares the six attention operations under their certified names", () => {
+    // F4 append (issue #44, flagged): attention.evaluateDueReminders joins
+    // the certified five as this lane's evaluator entry.
     expect(Object.keys(attentionOperations).sort()).toEqual([
       "attention.changeNotificationPreferences",
       "attention.evaluateDueIntents",
+      "attention.evaluateDueReminders",
       "attention.markSourceRead",
       "attention.registerPushSubscription",
       "attention.snoozeTaskReminders",

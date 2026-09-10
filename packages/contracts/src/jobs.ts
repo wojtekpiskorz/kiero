@@ -26,6 +26,11 @@ export const DurableJobKind = Schema.Literals([
   // A3 certification rename (one concept, one name): the module surface is
   // `attention`, so the job kinds follow it (was `notifications.*`).
   "attention.evaluate_due_intents",
+  // F4 amendment (issue #44, flagged coordinated change, the F2/D6
+  // precedent): the task-reminder scheduling job kind - the durable
+  // reaction to the work task events and bound-deadline revisions
+  // (`convex/attention/reminders/executor.ts` implements it).
+  "attention.schedule_task_reminders",
   "attention.deliver_push",
   "calendar.project_copy",
   "calendar.reconcile_outcome",
