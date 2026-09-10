@@ -64,6 +64,11 @@ export const TABLE_ID_NAMES = [
   "uploads",
   "attachments",
   "mediaRepresentations",
+  // processing/audio (D6 amendment, flagged in the issue report): the
+  // resumable long-audio STT fragment — transcript orders and per-segment
+  // checkpoints over accepted audio attachments.
+  "audioTranscripts",
+  "audioSegments",
   // memory/findings
   "findings",
   "findingRevisions",

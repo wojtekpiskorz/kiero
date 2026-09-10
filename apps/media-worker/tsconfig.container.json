@@ -1,8 +1,8 @@
 {
-  "extends": "./tsconfig.base.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": ["node"],
     "allowImportingTsExtensions": true
   },
-  "include": ["tests/**/*.ts", "vitest.config.mts"]
+  "include": ["src/container-main.ts"]
 }

@@ -11,7 +11,7 @@ import { jobExecutors } from "../../convex/platform/executors";
 import { echoExecutor } from "../../convex/platform/echo";
 
 describe("convex executor composition", () => {
-  it("registers exactly the implemented executors (platform + B3 + E3 text lane)", () => {
+  it("registers exactly the implemented executors (platform + B3 + D6 + E3 lanes)", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
       [
         "platform.echo_delivery",
@@ -19,6 +19,10 @@ describe("convex executor composition", () => {
         // B3's sanctioned append (issue #22 owns the declared consumer
         // proof for the access-revocation edges).
         "access.cleanup_revocation",
+        // D6's sanctioned append (issue #34 owns per-segment STT; the
+        // contracts amendment registering the kind is flagged there).
+        "processing.transcribe_segment",
+
         // D5's sanctioned append (issue #33 owns the declared consumer
         // proof for the accepted-photo normalization edge).
         "processing.normalize_photo",

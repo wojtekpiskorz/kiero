@@ -105,9 +105,9 @@ describe("composed registry integrity", () => {
   it("derives coherent features and rejects incoherent hand-written parts", () => {
     // One feature per executor; consumed edges and executed job kinds are
     // derived from the executor/consumer tables, never hand-written.
-    // 8 executors since A3 added platform.echo and D5 added
-    // processing.normalize (issue #33's sanctioned append).
-    expect(features).toHaveLength(8);
+    // 9 executors: platform.echo (A3) + B3 cleanup + E3 extract/analyze +
+    // D5 normalize + D6 transcribe (each lane's sanctioned append).
+    expect(features).toHaveLength(9);
     expect(features.every((feature) => feature.providesOperations.length === 0)).toBe(true);
     // The sourceAccepted edge belongs to processing.extract (the executor of
     // processing.extract_fragments), not processing.analyze.

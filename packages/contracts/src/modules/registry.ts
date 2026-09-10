@@ -154,6 +154,14 @@ export const echoDeliveryInput = Schema.Struct({
   message: Schema.NonEmptyString,
 });
 
+// D6 amendment (flagged coordinated change, the B3 precedent): the first
+// model-call job kind gets its executor registration — the prerequisite E2's
+// dispatch named. Per-segment STT executes through the durable path; the
+// transcript row is the order the workflow owns.
+export const transcribeSegmentInput = Schema.Struct({
+  transcriptId: tableIdSchema("audioTranscripts"),
+});
+
 function decodeFeatureId(value: string): Schema.Schema.Type<typeof FeatureId> {
   return Schema.decodeUnknownSync(FeatureId)(value);
 }
@@ -218,6 +226,15 @@ export const executors: readonly ExecutorEntry[] = [
     executorId: decodeFeatureId("platform.echo"),
     jobKind: "platform.echo_delivery",
     input: echoDeliveryInput,
+  }),
+  // D6 amendment (flagged coordinated change): the durable per-segment STT
+  // executor over one transcript order (resumable, checkpointed per
+  // segment; `convex/processing/audio/executor.ts` implements it).
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("processing.transcribe"),
+    jobKind: "processing.transcribe_segment",
+    input: transcribeSegmentInput,
   }),
 ];
 
