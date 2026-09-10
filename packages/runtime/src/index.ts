@@ -14,6 +14,9 @@
  *   `backoffDelayMs`, `reconcileMayRetry`: the single definition of outbox
  *   idempotency, retry and uncertain-outcome rules used by the transactional
  *   publishers in `convex/platform/publish.ts`.
+ * - `envelopeHttpStatus`: the single envelope-to-HTTP-status mapping every
+ *   transport boundary (Convex bridge endpoints, gateway routes) answers
+ *   through.
  * - `runDomainEffect`: Effect 4 RC execution inside Convex functions with a
  *   bounded deadline and defect sanitization.
  * - `toolJsonSchema`: the TanStack AI standard-schema -> JSON-schema
@@ -26,6 +29,7 @@
  */
 
 export * from "./errors";
+export * from "./http";
 export * from "./decode";
 export * from "./context";
 export * from "./command";

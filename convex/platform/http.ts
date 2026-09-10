@@ -28,8 +28,9 @@
 import { v } from "convex/values";
 import { httpAction, internalMutation } from "../_generated/server";
 import { api, internal } from "../_generated/api";
-import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
+import { errorResult, okResult } from "@kiero/contracts";
 import {
+  envelopeHttpStatus,
   forbiddenError,
   unauthenticatedError,
   unsupportedError,
@@ -61,26 +62,6 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-function bridgeStatus(result: ResultEnvelope): number {
-  if (result._tag === "ok") {
-    return 200;
-  }
-  switch (result.error._tag) {
-    case "unauthenticated":
-      return 401;
-    case "forbidden":
-      return 403;
-    case "not_found":
-      return 404;
-    case "unsupported":
-      return 501;
-    case "unavailable":
-      return 503;
-    default:
-      return 400;
-  }
-}
-
 // --- the endpoint handlers --------------------------------------------------------
 
 /** The verified Worker bridge endpoint handler. */
@@ -103,7 +84,7 @@ export const bridgeHandler = httpAction(async (ctx, request) => {
     { action: ctx, serviceSessionId: session.sessionId },
     envelope,
   );
-  return jsonResponse(bridgeStatus(result), result);
+  return jsonResponse(envelopeHttpStatus(result), result);
 });
 
 /** The external echo stand-in endpoint handler (see module docs). */

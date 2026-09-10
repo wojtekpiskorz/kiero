@@ -1,5 +1,6 @@
 /**
- * Convex HTTP actions composition entry (A3; telemetry routes appended by I2).
+ * Convex HTTP actions composition entry (A3; telemetry routes appended by
+ * I2; sources/uploads routes by D2; Calendar OAuth routes by G1).
  *
  * Convex serves the default export of the `http` module as the deployment's
  * HTTP router. Route handlers live in their owning lane files; this entry
@@ -9,6 +10,10 @@
  * B1 addition: the Convex Auth HTTP routes (JWKS discovery, OAuth
  * sign-in/callback) come from the configured auth entry
  * (convex/access/identity/authEntry.ts) via `auth.addHttpRoutes`.
+ *
+ * G1 addition: the Calendar OAuth boundary (authorization start, callback,
+ * bridge completion) from convex/calendar/connection/http.ts, plus its
+ * guarded proof fixtures from convex/calendar/connection/proofHttp.ts.
  */
 
 import { httpRouter } from "convex/server";
@@ -19,6 +24,19 @@ import {
   ingestHandler,
   telemetryHealthHandler,
 } from "./operations/telemetry/http";
+import { uploadsBridgeHandler, uploadsStateHandler } from "./sources/uploads/http";
+import {
+  calendarStartHandler,
+  calendarCallbackHandler,
+  calendarCallbackCompleteHandler,
+} from "./calendar/connection/http";
+import {
+  proofFakeTokenEndpoint,
+  proofFakeCalendarCreate,
+  proofFakeCalendarRead,
+  proofRefreshHandler,
+  proofStateHandler,
+} from "./calendar/connection/proofHttp";
 
 const http = httpRouter();
 
@@ -29,5 +47,32 @@ http.route({ path: "/platform/health", method: "GET", handler: healthHandler });
 http.route({ path: "/platform/telemetry/ingest", method: "POST", handler: ingestHandler });
 http.route({ path: "/platform/telemetry/heartbeat", method: "POST", handler: heartbeatHandler });
 http.route({ path: "/platform/telemetry/health", method: "GET", handler: telemetryHealthHandler });
+http.route({ path: "/sources/uploads/bridge", method: "POST", handler: uploadsBridgeHandler });
+http.route({ path: "/sources/uploads/state", method: "POST", handler: uploadsStateHandler });
+
+http.route({ path: "/calendar/oauth/start", method: "POST", handler: calendarStartHandler });
+http.route({ path: "/calendar/oauth/callback", method: "GET", handler: calendarCallbackHandler });
+http.route({
+  path: "/calendar/oauth/callback/complete",
+  method: "POST",
+  handler: calendarCallbackCompleteHandler,
+});
+http.route({
+  path: "/calendar/oauth/proof/fake-google/token",
+  method: "POST",
+  handler: proofFakeTokenEndpoint,
+});
+http.route({
+  path: "/calendar/oauth/proof/fake-google/api/calendars",
+  method: "POST",
+  handler: proofFakeCalendarCreate,
+});
+http.route({
+  path: "/calendar/oauth/proof/fake-google/api/calendars/kiero-proof-calendar",
+  method: "GET",
+  handler: proofFakeCalendarRead,
+});
+http.route({ path: "/calendar/oauth/proof/refresh", method: "POST", handler: proofRefreshHandler });
+http.route({ path: "/calendar/oauth/proof/state", method: "POST", handler: proofStateHandler });
 
 export default http;

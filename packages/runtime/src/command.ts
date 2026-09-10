@@ -22,6 +22,7 @@ import {
   CommandEnvelope,
   errorResult,
   operations,
+  type AnyOperationEntry,
   type ResultEnvelope,
 } from "@kiero/contracts";
 import { decodeInput } from "./decode";
@@ -63,6 +64,16 @@ export interface CommandDeps<Ctx, Context extends RequestContext = RequestContex
   readonly resolveContext: (ctx: Ctx) => Promise<Context | null>;
   readonly policy: AccessPolicy;
   readonly handlers: HandlerRegistry<Ctx, Context>;
+  /**
+   * Optional operation-entry lookup consulted BEFORE the composed client
+   * registry (`operations`). A channel that serves operations outside the
+   * certified client surface (e.g. the D2 gateway uploads steps) resolves
+   * their input codecs here; names it does not know still fall through to
+   * the certified registry, so ONE checked order — registry lookup, context
+   * resolution, policy, input decode, sanitized handler — serves certified
+   * and channel operations alike, with no mirrored dispatch to drift.
+   */
+  readonly entries?: (operation: string) => AnyOperationEntry | undefined;
 }
 
 /**
@@ -80,7 +91,9 @@ export async function dispatchCommand<Ctx, Context extends RequestContext = Requ
   }
   const command = decodedEnvelope.value;
 
-  const entry = operations[command.operation];
+  // The optional channel override is consulted first; certified names fall
+  // through to the composed client registry (see CommandDeps.entries).
+  const entry = deps.entries?.(command.operation) ?? operations[command.operation];
   if (entry === undefined) {
     return errorResult(unsupportedError(command.operation, "unknown_operation"));
   }

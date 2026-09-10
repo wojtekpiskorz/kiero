@@ -81,7 +81,7 @@ export const platformRoutes: readonly GatewayRoute[] = [
   },
 ];
 
-/** Answers an unmatched /platform/ path with the honest closed error. */
-export function unsupportedPlatformRoute(path: string): Response {
+/** Answers any unmatched gateway path with the honest closed error. */
+export function unsupportedRoute(path: string): Response {
   return jsonResponse(400, errorResult(unsupportedError(`gateway${path}`, "no_such_route")));
 }

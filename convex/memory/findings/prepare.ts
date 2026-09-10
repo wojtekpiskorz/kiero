@@ -23,6 +23,7 @@ import {
 import { checkPlanConsistency, wouldCreateCycle } from "@kiero/domain";
 import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
+import { checkExtensionFindingValue } from "../extensions/validate";
 import {
   companyDependencyEdges,
   findFindingByKey,
@@ -151,12 +152,21 @@ export async function performPrepareChangeSet(
       derivesFrom.push(basisFinding._id);
     }
 
+    // C3 seam (additive, flagged): extension values validate against their
+    // exact stored definition version at prepare too — the plan is refused
+    // before staging when the value cannot be interpreted under its version.
+    const encodedValue = encodeFindingValue(entry.value);
+    const extensionCheck = await checkExtensionFindingValue(tx.db, companyId, encodedValue);
+    if (extensionCheck !== null && !extensionCheck.ok) {
+      return errorResult(validationError(extensionCheck.code));
+    }
+
     staged.push({
       ...(findingId === undefined ? {} : { findingId }),
       scopeKind: entry.scope._tag,
       ...(scopeProjectId === undefined ? {} : { scopeProjectId }),
       semanticKey: entry.semanticKey,
-      value: encodeFindingValue(entry.value),
+      value: encodedValue,
       knowledgeState: encodeKnowledgeState(entry.knowledgeState),
       ...(entry.effectiveFrom === null
         ? {}
