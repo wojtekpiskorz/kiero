@@ -29,6 +29,7 @@
 
 import {
   createElement,
+  useEffect,
   useState,
   type ChangeEvent,
   type ReactNode,
@@ -82,6 +83,16 @@ function MemoryMain({
 }): ReactNode {
   const projects = useQueryState({ query: api.projects.functions.projectsOverview, args: {} });
   const [memoryScope, setMemoryScope] = useState<string>(() => searchParam(PROJECT_PARAM) ?? "company");
+  // Back after a scope change rewrites the URL; the view follows it (the
+  // conversation route's listener discipline, so the select and the URL
+  // agree in both directions).
+  useEffect(() => {
+    const onPop = () => {
+      setMemoryScope(searchParam(PROJECT_PARAM) ?? "company");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const projectViews: readonly {
     projectId: string;
