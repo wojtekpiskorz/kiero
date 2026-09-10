@@ -120,17 +120,14 @@ describe("drain row semantics (the multi-edge decision)", () => {
     // as the platform tests. Here we assert the loud failure when it
     // occurs by temporarily relying on an event with a registered but
     // unprojected edge: sources.sourcePurged -> deletion.purge_source.)
+    // deletion.purge_source is I4's edge and stays unprojected until then;
+    // assert unconditionally so a silently-gained projection fails here
+    // instead of degrading the loud-failure branch to a delivered check.
     await seedRow("sources.sourcePurged", { sourceId: "k" + "s".repeat(31) }, "dk-purged");
     await drainBatch(tx());
     const row = ctx.db.rows("outboxEvents")[0]!;
-    if (row.deliveryState === "failed") {
-      expect(row.lastErrorKind).toBe("consumer_projection_missing");
-      expect(ctx.db.rows("durableJobs")).toHaveLength(0);
-    } else {
-      // The purge edge gained a projection since: then the row must be
-      // delivered with its reaction registered instead.
-      expect(row.deliveryState).toBe("delivered");
-      expect(ctx.db.rows("durableJobs")).toHaveLength(1);
-    }
+    expect(row.deliveryState).toBe("failed");
+    expect(row.lastErrorKind).toBe("consumer_projection_missing");
+    expect(ctx.db.rows("durableJobs")).toHaveLength(0);
   });
 });

@@ -19,7 +19,10 @@
  * a completing executor, because under fan-out one row cannot represent
  * several executors' outcomes. Executors whose projections carry the row's
  * dedup identity (echo, B3's cleanup) still flip their own row — those
- * flips are idempotent writes on a row the drain already delivered; the
+ * flips are idempotent writes on a row the drain already delivered. The
+ * TERMINAL-failure path intentionally flips a delivered row to `failed`
+ * as a loud per-reaction alert (the incident scan reads it); that is a
+ * deliberate exception to drain-owned terminality, not an oversight. The
  * retryable-echo path may set a delivered row back to `pending`, after
  * which the drain re-runs, dedup-skips and re-delivers — bounded and
  * converging.
