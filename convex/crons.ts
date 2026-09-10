@@ -26,7 +26,7 @@ crons.cron(
 // G3 append (flagged shared-file change, the drain safety net's shape):
 // the Calendar reconciliation safety net. Event-driven observation (the
 // copyOutcomeRecorded consumer edge) is the fast path; this pass converges
-// stragglers — reconnect rebuilds, drift re-checks and copies whose events
+// stragglers - reconnect rebuilds, drift re-checks and copies whose events
 // were never delivered. Suspended connections contribute zero Google legs.
 crons.cron(
   "calendar-sync-safety-net",
@@ -34,7 +34,7 @@ crons.cron(
   internal.calendar.sync.functions.runCalendarSyncPass,
   {},
 );
-// F2 amendment (issue #42, flagged coordinated change — the I2 outbox-cron
+// F2 amendment (issue #42, flagged coordinated change - the I2 outbox-cron
 // precedent): the notification-intent evaluator's safety net. The evaluator
 // is primarily event/scheduler driven (intent creation schedules the hop
 // atomically; each sweep schedules the next), so under total scheduler loss
@@ -44,6 +44,19 @@ crons.cron(
   "attention-intent-safety-net",
   "* * * * *",
   internal.attention.delivery.evaluate.evaluateDueIntentsTick,
+);
+
+// F3 amendment (issue #43, flagged coordinated change - the F2/I2 safety-net
+// precedent): the web-push transport's safety net. The fast path is the
+// intentDelivered consumer edge (event -> drain -> job -> bounded legs);
+// this sweep converges stragglers (retryable legs after job attempts ran
+// out, total scheduler loss) and persists the honest disabled state for
+// subscriptions whose session or membership was revoked (delivery already
+// denies both structurally at prepare time).
+crons.cron(
+  "attention-push-safety-net",
+  "*/5 * * * *",
+  internal.attention.push.functions.pushSafetyNetTick,
 );
 
 // Incident scan + cost thresholds + retention + best-effort sink forward.

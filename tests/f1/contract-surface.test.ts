@@ -49,12 +49,15 @@ const row = Schema.decodeUnknownSync(SourceConversationRow)({
 });
 
 describe("the composed registry still carries exactly the attention surface", () => {
-  it("declares the five attention operations under their certified names", () => {
+  it("declares the six attention operations under their certified names", () => {
+    // F3 amendment (issue #43): attention.revokePushSubscription joins the
+    // certified surface (the sanctioned registry append).
     expect(Object.keys(attentionOperations).sort()).toEqual([
       "attention.changeNotificationPreferences",
       "attention.evaluateDueIntents",
       "attention.markSourceRead",
       "attention.registerPushSubscription",
+      "attention.revokePushSubscription",
       "attention.snoozeTaskReminders",
     ]);
     for (const name of Object.keys(attentionOperations)) {
@@ -164,7 +167,7 @@ describe("notification eligibility consumes the D1 identities verbatim", () => {
 
   it("feeds the row's author identity through the event payload vocabulary", () => {
     // The canonical event carries the same branded user/source identities
-    // the resolution chain and D1 rows produce — no translation layer.
+    // the resolution chain and D1 rows produce - no translation layer.
     const payload = Schema.decodeUnknownSync(
       attentionEvents["attention.sourceReadChanged"].payload,
     )({ userId: parseTableId("users", AUTHOR_ID), sourceId: row.sourceId, read: true });

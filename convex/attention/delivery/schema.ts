@@ -17,7 +17,7 @@
  *
  * - `semanticKind` gains `source_entry`; `confirmation` stays in the union
  *   but this lane NEVER creates it ("zwykłe potwierdzenia porządkowania
- *   przez agenta nie tworzą dodatkowych pushy" — ordinary agent
+ *   przez agenta nie tworzą dodatkowych pushy" - ordinary agent
  *   confirmations produce no push intent, so no row may carry the kind).
  * - `sourceId`: the logical source a `source_entry` (or an addressed
  *   `clarification`) intent is about.
@@ -30,6 +30,11 @@
  *   the delivery adapter seam (F3 owns what happens after).
  * - `by_source` index: the per-source intent listing the probes and F3's
  *   export read.
+ *
+ * F3 amendment (issue #43, flagged): `pushSubscriptions` gains the
+ * user/session/company binding columns and `by_endpoint` (see the table
+ * comment); F3's per-device delivery rows live in its own fragment
+ * (`convex/attention/push/schema.ts`, pushDeliveries).
  *
  * Tables: notificationIntents, pushSubscriptions, notificationAttempts.
  */
@@ -78,15 +83,28 @@ export const deliveryTables = {
     .index("by_source", ["sourceId"]),
 
   /** Current device subscription of one user for web push. */
+  // F3 amendment (issue #43, flagged in the sibling pattern - this
+  // fragment's header names F3 as the co-owning implementer of push
+  // delivery, and this table is the push transport's registry): the
+  // subscription binds to the CURRENT user, device/session and company
+  // context at registration (never to anything a client asserts), so
+  // delivery can deny a revoked session or membership before any cleanup
+  // finishes. Re-registering an existing endpoint (browser renewal)
+  // refreshes the binding and the keys in place; `by_endpoint` finds it.
   pushSubscriptions: defineTable({
     userId: shared.userId,
+    companyId: shared.companyId,
+    /** The device/session whose sign-in enabled this device. */
+    sessionId: v.optional(v.id("sessions")),
     endpoint: v.string(),
     p256dhKeyBase64: v.string(),
     authKeyBase64: v.string(),
     deviceLabel: v.string(),
     createdAtMs: shared.tsMs,
     revokedAtMs: v.optional(shared.tsMs),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_endpoint", ["endpoint"]),
 
   /** External delivery attempt history with known/unknown outcomes. */
   notificationAttempts: defineTable({

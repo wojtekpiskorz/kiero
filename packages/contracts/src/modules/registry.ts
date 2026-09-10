@@ -107,7 +107,7 @@ export const revokedAccessCleanupInput = Schema.Struct({
  * amendment on the B3 input-shape precedent (additive, flagged): `reason`
  * and `withdrawnByUserId` join the certified shape as NULLABLE fields so
  * the drain can project event payloads that do not carry them, while the
- * withdrawal transaction registers the job with the real values — the
+ * withdrawal transaction registers the job with the real values - the
  * marking revisions record the withdrawal's reason and actor.
  */
 export const recomputeDependentsInput = Schema.Struct({
@@ -165,7 +165,7 @@ export const echoDeliveryInput = Schema.Struct({
 });
 
 // D6 amendment (flagged coordinated change, the B3 precedent): the first
-// model-call job kind gets its executor registration — the prerequisite E2's
+// model-call job kind gets its executor registration - the prerequisite E2's
 // dispatch named. Per-segment STT executes through the durable path; the
 // transcript row is the order the workflow owns.
 export const transcribeSegmentInput = Schema.Struct({
@@ -183,6 +183,15 @@ export const attentionIntentsInput = Schema.Struct({
   sourceId: Schema.NullOr(tableIdSchema("sources")),
   clarificationId: Schema.NullOr(tableIdSchema("clarifications")),
   changeSetId: Schema.NullOr(tableIdSchema("changeSets")),
+});
+
+// F3 amendment (issue #43, flagged coordinated change - the F2 precedent):
+// the web-push delivery executor input. The drain projects the delivered
+// intent's own event onto this shape; the executor's prepare re-reads the
+// intent (state, rights, subscriptions, preview) at delivery time instead
+// of trusting the event payload.
+export const deliverPushInput = Schema.Struct({
+  notificationIntentId: tableIdSchema("notificationIntents"),
 });
 
 function decodeFeatureId(value: string): Schema.Schema.Type<typeof FeatureId> {
@@ -233,7 +242,7 @@ export const executors: readonly ExecutorEntry[] = [
     input: analyzeChangePlanInput,
   }),
   // D5 amendment (issue #33): the accepted-photo normalization executor
-  // (architecture protocol step 4 — normalize before ordinary vision). It
+  // (architecture protocol step 4 - normalize before ordinary vision). It
   // consumes `sources.sourceAccepted` through its own edge; the extraction
   // job the acceptance transaction registers stays E3's.
   executorEntry({
@@ -260,7 +269,7 @@ export const executors: readonly ExecutorEntry[] = [
     input: transcribeSegmentInput,
   }),
   // F2 amendment (issue #42, flagged coordinated change): the durable
-  // notification-intent executor — intent creation from the consumed
+  // notification-intent executor - intent creation from the consumed
   // events plus the due-time evaluator kick
   // (`convex/attention/delivery/executor.ts` implements it).
   executorEntry({
@@ -268,6 +277,15 @@ export const executors: readonly ExecutorEntry[] = [
     executorId: decodeFeatureId("attention.evaluate"),
     jobKind: "attention.evaluate_due_intents",
     input: attentionIntentsInput,
+  }),
+  // F3 amendment (issue #43, flagged coordinated change): the web-push
+  // transport executor - the per-device delivery of one delivered intent
+  // (`convex/attention/push/executor.ts` implements it).
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("attention.push"),
+    jobKind: "attention.deliver_push",
+    input: deliverPushInput,
   }),
 ];
 
@@ -290,7 +308,7 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceWithdrawn", "memory.recompute_dependents"),
   consumer("memory.dependentsMarkedStale", "memory.recompute_dependents"),
   // C5 registration (issue #28 owns the revalidation half of this edge):
-  // every revised finding drains into one bounded dependent walk — a basis
+  // every revised finding drains into one bounded dependent walk - a basis
   // that became non-known propagates updating markings through the
   // dependentsMarkedStale cascade; a basis that became known again
   // revalidates its updating dependents by registering their linked
@@ -328,6 +346,12 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceAccepted", "attention.evaluate_due_intents"),
   consumer("memory.clarificationRaised", "attention.evaluate_due_intents"),
   consumer("memory.changeSetPublished", "attention.evaluate_due_intents"),
+  // F3 amendment (issue #43, flagged coordinated change): every delivered
+  // notification intent drains into the web-push transport. The projection
+  // derives its dedup identity from the intent, so a replayed or
+  // differently-keyed duplicate event collapses onto the same per-device
+  // delivery rows (issue 43: semantic intent plus subscription).
+  consumer("attention.intentDelivered", "attention.deliver_push"),
 ];
 
 /**
