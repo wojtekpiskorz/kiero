@@ -28,6 +28,7 @@ import { checkPlanConsistency, decidePublish, wouldCreateCycle } from "@kiero/do
 import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { publishEvent } from "../../platform/publish";
+import { checkExtensionFindingValue, recordExtensionValueUsage } from "../extensions/validate";
 import {
   companyDependencyEdges,
   findFindingByKey,
@@ -132,6 +133,20 @@ export async function performPublishChangeSet(
     decodeKnowledgeState(entry.knowledgeState);
     if (entry.effectiveFrom !== undefined) {
       decodeTemporalValue(entry.effectiveFrom);
+    }
+    // C3 seam (additive, flagged): re-check every extension value against
+    // its exact stored definition version inside THIS transaction — the
+    // version may have moved (or been defined) since prepare. A staged value
+    // that no longer interprets can never publish as staged: the set fails.
+    const extensionCheck = await checkExtensionFindingValue(tx.db, companyId, entry.value);
+    if (extensionCheck !== null && !extensionCheck.ok) {
+      return failChangeSet(
+        tx,
+        changeSetId,
+        group,
+        `extension_value_invalid:${extensionCheck.code}`,
+        validationError(extensionCheck.code),
+      );
     }
     if (entry.findingId !== undefined) {
       const finding = await requireFinding(tx.db, entry.findingId, companyId);
@@ -373,6 +388,10 @@ export async function performPublishChangeSet(
       recordedAtMs: nowMs,
     });
     publishedRevisionIds.push(revisionId);
+    // C3 seam (additive, flagged): the committed-usage counter moves WITH
+    // the revision it counts, in this transaction — usage statistics are
+    // derived from committed records, never estimated.
+    await recordExtensionValueUsage(tx.db, companyId, entry.value, nowMs);
     revisedEvents.push({
       findingId,
       revisionId,
