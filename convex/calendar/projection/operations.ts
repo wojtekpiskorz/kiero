@@ -82,13 +82,28 @@ async function syncStateOf(
     .first();
 }
 
-/** The personal project selection of one sync row (default: all projects). */
-function projectSelectionOf(row: Doc<"calendarSyncState"> | null): ProjectSelection {
+/**
+ * The ONE decoder of the stored selection column: the read and the pass both
+ * derive from it, so a new mode or a stored-shape migration lands in one
+ * place (the read and the pass can never disagree about the boss's
+ * selection). The empty explicit list is the honest opt-out.
+ */
+export function decodedStoredSelection(
+  row: Doc<"calendarSyncState"> | null,
+): { mode: "all_projects" } | { mode: "explicit"; projectIds: string[] } {
   const stored = row?.selectedProjects;
   if (stored === undefined || stored.mode === "all_projects") {
     return { mode: "all_projects" };
   }
-  return { mode: "explicit", projectIds: new Set<string>(stored.projectIds ?? []) };
+  return { mode: "explicit", projectIds: stored.projectIds ?? [] };
+}
+
+/** The pass view of the decoded selection (the set the diff consumes). */
+function projectSelectionOf(row: Doc<"calendarSyncState"> | null): ProjectSelection {
+  const decoded = decodedStoredSelection(row);
+  return decoded.mode === "all_projects"
+    ? { mode: "all_projects" }
+    : { mode: "explicit", projectIds: new Set<string>(decoded.projectIds) };
 }
 
 /** The existing-copy view the pure diff consumes. */

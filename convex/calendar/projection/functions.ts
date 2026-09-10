@@ -38,6 +38,7 @@ import {
 } from "../../access/identity/resolution";
 import { resolveRequestContext } from "../../platform/context";
 import { dispatchCalendarProjectionCommand } from "./dispatch";
+import { decodedStoredSelection } from "./operations";
 
 /** The sanitized denial every protected read fails with. */
 function denialError(reason: string): never {
@@ -130,11 +131,12 @@ export const dispatchCalendarProjection = mutation({
 function effectiveSelection(
   row: Doc<"calendarSyncState"> | null,
 ): { mode: "all_projects" | "explicit"; projectIds: string[] | null } {
-  const stored = row?.selectedProjects;
-  if (stored === undefined || stored.mode === "all_projects") {
-    return { mode: "all_projects", projectIds: null };
-  }
-  return { mode: "explicit", projectIds: stored.projectIds ?? [] };
+  // Thin adapter over the ONE decoder (the pass consumes the same rule; a
+  // drift between the read and the pass is now a compile-visible thing).
+  const decoded = decodedStoredSelection(row);
+  return decoded.mode === "all_projects"
+    ? { mode: "all_projects", projectIds: null }
+    : { mode: "explicit", projectIds: decoded.projectIds };
 }
 
 /**

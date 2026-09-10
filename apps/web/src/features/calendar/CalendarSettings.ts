@@ -79,13 +79,14 @@ export function CalendarSettings({ actionsEnabled }: { readonly actionsEnabled: 
     return null;
   }
   const projectionView: ProjectionOverviewView = projectionData;
-  const selection = projectionView.selection;
-  if (selection === null) {
-    // Redundant with the gate above by construction; kept fail-closed so
-    // the editor below can never receive a scopeless selection.
+  const overview: SyncOverviewView = sync.data;
+  // One gate, after the view annotations: every projectionOverview branch
+  // carries `selection` (null on the lean ones), so a plain null check is
+  // the whole discriminator here.
+  if (projectionView.selection === null) {
     return null;
   }
-  const overview: SyncOverviewView = sync.data;
+  const selection: SelectionView = projectionView.selection;
   const children: ReactNode[] = [
     createElement(DiagnosticsSection, {
       overview,
@@ -180,7 +181,7 @@ export function ScopeSection({ selection }: { readonly selection: SelectionView 
       setNotice(
         result._tag === "ok"
           ? { kind: "ok", text: settingsCopy.scopeSaved }
-          : { kind: "error", text: scopeFailureHint(result.error.code) },
+          : { kind: "error", text: scopeFailureHint(result.error) },
       );
     } catch {
       setNotice({ kind: "error", text: settingsCopy.networkFailure });
@@ -279,9 +280,9 @@ export function ScopeSection({ selection }: { readonly selection: SelectionView 
   return createElement("section", { "aria-labelledby": "calendar-scope-heading" }, ...children);
 }
 
-/** Honest Polish text for one selection dispatch failure code. */
-function scopeFailureHint(code: string): string {
-  if (code === "not_found") {
+/** Honest Polish text for one selection dispatch failure (the kind is the envelope's _tag; a retry cannot cure a vanished project). */
+function scopeFailureHint(error: { readonly _tag?: string }): string {
+  if (error._tag === "not_found") {
     return settingsCopy.scopeProjectNotFound;
   }
   return settingsCopy.unexpectedFailure;
