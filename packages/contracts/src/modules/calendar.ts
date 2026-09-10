@@ -1,7 +1,8 @@
 /**
  * Calendar module surface (architecture "Deep modules": Integrations, the
  * Calendar half; see CONTEXT.md "Kalendarz Kiero w Google").
- * Implements lanes: G1 (connection), G2 (projection), G3 (reconciliation).
+ * Implements lanes: G1 (connection), G2 (projection), G3 (reconciliation),
+ * G5 (the personal project-selection write and read; issue #107).
  *
  * Kiero → Google one-way projection into a dedicated personal calendar.
  * Actual agreements stay in Kiero. Unknown remote outcomes require
@@ -26,6 +27,20 @@ export const CalendarSubject = Schema.TaggedUnion({
   event: { eventId: tableIdSchema("events") },
 });
 export type CalendarSubject = Schema.Schema.Type<typeof CalendarSubject>;
+
+/**
+ * The boss's personal project selection: every project of the firm, or an
+ * explicit list (possibly empty: an honest opt-out that projects nothing).
+ * Mirrors the stored calendarSyncState column's shape exactly.
+ */
+export const CalendarProjectSelection = Schema.Union([
+  Schema.Struct({ mode: Schema.Literal("all_projects") }),
+  Schema.Struct({
+    mode: Schema.Literal("explicit"),
+    projectIds: Schema.Array(tableIdSchema("projects")),
+  }),
+]);
+export type CalendarProjectSelection = Schema.Schema.Type<typeof CalendarProjectSelection>;
 
 export const calendarOperations = {
   "calendar.connectCalendar": operationEntry({
@@ -64,6 +79,21 @@ export const calendarOperations = {
       remoteOutcome: CalendarRemoteOutcome,
     }),
     errorKinds: ["forbidden", "not_found", "unavailable"],
+  }),
+  // G5 (issue #107): G2's report certified this write as the named
+  // prerequisite but the entry never landed in the file (G4 proved the
+  // honest `unsupported` refusal live). This is the minimal certificate
+  // amendment: the flat { mode, projectIds? } shape G4's recorded dispatch
+  // used, over the SAME vocabulary the calendarSyncState column stores.
+  "calendar.setSelection": operationEntry({
+    kind: "operation",
+    name: "calendar.setSelection",
+    input: CalendarProjectSelection,
+    result: Schema.Struct({
+      mode: Schema.Literals(["all_projects", "explicit"]),
+      projectIds: Schema.NullOr(Schema.Array(tableIdSchema("projects"))),
+    }),
+    errorKinds: ["forbidden", "validation", "not_found"],
   }),
 } as const;
 

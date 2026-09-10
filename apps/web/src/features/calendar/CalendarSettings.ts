@@ -15,10 +15,10 @@
  * success sentence appears when every copy is confirmed and no attempt is
  * failed or uncertain.
  *
- * The personal project scope is displayed honestly (today: all projects)
- * without a fake edit control: the certified write interface for narrowing
- * it (`calendar.setSelection`, flagged in G2's report) does not exist yet,
- * and a missing shared interface is a named prerequisite, not a UI to fake.
+ * The personal project scope is editable through the certified
+ * `calendar.setSelection` write (G5, issue #107): the scope section's
+ * mounted follow-up over G4's honest not-yet-available notice. The saved
+ * choice is personal and applies at the next synchronization pass.
  */
 
 import { createElement, useState, type ReactNode } from "react";
@@ -36,6 +36,7 @@ import {
   syncStatusLines,
   type CopyRowView,
   type ProjectionOverviewView,
+  type SelectionView,
   type SyncOverviewView,
 } from "./state";
 
@@ -61,24 +62,35 @@ export function CalendarSettings({ actionsEnabled }: { readonly actionsEnabled: 
   if (sync.status !== "success" || projection.status !== "success") {
     return createElement("p", { role: "status" }, calendarCopy.checkingSession);
   }
-  const projectionView: ProjectionOverviewView = projection.data;
+  const projectionData = projection.data;
   // Without the actor's own connection row there is nothing to operate on;
   // the connection panel above already explains those states. The lean
-  // read branches carry only `state`, so the full branch's discriminator
-  // is the honest narrowing: `reconnectNeeded` exists on the full branch
-  // alone, and the assignment below turns server-side shape drift into a
-  // compile error instead of a silently blanked section.
-  if (!("reconnectNeeded" in sync.data) || typeof sync.data.reconnectNeeded !== "boolean") {
+  // read branches carry `selection: null` (no own connection means no
+  // scope to read), so the non-null selection is the projection read's
+  // full-branch discriminator; the sync read discriminates on
+  // `reconnectNeeded`, which exists on the full branch only.
+  if (
+    !("reconnectNeeded" in sync.data) ||
+    typeof sync.data.reconnectNeeded !== "boolean"
+  ) {
     return null;
   }
+  const projectionView: ProjectionOverviewView = projectionData;
   const overview: SyncOverviewView = sync.data;
+  // The ONE selection gate, after the view annotations: every
+  // projectionOverview branch carries `selection` (null on the lean ones),
+  // so a plain null check is the whole discriminator here.
+  if (projectionView.selection === null) {
+    return null;
+  }
+  const selection: SelectionView = projectionView.selection;
   const children: ReactNode[] = [
     createElement(DiagnosticsSection, {
       overview,
       lastPassState: projectionView.sync?.state ?? null,
       suspendedReason: projectionView.sync?.suspendedReason ?? null,
     }),
-    createElement(ScopeSection, null),
+    createElement(ScopeSection, { selection }),
     createElement(CopiesSection, { copies: projectionView.copies, actionsEnabled }),
   ];
   return createElement("section", { "aria-labelledby": "calendar-sync-heading" }, ...children);
@@ -131,20 +143,146 @@ export function DiagnosticsSection({
 }
 
 // ---------------------------------------------------------------------------
-// The personal project scope (displayed honestly; the write interface is a
-// named prerequisite — no fake edit control, criterion 3's spirit).
+// The personal project scope: the certified calendar.setSelection write
+// (G5, issue #107) mounted as the honest editor. G4 rendered the
+// not-yet-available notice here; this section is its sanctioned follow-up.
 // ---------------------------------------------------------------------------
 
-export function ScopeSection(): ReactNode {
-  return createElement(
-    "section",
-    { "aria-labelledby": "calendar-scope-heading" },
+/**
+ * The scope editor: two mode radios (all projects vs an explicit checkbox
+ * list of the firm's projects from the projects catalog read) and one save
+ * button dispatching `calendar.setSelection`. Seeded from the effective
+ * selection the projection read carries; the saved choice applies at the
+ * NEXT synchronization pass, which the copy states honestly.
+ */
+export function ScopeSection({ selection }: { readonly selection: SelectionView }): ReactNode {
+  const projects = useQueryState({ query: api.projects.functions.projectsOverview, args: {} });
+  const setSelection = useMutation(api.calendar.projection.functions.dispatchCalendarProjection);
+  const [mode, setMode] = useState<"all_projects" | "explicit">(selection.mode);
+  const [checked, setChecked] = useState<ReadonlySet<string>>(
+    new Set(selection.projectIds ?? []),
+  );
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const loaded = projects.status === "success";
+
+  async function save(): Promise<void> {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const result = await setSelection({
+        envelope: envelopeOf("calendar.setSelection", {
+          ...(mode === "explicit" ? { mode, projectIds: [...checked] } : { mode }),
+        }),
+      });
+      setNotice(
+        result._tag === "ok"
+          ? { kind: "ok", text: settingsCopy.scopeSaved }
+          : { kind: "error", text: scopeFailureHint(result.error) },
+      );
+    } catch {
+      setNotice({ kind: "error", text: settingsCopy.networkFailure });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const children: ReactNode[] = [
     createElement("h2", { id: "calendar-scope-heading" }, settingsCopy.scopeHeading),
     createElement("p", null, settingsCopy.scopeIntro),
-    createElement("p", { role: "status" }, settingsCopy.scopeAll),
-    createElement("p", null, settingsCopy.scopeEditUnavailable),
+    createElement(
+      "fieldset",
+      null,
+      createElement("legend", null, settingsCopy.scopeEditMode),
+      createElement(
+        "label",
+        null,
+        createElement("input", {
+          type: "radio",
+          name: "calendar-scope-mode",
+          checked: mode === "all_projects",
+          onChange: () => setMode("all_projects"),
+        }),
+        ` ${settingsCopy.scopeModeAll}`,
+      ),
+      createElement(
+        "label",
+        null,
+        createElement("input", {
+          type: "radio",
+          name: "calendar-scope-mode",
+          checked: mode === "explicit",
+          onChange: () => setMode("explicit"),
+        }),
+        ` ${settingsCopy.scopeModeExplicit}`,
+      ),
+      ...(mode === "explicit"
+        ? [
+            loaded
+              ? createElement(
+                  "ul",
+                  null,
+                  // Closed projects stay selectable: they keep retained
+                  // obligations the projection still copies (G2's rule).
+                  ...[...projects.data.active, ...projects.data.closed].map((project) =>
+                    createElement(
+                      "li",
+                      { key: project.projectId },
+                      createElement(
+                        "label",
+                        null,
+                        createElement("input", {
+                          type: "checkbox",
+                          checked: checked.has(project.projectId),
+                          onChange: (event: { target: { checked: boolean } }) => {
+                            const next = new Set(checked);
+                            if (event.target.checked) {
+                              next.add(project.projectId);
+                            } else {
+                              next.delete(project.projectId);
+                            }
+                            setChecked(next);
+                          },
+                        }),
+                        ` ${project.displayName}`,
+                      ),
+                    ),
+                  ),
+                )
+              : createElement("p", { role: "status" }, calendarCopy.checkingSession),
+            createElement("p", { role: "status" }, settingsCopy.scopeCount(checked.size)),
+          ]
+        : []),
+    ),
+    createElement(
+      "button",
+      { type: "button", disabled: busy || (mode === "explicit" && !loaded), onClick: () => void save() },
+      settingsCopy.scopeSave,
+    ),
+    ...(mode === "explicit" && checked.size === 0
+      ? [createElement("p", { role: "note" }, settingsCopy.scopeExplicitEmpty)]
+      : []),
+    ...(notice === null
+      ? []
+      : [
+          createElement(
+            "p",
+            { role: notice.kind === "error" ? "alert" : "status" },
+            notice.text,
+          ),
+        ]),
+    createElement("p", null, settingsCopy.scopeNextSyncNote),
     createElement("p", null, settingsCopy.personalFieldsNote),
-  );
+  ];
+  return createElement("section", { "aria-labelledby": "calendar-scope-heading" }, ...children);
+}
+
+/** Honest Polish text for one selection dispatch failure (the kind is the envelope's _tag; a retry cannot cure a vanished project). */
+function scopeFailureHint(error: { readonly _tag?: string }): string {
+  if (error._tag === "not_found") {
+    return settingsCopy.scopeProjectNotFound;
+  }
+  return settingsCopy.unexpectedFailure;
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +320,7 @@ export function CopiesSection({
               }),
             });
       if (result._tag === "error") {
-        setNotice({ kind: "error", text: commandFailureHint(result.error.code) });
+        setNotice({ kind: "error", text: commandFailureHint(result.error) });
         return;
       }
       if (command === "hide") {

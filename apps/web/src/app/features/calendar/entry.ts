@@ -31,6 +31,9 @@ export const calendarFeatureEntry = appFeatureEntry({
     // commands the settings surface issues through the typed dispatches.
     "calendar.setCopyHidden",
     "calendar.reconcileCopy",
+    // G5 addition (issue #107): the personal project-selection write the
+    // scope section's editor issues (G4's own pin-amendment precedent).
+    "calendar.setSelection",
   ],
   implementation: "mounted",
   screen: () => createElement(CalendarFeature),

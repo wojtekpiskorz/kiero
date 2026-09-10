@@ -13,8 +13,10 @@
  * and the joins trigger.
  *
  * `dispatchCalendarProjection` carries the certified personal-hide
- * operation (`calendar.setCopyHidden`); `calendar.reconcileCopy` stays
- * unimplemented here (G3's lane) and fails closed `unsupported`.
+ * operation (`calendar.setCopyHidden`) and, since G5 (issue #107), the
+ * personal project-selection write (`calendar.setSelection`); the reads
+ * below expose the boss's EFFECTIVE selection. `calendar.reconcileCopy`
+ * stays unimplemented here (G3's lane) and fails closed `unsupported`.
  */
 
 import { v } from "convex/values";
@@ -28,7 +30,7 @@ import {
 import { internal } from "../../_generated/api";
 import type { ResultEnvelope } from "@kiero/contracts";
 import { unauthenticatedError } from "@kiero/runtime";
-import type { Id } from "../../_generated/dataModel";
+import type { Doc, Id } from "../../_generated/dataModel";
 import {
   liveSessionIdentity,
   liveSessionStore,
@@ -36,6 +38,7 @@ import {
 } from "../../access/identity/resolution";
 import { resolveRequestContext } from "../../platform/context";
 import { dispatchCalendarProjectionCommand } from "./dispatch";
+import { decodedStoredSelection } from "./operations";
 
 /** The sanitized denial every protected read fails with. */
 function denialError(reason: string): never {
@@ -120,10 +123,27 @@ export const dispatchCalendarProjection = mutation({
 // ---------------------------------------------------------------------------
 
 /**
+ * The boss's EFFECTIVE selection view (G5): the stored column when present,
+ * the all-projects default otherwise. Explicit selections always carry a
+ * (possibly empty) list: an explicit row without ids reads as the honest
+ * empty opt-out, the same shape `calendar.setSelection` returns.
+ */
+function effectiveSelection(
+  row: Doc<"calendarSyncState"> | null,
+): { mode: "all_projects" | "explicit"; projectIds: string[] | null } {
+  // Thin adapter over the ONE decoder (the pass consumes the same rule; a
+  // drift between the read and the pass is now a compile-visible thing).
+  const decoded = decodedStoredSelection(row);
+  return decoded.mode === "all_projects"
+    ? { mode: "all_projects", projectIds: null }
+    : { mode: "explicit", projectIds: decoded.projectIds };
+}
+
+/**
  * Authenticated: the actor's own copies and sync state — the honest
- * "pending changes / needs reconnect" signal and the personal-hide
- * surface (the barebones UI and G4 diagnostics consume this read; the UI
- * itself is a separate track).
+ * "pending changes / needs reconnect" signal, the personal-hide surface
+ * and the effective project selection (G5) the settings screen and the
+ * J4 interval consume.
  */
 export const projectionOverview = query({
   args: {},
@@ -137,18 +157,18 @@ export const projectionOverview = query({
       liveSessionIdentity(live.session, Date.now()),
     );
     if (context === null) {
-      return { state: "unavailable_no_company", copies: [], sync: null };
+      return { state: "unavailable_no_company", selection: null, copies: [], sync: null };
     }
     const connection = await ctx.db
       .query("calendarConnections")
       .withIndex("by_user", (q) => q.eq("userId", live.session.userId))
       .first();
     if (connection === null) {
-      return { state: "no_connection", copies: [], sync: null };
+      return { state: "no_connection", selection: null, copies: [], sync: null };
     }
     const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
     if (companyId === null || connection.companyId !== companyId) {
-      return { state: "membership_lost", copies: [], sync: null };
+      return { state: "membership_lost", selection: null, copies: [], sync: null };
     }
     const copies = await ctx.db
       .query("calendarCopies")
@@ -160,6 +180,7 @@ export const projectionOverview = query({
       .first();
     return {
       state: "connected",
+      selection: effectiveSelection(sync),
       copies: copies.map((copy) => ({
         copyId: copy._id,
         subjectKind: copy.subjectKind,

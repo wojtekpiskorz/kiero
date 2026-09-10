@@ -52,10 +52,13 @@ const validHide = () => ({
 });
 
 describe("calendar projection dispatch registration", () => {
-  it("registers exactly the one certified G2 operation under the write intent", () => {
+  it("registers exactly the two certified G2+G5 operations under the write intent", () => {
     const handlers = calendarProjectionHandlers();
-    expect(Object.keys(handlers).sort()).toEqual(["calendar.setCopyHidden"]);
+    // G5 (issue #107) appended calendar.setSelection to this lane's registry:
+    // the minimal flagged amendment of this pin.
+    expect(Object.keys(handlers).sort()).toEqual(["calendar.setCopyHidden", "calendar.setSelection"]);
     expect(handlers["calendar.setCopyHidden"]?.intent).toBe("write");
+    expect(handlers["calendar.setSelection"]?.intent).toBe("write");
   });
 
   it("is G3's reconcileCopy that stays unsupported: the lane never fakes it", () => {
