@@ -38,12 +38,12 @@ describe("pending feature screens render without fake data", () => {
   it("renders the default company conversation screen with the disconnected state", () => {
     const html = renderScreen(0);
     expect(html).toContain("Rozmowa firmy");
-    expect(html).toContain("W przygotowaniu.");
-    expect(html).toContain("Nie pokazujemy przykładowych wpisów");
+    // J1's sanctioned mount: the conversation entry is no longer pending —
+    // the core-text feature owns it now. The honest disconnected state is
+    // the feature's own connection gate (no fake entries either way).
+    expect(html).toContain("Aplikacja nie jest połączona z backendem");
     // The disconnected explanation names the missing config seam.
     expect(html).toContain("VITE_CONVEX_URL");
-    // Consumed contract operations are visible, not hidden behind fake UI.
-    expect(html).toContain("sources.acceptSource");
   });
 
   it("renders Co teraz and projects context through the shared placeholder screen", () => {

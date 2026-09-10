@@ -33,10 +33,10 @@ import type { QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import {
   bridgeIdentity,
-  identityFromConvexAuth,
   resolveRequestContext,
   type ResolutionDb,
 } from "../../platform/context";
+import { resolveAccessContextFromConvexAuth } from "../../access/identity/resolution";
 import { Schema } from "effect";
 import {
   ConversationPage,
@@ -156,8 +156,12 @@ async function sourceDetailRow(
 // --- public queries (Convex Auth identity) ---------------------------------
 
 async function contextOrFail(ctx: QueryCtx) {
-  const identity = await identityFromConvexAuth(ctx.auth, Date.now());
-  const context = await resolveRequestContext(ctx.db, identity);
+  // J1 prerequisite repair (same defect C4 flagged on C2's public entries):
+  // B1's live-session read chain (no provisioning — queries never write).
+  // The platform-generic subject is not a sessions-registry id, so ordinary
+  // user tokens failed the resolution and the conversation views were
+  // unreachable from the app.
+  const context = await resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
   if (context === null) {
     return null;
   }
