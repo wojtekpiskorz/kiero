@@ -17,8 +17,8 @@
  * Two callable shapes, one checked resolution (the lane pattern): public
  * queries (Convex Auth; honestly `unauthenticated` until B1) and internal
  * queries behind the verified service session (the A3 bridge identity).
- * The identity-to-scope resolution lives in the two helpers below, each
- * spelled once (the resolveOwnScope pattern of the sibling read lane).
+ * The identity-to-scope resolution lives once in ../context.ts (the
+ * round-1 lane-local ruling).
  */
 
 import { v } from "convex/values";
@@ -27,8 +27,7 @@ import { forbiddenError, unauthenticatedError } from "@kiero/runtime";
 import { internalQuery, query } from "../../_generated/server";
 import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
-import {
-} from "../../platform/context";
+import { resolveBridgeQueryScope, resolveOwnQueryScope } from "../context";
 import {
   DEFAULT_QUIET_HOURS,
   decidePersonalDelivery,
@@ -51,11 +50,6 @@ export interface EffectivePreferences {
   /** Whether `quietHours` is a personal override or the company default. */
   readonly quietHoursSource: "personal" | "company_default";
 }
-
-// Scope resolution lives once in attention/context.ts (the round-1 ruling):
-// the identity->context->normalize chain has one home; the aliases keep the
-// caller names below stable.
-import { resolveBridgeQueryScope as resolveBridgeScope, resolveOwnQueryScope as resolveOwnScope } from "../context";
 
 /** The personal settings plus the quiet-hours window that applies. */
 async function effectivePreferences(
@@ -167,7 +161,7 @@ export const deliveryRequestValidator = v.object({
 export const myNotificationPreferences = query({
   args: {},
   handler: async (ctx): Promise<ResultEnvelope> => {
-    const scope = await resolveOwnScope(ctx);
+    const scope = await resolveOwnQueryScope(ctx);
     if (scope === null) {
       return errorResult(unauthenticatedError());
     }
@@ -181,7 +175,7 @@ export const myNotificationPreferences = query({
 export const myNotificationPreferencesFor = internalQuery({
   args: { serviceSessionId: v.string() },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const scope = await resolveBridgeScope(ctx, args.serviceSessionId);
+    const scope = await resolveBridgeQueryScope(ctx, args.serviceSessionId);
     if (scope === null) {
       return errorResult(forbiddenError("no_verified_identity"));
     }
@@ -197,7 +191,7 @@ export const myNotificationPreferencesFor = internalQuery({
 export const evaluatePersonalDeliveryFor = internalQuery({
   args: { serviceSessionId: v.string(), request: deliveryRequestValidator },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const scope = await resolveBridgeScope(ctx, args.serviceSessionId);
+    const scope = await resolveBridgeQueryScope(ctx, args.serviceSessionId);
     if (scope === null) {
       return errorResult(forbiddenError("no_verified_identity"));
     }

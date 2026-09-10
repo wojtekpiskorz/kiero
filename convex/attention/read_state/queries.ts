@@ -37,14 +37,10 @@ import type { Id } from "../../_generated/dataModel";
 import { decideGmCompanyAccess, openGrantOfUser } from "../../access/gm/cores";
 import { gmStore } from "../../access/gm/storeAdapter";
 import { resolveBridgeQueryScope, resolveOwnQueryScope } from "../context";
-import {
-} from "../../platform/context";
 import { MAX_PROJECTION_SOURCE_IDS, projectReadState, type StoredReadState } from "./state";
 
 /** The DB reader surface these queries need (any Convex ctx.db). */
 type ReadDb = QueryCtx["db"];
-
-const resolveOwnScope = resolveOwnQueryScope;
 
 /** Tenant-checks and loads the read-state rows for the requested sources. */
 async function readStateEntries(
@@ -92,7 +88,7 @@ async function readStateEntries(
 export const readStateForSources = query({
   args: { sourceIds: v.array(v.id("sources")) },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const scope = await resolveOwnScope(ctx);
+    const scope = await resolveOwnQueryScope(ctx);
     if (scope === null) {
       return errorResult(unauthenticatedError());
     }
@@ -139,6 +135,13 @@ export const gmReadStateOverview = internalQuery({
     if (session === null || session.revokedAtMs !== undefined) {
       return errorResult(forbiddenError("no_verified_identity"));
     }
+    // Normalize once, up front: the store reads and the readStates listing
+    // below all key off this id, and an unnormalizable target fails here
+    // (the store would see no company and the decision would deny anyway).
+    const companyId = ctx.db.normalizeId("companies", args.companyId);
+    if (companyId === null) {
+      return errorResult(forbiddenError("company_not_found", "companies"));
+    }
     const store = gmStore(ctx.db);
     const grant = openGrantOfUser(await store.grantsOfUser(session.userId));
     const company = await store.companyById(args.companyId);
@@ -150,10 +153,6 @@ export const gmReadStateOverview = internalQuery({
     });
     if (!access.ok) {
       return errorResult(forbiddenError(access.code, "gm"));
-    }
-    const companyId = ctx.db.normalizeId("companies", args.companyId);
-    if (companyId === null) {
-      return errorResult(forbiddenError("company_not_found", "companies"));
     }
     const rows = await ctx.db
       .query("readStates")

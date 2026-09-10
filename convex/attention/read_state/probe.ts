@@ -34,6 +34,7 @@ import {
 } from "@kiero/contracts";
 import { forbiddenError, membershipPolicy, type RequestContext } from "@kiero/runtime";
 import { bridgeIdentity, resolveRequestContext } from "../../platform/context";
+import { resolveBridgeQueryScope } from "../context";
 import { markSourceReadOperation, performMarkSourceRead } from "./operations";
 import {
   probeDisabled,
@@ -154,14 +155,15 @@ export const probeCrashMarkSourceRead = action({
 export const attentionState = internalQuery({
   args: { serviceSessionId: v.string() },
   handler: async (ctx, args) => {
-    const context = await resolveRequestContext(ctx.db, bridgeIdentity(args.serviceSessionId, Date.now()));
-    if (context === null) {
+    // The lane's shared bridge-scope helper (../context.ts): the same
+    // chain every internal query uses, not a probe-local re-spelling.
+    // (crashMarkRead above deliberately resolves the FULL RequestContext:
+    // the crash transaction runs the real dispatch path.)
+    const scope = await resolveBridgeQueryScope(ctx, args.serviceSessionId);
+    if (scope === null) {
       return errorResult(forbiddenError("no_verified_identity"));
     }
-    const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
-    if (companyId === null) {
-      return errorResult(forbiddenError("no_verified_identity"));
-    }
+    const companyId = scope.companyId;
     const rows = await ctx.db
       .query("readStates")
       .withIndex("by_company", (q) => q.eq("companyId", companyId))
