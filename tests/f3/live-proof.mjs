@@ -224,6 +224,11 @@ for (const [label, device, sessionId] of [
 }
 
 // --- scenario 1: one eligible intent reaches all active subscriptions once --
+// Reset hide-preview BEFORE the source: scenario 3 leaves it ON and the
+// payload composes at delivery time, so without this a second run of this
+// script on the same lease would answer the normal-preview checks with the
+// neutral payload.
+await changePrefs({ hidePreviewContent: false }, SESSION);
 const source1 = await acceptCompanySource("Klient potwierdził termin betonowania na piątek.");
 
 const phoneMessages = await waitFor(okPhone.token, (messages) => messages.length === 1, "phone delivery");
