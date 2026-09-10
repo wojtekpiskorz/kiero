@@ -25,22 +25,40 @@ export const attentionOperations = {
     result: Schema.Struct({ sourceId: tableIdSchema("sources") }),
     errorKinds: ["forbidden", "not_found"],
   }),
+  // F1 amendment (issue #41, flagged in the issue report): the A2 candidate
+  // input expressed the mute vocabulary as per-source ids, but the accepted
+  // product decision (issue 7 resolution: "Nowe wpisy, odbiorcy i
+  // grupowanie" / "Przypomnienia o zadaniach" / "Podgląd, otwarcie i
+  // urządzenia") defines PERSONAL mutes per project conversation, a separate
+  // personal mute of company entries, a separate personal task-reminder
+  // mute, a personal preview-content preference and personal quiet hours in
+  // the company timezone. The input is therefore the decision's vocabulary
+  // as independent PATCH keys: an omitted key leaves that control unchanged
+  // (issue 41 acceptance: the controls "can be changed independently"), and
+  // `quietHours: null` reverts to the company default window. No operation
+  // or event name changed; nothing implemented or consumed the candidate
+  // shape (dispatch failed closed `unsupported` until F1).
   "attention.changeNotificationPreferences": operationEntry({
     kind: "operation",
     name: "attention.changeNotificationPreferences",
     input: Schema.Struct({
-      mutedSourceIds: Schema.Array(tableIdSchema("sources")),
-      quietHours: Schema.NullOr(
-        Schema.Struct({
-          startMinuteOfDay: Schema.Number.pipe(
-            Schema.check(Schema.isInt()),
-            Schema.check(Schema.isBetween({ minimum: 0, maximum: 1439 })),
-          ),
-          endMinuteOfDay: Schema.Number.pipe(
-            Schema.check(Schema.isInt()),
-            Schema.check(Schema.isBetween({ minimum: 0, maximum: 1439 })),
-          ),
-        }),
+      mutedProjectIds: Schema.optionalKey(Schema.Array(tableIdSchema("projects"))),
+      companyEntriesMuted: Schema.optionalKey(Schema.Boolean),
+      taskRemindersMuted: Schema.optionalKey(Schema.Boolean),
+      hidePreviewContent: Schema.optionalKey(Schema.Boolean),
+      quietHours: Schema.optionalKey(
+        Schema.NullOr(
+          Schema.Struct({
+            startMinuteOfDay: Schema.Number.pipe(
+              Schema.check(Schema.isInt()),
+              Schema.check(Schema.isBetween({ minimum: 0, maximum: 1439 })),
+            ),
+            endMinuteOfDay: Schema.Number.pipe(
+              Schema.check(Schema.isInt()),
+              Schema.check(Schema.isBetween({ minimum: 0, maximum: 1439 })),
+            ),
+          }),
+        ),
       ),
     }),
     result: Schema.Struct({ changed: Schema.Literal("changed") }),
