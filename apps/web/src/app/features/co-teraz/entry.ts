@@ -20,6 +20,9 @@ export const coTerazFeatureEntry = appFeatureEntry({
     "work.changeTaskState",
     "attention.snoozeTaskReminders",
     "attention.evaluateDueIntents",
+    // F1 registration (issue #41): the personal notification-preference
+    // controls this attention surface will expose once mounted.
+    "attention.changeNotificationPreferences",
   ],
   implementation: "pending",
 });
