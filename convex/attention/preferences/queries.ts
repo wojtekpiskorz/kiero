@@ -23,14 +23,11 @@
 
 import { v } from "convex/values";
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
-import { forbiddenError, unauthenticatedError, type RequestContext } from "@kiero/runtime";
+import { forbiddenError, unauthenticatedError } from "@kiero/runtime";
 import { internalQuery, query } from "../../_generated/server";
 import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import {
-  bridgeIdentity,
-  identityFromConvexAuth,
-  resolveRequestContext,
 } from "../../platform/context";
 import {
   DEFAULT_QUIET_HOURS,
@@ -55,40 +52,10 @@ export interface EffectivePreferences {
   readonly quietHoursSource: "personal" | "company_default";
 }
 
-/** One resolved actor scope: the company and user every query below reads. */
-interface ActorScope {
-  readonly companyId: Id<"companies">;
-  readonly userId: Id<"users">;
-}
-
-/** Resolves the caller's scope from Convex Auth (the user path). */
-async function resolveOwnScope(ctx: QueryCtx): Promise<ActorScope | null> {
-  const identity = await identityFromConvexAuth(ctx.auth, Date.now());
-  const context = await resolveRequestContext(ctx.db, identity);
-  return scopeOf(ctx, context);
-}
-
-/** Resolves the caller's scope from a verified service session (bridge path). */
-async function resolveBridgeScope(
-  ctx: QueryCtx,
-  serviceSessionId: string,
-): Promise<ActorScope | null> {
-  const context = await resolveRequestContext(ctx.db, bridgeIdentity(serviceSessionId, Date.now()));
-  return scopeOf(ctx, context);
-}
-
-/** Narrows a resolved context into the query scope (null when unresolvable). */
-async function scopeOf(ctx: QueryCtx, context: RequestContext | null): Promise<ActorScope | null> {
-  if (context === null) {
-    return null;
-  }
-  const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
-  const userId = ctx.db.normalizeId("users", context.actor.userId);
-  if (companyId === null || userId === null) {
-    return null;
-  }
-  return { companyId, userId };
-}
+// Scope resolution lives once in attention/context.ts (the round-1 ruling):
+// the identity->context->normalize chain has one home; the aliases keep the
+// caller names below stable.
+import { resolveBridgeQueryScope as resolveBridgeScope, resolveOwnQueryScope as resolveOwnScope } from "../context";
 
 /** The personal settings plus the quiet-hours window that applies. */
 async function effectivePreferences(

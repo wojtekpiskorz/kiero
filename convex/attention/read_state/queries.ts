@@ -36,29 +36,15 @@ import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { decideGmCompanyAccess, openGrantOfUser } from "../../access/gm/cores";
 import { gmStore } from "../../access/gm/storeAdapter";
+import { resolveBridgeQueryScope, resolveOwnQueryScope } from "../context";
 import {
-  bridgeIdentity,
-  identityFromConvexAuth,
-  resolveRequestContext,
 } from "../../platform/context";
 import { MAX_PROJECTION_SOURCE_IDS, projectReadState, type StoredReadState } from "./state";
 
 /** The DB reader surface these queries need (any Convex ctx.db). */
 type ReadDb = QueryCtx["db"];
 
-async function resolveOwnScope(ctx: QueryCtx) {
-  const identity = await identityFromConvexAuth(ctx.auth, Date.now());
-  const context = await resolveRequestContext(ctx.db, identity);
-  if (context === null) {
-    return null;
-  }
-  const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
-  const userId = ctx.db.normalizeId("users", context.actor.userId);
-  if (companyId === null || userId === null) {
-    return null;
-  }
-  return { companyId, userId };
-}
+const resolveOwnScope = resolveOwnQueryScope;
 
 /** Tenant-checks and loads the read-state rows for the requested sources. */
 async function readStateEntries(
@@ -120,19 +106,11 @@ export const readStateForSources = query({
 export const readStateForSourcesFor = internalQuery({
   args: { serviceSessionId: v.string(), sourceIds: v.array(v.id("sources")) },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const context = await resolveRequestContext(
-      ctx.db,
-      bridgeIdentity(args.serviceSessionId, Date.now()),
-    );
-    if (context === null) {
+    const scope = await resolveBridgeQueryScope(ctx, args.serviceSessionId);
+    if (scope === null) {
       return errorResult(forbiddenError("no_verified_identity"));
     }
-    const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
-    const userId = ctx.db.normalizeId("users", context.actor.userId);
-    if (companyId === null || userId === null) {
-      return errorResult(forbiddenError("no_verified_identity"));
-    }
-    return readStateEntries(ctx.db, companyId, userId, args.sourceIds);
+    return readStateEntries(ctx.db, scope.companyId, scope.userId, args.sourceIds);
   },
 });
 

@@ -16,8 +16,47 @@
  */
 
 import type { RequestContext } from "@kiero/runtime";
-import type { MutationCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { bridgeIdentity, identityFromConvexAuth, resolveRequestContext } from "../platform/context";
+
+/** One resolved actor scope: the company and user every query below reads. */
+export interface ActorScope {
+  readonly companyId: Id<"companies">;
+  readonly userId: Id<"users">;
+}
+
+/** Narrows a resolved context into a query scope (null when unresolvable). */
+export async function scopeOfContext(
+  db: QueryCtx["db"],
+  context: RequestContext | null,
+): Promise<ActorScope | null> {
+  if (context === null) {
+    return null;
+  }
+  const companyId = db.normalizeId("companies", context.actor.companyId);
+  const userId = db.normalizeId("users", context.actor.userId);
+  if (companyId === null || userId === null) {
+    return null;
+  }
+  return { companyId, userId };
+}
+
+/** Resolves the caller's query scope from Convex Auth (the user path). */
+export async function resolveOwnQueryScope(ctx: QueryCtx): Promise<ActorScope | null> {
+  const identity = await identityFromConvexAuth(ctx.auth, Date.now());
+  const context = await resolveRequestContext(ctx.db, identity);
+  return scopeOfContext(ctx.db, context);
+}
+
+/** Resolves the caller's query scope from a verified service session (bridge path). */
+export async function resolveBridgeQueryScope(
+  ctx: QueryCtx,
+  serviceSessionId: string,
+): Promise<ActorScope | null> {
+  const context = await resolveRequestContext(ctx.db, bridgeIdentity(serviceSessionId, Date.now()));
+  return scopeOfContext(ctx.db, context);
+}
 
 /**
  * Builds the `resolveContext` dependency for one attention dispatch.
