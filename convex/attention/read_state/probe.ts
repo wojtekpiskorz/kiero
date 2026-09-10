@@ -18,24 +18,18 @@
  * - `probeAttentionState`: the tenant-scoped inspection the evidence
  *   scripts assert on (read-state rows plus `attention.sourceReadChanged`
  *   outbox events, proving one event per actual transition).
- * - `probeCrashMarkSourceRead`: performs the FULL mark transaction and then
- *   THROWS before commit, proving rollback of row and event together.
+ * - `probeCrashMarkSourceRead`: runs the FULL mark through the lane's own
+ *   dispatch and then THROWS before commit, proving rollback of row and
+ *   event together.
  */
 
 import { v } from "convex/values";
-import { Schema } from "effect";
 import { action, internalMutation, internalQuery } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import {
-  CommandEnvelope,
-  errorResult,
-  okResult,
-  type ResultEnvelope,
-} from "@kiero/contracts";
-import { forbiddenError, membershipPolicy, type RequestContext } from "@kiero/runtime";
-import { bridgeIdentity, resolveRequestContext } from "../../platform/context";
+import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
+import { forbiddenError } from "@kiero/runtime";
 import { resolveBridgeQueryScope } from "../context";
-import { markSourceReadOperation, performMarkSourceRead } from "./operations";
+import { dispatchReadStateCommand } from "./dispatch";
 import {
   probeDisabled,
   probeGuardEnabled,
@@ -98,32 +92,21 @@ export const probeGmReadStateOverview = action({
 // --- the crash proof ------------------------------------------------------------
 
 /**
- * The guarded crash mutation: FULL mark transaction, then a deliberate
- * throw so the whole transaction rolls back — read-state row AND canonical
- * event together (the no-partial-commit proof).
+ * The guarded crash mutation (the memory lane's crashPublish shape): the
+ * FULL mark runs through the LANE'S OWN dispatch — no parallel re-spelling
+ * of decode/context/authorization — and a deliberate throw after the
+ * returned ok aborts the whole transaction, rolling the read-state row and
+ * the canonical event back together (the no-partial-commit proof). The
+ * throw lands after dispatch RETURNS, so dispatchCommand's in-handler
+ * sanitization does not absorb it; the mutation itself throws.
  */
 export const crashMarkRead = internalMutation({
   args: { envelope: v.any(), serviceSessionId: v.string() },
   handler: async (ctx, args) => {
-    const command = Schema.decodeUnknownSync(CommandEnvelope)(args.envelope);
-    const context: RequestContext | null = await resolveRequestContext(
-      ctx.db,
-      bridgeIdentity(args.serviceSessionId, Date.now()),
-    );
-    if (context === null) {
-      return errorResult(forbiddenError("no_verified_identity"));
-    }
-    const decision = await membershipPolicy.authorize(context, { intent: "write" });
-    if (!decision.allowed) {
-      return errorResult(decision.error);
-    }
-    const input = Schema.decodeUnknownSync(markSourceReadOperation.input)(command.input);
-    const result = await performMarkSourceRead(ctx, context, input);
+    const result = await dispatchReadStateCommand(ctx, args.envelope, args.serviceSessionId);
     if (result._tag === "error") {
-      return result; // the mark itself failed; nothing was written
+      return result; // the mark itself refused; nothing was committed
     }
-    // The row and event were registered inside THIS transaction; throwing
-    // aborts both together.
     throw new Error("probe: deliberate failure after read-state registration");
   },
 });
