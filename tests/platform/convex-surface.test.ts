@@ -12,7 +12,7 @@ import { echoExecutor } from "../../convex/platform/echo";
 import { analyzeChangePlanExecutor } from "../../convex/platform/pipeline";
 
 describe("convex executor composition", () => {
-  it("registers exactly the platform mechanical executors plus the B3 access cleanup", () => {
+  it("registers exactly the platform mechanical executors plus the B3/D6 appends", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
       [
         "platform.echo_delivery",
@@ -20,6 +20,9 @@ describe("convex executor composition", () => {
         // B3's sanctioned append (issue #22 owns the declared consumer
         // proof for the access-revocation edges).
         "access.cleanup_revocation",
+        // D6's sanctioned append (issue #34 owns per-segment STT; the
+        // contracts amendment registering the kind is flagged there).
+        "processing.transcribe_segment",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");

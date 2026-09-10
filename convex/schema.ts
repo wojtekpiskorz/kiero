@@ -33,6 +33,8 @@ import { extensionsTables } from "./memory/extensions/schema";
 import { workTables } from "./work/schema";
 import { acceptTables } from "./sources/accept/schema";
 import { uploadsTables } from "./sources/uploads/schema";
+// D6 amendment (flagged coordinated change): the audio STT fragment.
+import { audioTables } from "./processing/audio/schema";
 import { platformTables } from "./platform/schema";
 import { searchTables } from "./search/schema";
 import { readStateTables } from "./attention/read-state/schema";
@@ -56,6 +58,7 @@ const fragments: ReadonlyArray<Record<string, TableDefinition>> = [
   workTables,
   acceptTables,
   uploadsTables,
+  audioTables,
   platformTables,
   searchTables,
   readStateTables,
@@ -112,6 +115,7 @@ export default defineSchema({
   ...workTables,
   ...acceptTables,
   ...uploadsTables,
+  ...audioTables,
   ...platformTables,
   ...searchTables,
   ...readStateTables,

@@ -17,6 +17,10 @@
  *   durable revocation fan-out the access lane owns (device-session
  *   revocation after membership removal; the declared consumer proof of
  *   `access.membershipRevoked` / `access.sessionRevoked`).
+ * - `processing.transcribe_segment` (../processing/audio/executor.ts, D6):
+ *   the resumable per-segment STT workflow over one audio transcript order
+ *   (the first model-call executor; the contracts amendment E2 named as
+ *   its prerequisite, registered in @kiero/contracts by D6, flagged).
  */
 
 import type { FunctionReference } from "convex/server";
@@ -26,6 +30,7 @@ import type { Doc } from "../_generated/dataModel";
 import { echoExecutor } from "./echo";
 import { analyzeChangePlanExecutor } from "./pipeline";
 import { cleanupRevocationExecutor } from "../access/membership/cleanup";
+import { transcribeSegmentExecutor } from "../processing/audio/executor";
 
 /** One durable job row (the executable counterpart of an outbox event). */
 export type DurableJobDoc = Doc<"durableJobs">;
@@ -52,4 +57,5 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [echoExecutor.jobKind]: echoExecutor,
   [analyzeChangePlanExecutor.jobKind]: analyzeChangePlanExecutor,
   [cleanupRevocationExecutor.jobKind]: cleanupRevocationExecutor,
+  [transcribeSegmentExecutor.jobKind]: transcribeSegmentExecutor,
 };
