@@ -11,8 +11,8 @@
  * registry's real edges.
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
-import { drainBatch } from "../../convex/platform/outbox";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { drainBatch, projectEventToJobInputs } from "../../convex/platform/outbox";
 import { asTx, fakeCtx } from "../d2/harness";
 
 let ctx: ReturnType<typeof fakeCtx>;
@@ -119,21 +119,39 @@ describe("drain row semantics (the multi-edge decision)", () => {
     expect(ctx.db.rows("durableJobs")).toHaveLength(0);
   });
 
-  it("a registered edge WITHOUT a projection fails the row LOUDLY (machine-readable)", async () => {
-    // Find an event whose single edge has no projection in this window.
-    // (The composed registry currently projects every projected kind's
-    // edge; the unprojected case is exercised through the same code path
-    // as the platform tests. Here we assert the loud failure when it
-    // occurs by temporarily relying on an event with a registered but
-    // unprojected edge: sources.sourcePurged -> deletion.purge_source.)
-    // deletion.purge_source is I4's edge and stays unprojected until then;
-    // assert unconditionally so a silently-gained projection fails here
-    // instead of degrading the loud-failure branch to a delivered check.
-    await seedRow("sources.sourcePurged", { sourceId: "k" + "s".repeat(31) }, "dk-purged");
-    await drainBatch(tx());
-    const row = ctx.db.rows("outboxEvents")[0]!;
-    expect(row.deliveryState).toBe("failed");
-    expect(row.lastErrorKind).toBe("consumer_projection_missing");
-    expect(ctx.db.rows("durableJobs")).toHaveLength(0);
+  it("an unprojected edge stays LOUD beside a projected sibling (machine-readable)", async () => {
+    // E5 amendment (issue #39, flagged coordinated append): the purge event
+    // gained a PROJECTED sibling edge (the derived-search refresh), so the
+    // multi-edge row semantics apply: the projected edge's job registers,
+    // the row delivers, and the UNPROJECTED deletion edge (I4's seam) still
+    // fails LOUDLY per-edge through the console channel — never a silent
+    // strand. (The all-edges-unprojected `failed` row branch remains in
+    // drainBatch for the first lane that registers an edge without a
+    // projection; no such event exists in the composed registry today, so
+    // it is no longer reachable from real data.)
+    const loud = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await seedRow("sources.sourcePurged", { sourceId: "k" + "s".repeat(31) }, "dk-purged");
+      await drainBatch(tx());
+      const row = ctx.db.rows("outboxEvents")[0]!;
+      expect(row.deliveryState).toBe("delivered");
+      expect(ctx.db.rows("durableJobs")).toHaveLength(1);
+      expect(ctx.db.rows("durableJobs")[0]?.kind).toBe("search.index_generation");
+      expect(loud).toHaveBeenCalledWith(
+        expect.stringContaining("consumer projection missing"),
+      );
+      // The pure projection still names the unprojected seam exactly.
+      const projections = projectEventToJobInputs(
+        "sources.sourcePurged",
+        { sourceId: "k" + "s".repeat(31) },
+        "dk-purged",
+      );
+      expect(projections).toContainEqual({
+        kind: "unprojected_edge",
+        jobKind: "deletion.purge_source",
+      });
+    } finally {
+      loud.mockRestore();
+    }
   });
 });

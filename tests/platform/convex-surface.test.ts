@@ -11,7 +11,7 @@ import { jobExecutors } from "../../convex/platform/executors";
 import { echoExecutor } from "../../convex/platform/echo";
 
 describe("convex executor composition", () => {
-  it("registers exactly the implemented executors (platform + B3 + C5 + D6 + E3 lanes)", () => {
+  it("registers exactly the implemented executors (platform + B3 + C5 + D5 + D6 + E3 + F2 + G3 + E5 lanes)", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
       [
         "platform.echo_delivery",
@@ -40,6 +40,11 @@ describe("convex executor composition", () => {
         // G3's sanctioned append (issue #47 owns the declared consumer
         // proof for the calendar.copyOutcomeRecorded edge).
         "calendar.reconcile_outcome",
+
+        // E5's sanctioned append (issue #39 owns the derived-search lane:
+        // versioned index generations plus the scoped lifecycle refreshes of
+        // the disposable search rows).
+        "search.index_generation",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");
