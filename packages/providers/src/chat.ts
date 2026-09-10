@@ -61,8 +61,9 @@ export interface OpenRouterCredentials {
 
 /**
  * The server-held OpenRouter key from the environment; presence only, never
- * its value. E5 append (flagged coordinated change): the one home for the
- * four per-lane copies of this reader.
+ * its value. E5 append (flagged coordinated change): the canonical reader;
+ * the copies in D6's audio executor, E3's analyze and the ai dispatch are
+ * proposed follow-ups for their own lanes.
  */
 export function openRouterCredentialsFromEnv(): OpenRouterCredentials | null {
   const apiKey = process.env.OPENROUTER_API_KEY;

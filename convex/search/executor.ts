@@ -214,7 +214,6 @@ export function draftKeyOf<
       : `source:${input.sourceId ?? ""}`;
 }
 
-/** Reads the server-held OpenRouter key; presence only, never its value. */
 /** Records a typed terminal failure from the external half. */
 export const failJob = internalMutation({
   args: { jobKey: v.string(), errorKind: v.string() },

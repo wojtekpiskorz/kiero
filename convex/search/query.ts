@@ -50,7 +50,6 @@ import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import type { ScopedContext } from "./views";
 
-/** Reads the server-held OpenRouter key; presence only, never its value. */
 /** The decoded query input (the contract shape, after dispatch decode). */
 export interface QueryEvidenceInput {
   readonly query: string;

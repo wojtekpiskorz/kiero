@@ -67,7 +67,8 @@ describe("the outbox projections", () => {
       "memory.findingRevised:krevision9",
     );
     // The event fans out to C5's recompute walk AND F4's reminder edge.
-    expect(revised).toHaveLength(2);
+    // E5 appended the derived-search refresh beside C5 and F4: three edges.
+    expect(revised).toHaveLength(3);
     const reminderEdge = revised.find(
       (projection) =>
         projection.kind === "job" && projection.jobKind === "attention.schedule_task_reminders",

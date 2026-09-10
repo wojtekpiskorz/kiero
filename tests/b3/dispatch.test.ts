@@ -354,8 +354,5 @@ describe("the declared consumer edge (access revocation drains durably)", () => 
       "job",
       "job",
     ]);
-    expect(
-      projectEventToJobInputs("sources.sourcePurged", { sourceId: "s1" }, "d"),
-    ).toEqual([{ kind: "unprojected_edge", jobKind: "deletion.purge_source" }]);
   });
 });

@@ -135,7 +135,7 @@ describe("drain row semantics (the multi-edge decision)", () => {
     // gained a PROJECTED sibling edge (the derived-search refresh), so the
     // multi-edge row semantics apply: the projected edge's job registers,
     // the row delivers, and the UNPROJECTED deletion edge (I4's seam) still
-    // fails LOUDLY per-edge through the console channel — never a silent
+    // fails LOUDLY per-edge through the console channel, never a silent
     // strand. (The all-edges-unprojected `failed` row branch remains in
     // drainBatch for the first lane that registers an edge without a
     // projection; no such event exists in the composed registry today, so
@@ -166,25 +166,10 @@ describe("drain row semantics (the multi-edge decision)", () => {
     }
   });
 
-  it("a registered edge WITHOUT a projection fails the row LOUDLY (machine-readable)", async () => {
-    // Find an event whose single edge has no projection in this window.
-    // (The composed registry currently projects every projected kind's
-    // edge; the unprojected case is exercised through the same code path
-    // as the platform tests. Here we assert the loud failure when it
-    // occurs by temporarily relying on an event with a registered but
-    // unprojected edge: sources.sourcePurged -> deletion.purge_source.)
-    // deletion.purge_source is I4's edge and stays unprojected until then;
-    // assert unconditionally so a silently-gained projection fails here
-    // instead of degrading the loud-failure branch to a delivered check.
-    await seedRow(
-      "sources.sourcePurged",
-      { sourceId: "k" + "s".repeat(31) },
-      "dk-purged",
-    );
-    await drainBatch(tx());
-    const row = ctx.db.rows("outboxEvents")[0]!;
-    expect(row.deliveryState).toBe("failed");
-    expect(row.lastErrorKind).toBe("consumer_projection_missing");
-    expect(ctx.db.rows("durableJobs")).toHaveLength(0);
-  });
+  // E5 amendment note: the all-edges-unprojected `failed` branch in
+  // drainBatch stays for the first lane that registers an edge without a
+  // projection; since the derived-search refresh projected sourcePurged,
+  // no composed event reaches it, so the old unconditional test (which
+  // seeded sourcePurged expecting a failed row) is deleted alongside the
+  // sibling test above that pins the per-edge loud behavior.
 });

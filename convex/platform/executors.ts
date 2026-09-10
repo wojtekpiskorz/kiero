@@ -49,7 +49,7 @@
  *   creates the addressed agent-question intent, a published change set
  *   only wakes the evaluator).
  * - `search.index_generation` (../search/executor.ts, E5): the versioned
- *   derived-index executor — full generation builds through E2's embedding
+ *   derived-index executor. Full generation builds through E2's embedding
  *   adapter plus the scoped lifecycle refreshes (withdrawal/purge drops a
  *   source's rows; a revised finding rebuilds from its current revision).
  * - `attention.deliver_push` (../attention/push/executor.ts, F3): the

@@ -122,17 +122,11 @@ describe("composed registry integrity", () => {
   it("derives coherent features and rejects incoherent hand-written parts", () => {
     // One feature per executor; consumed edges and executed job kinds are
     // derived from the executor/consumer tables, never hand-written.
-    // 10 executors: platform.echo (A3) + B3 cleanup + E3 extract/analyze +
-    // D5 normalize + D6 transcribe + F2 attention.evaluate (each lane's
-    // sanctioned append); 11 since the E5 amendment registered
-    // search.index (the derived-search index executor).
-    expect(features).toHaveLength(11);
-    expect(features.every((feature) => feature.providesOperations.length === 0)).toBe(true);
-    // 13 executors: platform.echo (A3) + B3 cleanup + E3 extract/analyze +
+    // 14 executors: platform.echo (A3) + B3 cleanup + E3 extract/analyze +
     // D5 normalize + D6 transcribe + C5 recompute + G3 calendar.reconcile +
     // E4 join + F2 attention.evaluate + F3 attention.push + F4
-    // attention.reminders (each lane's sanctioned append).
-    expect(features).toHaveLength(13);
+    // attention.reminders + E5 search.index (each lane's sanctioned append).
+    expect(features).toHaveLength(14);
     expect(
       features.every((feature) => feature.providesOperations.length === 0),
     ).toBe(true);

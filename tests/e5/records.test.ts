@@ -31,12 +31,15 @@ async function seedJobAndGeneration(): Promise<Seeded> {
     defaultCurrency: "PLN",
     createdAtMs: 1,
   });
+  // The schema's real shape: no companyId column, providerRouteVersion
+  // required (independent review: the fixture must not drift from
+  // convex/search/schema.ts, the fake db validates nothing).
   const generationId = await ctx.db.insert("searchIndexGenerations", {
-    companyId,
     state: "building",
     embeddingModel: INDEX_CANDIDATE.embeddingModel,
     dimensions: INDEX_CANDIDATE.dimensions,
     textPreparationVersion: INDEX_CANDIDATE.textPreparationVersion,
+    providerRouteVersion: "e2.embedding.route.v1",
     createdAtMs: 1,
   });
   const jobKey = "search-index-build:dk-1";
@@ -82,10 +85,14 @@ describe("recordIndexEntries failure path (round 2)", () => {
       },
     ]);
 
+    // The invariant round 2 exposed: the envelope and the durable row
+    // answer the SAME closed kind, asserted as one equality.
     expect(envelope._tag).toBe("error");
     const job = await jobRow(jobKey);
     expect(job.state).toBe("failed");
-    expect(job.lastErrorKind).toBe("embedding_dimension_mismatch");
+    const code = envelope._tag === "error" ? (envelope.error as { code?: string }).code : null;
+    expect(code).toBe("embedding_dimension_mismatch");
+    expect(job.lastErrorKind).toBe(code);
   });
 
   it("a missing generation fails the job and answers the same kind", async () => {
@@ -103,7 +110,9 @@ describe("recordIndexEntries failure path (round 2)", () => {
     expect(envelope._tag).toBe("error");
     const job = await jobRow(jobKey);
     expect(job.state).toBe("failed");
-    expect(job.lastErrorKind).toBe("generation_not_found");
+    const code = envelope._tag === "error" ? (envelope.error as { code?: string }).code : null;
+    expect(code).toBe("generation_not_found");
+    expect(job.lastErrorKind).toBe(code);
   });
 
   it("an unknown job answers job_not_found and touches no row", async () => {

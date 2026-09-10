@@ -343,7 +343,7 @@ export const executors: readonly ExecutorEntry[] = [
     input: attentionIntentsInput,
   }),
   // E5 amendment (issue #39, flagged coordinated change): the derived-search
-  // index executor (`convex/search/executor.ts` implements it) — the
+  // index executor (`convex/search/executor.ts` implements it). The
   // versioned generation builds and the scoped lifecycle refreshes of the
   // disposable index rows.
   executorEntry({
