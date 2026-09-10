@@ -5,7 +5,9 @@
  * The A3 echo template, applied per copy: `prepareCopyAttempt` decides the
  * ONE bounded leg and durably records the attempt with outcome `unknown`
  * BEFORE the external call runs (a crash in between honestly leaves an
- * uncertain attempt — the effect may have happened); the action executes
+ * uncertain attempt — the effect may have happened); the CLAIM on the
+ * copy row (`syncAttemptSeq`, the same transaction) serializes concurrent
+ * prepares so the same leg can never be opened twice; the action executes
  * the leg; `completeCopyAttempt` re-reads the copy (the stale-attempt
  * guard), records the attempt's definite outcome, applies the remote-ledger
  * transition and publishes `calendar.copyOutcomeRecorded` when the outcome
@@ -27,9 +29,11 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { publishEvent } from "../../platform/publish";
 import { earliestActiveCompanyId } from "../connection/operations";
 import {
+  attemptInFlight,
   attemptStillWanted,
   decideMutationTransition,
   decideObservationTransition,
+  nextAttemptClaim,
   observationFromMutation,
   canonicalJson,
   decideCopyLeg,
@@ -126,7 +130,10 @@ async function attemptFactsOf(
   stats: AttemptStats;
   lastObservation: ObservedEvent | null;
   absence: AbsenceContext;
-  legCounts: Map<string, number>;
+  /** Every attempt row of this copy, any semantic id (the claim floor). */
+  recorded: number;
+  /** Whether one attempt of this copy is OPEN (in flight, fresh). */
+  openAttempt: boolean;
 }> {
   const rows = await db
     .query("calendarSyncAttempts")
@@ -135,7 +142,7 @@ async function attemptFactsOf(
   const own = rows
     .filter((row) => row.semanticId === copy.semanticId)
     .sort((a, b) => a.startedAtMs - b.startedAtMs);
-  const legCounts = new Map<string, number>();
+  const nowMs = Date.now();
   let creates = 0;
   let updates = 0;
   let deletes = 0;
@@ -146,7 +153,6 @@ async function attemptFactsOf(
   let everConfirmed = false;
   let lastObservation: ObservedEvent | null = null;
   for (const row of own) {
-    legCounts.set(row.legKind, (legCounts.get(row.legKind) ?? 0) + 1);
     if (row.legKind === "create") {
       creates += 1;
       if (row.outcome === "succeeded") {
@@ -178,7 +184,8 @@ async function attemptFactsOf(
     stats: { creates, updates, deletes },
     lastObservation,
     absence: { authoredByKiero, everConfirmed },
-    legCounts,
+    recorded: rows.length,
+    openAttempt: rows.some((row) => attemptInFlight(row, nowMs)),
   };
 }
 
@@ -225,6 +232,19 @@ export const prepareCopyAttempt = internalMutation({
       return { kind: "suspend", reason: "connection_not_connected" };
     }
     const facts = await attemptFactsOf(ctx.db, copy);
+    // The concurrent-prepare guard (round-2 finding 1): while ONE attempt
+    // of this copy is open (unknown, incomplete, fresh), every other
+    // prepare declines — the open attempt's own completion owns the next
+    // move. This is what makes the copy-row claim below airtight: the
+    // OCC retry after a lost claim lands HERE and never re-runs the leg
+    // the winner is already running (a racing observe-list could
+    // otherwise read the winner's unwritten create as a definite absence
+    // — a false personal-hide detection, worse than waiting one window).
+    // Past the window a crashed attempt is presumed dead and the
+    // observe-before-retry doctrine owns it again.
+    if (facts.openAttempt) {
+      return { kind: "none", reason: "attempt_in_flight" };
+    }
     const decision = decideCopyLeg(
       copySyncView(copy),
       connectionSyncView(connection),
@@ -240,8 +260,12 @@ export const prepareCopyAttempt = internalMutation({
       return { kind: "suspend", reason: decision.reason };
     }
     const leg = decision.leg;
-    const prior = facts.legCounts.get(leg.leg) ?? 0;
-    const attemptDedupKey = `calendar-sync-attempt:${copy._id}:${copy.semanticId}:${leg.leg}:${prior}`;
+    // The dedup key is minted from the PERSISTED claim sequence, never
+    // from a read-then-used row count: two racing prepares that both read
+    // `creates: 0` would mint the same key, and Convex has no unique
+    // secondary index to reject the twin insert (round-2 finding 1).
+    const claim = nextAttemptClaim(copy.syncAttemptSeq ?? null, facts.recorded);
+    const attemptDedupKey = `calendar-sync-attempt:${copy._id}:${copy.semanticId}:${leg.leg}:${claim.seq}`;
     const nowMs = Date.now();
     // The attempt opens UNCERTAIN: if the action dies mid-leg, this row is
     // the honest record that an effect may have happened (architecture
@@ -264,6 +288,17 @@ export const prepareCopyAttempt = internalMutation({
       dedupKey: attemptDedupKey,
       createdAtMs: nowMs,
     });
+    // The CLAIM, in the same transaction as the insert: concurrent
+    // prepares for this copy conflict on the copy document and Convex
+    // retries the loser with the winner's rows visible — it then declines
+    // behind the open-attempt guard above, so two racing prepares can
+    // never mint the same dedup key or leave the transaction with the
+    // same leg twice (the explicit-reconcile-vs-cron and the
+    // click-per-job dispatch paths all funnel through here). Only the
+    // counter is written: this is neither a desire change nor a ledger
+    // fact, and touching `updatedAtMs` would rebase the attempt's J4
+    // latency basis (`desiredAtMs` snapshots it at leg start).
+    await ctx.db.patch(args.copyId, { syncAttemptSeq: claim.nextSeq });
     return {
       kind: "leg",
       leg,
@@ -311,7 +346,7 @@ const legResultValue: ValueValidator<LegResult> = v.union(
       }),
       v.object({ kind: v.literal("empty") }),
       v.object({ kind: v.literal("calendar_gone") }),
-      v.object({ kind: v.literal("unknown") }),
+      v.object({ kind: v.literal("unknown"), cause: v.optional(v.literal("timeout")) }),
     ),
   }),
   v.object({
@@ -321,7 +356,7 @@ const legResultValue: ValueValidator<LegResult> = v.union(
       v.object({ kind: v.literal("gone") }),
       v.object({ kind: v.literal("calendar_gone") }),
       v.object({ kind: v.literal("definitely_failed") }),
-      v.object({ kind: v.literal("unknown") }),
+      v.object({ kind: v.literal("unknown"), cause: v.optional(v.literal("timeout")) }),
     ),
     eventId: v.optional(v.string()),
   }),
@@ -444,13 +479,14 @@ export const completeCopyAttempt = internalMutation({
     const outcomeChanged = remoteOutcome !== copy.remoteOutcome;
     // The certified consumer edge trigger: every CHANGED outcome
     // accelerates one durable observation, and so does an UNCERTAIN
-    // MUTATION (a timeout after a possible success) even when the ledger
-    // word stays `unknown` — G2 initializes new copies as unknown, so the
-    // uncertain signal itself is the reconcile trigger. An uncertain
-    // OBSERVATION deliberately publishes nothing: nothing was written,
-    // the mutation gate already blocks on it, and publishing would let a
-    // flaky network loop events and jobs (the cron safety net owns the
-    // retry cadence there).
+    // MUTATION (an unknown/timeout after a possible success — the timeout
+    // word names a bounded-deadline hit) even when the ledger word stays
+    // `unknown` — G2 initializes new copies as unknown, so the uncertain
+    // signal itself is the reconcile trigger. An uncertain OBSERVATION
+    // deliberately publishes nothing: nothing was written, the mutation
+    // gate already blocks on it, and publishing would let a flaky network
+    // loop events and jobs (the cron safety net owns the retry cadence
+    // there).
     const uncertainMutation =
       (attempt.legKind === "create" ||
         attempt.legKind === "update" ||

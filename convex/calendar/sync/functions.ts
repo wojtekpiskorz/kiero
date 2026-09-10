@@ -15,9 +15,10 @@
  * recorded and never retried blindly.
  *
  * `syncOverview` is the status export the issue names (last success,
- * pending, failed, reconnect-needed, possible-cleanup-remains) and the
- * timing basis for J4's 95%-within-60-seconds evaluation — recorded, never
- * claimed here.
+ * pending, failed, reconnect-needed, possible-cleanup-remains); the
+ * timing basis for J4's 95%-within-60-seconds evaluation stays on the
+ * attempt rows (`desiredAtMs`/`completedAtMs`) — recorded, never claimed
+ * here.
  */
 
 import { v } from "convex/values";
@@ -250,8 +251,9 @@ async function runOneAttempt(
 
 /**
  * Records one leg's outcome: the attempt-outcome word comes from the
- * cores' exhaustive mappers, and an uncertain leg carries its sanitized
- * error kind (the platform's blind-retry block reads the row).
+ * cores' exhaustive mappers (a bounded-deadline hit carries the distinct
+ * `timeout` word), and an uncertain leg carries its sanitized error kind
+ * (the platform's blind-retry block reads the row).
  */
 async function finishAttempt(
   ctx: ActionCtx,
@@ -265,7 +267,9 @@ async function finishAttempt(
   const completion = await ctx.runMutation(internal.calendar.sync.operations.completeCopyAttempt, {
     attemptDedupKey,
     outcome,
-    ...(outcome === "unknown" ? { errorKind: "external_uncertain" } : {}),
+    ...(outcome === "unknown" || outcome === "timeout"
+      ? { errorKind: "external_uncertain" }
+      : {}),
     result,
   });
   return {
@@ -466,7 +470,8 @@ export const runOneAttemptPublic = internalAction({
 });
 
 /** The job-row read the executor action starts from. */
-export const jobInputForReconcile = internalQuery({  args: { jobKey: v.string() },
+export const jobInputForReconcile = internalQuery({
+  args: { jobKey: v.string() },
   handler: async (ctx, args) => {
     const job = await ctx.db
       .query("durableJobs")
@@ -498,9 +503,13 @@ export const jobInputForReconcile = internalQuery({  args: { jobKey: v.string() 
 
 /**
  * Authenticated: the actor's own sync status — last success, pending,
- * failed, reconnect-needed and possible-cleanup-remains, plus the timing
- * basis J4 will evaluate (save-to-Google acceptance latency, recorded per
- * attempt, never claimed as the 95% target here).
+ * failed, reconnect-needed and possible-cleanup-remains. The
+ * save-to-Google acceptance timing for J4's 95%-within-60-seconds
+ * evaluation is NOT aggregated here: a derived number measured neither
+ * "last" nor save-only (the round-2 review flagged the old
+ * max-latency-over-all-attempts reduce), and a percentile needs the
+ * attempt rows anyway — J4 reads their `desiredAtMs`/`completedAtMs`
+ * pairs directly.
  */
 export const syncOverview = query({
   args: {},
@@ -557,13 +566,6 @@ export const syncOverview = query({
       }
       return best === null || attempt.completedAtMs > best ? attempt.completedAtMs : best;
     }, null);
-    const lastAcceptanceMs = attempts.reduce<number | null>((best, attempt) => {
-      if (attempt.outcome !== "succeeded" || attempt.completedAtMs === undefined) {
-        return best;
-      }
-      const latency = attempt.completedAtMs - attempt.desiredAtMs;
-      return best === null || latency > best ? latency : best;
-    }, null);
     return {
       state: connection.state,
       connectionId: connection._id,
@@ -577,8 +579,6 @@ export const syncOverview = query({
         failed: failedAttempts,
       },
       lastConfirmedAtMs,
-      /** J4's basis: the widest recorded save-to-Google acceptance window. */
-      lastSaveToGoogleAcceptanceMs: lastAcceptanceMs,
     };
   },
 });

@@ -42,6 +42,16 @@ export const MAX_DELETE_ATTEMPTS = 5;
  */
 export const OBSERVATION_REFRESH_MS = 60 * 60 * 1000;
 
+/**
+ * How long an OPEN attempt (outcome `unknown`, never completed) blocks a
+ * concurrent prepare for the same copy: comfortably above one leg's worst
+ * bound (a 4s deadline per call, at most two calls for the disambiguating
+ * observe, plus the token refresh), so only a genuinely crashed attempt
+ * outlives the window — and a crashed attempt then falls back to the
+ * observe-before-retry doctrine like any other stale unknown.
+ */
+export const ATTEMPT_IN_FLIGHT_WINDOW_MS = 60_000;
+
 /** The private extended property key marking Kiero-managed events. */
 export const KIERO_SEMANTIC_PROPERTY = "kiero.semanticId";
 
@@ -159,6 +169,53 @@ export function createEventBody(
  */
 export function updateEventBody(payload: DesiredGoogleEvent): Record<string, unknown> {
   return { ...managedFieldsOf(payload) };
+}
+
+// ---------------------------------------------------------------------------
+// The attempt claim (concurrent-prepare serialization, round-2 finding 1).
+// ---------------------------------------------------------------------------
+
+/**
+ * The claim one prepare derives before minting the attempt's dedup key:
+ * the sequence comes from the PERSISTED copy-row counter (bumped in the
+ * same transaction that inserts the attempt row), never from a
+ * read-then-used row count — two racing prepares that both read `creates:
+ * 0` could mint the same key, and Convex has no unique secondary index to
+ * reject the twin insert. The sequence starts above the copy's recorded
+ * row count so keys minted before the counter existed (count-derived)
+ * can never collide with counter-minted ones.
+ */
+export function nextAttemptClaim(
+  storedSeq: number | null,
+  recordedAttempts: number,
+): { readonly seq: number; readonly nextSeq: number } {
+  const seq = Math.max(storedSeq ?? 0, recordedAttempts);
+  return { seq, nextSeq: seq + 1 };
+}
+
+/** The liveness columns of one attempt row the in-flight check reads. */
+export interface AttemptLiveness {
+  readonly outcome: string;
+  readonly completedAtMs?: number | undefined;
+  readonly startedAtMs: number;
+}
+
+/**
+ * Whether one attempt row is still OPEN: it left with outcome `unknown`
+ * and never completed, freshly enough that its action may still be
+ * running the leg. A COMPLETED uncertain attempt (unknown/timeout with
+ * `completedAtMs` set) is not in flight — the observe-before-retry
+ * doctrine owns it. While any attempt of a copy is open, every concurrent
+ * prepare declines: a racing observe-list could otherwise read the
+ * winner's unwritten create as a definite absence (a false personal-hide
+ * detection), which is worse than waiting one window.
+ */
+export function attemptInFlight(attempt: AttemptLiveness, nowMs: number): boolean {
+  return (
+    attempt.outcome === "unknown" &&
+    attempt.completedAtMs === undefined &&
+    nowMs - attempt.startedAtMs <= ATTEMPT_IN_FLIGHT_WINDOW_MS
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -397,7 +454,7 @@ export type ObservationResult =
     }
   | { readonly kind: "empty" }
   | { readonly kind: "calendar_gone" }
-  | { readonly kind: "unknown" };
+  | { readonly kind: "unknown"; readonly cause?: "timeout" };
 
 /** The ledger transition an observation implies (pure; the mutation applies). */
 export interface ObservationTransition {
@@ -524,7 +581,13 @@ export type MutationReport =
   | { readonly kind: "gone" } // 404 on the target: event or calendar, ambiguous
   | { readonly kind: "calendar_gone" } // 401/403, or 404 at the calendar scope
   | { readonly kind: "definitely_failed" }
-  | { readonly kind: "unknown" };
+  /**
+   * Uncertain: the effect may have happened. `cause: "timeout"` names a
+   * bounded-deadline hit (the protocol's `unknown_timeout`) so the attempt
+   * rows and the job's externalOutcome can carry the A3 word; every other
+   * uncertainty (5xx, unreadable body) stays causeless `unknown`.
+   */
+  | { readonly kind: "unknown"; readonly cause?: "timeout" };
 
 /** The ledger transition a mutation implies (pure; the mutation applies). */
 export interface MutationTransition {
@@ -696,12 +759,13 @@ export function observationFromMutation(
  * The attempt-outcome word one MUTATION report implies (the A3
  * `ExternalOutcome` vocabulary: a definite answer — applied, or the
  * idempotent 404 — is a completed leg; a refused or access-lost shape is
- * a failure; only `unknown` is uncertain). Exhaustive by construction: a
- * new report kind fails this switch at compile time.
+ * a failure; `unknown` is uncertain, and a bounded-deadline hit carries
+ * the distinct `timeout` word). Exhaustive by construction: a new report
+ * kind fails this switch at compile time.
  */
 export function attemptOutcomeOfMutation(
   report: MutationReport,
-): "succeeded" | "failed" | "unknown" {
+): "succeeded" | "failed" | "timeout" | "unknown" {
   switch (report.kind) {
     case "applied":
     case "gone":
@@ -710,14 +774,14 @@ export function attemptOutcomeOfMutation(
     case "calendar_gone":
       return "failed";
     case "unknown":
-      return "unknown";
+      return report.cause === "timeout" ? "timeout" : "unknown";
   }
 }
 
 /** The attempt-outcome word one OBSERVATION result implies. */
 export function attemptOutcomeOfObservation(
   observation: ObservationResult,
-): "succeeded" | "failed" | "unknown" {
+): "succeeded" | "failed" | "timeout" | "unknown" {
   switch (observation.kind) {
     case "present":
     case "empty":
@@ -725,7 +789,7 @@ export function attemptOutcomeOfObservation(
     case "calendar_gone":
       return "failed";
     case "unknown":
-      return "unknown";
+      return observation.cause === "timeout" ? "timeout" : "unknown";
   }
 }
 

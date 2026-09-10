@@ -99,6 +99,15 @@ export async function performReconcileCopy(
     // calendar) — an honest refusal, never a fake outcome.
     return errorResult(unavailableError(false, "calendar_reconcile_unavailable"));
   }
+  // A FRESH job key per command is deliberate (each explicit click is a
+  // new logical reconcile), and safe: concurrent commands for one copy
+  // cannot duplicate an external effect, because every executor path
+  // funnels through `prepareCopyAttempt`, which CLAIMS the attempt on the
+  // copy row — the OCC-retried loser counts the winner's row and declines
+  // behind the open-attempt guard (round-2 finding 1). The job layer's
+  // dedup-by-dedup-key would be the wrong tool here anyway: a stable
+  // per-copy key would make the boss's second click a forever no-op after
+  // the first job succeeds.
   await registerDurableJob(ctx, {
     kind: "calendar.reconcile_outcome",
     input: { copyId: id, lastKnownOutcome: copy.remoteOutcome },

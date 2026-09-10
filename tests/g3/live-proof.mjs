@@ -18,7 +18,11 @@
  * calendar_access_lost -> explicit recreate path, user-deleted and
  * user-moved detection (the personal-hide origins), the refresh_failed ->
  * error -> reconnect restore WITHOUT duplicates, the account-switch
- * ledger reset and rebuild, and convergence across repeated passes.
+ * ledger reset and rebuild, convergence across repeated passes, and the
+ * round-2 concurrent-prepare window raced live (four simultaneous
+ * reconciles of one copy at the first create AND at a recreate each
+ * produce exactly one create effect — the copy-row claim serializes
+ * them; the fake Events API counts the inserts).
  *
  * Run: node tests/g3/live-proof.mjs
  * (Not a vitest file: live evidence, transcribed into the issue report.)
@@ -632,6 +636,77 @@ row(
   );
 }
 
+// --- Phase 5.5: the concurrent-prepare window — race the RECREATE --------
+//
+// Round-2 finding 1's exact window, raced live: FOUR reconcile commands
+// for ONE copy must produce exactly ONE recreate. The fake Events API
+// records every insert, so a duplicated create (the pre-claim code minted
+// the same ...:create:N key from the same counted rows and POSTed twice)
+// would show as an effect-count delta above one. No settling pass runs
+// first: the outcome-recorded event chain re-creates on its own, so the
+// reconciles are fired straight into the post-restore window — whatever
+// leg arm they meet (the stale-id refind or the create the chain opens),
+// the concurrent prepares must serialize onto ONE leg.
+
+{
+  const h1Before = copyFor(connectionById(await syncState(companyId), connH.connectionId), taskOf.h1);
+  const hid = await setCopyHidden(H.client, h1Before.copyId, true);
+  check("5f H hides the copy again (arming the raced recreate)", isOk(hid), errCode(hid));
+  await runPassesUntil(
+    connH.connectionId,
+    companyId,
+    (s) => copyFor(connectionById(s, connH.connectionId), taskOf.h1)?.remoteOutcome === "absent",
+    "hidden again (raced arm)",
+  );
+  const effectsBefore = await effectCountOf(
+    companyId,
+    `g3-proof-event-create:proof-google-subject-1:${h1Before?.semanticId}`,
+  );
+  const connBefore = connectionById(await syncState(companyId), connH.connectionId);
+  const createsBefore = (connBefore?.attempts ?? []).filter(
+    (a) => a.copyId === h1Before?.copyId && a.legKind === "create",
+  ).length;
+  const restored = await setCopyHidden(H.client, h1Before.copyId, false);
+  check("5g H restores it (the recreate window opens)", isOk(restored), errCode(restored));
+  const fired = await Promise.all([
+    reconcileCopy(h1Before.copyId),
+    reconcileCopy(h1Before.copyId),
+    reconcileCopy(h1Before.copyId),
+    reconcileCopy(h1Before.copyId),
+  ]);
+  row("raced reconcile answers (the losers must decline or observe, never re-create)", JSON.stringify(fired.map((r) => value(r) ?? r)));
+  const convergedRace = await runPassesUntil(
+    connH.connectionId,
+    companyId,
+    (s) => copyFor(connectionById(s, connH.connectionId), taskOf.h1)?.remoteOutcome === "confirmed",
+    "raced recreate converged",
+  );
+  const effectsAfter = await effectCountOf(
+    companyId,
+    `g3-proof-event-create:proof-google-subject-1:${h1Before?.semanticId}`,
+  );
+  const connAfter = connectionById(convergedRace, connH.connectionId);
+  const createsAfter = (connAfter?.attempts ?? []).filter(
+    (a) => a.copyId === h1Before?.copyId && a.legKind === "create",
+  ).length;
+  const h1Race = copyFor(connAfter, taskOf.h1);
+  check(
+    "5h FOUR concurrent reconciles of one copy produced exactly ONE create effect",
+    effectsAfter - effectsBefore === 1,
+    `${effectsBefore} -> ${effectsAfter}`,
+  );
+  check(
+    "5i exactly ONE create attempt row was opened for the raced copy",
+    createsAfter - createsBefore === 1,
+    `${createsBefore} -> ${createsAfter}`,
+  );
+  check(
+    "5j the raced recreate converged (confirmed, remote id recorded)",
+    h1Race?.remoteOutcome === "confirmed" && typeof h1Race?.googleEventId === "string",
+    JSON.stringify([h1Race?.remoteOutcome, h1Race?.googleEventId != null]),
+  );
+}
+
 // --- Phase 6: user-DELETED detection -> hiddenOrigin deleted_in_google ---------
 
 {
@@ -707,11 +782,11 @@ row(
   const overview = await H.client.query("calendar/sync/functions:syncOverview", {});
   row("syncOverview (H)", JSON.stringify(overview));
   check(
-    "8c the status export reads the honest sync state (confirmed+hidden copies, timing present)",
+    "8c the status export reads the honest sync state (confirmed+hidden copies, last-confirmed timing present)",
     overview?.state === "connected" &&
       overview?.copies?.total >= 2 &&
       typeof overview?.lastConfirmedAtMs === "number" &&
-      typeof overview?.lastSaveToGoogleAcceptanceMs === "number" &&
+      overview?.lastSaveToGoogleAcceptanceMs === undefined &&
       overview?.reconnectNeeded === false,
     JSON.stringify(overview),
   );
@@ -821,6 +896,30 @@ row(
     hSwitched?.cleanupStatus === "unconfirmed",
     JSON.stringify([hSwitched?.cleanupStatus]),
   );
+  // The same raced window at the FIRST create of a fresh ledger: the
+  // switched copies start from creates:0 / remoteOutcome unknown — the
+  // exact counted-rows read two concurrent prepares could both see. Four
+  // concurrent reconciles must still produce exactly ONE create. The
+  // effect counter is the fake Google's OWN event store for the new
+  // account (semantic-agnostic on purpose: the copy's semantic id only
+  // moves to the new account when the projection pass runs, which may
+  // still be in flight inside this window).
+  const h1Switched = copyFor(hSwitched, taskOf.h1);
+  const subject9Events = (s) =>
+    fakeEventsForSubject(s, "proof-google-subject-9", companyId).filter((e) =>
+      e.kieroSemanticId.endsWith(taskOf.h1),
+    );
+  const switchEffectsBefore = subject9Events(await syncState(companyId)).length;
+  const switchCreatesBefore = (hSwitched?.attempts ?? []).filter(
+    (a) => a.copyId === h1Switched?.copyId && a.legKind === "create",
+  ).length;
+  const firedSwitch = await Promise.all([
+    reconcileCopy(h1Switched.copyId),
+    reconcileCopy(h1Switched.copyId),
+    reconcileCopy(h1Switched.copyId),
+    reconcileCopy(h1Switched.copyId),
+  ]);
+  row("raced first-create answers", JSON.stringify(firedSwitch.map((r) => value(r) ?? r)));
   const rebuilt = await runPassesUntil(
     hSwitched.connectionId,
     companyId,
@@ -851,6 +950,20 @@ row(
     "10e the old account's events remain (honest unconfirmed cleanup — no Kiero access)",
     oldEvents.length > 0,
     `${oldEvents.length} old-account events remain`,
+  );
+  const switchEffectsAfter = subject9Events(await syncState(companyId)).length;
+  const switchCreatesAfter = (hNew?.attempts ?? []).filter(
+    (a) => a.copyId === h1New.copyId && a.legKind === "create",
+  ).length;
+  check(
+    "10f FOUR concurrent reconciles at the fresh ledger produced exactly ONE create in Google",
+    switchEffectsAfter - switchEffectsBefore === 1,
+    `${switchEffectsBefore} -> ${switchEffectsAfter}`,
+  );
+  check(
+    "10g exactly ONE create attempt row for the raced copy",
+    switchCreatesAfter - switchCreatesBefore === 1,
+    `${switchCreatesBefore} -> ${switchCreatesAfter}`,
   );
 }
 

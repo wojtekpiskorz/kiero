@@ -70,10 +70,15 @@ const syncAttemptOutcomeValue = vocabularyOf(SYNC_ATTEMPT_OUTCOMES);
 
 export const calendarSyncTables = {
   /**
-   * One recorded external leg against Google Calendar. Attempts are
-   * bounded per (copy, leg kind, semantic id); the decision cores count
-   * these rows before any retry, so a blind second create is structurally
-   * impossible.
+   * One recorded external leg against Google Calendar. A blind second
+   * create is structurally impossible only because `prepareCopyAttempt`
+   * CLAIMS the attempt on the copy row (`calendarCopies.syncAttemptSeq`,
+   * bumped in the same transaction that inserts this row): concurrent
+   * prepares conflict on the copy document, Convex retries the loser into
+   * a view that counts the winner's row, and the loser declines behind
+   * the open-attempt guard. The counted rows alone are read-then-use —
+   * they bound retries per (copy, leg kind, semantic id); they do not
+   * serialize concurrency.
    */
   calendarSyncAttempts: defineTable({
     connectionId: shared.calendarConnectionId,
@@ -99,7 +104,10 @@ export const calendarSyncTables = {
     googleEventId: v.optional(v.string()),
     /** The managed fields Google answered with (the observation cache). */
     observedJson: v.optional(v.string()),
-    /** Unique per attempt: the no-duplicate-effect ledger identity. */
+    /**
+     * Unique per attempt — the no-duplicate-effect ledger identity —
+     * minted from the copy's persisted claim sequence.
+     */
     dedupKey: v.string(),
     createdAtMs: shared.tsMs,
   })

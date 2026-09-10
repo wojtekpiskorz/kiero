@@ -89,6 +89,20 @@ function eventIdStatusOf(body: unknown): { eventId: string; status: string } | n
   return { eventId: record.id, status: record.status };
 }
 
+/**
+ * The uncertain shape a bounded fetch that produced no clean answer
+ * implies: a deadline hit (`unknown_timeout`) carries the distinct
+ * `cause: "timeout"` word the attempt rows and the job's externalOutcome
+ * record; every other uncertainty (5xx, unreadable body, plain network
+ * error) stays causeless `unknown`. Both words block blind retries
+ * identically (`isUncertainJobFailure`).
+ */
+function uncertainOf(
+  failure: FetchFailure | undefined,
+): { readonly kind: "unknown"; readonly cause?: "timeout" } {
+  return failure === "unknown_timeout" ? { kind: "unknown", cause: "timeout" } : { kind: "unknown" };
+}
+
 // ---------------------------------------------------------------------------
 // Mutation legs (Events.insert / patch / delete -> MutationReport).
 // ---------------------------------------------------------------------------
@@ -128,7 +142,7 @@ export async function createCalendarEvent(input: {
   if (answer.status === 400) {
     return { kind: "definitely_failed" };
   }
-  return { kind: "unknown" };
+  return uncertainOf(answer.failure);
 }
 
 /**
@@ -157,7 +171,7 @@ export async function updateCalendarEvent(input: {
     },
     input.timeoutMs ?? EVENTS_HTTP_TIMEOUT_MS,
   );
-  return mutateOutcomeOf(answer.status);
+  return mutateOutcomeOf(answer);
 }
 
 /** Events.delete: 404 is the idempotent already-gone answer. */
@@ -173,24 +187,27 @@ export async function deleteCalendarEvent(input: {
     { method: "DELETE", headers: { authorization: `Bearer ${input.accessToken}` } },
     input.timeoutMs ?? EVENTS_HTTP_TIMEOUT_MS,
   );
-  return mutateOutcomeOf(answer.status);
+  return mutateOutcomeOf(answer);
 }
 
 /** The status->report mapping the patch/delete legs share. */
-function mutateOutcomeOf(status: number): MutationReport {
-  if (status === 200 || status === 204) {
+function mutateOutcomeOf(answer: {
+  readonly status: number;
+  readonly failure?: FetchFailure;
+}): MutationReport {
+  if (answer.status === 200 || answer.status === 204) {
     return { kind: "applied" };
   }
-  if (status === 404) {
+  if (answer.status === 404) {
     return { kind: "gone" };
   }
-  if (status === 401 || status === 403) {
+  if (answer.status === 401 || answer.status === 403) {
     return { kind: "calendar_gone" };
   }
-  if (status === 400) {
+  if (answer.status === 400) {
     return { kind: "definitely_failed" };
   }
-  return { kind: "unknown" };
+  return uncertainOf(answer.failure);
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +270,7 @@ export async function listEventsBySemanticId(input: {
     // both nonexistent and inaccessible calendars).
     return { kind: "calendar_gone" };
   }
-  return { kind: "unknown" };
+  return uncertainOf(answer.failure);
 }
 
 /**
@@ -304,7 +321,7 @@ export async function observeEventById(input: {
   if (answer.status === 401 || answer.status === 403) {
     return { kind: "calendar_gone" };
   }
-  return { kind: "unknown" };
+  return uncertainOf(answer.failure);
 }
 
 /** Extracts the managed fields one observed event body carries. */

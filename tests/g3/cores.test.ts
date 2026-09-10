@@ -16,15 +16,21 @@
  *   re-sent, so personally captured settings survive);
  * - repeated decisions over converged state produce `none` (idempotent
  *   replays make zero external calls);
- * - retry bounds suspend honestly instead of looping.
+ * - retry bounds suspend honestly instead of looping;
+ * - the attempt claim is minted from a PERSISTED sequence (never a
+ *   read-then-used row count), so two racing prepares can never mint the
+ *   same dedup key, and a concurrent prepare declines behind an open
+ *   attempt (round-2 finding 1).
  */
 
 import { describe, expect, it } from "vitest";
 import type { DesiredGoogleEvent } from "@kiero/domain";
 import {
+  ATTEMPT_IN_FLIGHT_WINDOW_MS,
   KIERO_SEMANTIC_PROPERTY,
   MAX_CREATE_ATTEMPTS,
   OBSERVATION_REFRESH_MS,
+  attemptInFlight,
   attemptOutcomeOfMutation as attemptOutcomeOfMutationFn,
   attemptOutcomeOfObservation as attemptOutcomeOfObservationFn,
   attemptStillWanted,
@@ -35,6 +41,7 @@ import {
   decideObservationTransition,
   managedFieldsMatch,
   managedFieldsOf,
+  nextAttemptClaim,
   observationFromMutation,
   updateEventBody,
   type ConnectionSyncView,
@@ -605,6 +612,64 @@ describe("the attempt-outcome mappers (exhaustive by construction)", () => {
     expect(attemptOutcomeOfObservation({ kind: "empty" })).toBe("succeeded");
     expect(attemptOutcomeOfObservation({ kind: "calendar_gone" })).toBe("failed");
     expect(attemptOutcomeOfObservation({ kind: "unknown" })).toBe("unknown");
+  });
+
+  it("a bounded-deadline hit carries the distinct timeout word (the A3 vocabulary)", () => {
+    expect(attemptOutcomeOfMutationFn({ kind: "unknown", cause: "timeout" })).toBe("timeout");
+    expect(attemptOutcomeOfObservationFn({ kind: "unknown", cause: "timeout" })).toBe("timeout");
+  });
+});
+
+describe("the attempt claim (concurrent-prepare serialization, round-2 finding 1)", () => {
+  const keyOf = (seq: number): string => `calendar-sync-attempt:k1:sem:create:${seq}`;
+
+  it("mints the key from the persisted sequence and advances it", () => {
+    expect(nextAttemptClaim(null, 0)).toEqual({ seq: 0, nextSeq: 1 });
+    expect(nextAttemptClaim(4, 0)).toEqual({ seq: 4, nextSeq: 5 });
+  });
+
+  it("two prepares starting from the same view mint DISTINCT keys after the OCC retry", () => {
+    // The winner claims first and persists nextSeq; the retrying loser
+    // starts from the persisted counter — the same starting view can
+    // never mint the same key twice (the read-then-used row count could).
+    const winner = nextAttemptClaim(null, 0);
+    const loser = nextAttemptClaim(winner.nextSeq, 1);
+    expect(keyOf(winner.seq)).not.toBe(keyOf(loser.seq));
+    expect(winner.nextSeq).toBe(loser.seq);
+  });
+
+  it("the sequence starts above any legacy count-minted key", () => {
+    // Three rows minted before the counter existed carry count-derived
+    // indices < 3; the first counter-minted key must clear them all.
+    const claim = nextAttemptClaim(null, 3);
+    expect(claim.seq).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("the open-attempt guard (a concurrent prepare declines behind a live leg)", () => {
+  const startedAt = NOW - 5_000;
+
+  it("an unknown, never-completed, fresh attempt is in flight", () => {
+    expect(attemptInFlight({ outcome: "unknown", startedAtMs: startedAt }, NOW)).toBe(true);
+  });
+
+  it("a COMPLETED uncertain attempt is not in flight (the observe doctrine owns it)", () => {
+    expect(
+      attemptInFlight({ outcome: "unknown", completedAtMs: NOW, startedAtMs: startedAt }, NOW),
+    ).toBe(false);
+    expect(
+      attemptInFlight({ outcome: "timeout", completedAtMs: NOW, startedAtMs: startedAt }, NOW),
+    ).toBe(false);
+  });
+
+  it("a crashed attempt outlives the window and stops blocking", () => {
+    const crashedAt = NOW - ATTEMPT_IN_FLIGHT_WINDOW_MS - 1;
+    expect(attemptInFlight({ outcome: "unknown", startedAtMs: crashedAt }, NOW)).toBe(false);
+  });
+
+  it("a definite outcome never blocks, complete or not", () => {
+    expect(attemptInFlight({ outcome: "succeeded", startedAtMs: startedAt }, NOW)).toBe(false);
+    expect(attemptInFlight({ outcome: "failed", startedAtMs: startedAt }, NOW)).toBe(false);
   });
 });
 

@@ -7,9 +7,11 @@
  * The protocol returns the DECISION CORES' vocabulary directly
  * (MutationReport / ObservationResult), so these tests pin that contract:
  *
- * - bounded deadlines: a stalling endpoint yields `unknown`, and the
- *   protocol layer issues NO second call after an uncertain outcome
- *   (the no-blind-retry property is pinned by counting requests);
+ * - bounded deadlines: a stalling endpoint yields the uncertain `unknown`
+ *   with the distinct `timeout` cause (the A3 word the attempt rows and
+ *   the job outcome record), and the protocol layer issues NO second call
+ *   after an uncertain outcome (the no-blind-retry property is pinned by
+ *   counting requests);
  * - outcome classification: 2xx confirms (with a readable id), 401/403
  *   and calendar-scoped 404 are the access-lost shapes, event-scoped 404
  *   on patch/delete is `gone`, 5xx is uncertain;
@@ -143,13 +145,22 @@ describe("create legs (MutationReport)", () => {
     fake.behavior.status = 200;
   });
 
-  it("keeps a deadline-hit create UNKNOWN (the timeout-after-success case)", async () => {
+  it("keeps a deadline-hit create uncertain with the timeout word (the timeout-after-success case)", async () => {
     fake.requests.length = 0;
     fake.behavior.delayMs = 10 * SHORT_TIMEOUT_MS;
     const report = await createCalendarEvent({ ...base(), body: { summary: "Z" } });
-    expect(report).toEqual({ kind: "unknown" });
+    expect(report).toEqual({ kind: "unknown", cause: "timeout" });
     expect(fake.requests).toHaveLength(1);
     delete fake.behavior.delayMs;
+  });
+
+  it("keeps a 5xx create uncertain WITHOUT the timeout word (a server error is not a deadline)", async () => {
+    fake.requests.length = 0;
+    fake.behavior.status = 500;
+    const report = await createCalendarEvent({ ...base(), body: { summary: "Z" } });
+    expect(report).toEqual({ kind: "unknown" });
+    expect(fake.requests).toHaveLength(1);
+    fake.behavior.status = 200;
   });
 
   it("never issues a second call after the uncertain outcome (protocol layer)", async () => {
@@ -204,6 +215,13 @@ describe("list legs (ObservationResult, the observation filter)", () => {
       expect(observation).toEqual({ kind: "calendar_gone" });
     }
     fake.behavior.status = 200;
+  });
+
+  it("a deadline-hit list is uncertain with the timeout word", async () => {
+    fake.behavior.delayMs = 10 * SHORT_TIMEOUT_MS;
+    const observation = await listEventsBySemanticId({ ...base(), semanticId: "sem-9" });
+    expect(observation).toEqual({ kind: "unknown", cause: "timeout" });
+    delete fake.behavior.delayMs;
   });
 });
 
@@ -299,14 +317,14 @@ describe("update legs (the managed-fields contract on the wire)", () => {
     fake.behavior.status = 200;
   });
 
-  it("keeps an unknown update unknown (the patch may have applied)", async () => {
+  it("keeps a deadline-hit update uncertain with the timeout word (the patch may have applied)", async () => {
     fake.behavior.delayMs = 10 * SHORT_TIMEOUT_MS;
     const report = await updateCalendarEvent({
       ...base(),
       eventId: "evt-3",
       body: { summary: "Nowy" },
     });
-    expect(report).toEqual({ kind: "unknown" });
+    expect(report).toEqual({ kind: "unknown", cause: "timeout" });
     delete fake.behavior.delayMs;
   });
 });
