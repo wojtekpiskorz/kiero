@@ -483,7 +483,8 @@ function EventStateForm({
   form,
   run,
   eventRevisionOf,
-}: FormProps & { readonly eventRevisionOf: (eventId: string) => number }): ReactNode {  const [eventId, setEventId] = useState(overview.events[0]?.eventId ?? "");
+}: FormProps & { readonly eventRevisionOf: (eventId: string) => number }): ReactNode {
+  const [eventId, setEventId] = useState(overview.events[0]?.eventId ?? "");
   const [state, setState] = useState<(typeof eventStateOrder)[number]>("occurred");
 
   async function submit(event: SubmitEvent): Promise<void> {
@@ -583,7 +584,9 @@ function CreateTaskForm({
   }
   const all = [...projects.data.active, ...projects.data.closed];
   if (all.length === 0) {
-    return null; // no project to attach an obligation to: the catalog owns that path
+    // No project to attach a task to: the catalog owns that path. The
+    // empty-tasks copy above must not point at a form that is not there.
+    return createElement("p", null, workCopy.createNeedsProject);
   }
   return createElement(
     "div",

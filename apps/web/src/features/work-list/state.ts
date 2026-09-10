@@ -62,6 +62,7 @@ export const workCopy = {
   tasksNote:
     "Zakończenie zadania to osobna decyzja — odhaczenie całej checklisty go nie kończy, a zadanie można wykonać przy nieodhaczonych punktach, które zachowują swój stan.",
   noTasks: "Brak zadań. Zapisz pierwsze zadanie poniżej.",
+  createNeedsProject: "Aby zapisać zadanie, najpierw utwórz projekt w katalogu projektów.",
   waitingReasonLabel: "Przeszkoda",
   executorLabel: (name: string | null): string =>
     name === null ? "wykonawca nieznany" : `wykonawca: ${name}`,
