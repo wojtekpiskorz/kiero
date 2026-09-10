@@ -8,7 +8,7 @@ Issue: [J1 — Prove the first real text-to-memory loop in the barebones app](ht
 - **Persons**: fixture addresses under the reserved proof domain `@kiero.invalid` (guarded code installs; real Convex Auth RS256 sessions — subjects are real `<userId>|<authSessions id>` values).
 - **Env on the lease (names only)**: `JWT_PRIVATE_KEY`, `JWKS` (fresh dev keypair generated for this lease), `SITE_URL`, `KIERO_PROBE_ENABLED`, `KIERO_B1_PROOF_ENABLED`, `KIERO_B3_PROOF_ENABLED`, `OPENROUTER_API_KEY`. No secret values appear in this file.
 - **Repeatable command**: `KIERO_J1_DEPLOYMENT=veracious-cricket-460 node e2e/core-text/live-proof.mjs` (per-run nonce fixture identities; re-runnable without resetting data).
-- **Deterministic tests**: `npx vitest run tests/j1` (15 tests) and the full root suite `npm test` (845 tests, 840 passed + 5 skipped) on the combined tree; `npm run typecheck` clean; `npm run build` (web) clean.
+- **Deterministic tests**: `npx vitest run tests/j1` (19 tests) and the full root suite `npm test` (851 tests, 846 passed + 5 skipped) on the combined tree; `npm run typecheck` clean; `npm run build` (web) clean.
 
 ## Prerequisite repairs folded into this assignment
 

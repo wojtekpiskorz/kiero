@@ -15,8 +15,9 @@
  *   accepted/processing/processed/failed — never a stored copy);
  * - read: `memory.readCurrentFindings` for the firm scope or one project
  *   (current memory without replaying the conversation);
- * - correct: a NEW source with the clear correction (CONTEXT.md: a
- *   correction is a new message; the original is never rewritten).
+ * - correct: "Korekta ustalenia" (CONTEXT.md) — the boss sends a NEW
+ *   source that explicitly resolves what changed; the earlier source
+ *   message is never rewritten.
  *
  * No styling, semantic controls only (the UX/UI track owns presentation).
  * Clarification questions raised by the agent are not yet surfaced here —
@@ -48,6 +49,7 @@ import {
   coreTextCopy as copy,
   failureHint,
   findingValueLabel,
+  justSentNotice,
   knowledgeStateLabel,
   processingStateLabels,
   signInCopy,
@@ -272,7 +274,7 @@ function CoreTextMain({
   }[] =
     projects.status === "success"
       ? [...projects.data.active, ...projects.data.closed].map((project) => ({
-          projectId: project.projectId as string,
+          projectId: project.projectId,
           displayName: project.displayName,
         }))
       : [];
@@ -314,15 +316,7 @@ function CoreTextMain({
       : createElement("p", { role: notice.kind === "error" ? "alert" : "status" }, notice.text),
     sentRow === null
       ? null
-      : createElement(
-          "p",
-          { role: "status" },
-          sentRow.processingState === "accepted" || sentRow.processingState === "processing"
-            ? copy.processingNotice
-            : sentRow.processingState === "processed"
-              ? copy.processedNotice
-              : copy.failedNotice,
-        ),
+      : createElement("p", { role: "status" }, justSentNotice(sentRow.processingState)),
     createElement("h2", null, copy.conversationHeading),
     conversation.status === "error"
       ? createElement("p", { role: "alert" }, signInCopy.sessionEndedNotice)

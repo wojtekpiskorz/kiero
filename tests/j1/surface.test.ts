@@ -23,6 +23,7 @@ import { loadAppConfig } from "../../apps/web/src/app/config";
 import { textConversationFeatureEntry } from "../../apps/web/src/composition/text";
 import {
   findingValueLabel,
+  justSentNotice,
   knowledgeStateLabel,
   processingStateLabels,
 } from "../../apps/web/src/features/core-text/state";
@@ -163,6 +164,18 @@ describe("the core-text renderers stay precise about the contract", () => {
     expect(knowledgeStateLabel({ _tag: "unknown", reason: "brak potwierdzenia" })).toContain(
       "brak potwierdzenia",
     );
+  });
+});
+
+describe("the just-sent notice keeps every derived state distinct", () => {
+  it("never routes partial into the failed copy", () => {
+    // Latent today (text-only sources never derive partial), but the day D1
+    // derives it the boss must hear part of the work succeeded.
+    expect(justSentNotice("partial")).not.toBe(justSentNotice("failed"));
+    expect(justSentNotice("partial")).toContain("czeka jeszcze na przetworzenie");
+    expect(justSentNotice("failed")).toContain("nie udało się");
+    expect(justSentNotice("processed")).toContain("Pamięć zaktualizowana");
+    expect(justSentNotice("processing")).toContain("przetwarza");
   });
 });
 

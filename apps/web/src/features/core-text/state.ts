@@ -65,10 +65,14 @@ export const coreTextCopy = {
   processedNotice: "Pamięć zaktualizowana.",
   failedNotice:
     "Przetwarzanie nie udało się. Wiadomość jest zapisana: nic nie przepadło, a przetwarzanie można później ponowić.",
+  partialNotice:
+    "Część materiałów tej wiadomości czeka jeszcze na przetworzenie.",
   lostResponseNotice:
     "Odpowiedź zaginęła podczas wysyłania. Wiadomość mogła zostać zapisana — ponowne kliknięcie „Wyślij” nie utworzy duplikatu.",
+  // The glossary term and definition (CONTEXT.md "Korekta ustalenia"),
+  // followed by the actionable instruction for this surface.
   correctionNote:
-    "Poprawka ustalenia to nowa wiadomość: napisz wyraźnie, co się zmienia, a agent zaktualizuje pamięć zachowując historię.",
+    "Korekta ustalenia to jawne rozstrzygnięcie zmieniające informację w pamięci, z własnym autorem i czasem. Nie przepisuje wcześniejszej wiadomości źródłowej — napisz wyraźnie, co się zmienia, a agent zaktualizuje pamięć zachowując historię.",
   // Conversation list
   conversationHeading: "Historia wiadomości",
   noMessages: "Brak wiadomości. Wyślij pierwszą powyżej.",
@@ -118,6 +122,26 @@ const failureHints: Partial<Record<string, string>> = {
 /** The notice text for one closed error code (hint or server message). */
 export function failureHint(code: string, serverMessage: string): string {
   return failureHints[code] ?? serverMessage;
+}
+
+/**
+ * The just-sent notice for the source's derived processing state. Every
+ * state is distinct: `partial` (some required segments of a multi-material
+ * message still pending) must never read as the failed copy — the day D1
+ * derives it, the boss is told part of the work succeeded.
+ */
+export function justSentNotice(state: SourceProcessingType): string {
+  switch (state) {
+    case "accepted":
+    case "processing":
+      return coreTextCopy.processingNotice;
+    case "partial":
+      return coreTextCopy.partialNotice;
+    case "processed":
+      return coreTextCopy.processedNotice;
+    case "failed":
+      return coreTextCopy.failedNotice;
+  }
 }
 
 // ---------------------------------------------------------------------------
