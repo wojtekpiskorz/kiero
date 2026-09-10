@@ -132,3 +132,8 @@ describe("the work-list feature vocabulary", () => {
     expect(failureHint(undefined)).toBeNull();
   });
 });
+
+it("pins the no-project fallback copy to the rendered surface name", () => {
+  expect(workCopy.createNeedsProject).toContain("sekcji Projekty");
+  expect(workCopy.createNeedsProject).not.toContain("katalogu projekt");
+});
