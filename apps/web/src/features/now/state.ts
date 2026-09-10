@@ -104,7 +104,7 @@ export function eventsAwaitingConfirmation(events: readonly EventView[]): readon
 export const nowCopy = {
   title: "Co teraz",
   intro:
-    "To, co teraz czeka na Ciebie i na firmę: Twoje zadania, wspólna kolejka, zaległości z zamkniętych projektów, zdarzenia czekające na potwierdzenie, sprawy do wyjaśnienia i stan przypomnień.",
+    "To, co teraz czeka na Ciebie i na firmę: Twoje zadania, wspólna kolejka, zobowiązania z zamkniętych projektów, zdarzenia czekające na potwierdzenie, sprawy do wyjaśnienia i stan przypomnień.",
   // Sections
   mineHeading: "Twoje zadania",
   mineIntro:
@@ -140,6 +140,7 @@ export const nowCopy = {
   suppressedReminder: (reason: string): string => `przypomnienie wstrzymane (${reason})`,
   noReminder: "brak zaplanowanych przypomnień",
   // The honest unavailable state: a refused projection is NOT "no reminders".
+  remindersLoading: "Sprawdzamy stan przypomnień…",
   remindersUnavailable: "stan przypomnień chwilowo niedostępny",
   // State-change control (the actionable half of Co teraz)
   stateChangeLabel: "Zmień stan",

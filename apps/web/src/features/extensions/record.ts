@@ -44,7 +44,7 @@ export interface Candidate {
   readonly shared: boolean;
   readonly usageCount: number;
   readonly lastUsedAtMs: number | null;
-  readonly similarity: { readonly verdict: string };
+  readonly similarity: { readonly verdict: "reuse_candidate" | "name_conflict" | "distinct" };
 }
 
 /** The scope args shape both sections receive (already contract-branded). */

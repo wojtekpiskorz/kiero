@@ -28,7 +28,7 @@ import {
 } from "@kiero/contracts";
 import {
   TAX_BASIS_LABELS,
-  TEMPORAL_ROLE_LABELS,
+  temporalValueLabel,
 } from "../../../../../packages/domain/findings/labels";
 import {
   CHECKLIST_ITEM_STATE_LABELS,
@@ -242,45 +242,6 @@ export function failureHint(code: string | undefined, serverMessage: string): st
 // domain's one label module (packages/domain/findings/labels.ts), the
 // same single-source pattern as the state vocabularies above.
 
-/** Renders one decoded date-only bound; no component is invented. */
-function dateOnlyLabel(bound: Extract<TemporalValue["shape"], { _tag: "day" | "month" | "year" }>): string {
-  switch (bound._tag) {
-    case "day":
-      return bound.day;
-    case "month":
-      return `${bound.month} (do danego miesiąca)`;
-    case "year":
-      return `${bound.year} (do danego roku)`;
-  }
-}
-
-/**
- * Renders one decoded temporal value: calendar facts plus the original
- * words. An exact date/time stays an exact instant; a date-only term names
- * the day it ends with; an open range end stays open.
- */
-export function temporalValueLabel(temporal: TemporalValue): string {
-  let when: string;
-  switch (temporal.shape._tag) {
-    case "day":
-    case "month":
-    case "year":
-      when = dateOnlyLabel(temporal.shape);
-      break;
-    case "date_time":
-      when = temporal.shape.value.toString();
-      break;
-    case "range": {
-      const { start, end } = temporal.shape;
-      when =
-        start === null && end === null
-          ? "zakres nieokreślony"
-          : `od ${start === null ? "…" : dateOnlyLabel(start)} do ${end === null ? "…" : dateOnlyLabel(end)}`;
-      break;
-    }
-  }
-  return `${when} (${TEMPORAL_ROLE_LABELS[temporal.role]}; powiedziano: „${temporal.originalExpression}”)`;
-}
 
 /** The honest tax-basis label of a money value (never guessed). */
 export function taxBasisLabel(taxBasis: TaxBasis): string {

@@ -12,7 +12,7 @@
  * extension value editor) and any backend lane consume the same maps.
  */
 
-import type { MoneyCertainty, MoneyRole, TaxBasis, TemporalRole } from "@kiero/contracts";
+import type { MoneyCertainty, MoneyRole, TaxBasis, TemporalRole, TemporalValue } from "@kiero/contracts";
 
 /** Polish product rendering of every temporal value role. */
 export const TEMPORAL_ROLE_LABELS: Readonly<Record<TemporalRole, string>> = {
@@ -44,3 +44,46 @@ export const MONEY_CERTAINTY_LABELS: Readonly<Record<MoneyCertainty, string>> = 
   exact: "kwota dokładna",
   estimate: "kwota szacunkowa",
 };
+
+
+/** Renders one decoded date-only bound; no component is invented. */
+export function dateOnlyLabel(
+  bound: Extract<TemporalValue["shape"], { _tag: "day" | "month" | "year" }>,
+): string {
+  switch (bound._tag) {
+    case "day":
+      return bound.day;
+    case "month":
+      return `${bound.month} (do danego miesiąca)`;
+    case "year":
+      return `${bound.year} (do danego roku)`;
+  }
+}
+
+/**
+ * Renders one decoded temporal value: calendar facts plus the original
+ * words. An exact date/time stays an exact instant; a date-only term names
+ * the day it ends with; an open range end stays open.
+ */
+export function temporalValueLabel(temporal: TemporalValue): string {
+  let when: string;
+  switch (temporal.shape._tag) {
+    case "day":
+    case "month":
+    case "year":
+      when = dateOnlyLabel(temporal.shape);
+      break;
+    case "date_time":
+      when = temporal.shape.value.toString();
+      break;
+    case "range": {
+      const { start, end } = temporal.shape;
+      when =
+        start === null && end === null
+          ? "zakres nieokreślony"
+          : `od ${start === null ? "…" : dateOnlyLabel(start)} do ${end === null ? "…" : dateOnlyLabel(end)}`;
+      break;
+    }
+  }
+  return temporal.originalExpression === "" ? when : `${when} (${temporal.originalExpression})`;
+}

@@ -141,6 +141,8 @@ export function CandidateRow({ candidate }: { readonly candidate: Candidate }): 
       "p",
       null,
       candidate.shared ? copy.sharedMark : copy.ownMark,
+      // The similarity verdict IS the answer to searchIntro's question.
+      ` · ${copy.verdictLabels[candidate.similarity.verdict]}`,
       ` · ${copy.usageLabel(candidate.usageCount, candidate.lastUsedAtMs === null ? null : `${candidate.lastUsedAtMs}`)}`,
     ),
     createElement(

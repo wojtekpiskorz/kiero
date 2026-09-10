@@ -128,16 +128,12 @@ export const extensionsCopy = {
     last === null
       ? `wykorzystana ${count} raz(y)`
       : `wykorzystana ${count} raz(y), ostatnio ${last}`,
+  fieldsHeading: "Pola definicji",
   verdictLabels: {
     reuse_candidate: "nadaje się do ponownego użycia",
     name_conflict: "nazwa zajęta przez inną strukturę",
     distinct: "odrębna definicja",
   } as const,
-  fieldsHeading: "Pola definicji",
-  fieldIdLabel: (fieldId: string): string => `id pola: ${fieldId}`,
-  fieldKindOf: (kind: DefinitionFieldKind): string => `rodzaj: ${fieldKindLabels[kind]}`,
-  fieldUnitOf: (unit: string): string => `jednostka: ${unit}`,
-  fieldItemKindOf: (itemKind: ScalarFieldKind): string => `elementy: ${scalarKindLabels[itemKind]}`,
   fieldOptionsOf: (options: readonly string[]): string => `opcje: ${options.join(", ")}`,
   // Define
   defineHeading: "Zdefiniuj nową informację",

@@ -33,6 +33,7 @@ import { api } from "../../../../../convex/_generated/api";
 import type { ProjectsOverview } from "../../../../../convex/projects/functions";
 import type { EventView, TaskView } from "../../../../../convex/work/read";
 import type { ClarificationWireRow } from "../../../../../convex/memory/findings/exposition";
+import type { MyTaskRemindersWire } from "../../../../../convex/attention/reminders/queries";
 import {
   CompanyFeatureGate,
   SessionEnded,
@@ -47,7 +48,6 @@ import {
   boundTermLabel,
   checklistItemStateLabels,
   eventStateLabels,
-  eventStateOrder,
   failureHint as workFailureHint,
   taskStateLabels,
   taskStateOrder,
@@ -82,34 +82,17 @@ export function NowFeature(): ReactNode {
 // The personal reminder projection (F4's myTaskReminders, envelope-decoded)
 // ---------------------------------------------------------------------------
 
-interface ReminderIntentRow {
-  readonly intentId: string;
-  readonly taskId: string | null;
-  readonly state: string;
-  readonly dueAtMs: number;
-  readonly suppressedReason: string | null;
-  readonly deliveredAtMs: number | null;
-}
 
-interface ReminderSnoozeRow {
-  readonly taskId: string;
-  readonly untilMs: number;
-}
-
-/** The decoded shape of `myTaskReminders`' ok value (typed at the boundary). */
-interface MyTaskReminders {
-  readonly intents: readonly ReminderIntentRow[];
-  readonly snoozes: readonly ReminderSnoozeRow[];
-}
-
-const EMPTY_REMINDERS: MyTaskReminders = { intents: [], snoozes: [] };
 
 /**
  * The personal projection's availability: `ok` with the rows, or
  * `unavailable` when the read refuses (an erroring or refused projection
  * must render as unavailable, NEVER as "no reminders").
  */
-type RemindersState = { readonly state: "ok"; readonly data: MyTaskReminders } | { readonly state: "unavailable" };
+type RemindersState =
+  | { readonly state: "ok"; readonly data: MyTaskRemindersWire }
+  | { readonly state: "loading" }
+  | { readonly state: "unavailable" };
 
 function useMyTaskReminders(): RemindersState {
   const reminders = useQueryState({ query: api.attention.reminders.queries.myTaskReminders, args: {} });
@@ -117,12 +100,13 @@ function useMyTaskReminders(): RemindersState {
     return { state: "unavailable" };
   }
   if (reminders.status !== "success") {
-    return { state: "ok", data: EMPTY_REMINDERS };
+    // Unknown is never "no reminders": the projection reads as loading.
+    return { state: "loading" };
   }
   if (reminders.data._tag !== "ok") {
     return { state: "unavailable" };
   }
-  const value = reminders.data.value as MyTaskReminders;
+  const value = reminders.data.value as MyTaskRemindersWire;
   return { state: "ok", data: value };
 }
 
@@ -130,6 +114,9 @@ function useMyTaskReminders(): RemindersState {
 function reminderLine(taskId: string, reminders: RemindersState): string {
   if (reminders.state === "unavailable") {
     return copy.remindersUnavailable;
+  }
+  if (reminders.state === "loading") {
+    return copy.remindersLoading;
   }
   const { intents, snoozes } = reminders.data;
   const snooze = snoozes.find((row) => row.taskId === taskId);
@@ -420,7 +407,7 @@ function TaskSection({
 /** The per-task state change (one explicit decision, revision-checked). */
 function TaskStateControl({ task }: { readonly task: TaskView }): ReactNode {
   const work = useCheckedDispatch(useMutation(api.work.functions.dispatchWork), workFailureHint);
-  const [state, setState] = useState<(typeof taskStateOrder)[number]>(task.state === "waiting" ? "waiting" : "todo");
+  const [state, setState] = useState<(typeof taskStateOrder)[number]>(task.state);
   const [waitingReason, setWaitingReason] = useState("");
 
   async function submit(event: SubmitEvent): Promise<void> {
@@ -715,4 +702,3 @@ function OpenQuestionRow({ row }: { readonly row: ClarificationWireRow }): React
 }
 
 // Re-exported labels keep the work vocabulary single-sourced for consumers.
-export { eventStateOrder, taskStateOrder };

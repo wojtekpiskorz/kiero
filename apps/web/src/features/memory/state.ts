@@ -27,7 +27,6 @@ import { BigDecimal, Schema } from "effect";
 import {
   FindingValue,
   KnowledgeState,
-  type DateOnly,
   type TemporalValue,
 } from "@kiero/contracts";
 import {
@@ -35,6 +34,7 @@ import {
   MONEY_ROLE_LABELS,
   TAX_BASIS_LABELS,
   TEMPORAL_ROLE_LABELS,
+  dateOnlyLabel,
 } from "../../../../../packages/domain/findings/labels";
 import { signInCopy } from "../sign-in/state";
 import { sessionFailureHints } from "../conversation/state";
@@ -144,20 +144,10 @@ export function failureHint(code: string | undefined, serverMessage: string): st
 // (packages/domain/findings/labels.ts): the same Polish strings the work
 // surface and the extension value editor render, from one source.
 
-/** Renders one decoded date-only bound; no component is invented. */
-function dateOnlyLabel(bound: DateOnly): string {
-  switch (bound._tag) {
-    case "day":
-      return bound.day;
-    case "month":
-      return `${bound.month} (do danego miesiąca)`;
-    case "year":
-      return `${bound.year} (do danego roku)`;
-  }
-}
-
-/** Renders one decoded temporal value: calendar facts plus the original words. */
-function temporalValueLabel(temporal: TemporalValue): string {
+/** Renders one decoded temporal value WITH its role attribution (the finding
+ * revision view); the plain rendering and the date-only bound live once in
+ * the domain labels module. */
+export function attributedTemporalLabel(temporal: TemporalValue): string {
   let when: string;
   switch (temporal.shape._tag) {
     case "day":
@@ -204,7 +194,7 @@ export function findingValueLabel(value: unknown): string {
   const decoded = Schema.decodeUnknownSync(FindingValue)(value);
   switch (decoded._tag) {
     case "temporal":
-      return temporalValueLabel(decoded.temporal);
+      return attributedTemporalLabel(decoded.temporal);
     case "money":
       return moneyValueLabel(decoded.money);
     case "text_note":

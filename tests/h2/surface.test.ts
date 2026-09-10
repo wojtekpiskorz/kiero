@@ -54,9 +54,9 @@ import {
   failureHint as workFailureHint,
   taskStateLabels,
   taxBasisLabel,
-  temporalValueLabel,
   workCopy,
 } from "../../apps/web/src/features/work/state";
+import { attributedTemporalLabel as temporalValueLabel } from "../../apps/web/src/features/memory/state";
 import { failureHint as extensionsFailureHint } from "../../apps/web/src/features/extensions/state";
 import { TaskRow, EventRow, projectJoinOf } from "../../apps/web/src/features/work/WorkFeature";
 import {
