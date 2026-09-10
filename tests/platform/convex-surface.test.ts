@@ -11,7 +11,7 @@ import { jobExecutors } from "../../convex/platform/executors";
 import { echoExecutor } from "../../convex/platform/echo";
 
 describe("convex executor composition", () => {
-  it("registers exactly the implemented executors (platform + B3 + C5 + D5 + D6 + E3 + F2 + G3 + E5 lanes)", () => {
+  it("registers exactly the implemented executors (platform + B3 + C5 + D5 + D6 + E3/E4 + F2 + G3 + E5 lanes)", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
       [
         "platform.echo_delivery",
@@ -30,6 +30,10 @@ describe("convex executor composition", () => {
         // F2's sanctioned append (issue #42 owns the notification-intent
         // lane: the durable reaction to the three consumed events).
         "attention.evaluate_due_intents",
+        // F4's sanctioned append (issue #44 owns the task-reminder lane:
+        // the durable schedule recompute for the work task events and
+        // bound-deadline revisions).
+        "attention.schedule_task_reminders",
         // E3's sanctioned append (issue #37 owns the text-analysis lane:
         // the mechanical A3 analyze executor is replaced behind the same
         // seam by the real workflow, and the extract edge is implemented).
@@ -45,6 +49,13 @@ describe("convex executor composition", () => {
         // versioned index generations plus the scoped lifecycle refreshes of
         // the disposable search rows).
         "search.index_generation",
+        // E4's sanctioned append (issue #38 owns the multimodal join; the
+        // contracts amendment registering the kind is flagged there).
+        "processing.join_multimodal",
+        // F3's sanctioned append (issue #43 owns the web push transport:
+        // the declared consumer proof for the attention.intentDelivered
+        // edge).
+        "attention.deliver_push",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");
@@ -52,7 +63,10 @@ describe("convex executor composition", () => {
 
   it("every registered kind exists in the A2/A3 registry executor table", () => {
     for (const kind of Object.keys(jobExecutors)) {
-      expect(executors.some((entry) => entry.jobKind === kind), kind).toBe(true);
+      expect(
+        executors.some((entry) => entry.jobKind === kind),
+        kind,
+      ).toBe(true);
     }
   });
 
@@ -75,7 +89,11 @@ describe("temporal cross-precision bound ordering (A2 deferral resolved by A3)",
 
   it("accepts equal period starts (a bound and the period containing it)", () => {
     expect(() =>
-      decode({ _tag: "range", start: { _tag: "month", month: "2026-05" }, end: { _tag: "month", month: "2026-05" } }),
+      decode({
+        _tag: "range",
+        start: { _tag: "month", month: "2026-05" },
+        end: { _tag: "month", month: "2026-05" },
+      }),
     ).not.toThrow();
   });
 

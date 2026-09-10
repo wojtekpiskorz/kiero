@@ -23,6 +23,7 @@ import { v } from "convex/values";
 import { ActorContext } from "@kiero/contracts";
 import type { VerifiedIdentity, RequestContext } from "@kiero/runtime";
 import type { QueryCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 
 /** Reads identity claims from Convex Auth; null when unauthenticated. */
 export async function identityFromConvexAuth(
@@ -128,3 +129,23 @@ export const resolveServiceContext = internalQuery({
     };
   },
 });
+
+/**
+ * E4 amendment: the author's live session row. Background analysis
+ * pipelines (E3's text analysis, E4's join) act within the source author's
+ * firm permissions through a server-resolved session, never client input,
+ * never a fabricated identity. The newest live session wins; the indexed
+ * scan stops at the first hit, so a long-lived author costs one read.
+ */
+export async function authorSessionId(
+  db: ResolutionDb,
+  authorUserId: Id<"users">,
+): Promise<Id<"sessions"> | null> {
+  const session = await db
+    .query("sessions")
+    .withIndex("by_user_started", (q) => q.eq("userId", authorUserId))
+    .order("desc")
+    .filter((q) => q.eq(q.field("revokedAtMs"), undefined))
+    .first();
+  return session?._id ?? null;
+}

@@ -89,6 +89,93 @@ export function isoWeekday(day: ResolvedDay): number {
   return sundayBased === 0 ? 7 : sundayBased;
 }
 
+// ---------------------------------------------------------------------------
+// Wall-clock instants (DST-correct through Intl).
+// ---------------------------------------------------------------------------
+
+/** Parts of one wall-clock time, as produced by Intl in a timezone. */
+interface WallTimeParts {
+  readonly year: number;
+  readonly month: number; // 1-12
+  readonly day: number; // 1-31
+  readonly minuteOfDay: number;
+}
+
+const wallTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function wallTimeFormatter(timeZone: string): Intl.DateTimeFormat {
+  const cached = wallTimeFormatterCache.get(timeZone);
+  if (cached !== undefined) {
+    return cached;
+  }
+  // `h23` keeps 0-23 hours (no 24:00) so minuteOfDay is always 0-1439.
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  wallTimeFormatterCache.set(timeZone, formatter);
+  return formatter;
+}
+
+/** The wall-clock parts of one instant in one timezone. */
+function wallTimeAt(instantMs: number, timeZone: string): WallTimeParts {
+  const parts = wallTimeFormatter(timeZone).formatToParts(new Date(instantMs));
+  const get = (type: string): number => {
+    const part = parts.find((candidate) => candidate.type === type);
+    if (part === undefined) {
+      // Unreachable for the part types requested above; fail loudly.
+      throw new Error(`temporal: missing ${type} part`);
+    }
+    return Number(part.value);
+  };
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    minuteOfDay: get("hour") * 60 + get("minute"),
+  };
+}
+
+/** The UTC offset of one timezone at one instant, in milliseconds. */
+function timezoneOffsetMs(instantMs: number, timeZone: string): number {
+  const wall = wallTimeAt(instantMs, timeZone);
+  const wallAsUtc = Date.UTC(wall.year, wall.month - 1, wall.day, 0, wall.minuteOfDay);
+  return wallAsUtc - (instantMs - (instantMs % 60_000));
+}
+
+/**
+ * The instant of one wall-clock minute on one calendar day in a timezone:
+ * the exact inverse of `localDateOfInstant` at whole minutes. Two-pass
+ * (guess the offset, correct, re-check) so a minute inside or beside a DST
+ * transition resolves the way schedulers expect. One definition shared by
+ * every scheduling reader of this package (F1's quiet-hours windows and
+ * F4's reminder slots); private per-lane copies would drift.
+ */
+export function instantOfLocalMinute(
+  day: ResolvedDay,
+  minuteOfDay: number,
+  timeZone: string,
+): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (match === null) {
+    throw new Error(`instantOfLocalMinute: not a calendar day: ${day}`);
+  }
+  const wallAsUtc = Date.UTC(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    0,
+    minuteOfDay,
+  );
+  const firstGuess = wallAsUtc - timezoneOffsetMs(wallAsUtc, timeZone);
+  return wallAsUtc - timezoneOffsetMs(firstGuess, timeZone);
+}
+
 /** The outcome of trying to read one relative expression. */
 export type RelativeResolution =
   | { readonly matched: true; readonly day: ResolvedDay; readonly offsetDays: number }

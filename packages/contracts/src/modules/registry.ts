@@ -34,7 +34,11 @@ import { memoryOperations, memoryEvents } from "./memory";
 import { projectsOperations, projectsEvents } from "./projects";
 import { workOperations, workEvents } from "./work";
 import { attentionOperations, attentionEvents } from "./attention";
-import { calendarOperations, calendarEvents, CalendarRemoteOutcome } from "./calendar";
+import {
+  calendarOperations,
+  calendarEvents,
+  CalendarRemoteOutcome,
+} from "./calendar";
 import { operationsOperations, operationsEvents } from "./operations";
 import { searchOperations, searchEvents } from "./search";
 import { integrationsOperations, integrationsEvents } from "./integrations";
@@ -52,7 +56,9 @@ function collect<E extends Nameable>(
     for (const key of Object.keys(group)) {
       const entry = group[key];
       if (entry === undefined || entry.name in out || entry.name !== key) {
-        throw new Error(`Contract registry: duplicate or mis-keyed entry: ${key}`);
+        throw new Error(
+          `Contract registry: duplicate or mis-keyed entry: ${key}`,
+        );
       }
       out[entry.name] = entry;
     }
@@ -61,19 +67,20 @@ function collect<E extends Nameable>(
 }
 
 /** All declared operations, keyed by operation name. */
-export const operations: Record<string, AnyOperationEntry> = collect<AnyOperationEntry>(
-  accessOperations,
-  sourcesOperations,
-  memoryOperations,
-  projectsOperations,
-  workOperations,
-  attentionOperations,
-  calendarOperations,
-  operationsOperations,
-  searchOperations,
-  integrationsOperations,
-  platformOperations,
-);
+export const operations: Record<string, AnyOperationEntry> =
+  collect<AnyOperationEntry>(
+    accessOperations,
+    sourcesOperations,
+    memoryOperations,
+    projectsOperations,
+    workOperations,
+    attentionOperations,
+    calendarOperations,
+    operationsOperations,
+    searchOperations,
+    integrationsOperations,
+    platformOperations,
+  );
 
 /** All declared events, keyed by event name. */
 export const events: Record<string, AnyEventEntry> = collect<AnyEventEntry>(
@@ -107,7 +114,7 @@ export const revokedAccessCleanupInput = Schema.Struct({
  * amendment on the B3 input-shape precedent (additive, flagged): `reason`
  * and `withdrawnByUserId` join the certified shape as NULLABLE fields so
  * the drain can project event payloads that do not carry them, while the
- * withdrawal transaction registers the job with the real values — the
+ * withdrawal transaction registers the job with the real values - the
  * marking revisions record the withdrawal's reason and actor.
  */
 export const recomputeDependentsInput = Schema.Struct({
@@ -165,13 +172,24 @@ export const echoDeliveryInput = Schema.Struct({
 });
 
 // D6 amendment (flagged coordinated change, the B3 precedent): the first
-// model-call job kind gets its executor registration — the prerequisite E2's
+// model-call job kind gets its executor registration - the prerequisite E2's
 // dispatch named. Per-segment STT executes through the durable path; the
 // transcript row is the order the workflow owns.
 export const transcribeSegmentInput = Schema.Struct({
   transcriptId: tableIdSchema("audioTranscripts"),
 });
 
+// E4 amendment (flagged coordinated change, the D6 precedent): the
+// multimodal-join executor input. `processingRunId` is the run the join
+// anchors its steps to (the drain hands the reanalysis kicker's NEW run;
+// null means "resolve the source's initial analysis run", exactly the way
+// D6's orders anchor). The join composes E3 text planning with D5 vision
+// representations and D6 transcript versions (issue #38).
+export const joinMultimodalInput = Schema.Struct({
+  sourceId: tableIdSchema("sources"),
+  processingRunId: Schema.NullOr(tableIdSchema("processingRuns")),
+  reanalysisOfRunId: Schema.NullOr(tableIdSchema("processingRuns")),
+});
 // F2 amendment (issue #42, flagged coordinated change on the B3/D5
 // precedent): the notification-intent executor input. The drain projects
 // the three consumed events onto this shape; the nullable ids let every
@@ -179,7 +197,11 @@ export const transcribeSegmentInput = Schema.Struct({
 // the trigger vocabulary IS the generic assignment/agent-message state
 // contract (E4 later emits the same terminal states through these edges).
 export const attentionIntentsInput = Schema.Struct({
-  trigger: Schema.Literals(["source_accepted", "clarification_raised", "change_set_published"]),
+  trigger: Schema.Literals([
+    "source_accepted",
+    "clarification_raised",
+    "change_set_published",
+  ]),
   sourceId: Schema.NullOr(tableIdSchema("sources")),
   clarificationId: Schema.NullOr(tableIdSchema("clarifications")),
   changeSetId: Schema.NullOr(tableIdSchema("changeSets")),
@@ -197,6 +219,32 @@ export const searchIndexInput = Schema.Struct({
   generationId: Schema.NullOr(tableIdSchema("searchIndexGenerations")),
   mode: Schema.Literals(["build", "refresh_source", "refresh_finding"]),
   sourceId: Schema.NullOr(tableIdSchema("sources")),
+  findingId: Schema.NullOr(tableIdSchema("findings")),
+});
+
+// F3 amendment (issue #43, flagged coordinated change - the F2 precedent):
+// the web-push delivery executor input. The drain projects the delivered
+// intent's own event onto this shape; the executor's prepare re-reads the
+// intent (state, rights, subscriptions, preview) at delivery time instead
+// of trusting the event payload.
+export const deliverPushInput = Schema.Struct({
+  notificationIntentId: tableIdSchema("notificationIntents"),
+});
+
+// F4 amendment (issue #44, flagged coordinated change on the F2 precedent):
+// the task-reminder scheduling executor input. The drain projects the three
+// consumed events onto this shape; the nullable ids let every trigger
+// share one closed input. Both work events (`work.taskChanged` and
+// `work.taskStateChanged`) project onto the ONE `task_changed` trigger:
+// the recompute re-reads the live task row, so the state event needs no
+// reaction of its own (PR #102 review round 1 dropped the certified but
+// never-produced `task_state_changed` literal). The work events' dedup
+// identity already carries the task revision
+// (`work.<event>:<id>:<revision>`), so the projection rides the row's key
+// and every distinct change registers its own job while replays collapse.
+export const attentionRemindersInput = Schema.Struct({
+  trigger: Schema.Literals(["task_changed", "finding_revised"]),
+  taskId: Schema.NullOr(tableIdSchema("tasks")),
   findingId: Schema.NullOr(tableIdSchema("findings")),
 });
 
@@ -248,7 +296,7 @@ export const executors: readonly ExecutorEntry[] = [
     input: analyzeChangePlanInput,
   }),
   // D5 amendment (issue #33): the accepted-photo normalization executor
-  // (architecture protocol step 4 — normalize before ordinary vision). It
+  // (architecture protocol step 4 - normalize before ordinary vision). It
   // consumes `sources.sourceAccepted` through its own edge; the extraction
   // job the acceptance transaction registers stays E3's.
   executorEntry({
@@ -274,8 +322,18 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "processing.transcribe_segment",
     input: transcribeSegmentInput,
   }),
+  // E4 amendment (flagged coordinated change): the multimodal-join executor
+  // (`convex/processing/multimodal/join.ts` implements it). It no-ops
+  // text-only sources (E3's analyze owns those) and joins extraction
+  // outcomes into partial-safe analysis groups for mixed ones.
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("processing.join"),
+    jobKind: "processing.join_multimodal",
+    input: joinMultimodalInput,
+  }),
   // F2 amendment (issue #42, flagged coordinated change): the durable
-  // notification-intent executor — intent creation from the consumed
+  // notification-intent executor - intent creation from the consumed
   // events plus the due-time evaluator kick
   // (`convex/attention/delivery/executor.ts` implements it).
   executorEntry({
@@ -294,9 +352,31 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "search.index_generation",
     input: searchIndexInput,
   }),
+  // F3 amendment (issue #43, flagged coordinated change): the web-push
+  // transport executor - the per-device delivery of one delivered intent
+  // (`convex/attention/push/executor.ts` implements it).
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("attention.push"),
+    jobKind: "attention.deliver_push",
+    input: deliverPushInput,
+  }),
+  // F4 amendment (issue #44, flagged coordinated change): the durable
+  // task-reminder scheduling executor - the semantic slot recompute from
+  // the consumed work events and bound-deadline revisions
+  // (`convex/attention/reminders/executor.ts` implements it).
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("attention.reminders"),
+    jobKind: "attention.schedule_task_reminders",
+    input: attentionRemindersInput,
+  }),
 ];
 
-function consumer(eventName: string, jobKind: EventConsumerEntry["jobKind"]): EventConsumerEntry {
+function consumer(
+  eventName: string,
+  jobKind: EventConsumerEntry["jobKind"],
+): EventConsumerEntry {
   return eventConsumerEntry({ kind: "event_consumer", eventName, jobKind });
 }
 
@@ -315,7 +395,7 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceWithdrawn", "memory.recompute_dependents"),
   consumer("memory.dependentsMarkedStale", "memory.recompute_dependents"),
   // C5 registration (issue #28 owns the revalidation half of this edge):
-  // every revised finding drains into one bounded dependent walk — a basis
+  // every revised finding drains into one bounded dependent walk - a basis
   // that became non-known propagates updating markings through the
   // dependentsMarkedStale cascade; a basis that became known again
   // revalidates its updating dependents by registering their linked
@@ -338,6 +418,12 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceAccepted", "processing.normalize_photo"),
   // Requested reanalysis runs as a linked new analysis run.
   consumer("operations.reanalysisRequested", "processing.analyze_change_plan"),
+  // E4 amendment (flagged coordinated change): acceptance also fans out the
+  // multimodal join (STT ordering + the joined partial-safe analysis), and
+  // a requested reanalysis of a MIXED source re-joins it through the same
+  // edge (text-only sources no-op inside the executor).
+  consumer("sources.sourceAccepted", "processing.join_multimodal"),
+  consumer("operations.reanalysisRequested", "processing.join_multimodal"),
   // A3 certification amendment: the platform's echo publication drains into
   // its own durable delivery job through the same edge mechanism.
   consumer("platform.echoRequested", "platform.echo_delivery"),
@@ -362,6 +448,22 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceWithdrawn", "search.index_generation"),
   consumer("sources.sourcePurged", "search.index_generation"),
   consumer("memory.findingRevised", "search.index_generation"),
+  // F3 amendment (issue #43, flagged coordinated change): every delivered
+  // notification intent drains into the web-push transport. The projection
+  // derives its dedup identity from the intent, so a replayed or
+  // differently-keyed duplicate event collapses onto the same per-device
+  // delivery rows (issue 43: semantic intent plus subscription).
+  consumer("attention.intentDelivered", "attention.deliver_push"),
+  // F4 amendment (issue #44, flagged coordinated change): the task-reminder
+  // scheduling edges. Every task change (creation, deadline binding,
+  // coordinator, reopen) recomputes the semantic slots; a revision of a
+  // bound deadline finding recomputes every task bound to it (a date
+  // correction does not touch the task row). Each edge rides the row's
+  // revision-carrying dedup identity, so distinct changes register
+  // distinct jobs while replays collapse.
+  consumer("work.taskChanged", "attention.schedule_task_reminders"),
+  consumer("work.taskStateChanged", "attention.schedule_task_reminders"),
+  consumer("memory.findingRevised", "attention.schedule_task_reminders"),
 ];
 
 /**
@@ -393,7 +495,9 @@ export const features: readonly FeatureEntry[] = executors.map((executor) =>
  * construction-time guarantee itself is under test: a silent Set collapse
  * here would let two lanes believe they own one job kind.
  */
-export function assertNoDuplicateExecutors(list: readonly ExecutorEntry[]): Set<string> {
+export function assertNoDuplicateExecutors(
+  list: readonly ExecutorEntry[],
+): Set<string> {
   const seen = new Set<string>();
   for (const executor of list) {
     if (seen.has(executor.jobKind)) {
@@ -421,12 +525,19 @@ export function assertFeaturesCoherent(
   for (const feature of list) {
     for (const name of feature.providesOperations) {
       if (!(name in knownOperations)) {
-        throw new Error(`Contract registry: feature ${feature.featureId} provides unknown operation ${name}`);
+        throw new Error(
+          `Contract registry: feature ${feature.featureId} provides unknown operation ${name}`,
+        );
       }
     }
-    for (const name of [...feature.publishesEvents, ...feature.consumesEvents]) {
+    for (const name of [
+      ...feature.publishesEvents,
+      ...feature.consumesEvents,
+    ]) {
       if (!(name in knownEvents)) {
-        throw new Error(`Contract registry: feature ${feature.featureId} references unknown event ${name}`);
+        throw new Error(
+          `Contract registry: feature ${feature.featureId} references unknown event ${name}`,
+        );
       }
     }
   }
@@ -445,7 +556,9 @@ export function assertFeaturesCoverRegistrations(
   registeredConsumers: readonly EventConsumerEntry[],
 ): void {
   for (const executor of registeredExecutors) {
-    const owning = list.filter((feature) => feature.executesJobs.includes(executor.jobKind));
+    const owning = list.filter((feature) =>
+      feature.executesJobs.includes(executor.jobKind),
+    );
     if (owning.length !== 1) {
       throw new Error(
         `Contract registry: job kind ${executor.jobKind} is executed by ${owning.length} features, expected exactly 1`,
@@ -453,14 +566,19 @@ export function assertFeaturesCoverRegistrations(
     }
     const feature = owning[0];
     if (feature === undefined) {
-      throw new Error(`Contract registry: job kind ${executor.jobKind} has no feature`);
+      throw new Error(
+        `Contract registry: job kind ${executor.jobKind} has no feature`,
+      );
     }
     const derivedEdges = registeredConsumers
       .filter((edge) => edge.jobKind === executor.jobKind)
       .map((edge) => edge.eventName)
       .sort();
     const declaredEdges = [...feature.consumesEvents].sort();
-    if (derivedEdges.length !== declaredEdges.length || derivedEdges.some((name, i) => name !== declaredEdges[i])) {
+    if (
+      derivedEdges.length !== declaredEdges.length ||
+      derivedEdges.some((name, i) => name !== declaredEdges[i])
+    ) {
       throw new Error(
         `Contract registry: feature ${feature.featureId} consumed edges diverge from the registered consumer edges for ${executor.jobKind}`,
       );
@@ -471,7 +589,9 @@ export function assertFeaturesCoverRegistrations(
 const registeredJobKinds = assertNoDuplicateExecutors(executors);
 for (const entry of eventConsumers) {
   if (!(entry.eventName in events)) {
-    throw new Error(`Contract registry: consumer references unknown event ${entry.eventName}`);
+    throw new Error(
+      `Contract registry: consumer references unknown event ${entry.eventName}`,
+    );
   }
   if (!registeredJobKinds.has(entry.jobKind)) {
     throw new Error(

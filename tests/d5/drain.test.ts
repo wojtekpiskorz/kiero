@@ -20,7 +20,11 @@ let ctx: ReturnType<typeof fakeCtx>;
 const tx = () => asTx(ctx);
 
 /** Inserts one pending publication row. */
-async function seedRow(eventName: string, payload: Record<string, unknown>, dedupKey: string) {
+async function seedRow(
+  eventName: string,
+  payload: Record<string, unknown>,
+  dedupKey: string,
+) {
   const companyId = await ctx.db.insert("companies", {
     name: `drain-${eventName}`,
     timezone: "Europe/Warsaw",
@@ -87,16 +91,20 @@ describe("drain row semantics (the multi-edge decision)", () => {
       .rows("durableJobs")
       .map((job) => job.kind)
       .sort();
-    // F2's notification-intent edge (issue #42, flagged coordinated
-    // append) joins the fan-out with its payload-derived dedup identity.
+    // E4's join edge (issue #38, flagged coordinated append) and F2's
+    // notification-intent edge (issue #42, flagged coordinated append)
+    // join the fan-out with payload-derived dedup identities.
     expect(kinds).toEqual([
       "attention.evaluate_due_intents",
       "processing.extract_fragments",
+      "processing.join_multimodal",
       "processing.normalize_photo",
     ]);
     // The normalize job's dedup identity is payload-derived (distinct from
     // the row's, so one key never carries two job kinds).
-    const normalize = ctx.db.rows("durableJobs").find((job) => job.kind === "processing.normalize_photo");
+    const normalize = ctx.db
+      .rows("durableJobs")
+      .find((job) => job.kind === "processing.normalize_photo");
     expect(normalize?.dedupKey).toMatch(/^processing\.normalize_photo:k/);
   });
 
@@ -106,7 +114,10 @@ describe("drain row semantics (the multi-edge decision)", () => {
     // Force the row back to pending (the retryable-echo path can do this)
     // and drain again: dedup-skips, stays delivered, still ONE job row.
     const row = ctx.db.rows("outboxEvents")[0]!;
-    await ctx.db.patch(row._id, { deliveryState: "pending", nextAttemptAtMs: 1 });
+    await ctx.db.patch(row._id, {
+      deliveryState: "pending",
+      nextAttemptAtMs: 1,
+    });
     await drainBatch(tx());
     expect(ctx.db.rows("outboxEvents")[0]?.deliveryState).toBe("delivered");
     expect(ctx.db.rows("durableJobs")).toHaveLength(1);
@@ -153,5 +164,27 @@ describe("drain row semantics (the multi-edge decision)", () => {
     } finally {
       loud.mockRestore();
     }
+  });
+
+  it("a registered edge WITHOUT a projection fails the row LOUDLY (machine-readable)", async () => {
+    // Find an event whose single edge has no projection in this window.
+    // (The composed registry currently projects every projected kind's
+    // edge; the unprojected case is exercised through the same code path
+    // as the platform tests. Here we assert the loud failure when it
+    // occurs by temporarily relying on an event with a registered but
+    // unprojected edge: sources.sourcePurged -> deletion.purge_source.)
+    // deletion.purge_source is I4's edge and stays unprojected until then;
+    // assert unconditionally so a silently-gained projection fails here
+    // instead of degrading the loud-failure branch to a delivered check.
+    await seedRow(
+      "sources.sourcePurged",
+      { sourceId: "k" + "s".repeat(31) },
+      "dk-purged",
+    );
+    await drainBatch(tx());
+    const row = ctx.db.rows("outboxEvents")[0]!;
+    expect(row.deliveryState).toBe("failed");
+    expect(row.lastErrorKind).toBe("consumer_projection_missing");
+    expect(ctx.db.rows("durableJobs")).toHaveLength(0);
   });
 });

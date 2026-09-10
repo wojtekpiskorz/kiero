@@ -24,7 +24,10 @@ describe("publication idempotency", () => {
 
   it("deduplicates a replay onto the existing event identity", () => {
     const decision = decideEventPublication({ eventId: "evt-1" });
-    expect(decision).toEqual({ decision: "deduplicated", existingEventId: "evt-1" });
+    expect(decision).toEqual({
+      decision: "deduplicated",
+      existingEventId: "evt-1",
+    });
   });
 });
 
@@ -34,42 +37,60 @@ describe("durable job registration decisions", () => {
   });
 
   it("never re-registers succeeded or active work", () => {
-    expect(decideJobRegistration({ externalOutcome: undefined, state: "succeeded" })).toEqual({
+    expect(
+      decideJobRegistration({ externalOutcome: undefined, state: "succeeded" }),
+    ).toEqual({
       decision: "skip",
       reason: "already_succeeded",
     });
-    expect(decideJobRegistration({ externalOutcome: undefined, state: "cancelled" })).toEqual({
+    expect(
+      decideJobRegistration({ externalOutcome: undefined, state: "cancelled" }),
+    ).toEqual({
       decision: "skip",
       reason: "already_succeeded",
     });
-    expect(decideJobRegistration({ externalOutcome: undefined, state: "queued" })).toEqual({
+    expect(
+      decideJobRegistration({ externalOutcome: undefined, state: "queued" }),
+    ).toEqual({
       decision: "skip",
       reason: "active_attempt",
     });
-    expect(decideJobRegistration({ externalOutcome: undefined, state: "running" })).toEqual({
+    expect(
+      decideJobRegistration({ externalOutcome: undefined, state: "running" }),
+    ).toEqual({
       decision: "skip",
       reason: "active_attempt",
     });
   });
 
   it("re-registers definite failures only (uncertainty reconciles instead)", () => {
-    expect(decideJobRegistration({ externalOutcome: undefined, state: "failed" })).toEqual({ decision: "register" });
-    expect(decideJobRegistration({ state: "failed", externalOutcome: "failed" })).toEqual({
+    expect(
+      decideJobRegistration({ externalOutcome: undefined, state: "failed" }),
+    ).toEqual({ decision: "register" });
+    expect(
+      decideJobRegistration({ state: "failed", externalOutcome: "failed" }),
+    ).toEqual({
       decision: "register",
     });
   });
 
   it("REFUSES re-registration of uncertain failures (timeout/unknown after possible success)", () => {
-    expect(decideJobRegistration({ state: "failed", externalOutcome: "timeout" })).toEqual({
+    expect(
+      decideJobRegistration({ state: "failed", externalOutcome: "timeout" }),
+    ).toEqual({
       decision: "skip",
       reason: "uncertain_outcome",
     });
-    expect(decideJobRegistration({ state: "failed", externalOutcome: "unknown" })).toEqual({
+    expect(
+      decideJobRegistration({ state: "failed", externalOutcome: "unknown" }),
+    ).toEqual({
       decision: "skip",
       reason: "uncertain_outcome",
     });
     // A succeeded external outcome on a failed row is not uncertainty.
-    expect(decideJobRegistration({ state: "failed", externalOutcome: "succeeded" })).toEqual({
+    expect(
+      decideJobRegistration({ state: "failed", externalOutcome: "succeeded" }),
+    ).toEqual({
       decision: "register",
     });
   });
@@ -80,7 +101,11 @@ describe("delivery state machine", () => {
 
   it("delivers on success", () => {
     expect(
-      nextDeliveryState({ outcome: "succeeded", attempts: 1, maxAttempts: 3 }, 0, base),
+      nextDeliveryState(
+        { outcome: "succeeded", attempts: 1, maxAttempts: 3 },
+        0,
+        base,
+      ),
     ).toEqual({ to: "delivered" });
   });
 
@@ -105,7 +130,11 @@ describe("delivery state machine", () => {
 
   it("fails terminally when attempts are exhausted", () => {
     expect(
-      nextDeliveryState({ outcome: "failed", attempts: 3, maxAttempts: 3 }, 0, base),
+      nextDeliveryState(
+        { outcome: "failed", attempts: 3, maxAttempts: 3 },
+        0,
+        base,
+      ),
     ).toEqual({ to: "failed", terminal: true });
   });
 
@@ -138,7 +167,9 @@ describe("delivery state machine", () => {
 
 describe("drain event projection (three-way)", () => {
   it("classifies projected, unconsumed and unprojected events", () => {
-    expect(projectEventToJobInputs("platform.echoRequested", { message: "m" }, "dk")).toEqual([
+    expect(
+      projectEventToJobInputs("platform.echoRequested", { message: "m" }, "dk"),
+    ).toEqual([
       {
         kind: "job",
         jobKind: "platform.echo_delivery",
@@ -146,13 +177,15 @@ describe("drain event projection (three-way)", () => {
         dedupKey: "dk",
       },
     ]);
-    expect(projectEventToJobInputs("operations.diagnosticEmitted", {}, "dk")).toEqual([
-      { kind: "no_consumer" },
-    ]);
-    // An event may carry SEVERAL edges (D5 fan-out, F2 append): the
-    // sourceAccepted row projects onto E3's extract (row dedup identity),
-    // D5's normalize and F2's notification-intents (both payload-derived
-    // dedup, never the row's).
+    expect(
+      projectEventToJobInputs("operations.diagnosticEmitted", {}, "dk"),
+    ).toEqual([{ kind: "no_consumer" }]);
+    // An event may carry SEVERAL edges (the fan-out precedent is D5):
+    // sourceAccepted projects onto E3's extract projection (row dedup
+    // identity), D5's normalize projection, E4's join projection (issue
+    // #38, flagged coordinated append) and F2's notification-intents
+    // (issue #42, flagged coordinated append) — the latter three with
+    // payload-derived dedups, never the row's.
     expect(
       projectEventToJobInputs(
         "sources.sourceAccepted",
@@ -174,13 +207,30 @@ describe("drain event projection (three-way)", () => {
       },
       {
         kind: "job",
+        jobKind: "processing.join_multimodal",
+        input: {
+          sourceId: "s1",
+          processingRunId: null,
+          reanalysisOfRunId: null,
+        },
+        dedupKey: "processing.join_multimodal:s1",
+      },
+      {
+        kind: "job",
         jobKind: "attention.evaluate_due_intents",
-        input: { trigger: "source_accepted", sourceId: "s1", clarificationId: null, changeSetId: null },
+        input: {
+          trigger: "source_accepted",
+          sourceId: "s1",
+          clarificationId: null,
+          changeSetId: null,
+        },
         dedupKey: "attention.evaluate_due_intents:source:s1",
       },
     ]);
 
-    expect(projectEventToJobInputs("platform.echoRequested", { message: "m" }, "dk")).toEqual([
+    expect(
+      projectEventToJobInputs("platform.echoRequested", { message: "m" }, "dk"),
+    ).toEqual([
       {
         kind: "job",
         jobKind: "platform.echo_delivery",
@@ -188,20 +238,25 @@ describe("drain event projection (three-way)", () => {
         dedupKey: "dk",
       },
     ]);
-    expect(projectEventToJobInputs("operations.diagnosticEmitted", {}, "dk")).toEqual([
-      { kind: "no_consumer" },
-    ]);
+    expect(
+      projectEventToJobInputs("operations.diagnosticEmitted", {}, "dk"),
+    ).toEqual([{ kind: "no_consumer" }]);
     // E3 owns this edge's projection: an accepted source drains into the
     // extract executor, which resolves the text extraction in-company when
     // the payload cannot name it (D1's publisher registered the real job
     // atomically under the same dedup key).
     expect(
-      projectEventToJobInputs("sources.sourceAccepted", { sourceId: "s1" }, "dk").map(
-        (projection) => (projection.kind === "job" ? projection.jobKind : projection.kind),
+      projectEventToJobInputs(
+        "sources.sourceAccepted",
+        { sourceId: "s1" },
+        "dk",
+      ).map((projection) =>
+        projection.kind === "job" ? projection.jobKind : projection.kind,
       ),
     ).toEqual([
       "processing.extract_fragments",
       "processing.normalize_photo",
+      "processing.join_multimodal",
       "attention.evaluate_due_intents",
     ]);
     expect(CONSUMER_PROJECTION_MISSING).toBe("consumer_projection_missing");
@@ -210,16 +265,30 @@ describe("drain event projection (three-way)", () => {
 
 describe("the one uncertain-failure predicate (single definition)", () => {
   it("is uncertain only for failed rows with timeout/unknown external outcomes", () => {
-    expect(isUncertainJobFailure({ state: "failed", externalOutcome: "timeout" })).toBe(true);
-    expect(isUncertainJobFailure({ state: "failed", externalOutcome: "unknown" })).toBe(true);
+    expect(
+      isUncertainJobFailure({ state: "failed", externalOutcome: "timeout" }),
+    ).toBe(true);
+    expect(
+      isUncertainJobFailure({ state: "failed", externalOutcome: "unknown" }),
+    ).toBe(true);
     // Definite external failure is not uncertainty.
-    expect(isUncertainJobFailure({ state: "failed", externalOutcome: "failed" })).toBe(false);
+    expect(
+      isUncertainJobFailure({ state: "failed", externalOutcome: "failed" }),
+    ).toBe(false);
     // Failures with NO external outcome (max attempts, not implemented) are
     // never conflated with uncertainty: nothing left the transaction.
-    expect(isUncertainJobFailure({ state: "failed", externalOutcome: undefined })).toBe(false);
-    expect(isUncertainJobFailure({ state: "failed", externalOutcome: "succeeded" })).toBe(false);
+    expect(
+      isUncertainJobFailure({ state: "failed", externalOutcome: undefined }),
+    ).toBe(false);
+    expect(
+      isUncertainJobFailure({ state: "failed", externalOutcome: "succeeded" }),
+    ).toBe(false);
     // Non-failed states never count.
-    expect(isUncertainJobFailure({ state: "succeeded", externalOutcome: "timeout" })).toBe(false);
-    expect(isUncertainJobFailure({ state: "queued", externalOutcome: "timeout" })).toBe(false);
+    expect(
+      isUncertainJobFailure({ state: "succeeded", externalOutcome: "timeout" }),
+    ).toBe(false);
+    expect(
+      isUncertainJobFailure({ state: "queued", externalOutcome: "timeout" }),
+    ).toBe(false);
   });
 });

@@ -12,19 +12,19 @@
  *
  * ROW SEMANTICS UNDER MULTI-EDGE FAN-OUT (the D5 decision, 2026-09-10): the
  * outbox row is the PUBLICATION RECORD, and the DRAIN owns its terminal
- * transition — `delivered` once every registered edge's reaction is
+ * transition - `delivered` once every registered edge's reaction is
  * registered. Per-reaction outcomes live on the `durableJobs` rows (state,
- * externalOutcome, attempts, finishedAtMs — the A3 round-2 outcome
+ * externalOutcome, attempts, finishedAtMs - the A3 round-2 outcome
  * carriers; H3 inspects those, not this row). No row waits `in_flight` for
  * a completing executor, because under fan-out one row cannot represent
  * several executors' outcomes. Executors whose projections carry the row's
- * dedup identity (echo, B3's cleanup) still flip their own row — those
+ * dedup identity (echo, B3's cleanup) still flip their own row - those
  * flips are idempotent writes on a row the drain already delivered. The
  * TERMINAL-failure path intentionally flips a delivered row to `failed`
  * as a loud per-reaction alert (the incident scan reads it); that is a
  * deliberate exception to drain-owned terminality, not an oversight. The
  * retryable-echo path may set a delivered row back to `pending`, after
- * which the drain re-runs, dedup-skips and re-delivers — bounded and
+ * which the drain re-runs, dedup-skips and re-delivers - bounded and
  * converging.
  *
  * An edge WITHOUT a projection fails LOUDLY: the row is marked failed with
@@ -144,13 +144,45 @@ function projectOneEdge(
       dedupKey: rowDedupKey,
     };
   }
+  // E4 registration (issue #38 owns these edges' projections): the accepted
+  // source projects onto the multimodal join (STT ordering + the joined
+  // partial-safe analysis; the executor resolves the source's initial
+  // analysis run from `null`, the way D6's orders anchor), and a requested
+  // reanalysis projects onto the kicker's NEW run so a mixed source re-joins
+  // its extraction outcomes. Dedup keys derive from the payload's source
+  // identity, never the row's, so the acceptance publisher and this edge
+  // can never collide across kinds.
+  if (jobKind === "processing.join_multimodal") {
+    if (eventName === "operations.reanalysisRequested") {
+      return {
+        kind: "job",
+        jobKind,
+        input: {
+          sourceId: payload.sourceId,
+          processingRunId: payload.newRunId ?? null,
+          reanalysisOfRunId: payload.reanalysisOfRunId ?? null,
+        },
+        dedupKey: `processing.join_multimodal:${String(payload.sourceId)}:reanalysis:${String(payload.newRunId ?? "")}`,
+      };
+    }
+    return {
+      kind: "job",
+      jobKind,
+      input: {
+        sourceId: payload.sourceId,
+        processingRunId: null,
+        reanalysisOfRunId: null,
+      },
+      dedupKey: `processing.join_multimodal:${String(payload.sourceId)}`,
+    };
+  }
   // C5 registration (issue #28 owns these edges' projections): withdrawal
   // and every finding revision drain into `memory.recompute_dependents`.
   // The withdrawal payload carries its reason; the publisher (the withdrawal
   // transaction) already registered the job itself with the real actor
   // under the SAME dedup key, so this projection collapses onto that row.
   // AMPLIFICATION NOTE (for H3's incident scanning): the `memory.findingRevised`
-  // edge fires one durable walk per revision — including the cascade's own
+  // edge fires one durable walk per revision - including the cascade's own
   // markings, most of which no-op. Accepted for alpha volume; per-reaction
   // outcomes live on the durableJobs rows, and the walk is one bounded
   // indexed query per job.
@@ -183,7 +215,7 @@ function projectOneEdge(
         dedupKey: rowDedupKey,
       };
     }
-    // memory.findingRevised: the revalidation walk — registrations only
+    // memory.findingRevised: the revalidation walk - registrations only
     // when the revised basis became known again.
     return {
       kind: "job",
@@ -218,7 +250,7 @@ function projectOneEdge(
   }
   // G3 registration (issue #47 owns this declared consumer proof): a
   // recorded Calendar outcome change projects onto ONE bounded
-  // reconciliation of that copy — the durable observation that resolves
+  // reconciliation of that copy - the durable observation that resolves
   // unknown outcomes (never a blind retry; the executor's uncertain
   // failures re-block registration). The row's dedup identity is the
   // job's, so one outcome change registers one job.
@@ -233,7 +265,7 @@ function projectOneEdge(
   // F2 registration (issue #42 owns these edges' projections): the three
   // intent-source events project onto `attention.evaluate_due_intents`.
   // The dedup keys are derived from each event's SUBJECT (source,
-  // clarification, change set), never the outbox row — the acceptance row's
+  // clarification, change set), never the outbox row - the acceptance row's
   // key already carries the extract job, and a differently-keyed duplicate
   // event still collapses onto the same semantic intents. The
   // change-set-published payload carries no source id; the executor
@@ -309,6 +341,43 @@ function projectOneEdge(
         findingId: payload.findingId,
       },
       dedupKey: `search.index_generation:refresh_finding:${String(payload.findingId)}`,
+    };
+  }
+  // F3 registration (issue #43 owns this declared consumer proof): every
+  // DELIVERED notification intent drains into the web-push transport.
+  // The dedup identity is the intent itself, so a replayed or
+  // differently-keyed duplicate event collapses onto the same per-device
+  // delivery rows (semantic intent plus subscription is the idempotency
+  // key; the executor's prepare re-reads everything at delivery time).
+  if (jobKind === "attention.deliver_push") {
+    return {
+      kind: "job",
+      jobKind,
+      input: { notificationIntentId: payload.notificationIntentId },
+      dedupKey: `attention.deliver_push:${String(payload.notificationIntentId)}`,
+    };
+  }
+  // F4 registration (issue #44 owns these edges' projections): the task and
+  // bound-deadline events project onto `attention.schedule_task_reminders`.
+  // The work dedup keys ride the ROW's identity (the work lane's canonical
+  // key carries the task revision, so every DISTINCT change registers its
+  // own job while event replays collapse); the finding-revised key is
+  // payload-derived instead, because that event fans out to C5's recompute
+  // walk too and one dedup key may never carry two job kinds.
+  if (jobKind === "attention.schedule_task_reminders") {
+    if (eventName === "memory.findingRevised") {
+      return {
+        kind: "job",
+        jobKind,
+        input: { trigger: "finding_revised", taskId: null, findingId: payload.findingId },
+        dedupKey: `attention.schedule_task_reminders:finding:${String(payload.findingId)}:${String(payload.revisionId)}`,
+      };
+    }
+    return {
+      kind: "job",
+      jobKind,
+      input: { trigger: "task_changed", taskId: payload.taskId, findingId: null },
+      dedupKey: rowDedupKey,
     };
   }
   return { kind: "unprojected_edge", jobKind };

@@ -2,7 +2,7 @@
  * Convex HTTP actions composition entry (A3; telemetry routes appended by
  * I2; sources/uploads routes by D2; Calendar OAuth routes by G1;
  * sources media-access route by D3, under its deployable module path
- * `sources/media_access` — Convex rejects hyphenated module path
+ * `sources/media_access` - Convex rejects hyphenated module path
  * components, so the issue's literal `sources/media-access/**` namespace
  * ships as `sources/media_access/**`; the lane's exclusivity is unchanged).
  *
@@ -56,6 +56,14 @@ import {
   proofFakeAdminEvent,
   proofSyncStateHandler,
 } from "./calendar/sync/proofHttp";
+// F3 append (flagged shared-file change, the G1/G3 sanctioned pattern): the
+// guarded fake WEB PUSH SERVICE (device subscribe, the push endpoint the
+// real transport POSTs to, and the evidence read).
+import {
+  proofDeviceHandler,
+  proofPushServiceHandler,
+  proofStateHandler as pushProofStateHandler,
+} from "./attention/push/proofService";
 
 const http = httpRouter();
 
@@ -133,5 +141,14 @@ http.route({
   method: "POST",
   handler: proofSyncStateHandler,
 });
+
+// F3 append: the guarded fake web push service (dev proof only).
+http.route({ path: "/attention/push/proof/device", method: "POST", handler: proofDeviceHandler });
+http.route({
+  pathPrefix: "/attention/push/proof/push-service/",
+  method: "POST",
+  handler: proofPushServiceHandler,
+});
+http.route({ path: "/attention/push/proof/state", method: "POST", handler: pushProofStateHandler });
 
 export default http;
