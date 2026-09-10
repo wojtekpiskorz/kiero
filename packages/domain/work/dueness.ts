@@ -152,6 +152,9 @@ function endOfDateOnly(bound: DateOnlyWire): DueMoment {
 export type TermUnusableReason =
   | "unknown"
   | "conflicted"
+  // C5 amendment (forced by the KnowledgeState `updating` variant, flagged):
+  // an updating-until-revalidated conclusion never drives a due moment.
+  | "updating"
   | "not_applicable"
   | "not_temporal"
   | "role_actual"

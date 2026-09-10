@@ -59,11 +59,16 @@ export type ValueValidator<T> = Validator<T, "required", string>;
 // schema's Encoded type; changing either side without the other fails here.
 // ---------------------------------------------------------------------------
 
+// C5 amendment (additive, flagged): the `updating` variant joins the union —
+// the updating-until-revalidated state for dependent inferred conclusions
+// whose basis moved (withdrawal/correction). The Encoded type pin forces
+// this line to exist exactly when the contracts side gains the variant.
 const knowledgeStateValidator: ValueValidator<Encoded<typeof KnowledgeState>> =
   v.union(
     v.object({ _tag: v.literal("known") }),
     v.object({ _tag: v.literal("unknown"), reason: v.string() }),
     v.object({ _tag: v.literal("conflicted") }),
+    v.object({ _tag: v.literal("updating"), reason: v.string() }),
     v.object({ _tag: v.literal("not_applicable") }),
   );
 

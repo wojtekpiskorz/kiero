@@ -56,6 +56,13 @@ export const acceptTables = {
     ),
     withdrawnReason: v.optional(v.string()),
     withdrawnAtMs: v.optional(shared.tsMs),
+    /**
+     * C5 amendment (additive, flagged): the user who executed the explicit
+     * withdrawal — "withdrawal records actor, time and reason on the same
+     * immutable D1 source" (issue #28). The recomputation's marking
+     * revisions record the same actor.
+     */
+    withdrawnByUserId: v.optional(shared.userId),
     purgedAtMs: v.optional(shared.tsMs),
     /**
      * The client-generated logical-source key (the accepting command's

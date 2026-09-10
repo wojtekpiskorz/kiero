@@ -37,8 +37,22 @@ import {
 } from "../../access/identity/resolution";
 import type { MutationCtx } from "../../_generated/server";
 import { acceptSourceEntry, performAcceptance } from "./acceptance";
+import {
+  performWithdrawSource,
+  withdrawSourceEntry,
+  type WithdrawSourceInput,
+} from "../../memory/recompute/withdrawal";
 
-/** Handler table for sources mutation-transaction dispatches (exported for tests). */
+/**
+ * Handler table for sources mutation-transaction dispatches (exported for tests).
+ *
+ * C5 registration (additive, flagged on the C3 merged-table precedent): the
+ * withdrawal operation `sources.withdrawSource` implements the declared
+ * sources contract entry from the recomputation lane's own module — the
+ * lifecycle transition, the canonical event and the durable recompute
+ * registration commit atomically there; this table only wires the checked
+ * path to it.
+ */
 export function sourcesHandlers(): HandlerRegistry<MutationCtx> {
   return {
     "sources.acceptSource": {
@@ -46,6 +60,13 @@ export function sourcesHandlers(): HandlerRegistry<MutationCtx> {
       run: async (tx, context, input, meta) => {
         const decoded = Schema.decodeUnknownSync(acceptSourceEntry.input)(input);
         return performAcceptance(tx, context, decoded, meta.idempotencyKey);
+      },
+    },
+    "sources.withdrawSource": {
+      intent: "write",
+      run: (tx, context, input) => {
+        const decoded = Schema.decodeUnknownSync(withdrawSourceEntry.input)(input);
+        return performWithdrawSource(tx, context, decoded as WithdrawSourceInput);
       },
     },
   };
