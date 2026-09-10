@@ -23,7 +23,12 @@
 
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { internalAction, internalQuery, mutation, query } from "../../_generated/server";
+import {
+  internalAction,
+  internalQuery,
+  mutation,
+  query,
+} from "../../_generated/server";
 import type { ActionCtx } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
@@ -45,10 +50,7 @@ import {
   observeEventById,
   updateCalendarEvent,
 } from "./protocol";
-import {
-  attemptOutcomeOfMutation,
-  attemptOutcomeOfObservation,
-} from "./cores";
+import { attemptOutcomeOfMutation, attemptOutcomeOfObservation } from "./cores";
 import type { LegResult } from "./operations";
 import { dispatchCalendarSyncCommand } from "./dispatch";
 
@@ -78,7 +80,12 @@ export const sealedCredentialForSync = internalQuery({
       row.credentialStorage === "none" ||
       row.credentialCiphertext === undefined
         ? { sealed: null }
-        : { sealed: { storage: row.credentialStorage, ciphertext: row.credentialCiphertext } }),
+        : {
+            sealed: {
+              storage: row.credentialStorage,
+              ciphertext: row.credentialCiphertext,
+            },
+          }),
     };
   },
 });
@@ -105,13 +112,19 @@ async function freshAccessToken(
   ctx: ActionCtx,
   connectionId: Id<"calendarConnections">,
 ): Promise<{ token: string } | { barrier: TokenBarrier }> {
-  const first = await ctx.runQuery(internal.calendar.sync.functions.sealedCredentialForSync, {
-    connectionId,
-  });
+  const first = await ctx.runQuery(
+    internal.calendar.sync.functions.sealedCredentialForSync,
+    {
+      connectionId,
+    },
+  );
   if (first === null) {
     return { barrier: "not_connected" };
   }
-  if (first.activeCompanyId === null || first.activeCompanyId !== first.companyId) {
+  if (
+    first.activeCompanyId === null ||
+    first.activeCompanyId !== first.companyId
+  ) {
     return { barrier: "membership_or_firm_changed" };
   }
   if (
@@ -121,7 +134,11 @@ async function freshAccessToken(
     if (first.sealed === null) {
       return { barrier: "no_credential" };
     }
-    const bundle = await openCredential(first.sealed.storage, first.sealed.ciphertext, process.env);
+    const bundle = await openCredential(
+      first.sealed.storage,
+      first.sealed.ciphertext,
+      process.env,
+    );
     if (bundle !== null) {
       return { token: bundle.accessToken };
     }
@@ -132,15 +149,25 @@ async function freshAccessToken(
     { connectionId },
   );
   if (refresh.outcome !== "refreshed") {
-    return { barrier: refresh.outcome === "unknown" ? "refresh_unknown" : "refresh_lost" };
+    return {
+      barrier:
+        refresh.outcome === "unknown" ? "refresh_unknown" : "refresh_lost",
+    };
   }
-  const second = await ctx.runQuery(internal.calendar.sync.functions.sealedCredentialForSync, {
-    connectionId,
-  });
+  const second = await ctx.runQuery(
+    internal.calendar.sync.functions.sealedCredentialForSync,
+    {
+      connectionId,
+    },
+  );
   if (second === null || second.sealed === null) {
     return { barrier: "no_credential" };
   }
-  const bundle = await openCredential(second.sealed.storage, second.sealed.ciphertext, process.env);
+  const bundle = await openCredential(
+    second.sealed.storage,
+    second.sealed.ciphertext,
+    process.env,
+  );
   if (bundle === null) {
     return { barrier: "no_credential" };
   }
@@ -164,39 +191,76 @@ export interface OneAttemptOutcome {
 }
 
 /**
- * Runs ONE copy's reconciliation: prepare (decide + durably open the
- * attempt), the ONE bounded external leg, complete (record + transition +
- * publish). A token barrier suspends honestly — the attempt row keeps its
- * uncertain `unknown` outcome so nothing is assumed and nothing retries
- * blindly.
+ * Runs ONE copy's reconciliation: the credential check, prepare (decide +
+ * durably open the attempt), the ONE bounded external leg, complete (record +
+ * transition + publish). A token barrier suspends honestly and is discovered
+ * BEFORE the attempt opens: a barrier means the leg provably never leaves
+ * the machine, so no attempt row is minted for it and no never-run leg is
+ * completed through the observation-unknown transition (which would demote
+ * a CONFIRMED copy and mint a row on every 5-minute pass of a lasting
+ * token outage).
  */
 async function runOneAttempt(
   ctx: ActionCtx,
   copyId: Id<"calendarCopies">,
   forceObservation = false,
 ): Promise<OneAttemptOutcome> {
-  const prepared = await ctx.runMutation(internal.calendar.sync.operations.prepareCopyAttempt, {
-    copyId,
-    forceObservation,
-  });
+  const connectionOfCopy = await ctx.runQuery(
+    internal.calendar.sync.functions.copyConnectionOf,
+    { copyId },
+  );
+  if (connectionOfCopy === null) {
+    return {
+      kind: "copy_missing",
+      reason: null,
+      accessLost: false,
+      remoteOutcome: null,
+      attemptOutcome: null,
+    };
+  }
+  const credential = await freshAccessToken(ctx, connectionOfCopy.connectionId);
+  if ("barrier" in credential) {
+    return {
+      kind: "barrier",
+      reason: credential.barrier,
+      accessLost: false,
+      remoteOutcome: null,
+      attemptOutcome: null,
+    };
+  }
+  const prepared = await ctx.runMutation(
+    internal.calendar.sync.operations.prepareCopyAttempt,
+    {
+      copyId,
+      forceObservation,
+    },
+  );
   if (prepared.kind === "none") {
-    return { kind: "none", reason: prepared.reason, accessLost: false, remoteOutcome: null, attemptOutcome: null };
+    return {
+      kind: "none",
+      reason: prepared.reason,
+      accessLost: false,
+      remoteOutcome: null,
+      attemptOutcome: null,
+    };
   }
   if (prepared.kind === "suspend") {
-    return { kind: "suspend", reason: prepared.reason, accessLost: false, remoteOutcome: null, attemptOutcome: null };
+    return {
+      kind: "suspend",
+      reason: prepared.reason,
+      accessLost: false,
+      remoteOutcome: null,
+      attemptOutcome: null,
+    };
   }
   if (prepared.kind === "copy_missing") {
-    return { kind: "copy_missing", reason: null, accessLost: false, remoteOutcome: null, attemptOutcome: null };
-  }
-  const credential = await freshAccessToken(ctx, prepared.connectionId);
-  if ("barrier" in credential) {
-    await ctx.runMutation(internal.calendar.sync.operations.completeCopyAttempt, {
-      attemptDedupKey: prepared.attemptDedupKey,
-      outcome: "failed",
-      errorKind: `credential_${credential.barrier}`,
-      result: { kind: "observation", observation: { kind: "unknown" } },
-    });
-    return { kind: "barrier", reason: credential.barrier, accessLost: false, remoteOutcome: null, attemptOutcome: "failed" };
+    return {
+      kind: "copy_missing",
+      reason: null,
+      accessLost: false,
+      remoteOutcome: null,
+      attemptOutcome: null,
+    };
   }
   const leg = prepared.leg;
   const base = {
@@ -216,12 +280,25 @@ async function runOneAttempt(
       });
     }
     case "update": {
-      const report = await updateCalendarEvent({ ...base, eventId: leg.eventId, body: leg.body });
-      return await finishAttempt(ctx, prepared.attemptDedupKey, { kind: "mutation", report });
+      const report = await updateCalendarEvent({
+        ...base,
+        eventId: leg.eventId,
+        body: leg.body,
+      });
+      return await finishAttempt(ctx, prepared.attemptDedupKey, {
+        kind: "mutation",
+        report,
+      });
     }
     case "delete": {
-      const report = await deleteCalendarEvent({ ...base, eventId: leg.eventId });
-      return await finishAttempt(ctx, prepared.attemptDedupKey, { kind: "mutation", report });
+      const report = await deleteCalendarEvent({
+        ...base,
+        eventId: leg.eventId,
+      });
+      return await finishAttempt(ctx, prepared.attemptDedupKey, {
+        kind: "mutation",
+        report,
+      });
     }
     case "observe_get": {
       // The 404 ambiguity (event gone vs calendar gone) is resolved inside
@@ -264,14 +341,17 @@ async function finishAttempt(
     result.kind === "mutation"
       ? attemptOutcomeOfMutation(result.report)
       : attemptOutcomeOfObservation(result.observation);
-  const completion = await ctx.runMutation(internal.calendar.sync.operations.completeCopyAttempt, {
-    attemptDedupKey,
-    outcome,
-    ...(outcome === "unknown" || outcome === "timeout"
-      ? { errorKind: "external_uncertain" }
-      : {}),
-    result,
-  });
+  const completion = await ctx.runMutation(
+    internal.calendar.sync.operations.completeCopyAttempt,
+    {
+      attemptDedupKey,
+      outcome,
+      ...(outcome === "unknown" || outcome === "timeout"
+        ? { errorKind: "external_uncertain" }
+        : {}),
+      result,
+    },
+  );
   return {
     kind: "leg_done",
     reason: null,
@@ -312,9 +392,27 @@ export const copyIdsOfConnection = internalQuery({
   handler: async (ctx, args): Promise<Id<"calendarCopies">[]> => {
     const rows = await ctx.db
       .query("calendarCopies")
-      .withIndex("by_connection", (q) => q.eq("connectionId", args.connectionId))
+      .withIndex("by_connection", (q) =>
+        q.eq("connectionId", args.connectionId),
+      )
       .collect();
     return rows.map((row) => row._id);
+  },
+});
+
+/**
+ * One copy's connection: the pre-prepare credential check's input. The
+ * barrier must be discoverable WITHOUT opening an attempt row (round-3
+ * small 2), and the connection id is the credential lookup's key.
+ */
+export const copyConnectionOf = internalQuery({
+  args: { copyId: v.id("calendarCopies") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ connectionId: Id<"calendarConnections"> } | null> => {
+    const copy = await ctx.db.get(args.copyId);
+    return copy === null ? null : { connectionId: copy.connectionId };
   },
 });
 
@@ -330,7 +428,10 @@ export const runCalendarSyncPass = internalAction({
   handler: async (ctx, args): Promise<ConnectionSyncResult[]> => {
     const ids =
       args.connectionId === undefined
-        ? await ctx.runQuery(internal.calendar.sync.functions.allConnectionIds, {})
+        ? await ctx.runQuery(
+            internal.calendar.sync.functions.allConnectionIds,
+            {},
+          )
         : [args.connectionId];
     const results: ConnectionSyncResult[] = [];
     for (const connectionId of ids) {
@@ -352,12 +453,18 @@ export const runCalendarSyncPass = internalAction({
         });
         continue;
       }
-      await ctx.runMutation(internal.calendar.sync.operations.beginSyncPassTransaction, {
-        connectionId,
-      });
-      const copyIds = await ctx.runQuery(internal.calendar.sync.functions.copyIdsOfConnection, {
-        connectionId,
-      });
+      await ctx.runMutation(
+        internal.calendar.sync.operations.beginSyncPassTransaction,
+        {
+          connectionId,
+        },
+      );
+      const copyIds = await ctx.runQuery(
+        internal.calendar.sync.functions.copyIdsOfConnection,
+        {
+          connectionId,
+        },
+      );
       let attempted = 0;
       let converged = 0;
       let suspended = 0;
@@ -385,21 +492,24 @@ export const runCalendarSyncPass = internalAction({
         }
       }
       const allConverged = converged === copyIds.length;
-      await ctx.runMutation(internal.calendar.sync.operations.finishSyncPassTransaction, {
-        connectionId,
-        state: allConverged ? "idle" : "needs_reconcile",
-        ...(allConverged
-          ? {}
-          : {
-              suspendedReason: accessLost
-                ? "calendar_access_lost"
-                : exhausted
-                  ? "attempts_exhausted"
-                  : barriers > 0
-                    ? "credential_barrier"
-                    : "legs_pending",
-            }),
-      });
+      await ctx.runMutation(
+        internal.calendar.sync.operations.finishSyncPassTransaction,
+        {
+          connectionId,
+          state: allConverged ? "idle" : "needs_reconcile",
+          ...(allConverged
+            ? {}
+            : {
+                suspendedReason: accessLost
+                  ? "calendar_access_lost"
+                  : exhausted
+                    ? "attempts_exhausted"
+                    : barriers > 0
+                      ? "credential_barrier"
+                      : "legs_pending",
+              }),
+        },
+      );
       results.push({
         connectionId,
         outcome: "synced",
@@ -430,30 +540,39 @@ export const runCalendarSyncPass = internalAction({
 export const runReconcileOutcomeAttempt = internalAction({
   args: { jobKey: v.string() },
   handler: async (ctx, args) => {
-    const job = await ctx.runQuery(internal.calendar.sync.functions.jobInputForReconcile, {
-      jobKey: args.jobKey,
-    });
+    const job = await ctx.runQuery(
+      internal.calendar.sync.functions.jobInputForReconcile,
+      {
+        jobKey: args.jobKey,
+      },
+    );
     if (job === null) {
       return;
     }
     const one = await runOneAttempt(ctx, job.copyId);
     const succeeded =
-      one.kind === "none" || (one.kind === "leg_done" && one.attemptOutcome === "succeeded");
+      one.kind === "none" ||
+      (one.kind === "leg_done" && one.attemptOutcome === "succeeded");
     // An uncertain leg fails the job WITH its uncertain external outcome,
     // so the platform's blind-retry block owns any replay.
-    const jobOutcome: "succeeded" | "failed" = succeeded ? "succeeded" : "failed";
+    const jobOutcome: "succeeded" | "failed" = succeeded
+      ? "succeeded"
+      : "failed";
     const externalOutcome: "unknown" | "timeout" | undefined =
       one.attemptOutcome === "unknown"
         ? "unknown"
         : one.attemptOutcome === "timeout"
           ? "timeout"
           : undefined;
-    await ctx.runMutation(internal.calendar.sync.operations.completeReconcileJob, {
-      jobKey: args.jobKey,
-      outcome: jobOutcome,
-      ...(externalOutcome === undefined ? {} : { externalOutcome }),
-      errorKind: succeeded ? "" : (one.reason ?? "reconcile_not_possible"),
-    });
+    await ctx.runMutation(
+      internal.calendar.sync.operations.completeReconcileJob,
+      {
+        jobKey: args.jobKey,
+        outcome: jobOutcome,
+        ...(externalOutcome === undefined ? {} : { externalOutcome }),
+        errorKind: succeeded ? "" : (one.reason ?? "reconcile_not_possible"),
+      },
+    );
   },
 });
 
@@ -464,7 +583,10 @@ export const runReconcileOutcomeAttempt = internalAction({
  * completion).
  */
 export const runOneAttemptPublic = internalAction({
-  args: { copyId: v.id("calendarCopies"), forceObservation: v.optional(v.boolean()) },
+  args: {
+    copyId: v.id("calendarCopies"),
+    forceObservation: v.optional(v.boolean()),
+  },
   handler: async (ctx, args): Promise<OneAttemptOutcome> =>
     await runOneAttempt(ctx, args.copyId, args.forceObservation ?? false),
 });
@@ -488,7 +610,10 @@ export const jobInputForReconcile = internalQuery({
     }
     const copyId =
       typeof input.copyId === "string"
-        ? (ctx.db.normalizeId("calendarCopies", input.copyId) as Id<"calendarCopies"> | null)
+        ? (ctx.db.normalizeId(
+            "calendarCopies",
+            input.copyId,
+          ) as Id<"calendarCopies"> | null)
         : null;
     if (copyId === null) {
       return null;
@@ -514,7 +639,11 @@ export const jobInputForReconcile = internalQuery({
 export const syncOverview = query({
   args: {},
   handler: async (ctx) => {
-    const live = await resolveLiveSession(liveSessionStore(ctx.db), ctx.auth, Date.now());
+    const live = await resolveLiveSession(
+      liveSessionStore(ctx.db),
+      ctx.auth,
+      Date.now(),
+    );
     if (live.tag === "denied") {
       denialError(live.reason);
     }
@@ -558,21 +687,39 @@ export const syncOverview = query({
         }
       }
     }
-    const uncertainAttempts = attempts.filter((attempt) => attempt.outcome === "unknown").length;
-    const failedAttempts = attempts.filter((attempt) => attempt.outcome === "failed").length;
-    const lastConfirmedAtMs = attempts.reduce<number | null>((best, attempt) => {
-      if (attempt.outcome !== "succeeded" || attempt.completedAtMs === undefined) {
-        return best;
-      }
-      return best === null || attempt.completedAtMs > best ? attempt.completedAtMs : best;
-    }, null);
+    const uncertainAttempts = attempts.filter(
+      (attempt) => attempt.outcome === "unknown",
+    ).length;
+    const failedAttempts = attempts.filter(
+      (attempt) => attempt.outcome === "failed",
+    ).length;
+    const lastConfirmedAtMs = attempts.reduce<number | null>(
+      (best, attempt) => {
+        if (
+          attempt.outcome !== "succeeded" ||
+          attempt.completedAtMs === undefined
+        ) {
+          return best;
+        }
+        return best === null || attempt.completedAtMs > best
+          ? attempt.completedAtMs
+          : best;
+      },
+      null,
+    );
     return {
       state: connection.state,
       connectionId: connection._id,
-      reconnectNeeded: connection.state === "error" || connection.state === "disconnected",
+      reconnectNeeded:
+        connection.state === "error" || connection.state === "disconnected",
       reconnectReason: connection.reconnectReason ?? null,
       cleanupRemains: connection.cleanupStatus === "unconfirmed",
-      copies: { total: copies.length, confirmed, pending, absentWhileProjected },
+      copies: {
+        total: copies.length,
+        confirmed,
+        pending,
+        absentWhileProjected,
+      },
       attempts: {
         recorded: attempts.length,
         uncertain: uncertainAttempts,
