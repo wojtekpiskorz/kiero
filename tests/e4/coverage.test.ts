@@ -20,6 +20,7 @@ import {
   type CoverageSourceView,
   type ImageInputView,
   type TranscriptOrderView,
+  type VisionOrderView,
 } from "@kiero/agent";
 
 /** One text+audio+images source view factory. */
@@ -40,7 +41,7 @@ function mixedView(overrides: {
         {
           attachmentId: "attachments_img1",
           representationId: null,
-          visionExtractionIds: [],
+          visionOrders: [],
           supersededVisionExtractionIds: [],
           pendingReason: "photo_normalization_in_progress",
           visionFailureKind: null,
@@ -48,7 +49,7 @@ function mixedView(overrides: {
         {
           attachmentId: "attachments_img2",
           representationId: null,
-          visionExtractionIds: [],
+          visionOrders: [],
           supersededVisionExtractionIds: [],
           pendingReason: "photo_normalization_in_progress",
           visionFailureKind: null,
@@ -66,10 +67,23 @@ const COMPLETE_TRANSCRIPT: TranscriptOrderView = {
   finishedAtMs: 1_000,
 };
 
+/** One completed vision order over a representation (view form). */
+const COMPLETED_VISION_ORDER = (
+  orderId: string,
+  extractionId: string,
+  finishedAtMs: number,
+): VisionOrderView => ({
+  orderId,
+  state: "complete",
+  lastErrorKind: null,
+  extractionId,
+  finishedAtMs,
+});
+
 const COMPLETE_IMAGE = (attachmentId: string, representationId: string): ImageInputView => ({
   attachmentId,
   representationId,
-  visionExtractionIds: [`extractions_vision_${attachmentId}`],
+  visionOrders: [COMPLETED_VISION_ORDER("visionOrders_1", `extractions_vision_${attachmentId}`, 1_000)],
   supersededVisionExtractionIds: [],
   pendingReason: null,
   visionFailureKind: null,
@@ -128,7 +142,7 @@ describe("joined coverage: partial (one image and one segment failing/pending)",
           {
             attachmentId: "attachments_img2",
             representationId: null,
-            visionExtractionIds: [],
+            visionOrders: [],
             supersededVisionExtractionIds: [],
             pendingReason: "photo_normalization_in_progress",
             visionFailureKind: null,
@@ -164,7 +178,7 @@ describe("joined coverage: partial (one image and one segment failing/pending)",
     const status = imageAttachmentStatus({
       attachmentId: "attachments_img1",
       representationId: "mediaRep_img1",
-      visionExtractionIds: [],
+      visionOrders: [],
       supersededVisionExtractionIds: [],
       pendingReason: null,
       visionFailureKind: "vision_routes_failed:output_rejected",
@@ -256,7 +270,7 @@ describe("joined coverage: replaced by a newer extraction version", () => {
     const status = imageAttachmentStatus({
       attachmentId: "attachments_img1",
       representationId: "mediaRep_v2",
-      visionExtractionIds: [],
+      visionOrders: [],
       supersededVisionExtractionIds: ["extractions_vision_over_v1"],
       pendingReason: null,
       visionFailureKind: null,
@@ -265,6 +279,55 @@ describe("joined coverage: replaced by a newer extraction version", () => {
       status: "pending",
       lastErrorKind: "vision_superseded_representation",
       representationId: "mediaRep_v2",
+    });
+  });
+
+  it("TWO completed vision orders over one representation: the NEWEST completion supplies the extraction, the older is marked replaced (the audio lane's rule, mirrored)", () => {
+    // The divergence case the round-2 review found: the proof order is
+    // created AND completed first, the media_worker order completes later.
+    // The selected version must follow finishedAtMs (the newest's OWN
+    // extraction id), never insertion or completion order of the
+    // extractions table.
+    const status = imageAttachmentStatus({
+      attachmentId: "attachments_img1",
+      representationId: "mediaRep_img1",
+      visionOrders: [
+        COMPLETED_VISION_ORDER("visionOrders_proof", "extractions_vision_proof", 1_000),
+        COMPLETED_VISION_ORDER("visionOrders_media", "extractions_vision_media", 2_000),
+      ],
+      supersededVisionExtractionIds: [],
+      pendingReason: null,
+      visionFailureKind: null,
+    });
+    expect(status).toMatchObject({
+      kind: "image",
+      status: "replaced_by_newer_version",
+      extractionId: "extractions_vision_media",
+      representationId: "mediaRep_img1",
+    });
+  });
+
+  it("a PENDING order beside a completed one changes nothing: the completed one wins alone", () => {
+    const status = imageAttachmentStatus({
+      attachmentId: "attachments_img1",
+      representationId: "mediaRep_img1",
+      visionOrders: [
+        COMPLETED_VISION_ORDER("visionOrders_done", "extractions_vision_done", 1_000),
+        {
+          orderId: "visionOrders_pending",
+          state: "pending",
+          lastErrorKind: "vision_routes_failed:output_rejected",
+          extractionId: null,
+          finishedAtMs: null,
+        },
+      ],
+      supersededVisionExtractionIds: [],
+      pendingReason: null,
+      visionFailureKind: null,
+    });
+    expect(status).toMatchObject({
+      status: "complete",
+      extractionId: "extractions_vision_done",
     });
   });
 });

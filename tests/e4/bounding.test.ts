@@ -327,6 +327,51 @@ describe("THE invariant: a text-only fallback never claims image inspection", ()
       mediaClaimsBackedByCompleteInputs({ proposals: fabricated }, imagePendingContext().coverage),
     ).toBe(false);
   });
+
+  it("a replaced_by_newer_version input (two completed vision orders) grounds ONLY the newest pin", () => {
+    // The version-pairing rule: with two completed orders over one
+    // representation the coverage reports the NEWEST extraction as the
+    // selected version and marks the older replaced. Evidence pinned to
+    // the newest passes (the marking never blocks publication by itself);
+    // evidence pinned to the older version is a re-join trigger.
+    const newestCoverage = {
+      inputs: joinedContext().coverage.inputs.map((input) =>
+        input.kind === "image"
+          ? { ...input, status: "replaced_by_newer_version" as const, extractionId: "extractions_vision_img1_v2" }
+          : input,
+      ),
+    };
+    const newestPinned: MultimodalFindingProposal[] = [
+      {
+        intent: "record",
+        semanticKey: "kwota_ze_zdjecia",
+        scope: { kind: "company" },
+        valueWire: { _tag: "text_note", text: "12 400" },
+        knowledgeStateWire: "known",
+        evidence: [
+          {
+            _tag: "image_region",
+            observationId: "obs:mediaRep_img1:0",
+            x: 40,
+            y: 60,
+            width: 300,
+            height: 80,
+            representationId: "mediaRep_img1",
+            extractionId: "extractions_vision_img1_v2",
+          },
+        ],
+        replacesFindingId: null,
+        derivesFromFindingIds: [],
+        readConfidence: 0.9,
+      },
+    ];
+    expect(mediaClaimsBackedByCompleteInputs({ proposals: newestPinned }, newestCoverage)).toBe(true);
+    // The same plan pinned to the SUPERSEDED version no longer grounds.
+    const olderPinned: MultimodalFindingProposal[] = [
+      { ...newestPinned[0]!, evidence: [{ ...newestPinned[0]!.evidence[0]!, extractionId: "extractions_vision_img1" }] },
+    ];
+    expect(mediaClaimsBackedByCompleteInputs({ proposals: olderPinned }, newestCoverage)).toBe(false);
+  });
 });
 
 describe("bounding by evidence completeness (the partial-safe split)", () => {

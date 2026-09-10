@@ -16,14 +16,24 @@
  *   region coordinates of the LocatedEvidence wire (one flat shape: the
  *   evidence carries the fragment-anchor fields verbatim, so a mismatch
  *   cannot arise between the two);
+ * - TWO completed vision orders over one representation (the round-2
+ *   version-pairing case): the loader pins the NEWEST order's observations
+ *   to that order's OWN extraction id, the coverage selects the same
+ *   newest version (the older marked replaced), the fresh gate accepts a
+ *   newest-pinned group and fragments mint on the newest extraction, while
+ *   an older-pinned group is honestly refused;
  * - re-running the transaction is idempotent per (run, sequence, kind):
  *   the fragment is ensured, never duplicated.
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { publishJoinGroupTransaction } from "../../convex/processing/multimodal/publish";
+import {
+  loadCompletedVisionObservations,
+  loadCoverageSourceView,
+} from "../../convex/processing/multimodal/coverageLoader";
 import { JOIN_GROUP_BASE } from "../../convex/processing/multimodal/journal";
-import { asTx, fakeCtx, type FakeCtx } from "../d2/harness";
+import { asReaderDb, asTx, fakeCtx, type FakeCtx } from "../d2/harness";
 
 const TABLES = [
   "companies",
@@ -64,7 +74,7 @@ const REGION = { x: 40, y: 60, width: 300, height: 80 };
 const SPACE = { width: 1_200, height: 900 };
 
 /** The company-scoped image-grounded group the publish stage receives. */
-function imageGroup(evidenceRegion = REGION) {
+function imageGroup(evidenceRegion = REGION, extractionId = seed.visionExtractionId) {
   return {
     key: { kind: "company", projectId: null },
     proposals: [
@@ -77,7 +87,7 @@ function imageGroup(evidenceRegion = REGION) {
             observationId: `obs:${seed.representationId}:0`,
             ...evidenceRegion,
             representationId: seed.representationId,
-            extractionId: seed.visionExtractionId,
+            extractionId,
           },
         ],
         replacesFindingId: null,
@@ -336,5 +346,92 @@ describe("the publish transaction's anchor minting (the wire-shape regression)",
     await publish(imageGroup());
     const fragments = ctx.db.rows("sourceFragments");
     expect(fragments).toHaveLength(1);
+  });
+});
+
+describe("the vision version pairing: two completed orders over one representation", () => {
+  const NEWEST_REGION = { x: 50, y: 70, width: 280, height: 90 };
+
+  /**
+   * Seeds the round-2 divergence case: the proof order (the beforeEach
+   * seed) was created and completed FIRST; this LATER media_worker order
+   * completes last, so newest-by-finishedAtMs and first-created point at
+   * DIFFERENT orders.
+   */
+  async function seedNewerCompletedOrder(): Promise<string> {
+    const newestExtractionId = await ctx.db.insert("extractions", {
+      sourceId: seed.sourceId,
+      representationId: seed.representationId,
+      kind: "vision",
+      pipelineVersion: "e4.vision/1",
+      model: "z-ai/glm-5.3-flash",
+      provider: "openrouter",
+      processingRunId: seed.runId,
+      createdAtMs: Date.now() + 5_000,
+    });
+    await ctx.db.insert("visionOrders", {
+      companyId: seed.companyId,
+      sourceId: seed.sourceId,
+      attachmentId: seed.attachmentId,
+      representationId: seed.representationId,
+      processingRunId: seed.runId,
+      pipelineVersion: "e4.vision/1",
+      visionRoutingVersion: "e2.0",
+      bytesChannel: "media_worker",
+      state: "complete",
+      extractionId: newestExtractionId,
+      observationsJson: JSON.stringify([{ text: "12 900", region: NEWEST_REGION }]),
+      createdAtMs: Date.now() + 4_000,
+      updatedAtMs: Date.now() + 5_000,
+      finishedAtMs: Date.now() + 5_000,
+    });
+    return newestExtractionId;
+  }
+
+  it("the loader returns the NEWEST order's observations pinned to that order's OWN extraction", async () => {
+    const newestExtractionId = await seedNewerCompletedOrder();
+    const db = asReaderDb(ctx);
+    const view = await loadCoverageSourceView(db, seed.sourceId as never);
+    const observations = await loadCompletedVisionObservations(db, view);
+    expect(observations).toHaveLength(1);
+    expect(observations[0]).toMatchObject({
+      observationId: `obs:${seed.representationId}:0`,
+      extractionId: newestExtractionId,
+      text: "12 900",
+      x: NEWEST_REGION.x,
+      y: NEWEST_REGION.y,
+      width: NEWEST_REGION.width,
+      height: NEWEST_REGION.height,
+    });
+  });
+
+  it("a newest-pinned group passes the fresh gate and mints its fragment on the NEWEST extraction", async () => {
+    const newestExtractionId = await seedNewerCompletedOrder();
+    const result = await publish(imageGroup(NEWEST_REGION, newestExtractionId));
+    expect(result).toMatchObject({ _tag: "ok" });
+    const output = await stepOutput();
+    // Past the fresh gate: the coverage selects the NEWEST completed
+    // version (the older marked replaced) and the evidence pin agrees. The
+    // C2 section then refuses (no author session in the fixture) AFTER the
+    // fragment was minted, which is exactly the assertion point.
+    expect(output.outcome).toBe("failed");
+    expect(output.error).toBe("actor_session_unavailable");
+    const fragments = ctx.db.rows("sourceFragments");
+    expect(fragments).toHaveLength(1);
+    expect(fragments[0]).toMatchObject({
+      extractionId: newestExtractionId,
+      sourceId: seed.sourceId,
+      anchor: { _tag: "image_region", ...NEWEST_REGION },
+    });
+  });
+
+  it("a group still pinned to the SUPERSEDED extraction is refused pending (the re-join trigger)", async () => {
+    await seedNewerCompletedOrder();
+    const result = await publish(imageGroup());
+    expect(result).toMatchObject({ _tag: "ok" });
+    const output = await stepOutput();
+    expect(output.outcome).toBe("pending_segments");
+    expect(output.fresh).toBe(true);
+    expect(ctx.db.rows("sourceFragments")).toHaveLength(0);
   });
 });

@@ -63,7 +63,13 @@ export interface BoundedJoinPlan {
   readonly clarifications: readonly MultimodalClarificationDraft[];
 }
 
-/** Whether one proposal's evidence kinds are all complete in the coverage. */
+/**
+ * Whether one proposal's evidence kinds are all complete in the coverage.
+ * A `replaced_by_newer_version` input counts as complete ONLY for evidence
+ * pinned to its SELECTED extraction (the newest completed version): the
+ * marking never blocks publication by itself, but an older pin is a
+ * re-join trigger.
+ */
 export function proposalGroundingComplete(
   proposal: { readonly evidence: readonly LocatedEvidence[] },
   coverage: { readonly inputs: readonly RequiredInput[] },
@@ -71,7 +77,7 @@ export function proposalGroundingComplete(
   return proposal.evidence.every((evidence) =>
     coverage.inputs.some(
       (input) =>
-        input.status === "complete" &&
+        (input.status === "complete" || input.status === "replaced_by_newer_version") &&
         input.kind === evidenceKindOf(evidence) &&
         input.extractionId === evidence.extractionId,
     ),
@@ -80,12 +86,14 @@ export function proposalGroundingComplete(
 
 /**
  * THE inspection-honesty invariant: no proposal may carry image or audio
- * evidence whose extraction version the coverage does not report COMPLETE.
- * The reducer admits such evidence only from completed extractions loaded
- * into the context; this predicate re-proves it over ANY plan (wire or
- * pure), so the publish stage and the tests share one authority. The
- * parameter is structural on purpose: it accepts the wire proposals the
- * workflow hands over exactly as it accepts the reducer's own.
+ * evidence whose extraction version the coverage does not report as its
+ * selected completed version (complete, or the newest of several completed
+ * versions). The reducer admits such evidence only from completed
+ * extractions loaded into the context; this predicate re-proves it over
+ * ANY plan (wire or pure), so the publish stage and the tests share one
+ * authority. The parameter is structural on purpose: it accepts the wire
+ * proposals the workflow hands over exactly as it accepts the reducer's
+ * own.
  */
 export function mediaClaimsBackedByCompleteInputs(
   plan: { readonly proposals: readonly { readonly evidence: readonly LocatedEvidence[] }[] },

@@ -11,22 +11,27 @@
  *   order (original-time intervals, verbatim provider text);
  * - D5 representation rows per image attachment -> the deterministic
  *   retained selection (`decideRetainedSelection` imported from the images
- *   protocol, never mirrored) -> the vision orders/extractions that exist
- *   over THAT representation (complete) versus older ones (superseded);
- * - the vision observations of the completed extraction, rebuilt from the
- *   order's durable `observationsJson` record with stable handles.
+ *   protocol, never mirrored) -> the vision orders over THAT
+ *   representation, whose NEWEST completed one supplies the extraction
+ *   version (the audio lane's rule), versus extractions over older
+ *   representations (superseded);
+ * - the vision observations of that newest completed order, rebuilt from
+ *   its durable `observationsJson` record with stable handles and pinned
+ *   to its OWN extraction id.
  */
 
 import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { decideRetainedSelection, toRepresentationView } from "../images/protocol";
 import {
+  completedVisionOrdersByNewest,
   observationIdOf,
   type CoverageSourceView,
   type ImageInputView,
   type JoinVisionObservation,
   type TranscriptOrderView,
   type TranscriptSegmentView,
+  type VisionOrderView,
 } from "@kiero/agent";
 
 /** The DB reader surface the loader needs (mutation or query context). */
@@ -96,12 +101,6 @@ async function loadImageInputView(
     .query("extractions")
     .withIndex("by_source_kind", (q) => q.eq("sourceId", sourceId).eq("kind", "vision"))
     .collect();
-  const currentIds =
-    selection === null
-      ? []
-      : visionExtractions
-          .filter((row) => row.representationId === selection._id)
-          .map((row) => row._id);
   const supersededIds = visionExtractions
     .filter(
       (row) =>
@@ -112,6 +111,7 @@ async function loadImageInputView(
   const normalizing = representations.some(
     (row) => (row.role === "processing" || row.role === "received") && row.removedAtMs === undefined,
   );
+  let visionOrders: VisionOrderView[] = [];
   let visionFailureKind: string | null = null;
   if (selection !== null) {
     const selectionId = db.normalizeId("mediaRepresentations", selection._id);
@@ -122,6 +122,13 @@ async function loadImageInputView(
             .query("visionOrders")
             .withIndex("by_representation", (q) => q.eq("representationId", selectionId))
             .collect();
+    visionOrders = orders.map((order) => ({
+      orderId: order._id,
+      state: order.state,
+      lastErrorKind: order.lastErrorKind ?? null,
+      extractionId: order.extractionId ?? null,
+      finishedAtMs: order.finishedAtMs ?? null,
+    }));
     const failed = orders.find(
       (order) => order.state === "pending" && order.lastErrorKind !== undefined,
     );
@@ -130,7 +137,7 @@ async function loadImageInputView(
   return {
     attachmentId,
     representationId: selection?._id ?? null,
-    visionExtractionIds: currentIds,
+    visionOrders,
     supersededVisionExtractionIds: supersededIds,
     pendingReason:
       selection === null && normalizing ? "photo_normalization_in_progress" : null,
@@ -226,12 +233,16 @@ export function parseRecordedObservations(
 }
 
 /**
- * The observations of the completed vision orders the coverage reports:
- * rebuilt from the durable order record, with stable per-representation
- * handles. The extraction id pins the version; the representation id pins
- * the coordinate space. This is the ONE place the record's nested
- * `region` object flattens into the fragment-anchor shape everything
- * downstream (prompt, evidence, anchors) speaks.
+ * The observations of the completed vision order the coverage SELECTS:
+ * the NEWEST completed order by finishedAtMs over the representation (the
+ * audio lane's rule, the same `completedVisionOrdersByNewest` the coverage
+ * decision applies), rebuilt from that order's durable record with stable
+ * per-representation handles. The extraction id is the completed order's
+ * OWN, so observations and their version pin can never come from two
+ * different provider passes. The representation id pins the coordinate
+ * space. This is the ONE place the record's nested `region` object
+ * flattens into the fragment-anchor shape everything downstream (prompt,
+ * evidence, anchors) speaks.
  */
 export async function loadCompletedVisionObservations(
   db: LoaderDb,
@@ -239,35 +250,23 @@ export async function loadCompletedVisionObservations(
 ): Promise<JoinVisionObservation[]> {
   const observations: JoinVisionObservation[] = [];
   for (const input of view.imageInputs) {
-    if (input.representationId === null || input.visionExtractionIds.length === 0) {
+    if (input.representationId === null) {
       continue;
     }
-    const representationId = db.normalizeId("mediaRepresentations", input.representationId);
-    if (representationId === null) {
+    const newest = completedVisionOrdersByNewest(input.visionOrders)[0];
+    if (newest === undefined || newest.extractionId === null) {
       continue;
     }
-    const orders = await db
-      .query("visionOrders")
-      .withIndex("by_representation", (q) => q.eq("representationId", representationId))
-      .collect();
-    const completed = orders.find(
-      (order) => order.state === "complete" && order.observationsJson !== undefined,
-    );
-    if (completed === undefined) {
+    const order = await db.get(newest.orderId as Id<"visionOrders">);
+    if (order === null || order.observationsJson === undefined) {
       continue;
     }
-    const extractionId = input.visionExtractionIds[0];
-    if (extractionId === undefined) {
-      continue;
-    }
-    for (const [index, recorded] of parseRecordedObservations(
-      completed.observationsJson,
-    ).entries()) {
+    for (const [index, recorded] of parseRecordedObservations(order.observationsJson).entries()) {
       observations.push({
         observationId: observationIdOf(input.representationId, index),
         attachmentId: input.attachmentId,
         representationId: input.representationId,
-        extractionId,
+        extractionId: newest.extractionId,
         text: recorded.text,
         x: recorded.region.x,
         y: recorded.region.y,

@@ -8,9 +8,11 @@
  * pending, not a complete transcript. Text-only fallback cannot claim to
  * have inspected a pending image").
  *
- * Like {@link TEXT_ANALYSIS_PIPELINE_VERSION}, these constants are the
- * single source the Convex-side executor copies onto the `processingRuns`
- * row; bumping any of them is a deliberate, reviewable change.
+ * Like {@link TEXT_ANALYSIS_PIPELINE_VERSION}, these constants are a
+ * deliberate, reviewable single source. E3's text executor copies them
+ * onto the `processingRuns` row; the join does not (the initial run row is
+ * shared with E3) and pins them on its own load-context step row and in
+ * `checkpoint.join.versions` instead.
  */
 
 /** The multimodal-join pipeline version (workflow shape, stage order). */

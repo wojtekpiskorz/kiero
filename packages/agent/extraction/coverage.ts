@@ -14,9 +14,11 @@
  *   terminal `failed`;
  * - D5 image representations: the deterministic retained selection
  *   (`decideRetainedSelection`, convex/processing/images/protocol.ts)
- *   defines the inspectable representation; a vision extraction over THAT
- *   exact representationId completes the input, both vision routes failing
- *   leaves it pending (architecture "Provider configuration").
+ *   defines the inspectable representation; the NEWEST completed vision
+ *   order over THAT exact representationId completes the input (older
+ *   completed versions are reported as replaced, the audio lane's rule),
+ *   and both vision routes failing leaves it pending (architecture
+ *   "Provider configuration").
  *
  * The status vocabulary is the issue's own: complete, pending, failed, or
  * replaced by a newer extraction version. `replaced_by_newer_version` is
@@ -128,13 +130,38 @@ export interface TranscriptOrderView {
   readonly finishedAtMs: number | null;
 }
 
-/** One image attachment's inspectable representation + vision extractions. */
+/** One vision order as the join sees it (E4 rows). */
+export interface VisionOrderView {
+  readonly orderId: string;
+  readonly state: "pending" | "complete" | "failed";
+  readonly lastErrorKind: string | null;
+  readonly extractionId: string | null;
+  /** Completion time, when complete (the newest complete order wins). */
+  readonly finishedAtMs: number | null;
+}
+
+/**
+ * The completed vision orders over one representation, NEWEST completion
+ * first (the audio lane's rule, mirrored): more than one channel may
+ * complete over the same representation, and the newest completed order's
+ * OWN extraction version is the one the coverage reports and the loader
+ * pins evidence to, never an insertion-order guess.
+ */
+export function completedVisionOrdersByNewest(
+  orders: readonly VisionOrderView[],
+): VisionOrderView[] {
+  return orders
+    .filter((order) => order.state === "complete" && order.extractionId !== null)
+    .sort((a, b) => (b.finishedAtMs ?? 0) - (a.finishedAtMs ?? 0));
+}
+
+/** One image attachment's inspectable representation + vision orders. */
 export interface ImageInputView {
   readonly attachmentId: string;
   /** The deterministic current retained selection (null while normalizing). */
   readonly representationId: string | null;
-  /** Vision extraction ids that exist over the CURRENT representationId. */
-  readonly visionExtractionIds: readonly string[];
+  /** The vision orders over the CURRENT representationId. */
+  readonly visionOrders: readonly VisionOrderView[];
   /** Vision extraction ids over OLDER representations (superseded versions). */
   readonly supersededVisionExtractionIds: readonly string[];
   /** Sanitized reason the representation is not inspectable yet, if any. */
@@ -235,7 +262,14 @@ export function audioAttachmentStatus(
   };
 }
 
-/** The status of one image attachment (pure). */
+/**
+ * The status of one image attachment (pure). Mirrors the audio lane's
+ * version rule: the NEWEST completed order by finishedAtMs supplies the
+ * extraction version, and older completed versions over the same
+ * representation are reported as replaced (informational; the selected
+ * newest stays usable, so publication is never blocked by the marking
+ * alone).
+ */
 export function imageAttachmentStatus(view: ImageInputView): RequiredInput {
   if (view.representationId === null) {
     return {
@@ -247,12 +281,14 @@ export function imageAttachmentStatus(view: ImageInputView): RequiredInput {
       lastErrorKind: view.pendingReason ?? "retained_representation_not_ready",
     };
   }
-  if (view.visionExtractionIds.length > 0) {
+  const completed = completedVisionOrdersByNewest(view.visionOrders);
+  const newest = completed[0];
+  if (newest !== undefined) {
     return {
       attachmentId: view.attachmentId,
       kind: "image",
-      status: "complete",
-      extractionId: view.visionExtractionIds[0] ?? null,
+      status: completed.length > 1 ? "replaced_by_newer_version" : "complete",
+      extractionId: newest.extractionId,
       representationId: view.representationId,
       lastErrorKind: null,
     };
