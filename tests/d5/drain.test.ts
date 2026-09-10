@@ -87,7 +87,14 @@ describe("drain row semantics (the multi-edge decision)", () => {
       .rows("durableJobs")
       .map((job) => job.kind)
       .sort();
-    expect(kinds).toEqual(["processing.extract_fragments", "processing.normalize_photo"]);
+    // E4 amendment: sourceAccepted now fans out to THREE edges (the join
+    // registers alongside extract and normalize; text-only sources no-op
+    // inside the join executor).
+    expect(kinds).toEqual([
+      "processing.extract_fragments",
+      "processing.join_multimodal",
+      "processing.normalize_photo",
+    ]);
     // The normalize job's dedup identity is payload-derived (distinct from
     // the row's, so one key never carries two job kinds).
     const normalize = ctx.db.rows("durableJobs").find((job) => job.kind === "processing.normalize_photo");

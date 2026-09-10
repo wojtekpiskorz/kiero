@@ -101,8 +101,9 @@ describe("schema composition", () => {
     // accountRecoveries; 65 since the B4 amendment added
     // gmCompanyActivations; 66 since C4 added workRevisions; 68 since the
     // D6 amendment added audioTranscripts and audioSegments (the resumable
-    // long-audio STT fragment).
-    expect(composed).toHaveLength(68);
+    // long-audio STT fragment); 69 since the E4 amendment added visionOrders
+    // (the multimodal-join vision extraction orders).
+    expect(composed).toHaveLength(69);
   });
 
   it("gives the domain event envelope a durable outbox home", () => {

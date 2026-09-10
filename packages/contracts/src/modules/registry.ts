@@ -162,6 +162,18 @@ export const transcribeSegmentInput = Schema.Struct({
   transcriptId: tableIdSchema("audioTranscripts"),
 });
 
+// E4 amendment (flagged coordinated change, the D6 precedent): the
+// multimodal-join executor input. `processingRunId` is the run the join
+// anchors its steps to (the drain hands the reanalysis kicker's NEW run;
+// null means "resolve the source's initial analysis run", exactly the way
+// D6's orders anchor). The join composes E3 text planning with D5 vision
+// representations and D6 transcript versions (issue #38).
+export const joinMultimodalInput = Schema.Struct({
+  sourceId: tableIdSchema("sources"),
+  processingRunId: Schema.NullOr(tableIdSchema("processingRuns")),
+  reanalysisOfRunId: Schema.NullOr(tableIdSchema("processingRuns")),
+});
+
 function decodeFeatureId(value: string): Schema.Schema.Type<typeof FeatureId> {
   return Schema.decodeUnknownSync(FeatureId)(value);
 }
@@ -236,6 +248,16 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "processing.transcribe_segment",
     input: transcribeSegmentInput,
   }),
+  // E4 amendment (flagged coordinated change): the multimodal-join executor
+  // (`convex/processing/multimodal/join.ts` implements it). It no-ops
+  // text-only sources (E3's analyze owns those) and joins extraction
+  // outcomes into partial-safe analysis groups for mixed ones.
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("processing.join"),
+    jobKind: "processing.join_multimodal",
+    input: joinMultimodalInput,
+  }),
 ];
 
 function consumer(eventName: string, jobKind: EventConsumerEntry["jobKind"]): EventConsumerEntry {
@@ -272,6 +294,12 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceAccepted", "processing.normalize_photo"),
   // Requested reanalysis runs as a linked new analysis run.
   consumer("operations.reanalysisRequested", "processing.analyze_change_plan"),
+  // E4 amendment (flagged coordinated change): acceptance also fans out the
+  // multimodal join (STT ordering + the joined partial-safe analysis), and
+  // a requested reanalysis of a MIXED source re-joins it through the same
+  // edge (text-only sources no-op inside the executor).
+  consumer("sources.sourceAccepted", "processing.join_multimodal"),
+  consumer("operations.reanalysisRequested", "processing.join_multimodal"),
   // A3 certification amendment: the platform's echo publication drains into
   // its own durable delivery job through the same edge mechanism.
   consumer("platform.echoRequested", "platform.echo_delivery"),

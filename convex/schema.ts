@@ -35,6 +35,8 @@ import { acceptTables } from "./sources/accept/schema";
 import { uploadsTables } from "./sources/uploads/schema";
 // D6 amendment (flagged coordinated change): the audio STT fragment.
 import { audioTables } from "./processing/audio/schema";
+// E4 amendment (flagged coordinated change): the multimodal-join fragment.
+import { multimodalTables } from "./processing/multimodal/schema";
 import { platformTables } from "./platform/schema";
 import { searchTables } from "./search/schema";
 import { readStateTables } from "./attention/read-state/schema";
@@ -59,6 +61,7 @@ const fragments: ReadonlyArray<Record<string, TableDefinition>> = [
   acceptTables,
   uploadsTables,
   audioTables,
+  multimodalTables,
   platformTables,
   searchTables,
   readStateTables,
@@ -116,6 +119,7 @@ export default defineSchema({
   ...acceptTables,
   ...uploadsTables,
   ...audioTables,
+  ...multimodalTables,
   ...platformTables,
   ...searchTables,
   ...readStateTables,

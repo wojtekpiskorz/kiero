@@ -11,7 +11,7 @@ import { jobExecutors } from "../../convex/platform/executors";
 import { echoExecutor } from "../../convex/platform/echo";
 
 describe("convex executor composition", () => {
-  it("registers exactly the implemented executors (platform + B3 + D6 + E3 lanes)", () => {
+  it("registers exactly the implemented executors (platform + B3 + D5/D6 + E3/E4 lanes)", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
       [
         "platform.echo_delivery",
@@ -31,6 +31,10 @@ describe("convex executor composition", () => {
         // the mechanical A3 analyze executor is replaced behind the same
         // seam by the real workflow, and the extract edge is implemented).
         "processing.extract_fragments",
+
+        // E4's sanctioned append (issue #38 owns the multimodal join; the
+        // contracts amendment registering the kind is flagged there).
+        "processing.join_multimodal",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");

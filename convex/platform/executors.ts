@@ -31,6 +31,11 @@
  * - `processing.normalize_photo` (../processing/images/executor.ts, D5):
  *   the accepted-photo normalization executor (architecture protocol step
  *   4) with the echo-template uncertain-outcome semantics.
+ * - `processing.join_multimodal` (../processing/multimodal/join.ts, E4):
+ *   the multimodal join over one mixed source's extraction outcomes —
+ *   partial-safe analysis groups joined from text, D6 transcript versions
+ *   and D5-backed vision extractions (text-only sources no-op here; E3's
+ *   analyze owns them).
  */
 
 import type { FunctionReference } from "convex/server";
@@ -44,6 +49,8 @@ import { cleanupRevocationExecutor } from "../access/membership/cleanup";
 import { transcribeSegmentExecutor } from "../processing/audio/executor";
 
 import { normalizePhotoExecutor } from "../processing/images/executor";
+// E4 amendment (flagged coordinated change): the multimodal-join executor.
+import { joinMultimodalExecutor as e4JoinMultimodalExecutor } from "../processing/multimodal/join";
 
 /** One durable job row (the executable counterpart of an outbox event). */
 export type DurableJobDoc = Doc<"durableJobs">;
@@ -74,4 +81,6 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [transcribeSegmentExecutor.jobKind]: transcribeSegmentExecutor,
 
   [normalizePhotoExecutor.jobKind]: normalizePhotoExecutor,
+
+  [e4JoinMultimodalExecutor.jobKind]: e4JoinMultimodalExecutor,
 };
