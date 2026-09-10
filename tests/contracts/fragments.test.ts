@@ -40,7 +40,10 @@ import { type GenericValidator } from "convex/values";
 
 const tables = schema.tables;
 
-function objectFields(validator: GenericValidator, table: string): Record<string, GenericValidator> {
+function objectFields(
+  validator: GenericValidator,
+  table: string,
+): Record<string, GenericValidator> {
   expect(validator.isConvexValidator, table).toBe(true);
   if (validator.kind !== "object") {
     throw new Error(`${table}: expected an object validator`);
@@ -60,7 +63,9 @@ function fieldOf(
   return field;
 }
 
-type IndexableTable = { " indexes"(): { indexDescriptor: string; fields: string[] }[] };
+type IndexableTable = {
+  " indexes"(): { indexDescriptor: string; fields: string[] }[];
+};
 
 /** The pinned experimental accessor `" indexes"()` returns the index list. */
 function indexFields(
@@ -90,7 +95,7 @@ function memberLiterals(validator: GenericValidator, table: string): string[] {
 }
 
 describe("schema composition", () => {
-  it("composes exactly the closed table inventory (68 tables)", () => {
+  it("composes exactly the closed table inventory (70 tables)", () => {
     const composed = Object.keys(tables).sort();
     const inventory = [...TABLE_ID_NAMES].sort();
     expect(composed).toEqual(inventory);
@@ -101,21 +106,38 @@ describe("schema composition", () => {
     // accountRecoveries; 65 since the B4 amendment added
     // gmCompanyActivations; 66 since C4 added workRevisions; 68 since the
     // D6 amendment added audioTranscripts and audioSegments (the resumable
-    // long-audio STT fragment).
-    expect(composed).toHaveLength(68);
+    // long-audio STT fragment); 70 since the G3 amendment added
+    // calendarSyncAttempts and calendarProofEvents (the sync attempt
+    // ledger and the proof-only fake-Google event store); 71 since the
+    // E4 amendment added visionOrders (the multimodal-join vision
+    // extraction orders).
+    expect(composed).toHaveLength(71);
   });
 
   it("gives the domain event envelope a durable outbox home", () => {
     expect(Object.keys(tables)).toContain("outboxEvents");
-    const fields = objectFields(tableOrFail("outboxEvents").validator, "outboxEvents");
-    for (const name of ["eventId", "companyId", "eventName", "envelopeJson", "deliveryState", "attempts"]) {
-      expect(fieldOf(fields, "outboxEvents", name).isOptional, name).toBe("required");
-    }
-    expect(indexFields(tables.outboxEvents, "outboxEvents", "by_delivery")).toEqual([
+    const fields = objectFields(
+      tableOrFail("outboxEvents").validator,
+      "outboxEvents",
+    );
+    for (const name of [
+      "eventId",
+      "companyId",
+      "eventName",
+      "envelopeJson",
       "deliveryState",
-      "nextAttemptAtMs",
-    ]);
-    expect(indexFields(tables.outboxEvents, "outboxEvents", "by_dedup")).toEqual(["dedupKey"]);
+      "attempts",
+    ]) {
+      expect(fieldOf(fields, "outboxEvents", name).isOptional, name).toBe(
+        "required",
+      );
+    }
+    expect(
+      indexFields(tables.outboxEvents, "outboxEvents", "by_delivery"),
+    ).toEqual(["deliveryState", "nextAttemptAtMs"]);
+    expect(
+      indexFields(tables.outboxEvents, "outboxEvents", "by_dedup"),
+    ).toEqual(["dedupKey"]);
   });
 
   it("every fragment table carries a genuine pinned object validator", () => {
@@ -139,24 +161,27 @@ describe("schema composition", () => {
     ]);
     // stable finding identity + current revision lookups
     expect(
-      indexFields(tables.findingRevisions, "findingRevisions", "by_finding_revision"),
+      indexFields(
+        tables.findingRevisions,
+        "findingRevisions",
+        "by_finding_revision",
+      ),
     ).toEqual(["findingId", "revision"]);
-    expect(indexFields(tables.evidenceLinks, "evidenceLinks", "by_fragment")).toEqual([
-      "sourceFragmentId",
-    ]);
+    expect(
+      indexFields(tables.evidenceLinks, "evidenceLinks", "by_fragment"),
+    ).toEqual(["sourceFragmentId"]);
     // due workflow/notification state
     expect(
       indexFields(tables.notificationIntents, "notificationIntents", "by_due"),
     ).toEqual(["state", "dueAtMs"]);
     // user/source read state
-    expect(indexFields(tables.readStates, "readStates", "by_user_source")).toEqual([
-      "userId",
-      "sourceId",
-    ]);
+    expect(
+      indexFields(tables.readStates, "readStates", "by_user_source"),
+    ).toEqual(["userId", "sourceId"]);
     // user/company Calendar mapping
-    expect(indexFields(tables.calendarCopies, "calendarCopies", "by_task")).toEqual([
-      "taskId",
-    ]);
+    expect(
+      indexFields(tables.calendarCopies, "calendarCopies", "by_task"),
+    ).toEqual(["taskId"]);
     // export/source invalidation
     expect(
       indexFields(tables.exportSourceLinks, "exportSourceLinks", "by_source"),
@@ -165,13 +190,24 @@ describe("schema composition", () => {
 });
 
 describe("extension definition versioning immutability", () => {
-  const fields = objectFields(extensionsTables.extensionVersions.validator, "extensionVersions");
+  const fields = objectFields(
+    extensionsTables.extensionVersions.validator,
+    "extensionVersions",
+  );
 
   it("a version snapshot is complete and required: no silent meaning change", () => {
     // The full declared meaning travels with the version row; a changed
     // meaning or field kind is a NEW version, never an edit in place.
-    for (const name of ["definitionId", "version", "name", "fields", "changeNote"]) {
-      expect(fieldOf(fields, "extensionVersions", name).isOptional, name).toBe("required");
+    for (const name of [
+      "definitionId",
+      "version",
+      "name",
+      "fields",
+      "changeNote",
+    ]) {
+      expect(fieldOf(fields, "extensionVersions", name).isOptional, name).toBe(
+        "required",
+      );
     }
     const shapeField = fieldOf(fields, "extensionVersions", "fields");
     if (shapeField.kind !== "array") {
@@ -194,7 +230,11 @@ describe("extension definition versioning immutability", () => {
 
   it("versions are keyed by definition and version (append-only identity)", () => {
     expect(
-      indexFields(extensionsTables.extensionVersions, "extensionVersions", "by_definition_version"),
+      indexFields(
+        extensionsTables.extensionVersions,
+        "extensionVersions",
+        "by_definition_version",
+      ),
     ).toEqual(["definitionId", "version"]);
   });
 });
@@ -208,11 +248,23 @@ describe("source correction immutability", () => {
     // plausible editable-text twins; the required core is the general part.
     // The boss's own words, authorship and send-time snapshot are required at
     // acceptance; a correction is a NEW source, lifecycle stays explicit.
-    for (const name of ["authorUserId", "authorText", "sentAtMs", "sentAtTimezone"]) {
-      expect(fieldOf(fields, "sources", name).isOptional, name).toBe("required");
+    for (const name of [
+      "authorUserId",
+      "authorText",
+      "sentAtMs",
+      "sentAtTimezone",
+    ]) {
+      expect(fieldOf(fields, "sources", name).isOptional, name).toBe(
+        "required",
+      );
     }
     // No in-place editable text override may exist.
-    for (const forbidden of ["editedText", "currentText", "textOverride", "correctedText"]) {
+    for (const forbidden of [
+      "editedText",
+      "currentText",
+      "textOverride",
+      "correctedText",
+    ]) {
       expect(fields[forbidden], forbidden).toBeUndefined();
     }
     // Withdrawal is an explicit lifecycle transition with reason and time.
@@ -224,7 +276,10 @@ describe("source correction immutability", () => {
 
 describe("independent parent and checklist state", () => {
   const taskFields = objectFields(workTables.tasks.validator, "tasks");
-  const itemFields = objectFields(workTables.checklistItems.validator, "checklistItems");
+  const itemFields = objectFields(
+    workTables.checklistItems.validator,
+    "checklistItems",
+  );
 
   it("task state and checklist item state are separate closed vocabularies", () => {
     const taskState = fieldOf(taskFields, "tasks", "state");
@@ -239,7 +294,10 @@ describe("independent parent and checklist state", () => {
       "cancelled",
     ]);
     // The item vocabulary has no task states: no inherited completion.
-    expect(memberLiterals(itemState, "checklistItems.state")).toEqual(["open", "checked"]);
+    expect(memberLiterals(itemState, "checklistItems.state")).toEqual([
+      "open",
+      "checked",
+    ]);
   });
 
   it("keeps parent and checklist state independent (vocabularies disjoint, blocklist of coupling fields absent)", () => {
@@ -267,7 +325,12 @@ describe("fragment vocabulary pins equal the contracts vocabularies", () => {
       readonly path: readonly string[];
       readonly schema: { readonly ast: unknown };
     }> = [
-      { table: workTables.tasks.validator, tableName: "tasks", path: ["state"], schema: TaskState },
+      {
+        table: workTables.tasks.validator,
+        tableName: "tasks",
+        path: ["state"],
+        schema: TaskState,
+      },
       {
         table: workTables.checklistItems.validator,
         tableName: "checklistItems",
@@ -390,7 +453,10 @@ describe("fragment vocabulary pins equal the contracts vocabularies", () => {
     // seven scalar kinds plus bounded lists; the value kind "object" stays in
     // ExtensionFieldKind but is not a legal field kind.)
     const fieldsField = fieldOf(
-      objectFields(extensionsTables.extensionVersions.validator, "extensionVersions"),
+      objectFields(
+        extensionsTables.extensionVersions.validator,
+        "extensionVersions",
+      ),
       "extensionVersions",
       "fields",
     );
@@ -402,9 +468,9 @@ describe("fragment vocabulary pins equal the contracts vocabularies", () => {
       "extensionVersions.fields",
       "kind",
     );
-    expect(memberLiterals(kindField, "extensionVersions.fields.kind").sort()).toEqual(
-      schemaLiterals(DefinitionFieldKind, "DefinitionFieldKind"),
-    );
+    expect(
+      memberLiterals(kindField, "extensionVersions.fields.kind").sort(),
+    ).toEqual(schemaLiterals(DefinitionFieldKind, "DefinitionFieldKind"));
   });
 });
 
@@ -417,9 +483,17 @@ function tableOrFail(name: TableIdName): { validator: GenericValidator } {
 }
 
 /** Extracts the string literals of a union-of-literals schema AST. */
-function schemaLiterals(schema: { readonly ast: unknown }, name: string): string[] {
+function schemaLiterals(
+  schema: { readonly ast: unknown },
+  name: string,
+): string[] {
   const ast = schema.ast;
-  if (typeof ast !== "object" || ast === null || !("_tag" in ast) || ast._tag !== "Union") {
+  if (
+    typeof ast !== "object" ||
+    ast === null ||
+    !("_tag" in ast) ||
+    ast._tag !== "Union"
+  ) {
     throw new Error(`${name}: expected a union-of-literals schema`);
   }
   if (!("types" in ast) || !Array.isArray(ast.types)) {

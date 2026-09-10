@@ -28,7 +28,7 @@ import {
   membershipPolicy,
   type RequestContext,
 } from "@kiero/runtime";
-import { membershipHandlers, } from "../../convex/access/membership/dispatch";
+import { membershipHandlers } from "../../convex/access/membership/dispatch";
 import { membershipLanePolicy } from "../../convex/access/membership/policy";
 import { projectEventToJobInputs } from "../../convex/platform/outbox";
 import { membershipTables } from "../../convex/access/membership/schema";
@@ -66,7 +66,9 @@ describe("the B3 membership handler registration", () => {
     const handlers = membershipHandlers();
     expect(handlers["access.revokeInvitation"]?.intent).toBe("administer");
     expect(handlers["access.changeMembershipRole"]?.intent).toBe("administer");
-    expect(handlers["access.transferAdministration"]?.intent).toBe("administer");
+    expect(handlers["access.transferAdministration"]?.intent).toBe(
+      "administer",
+    );
     // A plain boss may leave their own firm: the core decides self vs admin.
     expect(handlers["access.revokeMembership"]?.intent).toBe("write");
   });
@@ -106,7 +108,10 @@ describe("the B3 membership handler registration", () => {
         },
       },
       undefined,
-      envelope("access.createInvitation", { email: "not-an-address", role: "member" }),
+      envelope("access.createInvitation", {
+        email: "not-an-address",
+        role: "member",
+      }),
     );
     expect(result._tag).toBe("error");
     if (result._tag === "error") {
@@ -121,10 +126,14 @@ describe("the B3 membership handler registration", () => {
       {
         resolveContext: async () => null,
         policy: membershipLanePolicy,
-        handlers: { "access.revokeMembership": { intent: "write", run: handler } },
+        handlers: {
+          "access.revokeMembership": { intent: "write", run: handler },
+        },
       },
       undefined,
-      envelope("access.revokeMembership", { membershipId: parseTableId("memberships", "m1") }),
+      envelope("access.revokeMembership", {
+        membershipId: parseTableId("memberships", "m1"),
+      }),
     );
     expect(result._tag).toBe("error");
     if (result._tag === "error") {
@@ -140,26 +149,39 @@ describe("the B3 policy registration (authoritative for membership rules)", () =
   });
 
   it("denies null contexts and non-admin administer intents like the certified semantics", async () => {
-    expect(await membershipLanePolicy.authorize(null, { intent: "write" })).toEqual({
+    expect(
+      await membershipLanePolicy.authorize(null, { intent: "write" }),
+    ).toEqual({
       allowed: false,
       error: expect.objectContaining({ _tag: "unauthenticated" }),
     });
-    const memberDecision = await membershipLanePolicy.authorize(contextFixture("member"), {
-      intent: "administer",
-    });
+    const memberDecision = await membershipLanePolicy.authorize(
+      contextFixture("member"),
+      {
+        intent: "administer",
+      },
+    );
     expect(memberDecision.allowed).toBe(false);
-    const adminDecision = await membershipLanePolicy.authorize(contextFixture("admin"), {
-      intent: "administer",
-    });
+    const adminDecision = await membershipLanePolicy.authorize(
+      contextFixture("admin"),
+      {
+        intent: "administer",
+      },
+    );
     expect(adminDecision).toEqual({ allowed: true });
   });
 
   it("keeps the tenant-scope check (cross-company requests deny)", async () => {
-    const otherCompanyId = Schema.decodeUnknownSync(tableIdSchema("companies"))("c2");
-    const decision = await membershipLanePolicy.authorize(contextFixture("admin"), {
-      intent: "read",
-      companyId: otherCompanyId,
-    });
+    const otherCompanyId = Schema.decodeUnknownSync(tableIdSchema("companies"))(
+      "c2",
+    );
+    const decision = await membershipLanePolicy.authorize(
+      contextFixture("admin"),
+      {
+        intent: "read",
+        companyId: otherCompanyId,
+      },
+    );
     expect(decision.allowed).toBe(false);
   });
 
@@ -184,28 +206,24 @@ describe("the B3 policy registration (authoritative for membership rules)", () =
 
 describe("the B3 contract entries (closed error vocabulary)", () => {
   it("declares the admission, issuance and transfer operations with pinned error kinds", () => {
-    expect([...accessOperations["access.createCompany"].errorKinds].sort()).toEqual([
-      "conflict",
-      "validation",
-    ]);
-    expect([...accessOperations["access.createInvitation"].errorKinds].sort()).toEqual([
-      "conflict",
-      "forbidden",
-      "validation",
-    ]);
-    expect([...accessOperations["access.rejectInvitation"].errorKinds].sort()).toEqual([
-      "conflict",
-      "not_found",
-    ]);
-    expect([...accessOperations["access.transferAdministration"].errorKinds].sort()).toEqual([
-      "forbidden",
-      "not_found",
-      "validation",
-    ]);
+    expect(
+      [...accessOperations["access.createCompany"].errorKinds].sort(),
+    ).toEqual(["conflict", "validation"]);
+    expect(
+      [...accessOperations["access.createInvitation"].errorKinds].sort(),
+    ).toEqual(["conflict", "forbidden", "validation"]);
+    expect(
+      [...accessOperations["access.rejectInvitation"].errorKinds].sort(),
+    ).toEqual(["conflict", "not_found"]);
+    expect(
+      [...accessOperations["access.transferAdministration"].errorKinds].sort(),
+    ).toEqual(["forbidden", "not_found", "validation"]);
   });
 
   it("decodes a well-formed createCompany input and rejects a malformed currency", () => {
-    const decoded = Schema.decodeUnknownSync(accessOperations["access.createCompany"].input)({
+    const decoded = Schema.decodeUnknownSync(
+      accessOperations["access.createCompany"].input,
+    )({
       name: "Budowa Kowalscy",
       timezone: "Europe/Warsaw",
       defaultCurrency: "PLN",
@@ -224,7 +242,9 @@ describe("the B3 contract entries (closed error vocabulary)", () => {
     // Real IANA shapes the removed regex rejected; the contract layer must
     // pass them through and let validateTimezone decide.
     for (const zone of ["America/Argentina/Buenos_Aires", "Etc/GMT+5", "UTC"]) {
-      const decoded = Schema.decodeUnknownSync(accessOperations["access.createCompany"].input)({
+      const decoded = Schema.decodeUnknownSync(
+        accessOperations["access.createCompany"].input,
+      )({
         name: "X",
         timezone: zone,
         defaultCurrency: "PLN",
@@ -234,13 +254,17 @@ describe("the B3 contract entries (closed error vocabulary)", () => {
   });
 
   it("carries the single-use invitation code as plain string input, role per the vocabulary", () => {
-    const decoded = Schema.decodeUnknownSync(accessOperations["access.createInvitation"].input)({
+    const decoded = Schema.decodeUnknownSync(
+      accessOperations["access.createInvitation"].input,
+    )({
       email: "szef@firma.pl",
       role: "admin",
     });
     expect(decoded.role).toBe("admin");
     expect(() =>
-      Schema.decodeUnknownSync(accessOperations["access.createInvitation"].input)({
+      Schema.decodeUnknownSync(
+        accessOperations["access.createInvitation"].input,
+      )({
         email: "szef@firma.pl",
         role: "boss",
       }),
@@ -268,7 +292,12 @@ describe("the declared consumer edge (access revocation drains durably)", () => 
     expect(projection).toEqual({
       kind: "job",
       jobKind: "access.cleanup_revocation",
-      input: { kind: "membership", membershipId, sessionId: null, revokedAtMs: 123 },
+      input: {
+        kind: "membership",
+        membershipId,
+        sessionId: null,
+        revokedAtMs: 123,
+      },
       dedupKey: "dedup-1",
     });
     // The projected input decodes against the executor's registry schema.
@@ -299,14 +328,25 @@ describe("the declared consumer edge (access revocation drains durably)", () => 
   });
 
   it("leaves events without a registered edge undelivered by consumers", () => {
-    // E3 owns the extract projection and D5 the normalize projection;
-    // both edges fan out from sources.sourceAccepted. C5 (issue #28) now
-    // owns the three recomputation-edge projections, so the still-
-    // unprojected example is the permanent-deletion seam (I4's lane).
-    const projections = projectEventToJobInputs("sources.sourceAccepted", {}, "d");
-    expect(projections.map((projection) => projection.kind)).toEqual(["job", "job"]);
-    expect(projectEventToJobInputs("sources.sourcePurged", { sourceId: "s1" }, "d")).toEqual([
-      { kind: "unprojected_edge", jobKind: "deletion.purge_source" },
+    // E3 owns the extract projection, D5 the normalize projection, E4
+    // (issue #38, flagged coordinated append) the join projection and
+    // F2 (issue #42, flagged coordinated append) the notification-intent
+    // projection; all four edges fan out from sources.sourceAccepted.
+    // C5 (issue #28) owns the recomputation-edge projections, so the
+    // still-unprojected example is the permanent-deletion seam (I4's lane).
+    const projections = projectEventToJobInputs(
+      "sources.sourceAccepted",
+      {},
+      "d",
+    );
+    expect(projections.map((projection) => projection.kind)).toEqual([
+      "job",
+      "job",
+      "job",
+      "job",
     ]);
+    expect(
+      projectEventToJobInputs("sources.sourcePurged", { sourceId: "s1" }, "d"),
+    ).toEqual([{ kind: "unprojected_edge", jobKind: "deletion.purge_source" }]);
   });
 });

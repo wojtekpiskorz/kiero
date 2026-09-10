@@ -17,9 +17,40 @@ import { internal } from "./_generated/api";
 const crons = cronJobs();
 
 // The outbox drain safety net (A3 handoff note: cron-table drain upgrade).
-crons.cron("outbox-drain-safety-net", "*/5 * * * *", internal.platform.outbox.drainOutbox);
+crons.cron(
+  "outbox-drain-safety-net",
+  "*/5 * * * *",
+  internal.platform.outbox.drainOutbox,
+);
+
+// G3 append (flagged shared-file change, the drain safety net's shape):
+// the Calendar reconciliation safety net. Event-driven observation (the
+// copyOutcomeRecorded consumer edge) is the fast path; this pass converges
+// stragglers — reconnect rebuilds, drift re-checks and copies whose events
+// were never delivered. Suspended connections contribute zero Google legs.
+crons.cron(
+  "calendar-sync-safety-net",
+  "*/5 * * * *",
+  internal.calendar.sync.functions.runCalendarSyncPass,
+  {},
+);
+// F2 amendment (issue #42, flagged coordinated change — the I2 outbox-cron
+// precedent): the notification-intent evaluator's safety net. The evaluator
+// is primarily event/scheduler driven (intent creation schedules the hop
+// atomically; each sweep schedules the next), so under total scheduler loss
+// this once-a-minute sweep keeps due intents converging. Idempotent: the
+// pending-state index range makes replays no-ops.
+crons.cron(
+  "attention-intent-safety-net",
+  "* * * * *",
+  internal.attention.delivery.evaluate.evaluateDueIntentsTick,
+);
 
 // Incident scan + cost thresholds + retention + best-effort sink forward.
-crons.interval("telemetry-tick", { minutes: 1 }, internal.operations.telemetry.cron.cronTick);
+crons.interval(
+  "telemetry-tick",
+  { minutes: 1 },
+  internal.operations.telemetry.cron.cronTick,
+);
 
 export default crons;

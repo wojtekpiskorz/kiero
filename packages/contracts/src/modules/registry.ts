@@ -34,7 +34,11 @@ import { memoryOperations, memoryEvents } from "./memory";
 import { projectsOperations, projectsEvents } from "./projects";
 import { workOperations, workEvents } from "./work";
 import { attentionOperations, attentionEvents } from "./attention";
-import { calendarOperations, calendarEvents, CalendarRemoteOutcome } from "./calendar";
+import {
+  calendarOperations,
+  calendarEvents,
+  CalendarRemoteOutcome,
+} from "./calendar";
 import { operationsOperations, operationsEvents } from "./operations";
 import { searchOperations, searchEvents } from "./search";
 import { integrationsOperations, integrationsEvents } from "./integrations";
@@ -52,7 +56,9 @@ function collect<E extends Nameable>(
     for (const key of Object.keys(group)) {
       const entry = group[key];
       if (entry === undefined || entry.name in out || entry.name !== key) {
-        throw new Error(`Contract registry: duplicate or mis-keyed entry: ${key}`);
+        throw new Error(
+          `Contract registry: duplicate or mis-keyed entry: ${key}`,
+        );
       }
       out[entry.name] = entry;
     }
@@ -61,19 +67,20 @@ function collect<E extends Nameable>(
 }
 
 /** All declared operations, keyed by operation name. */
-export const operations: Record<string, AnyOperationEntry> = collect<AnyOperationEntry>(
-  accessOperations,
-  sourcesOperations,
-  memoryOperations,
-  projectsOperations,
-  workOperations,
-  attentionOperations,
-  calendarOperations,
-  operationsOperations,
-  searchOperations,
-  integrationsOperations,
-  platformOperations,
-);
+export const operations: Record<string, AnyOperationEntry> =
+  collect<AnyOperationEntry>(
+    accessOperations,
+    sourcesOperations,
+    memoryOperations,
+    projectsOperations,
+    workOperations,
+    attentionOperations,
+    calendarOperations,
+    operationsOperations,
+    searchOperations,
+    integrationsOperations,
+    platformOperations,
+  );
 
 /** All declared events, keyed by event name. */
 export const events: Record<string, AnyEventEntry> = collect<AnyEventEntry>(
@@ -172,6 +179,34 @@ export const transcribeSegmentInput = Schema.Struct({
   transcriptId: tableIdSchema("audioTranscripts"),
 });
 
+// E4 amendment (flagged coordinated change, the D6 precedent): the
+// multimodal-join executor input. `processingRunId` is the run the join
+// anchors its steps to (the drain hands the reanalysis kicker's NEW run;
+// null means "resolve the source's initial analysis run", exactly the way
+// D6's orders anchor). The join composes E3 text planning with D5 vision
+// representations and D6 transcript versions (issue #38).
+export const joinMultimodalInput = Schema.Struct({
+  sourceId: tableIdSchema("sources"),
+  processingRunId: Schema.NullOr(tableIdSchema("processingRuns")),
+  reanalysisOfRunId: Schema.NullOr(tableIdSchema("processingRuns")),
+});
+// F2 amendment (issue #42, flagged coordinated change on the B3/D5
+// precedent): the notification-intent executor input. The drain projects
+// the three consumed events onto this shape; the nullable ids let every
+// trigger share one closed input (the B3 optional-field precedent), and
+// the trigger vocabulary IS the generic assignment/agent-message state
+// contract (E4 later emits the same terminal states through these edges).
+export const attentionIntentsInput = Schema.Struct({
+  trigger: Schema.Literals([
+    "source_accepted",
+    "clarification_raised",
+    "change_set_published",
+  ]),
+  sourceId: Schema.NullOr(tableIdSchema("sources")),
+  clarificationId: Schema.NullOr(tableIdSchema("clarifications")),
+  changeSetId: Schema.NullOr(tableIdSchema("changeSets")),
+});
+
 function decodeFeatureId(value: string): Schema.Schema.Type<typeof FeatureId> {
   return Schema.decodeUnknownSync(FeatureId)(value);
 }
@@ -246,9 +281,32 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "processing.transcribe_segment",
     input: transcribeSegmentInput,
   }),
+  // E4 amendment (flagged coordinated change): the multimodal-join executor
+  // (`convex/processing/multimodal/join.ts` implements it). It no-ops
+  // text-only sources (E3's analyze owns those) and joins extraction
+  // outcomes into partial-safe analysis groups for mixed ones.
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("processing.join"),
+    jobKind: "processing.join_multimodal",
+    input: joinMultimodalInput,
+  }),
+  // F2 amendment (issue #42, flagged coordinated change): the durable
+  // notification-intent executor — intent creation from the consumed
+  // events plus the due-time evaluator kick
+  // (`convex/attention/delivery/executor.ts` implements it).
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("attention.evaluate"),
+    jobKind: "attention.evaluate_due_intents",
+    input: attentionIntentsInput,
+  }),
 ];
 
-function consumer(eventName: string, jobKind: EventConsumerEntry["jobKind"]): EventConsumerEntry {
+function consumer(
+  eventName: string,
+  jobKind: EventConsumerEntry["jobKind"],
+): EventConsumerEntry {
   return eventConsumerEntry({ kind: "event_consumer", eventName, jobKind });
 }
 
@@ -290,9 +348,27 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceAccepted", "processing.normalize_photo"),
   // Requested reanalysis runs as a linked new analysis run.
   consumer("operations.reanalysisRequested", "processing.analyze_change_plan"),
+  // E4 amendment (flagged coordinated change): acceptance also fans out the
+  // multimodal join (STT ordering + the joined partial-safe analysis), and
+  // a requested reanalysis of a MIXED source re-joins it through the same
+  // edge (text-only sources no-op inside the executor).
+  consumer("sources.sourceAccepted", "processing.join_multimodal"),
+  consumer("operations.reanalysisRequested", "processing.join_multimodal"),
   // A3 certification amendment: the platform's echo publication drains into
   // its own durable delivery job through the same edge mechanism.
   consumer("platform.echoRequested", "platform.echo_delivery"),
+  // F2 amendment (issue #42, flagged coordinated change): the three
+  // intent-source events drain into the notification-intent executor.
+  // Acceptance creates the per-recipient source intents; a raised
+  // clarification creates the addressed agent-question intent; a published
+  // change set creates NOTHING (ordinary agent confirmations produce no
+  // push) and only wakes the evaluator because the assignment may have
+  // gone terminal. Each edge's projection derives its own dedup identity
+  // from the event's SUBJECT, never the outbox row (the acceptance row's
+  // key already carries `processing.extract_fragments`).
+  consumer("sources.sourceAccepted", "attention.evaluate_due_intents"),
+  consumer("memory.clarificationRaised", "attention.evaluate_due_intents"),
+  consumer("memory.changeSetPublished", "attention.evaluate_due_intents"),
 ];
 
 /**
@@ -324,7 +400,9 @@ export const features: readonly FeatureEntry[] = executors.map((executor) =>
  * construction-time guarantee itself is under test: a silent Set collapse
  * here would let two lanes believe they own one job kind.
  */
-export function assertNoDuplicateExecutors(list: readonly ExecutorEntry[]): Set<string> {
+export function assertNoDuplicateExecutors(
+  list: readonly ExecutorEntry[],
+): Set<string> {
   const seen = new Set<string>();
   for (const executor of list) {
     if (seen.has(executor.jobKind)) {
@@ -352,12 +430,19 @@ export function assertFeaturesCoherent(
   for (const feature of list) {
     for (const name of feature.providesOperations) {
       if (!(name in knownOperations)) {
-        throw new Error(`Contract registry: feature ${feature.featureId} provides unknown operation ${name}`);
+        throw new Error(
+          `Contract registry: feature ${feature.featureId} provides unknown operation ${name}`,
+        );
       }
     }
-    for (const name of [...feature.publishesEvents, ...feature.consumesEvents]) {
+    for (const name of [
+      ...feature.publishesEvents,
+      ...feature.consumesEvents,
+    ]) {
       if (!(name in knownEvents)) {
-        throw new Error(`Contract registry: feature ${feature.featureId} references unknown event ${name}`);
+        throw new Error(
+          `Contract registry: feature ${feature.featureId} references unknown event ${name}`,
+        );
       }
     }
   }
@@ -376,7 +461,9 @@ export function assertFeaturesCoverRegistrations(
   registeredConsumers: readonly EventConsumerEntry[],
 ): void {
   for (const executor of registeredExecutors) {
-    const owning = list.filter((feature) => feature.executesJobs.includes(executor.jobKind));
+    const owning = list.filter((feature) =>
+      feature.executesJobs.includes(executor.jobKind),
+    );
     if (owning.length !== 1) {
       throw new Error(
         `Contract registry: job kind ${executor.jobKind} is executed by ${owning.length} features, expected exactly 1`,
@@ -384,14 +471,19 @@ export function assertFeaturesCoverRegistrations(
     }
     const feature = owning[0];
     if (feature === undefined) {
-      throw new Error(`Contract registry: job kind ${executor.jobKind} has no feature`);
+      throw new Error(
+        `Contract registry: job kind ${executor.jobKind} has no feature`,
+      );
     }
     const derivedEdges = registeredConsumers
       .filter((edge) => edge.jobKind === executor.jobKind)
       .map((edge) => edge.eventName)
       .sort();
     const declaredEdges = [...feature.consumesEvents].sort();
-    if (derivedEdges.length !== declaredEdges.length || derivedEdges.some((name, i) => name !== declaredEdges[i])) {
+    if (
+      derivedEdges.length !== declaredEdges.length ||
+      derivedEdges.some((name, i) => name !== declaredEdges[i])
+    ) {
       throw new Error(
         `Contract registry: feature ${feature.featureId} consumed edges diverge from the registered consumer edges for ${executor.jobKind}`,
       );
@@ -402,7 +494,9 @@ export function assertFeaturesCoverRegistrations(
 const registeredJobKinds = assertNoDuplicateExecutors(executors);
 for (const entry of eventConsumers) {
   if (!(entry.eventName in events)) {
-    throw new Error(`Contract registry: consumer references unknown event ${entry.eventName}`);
+    throw new Error(
+      `Contract registry: consumer references unknown event ${entry.eventName}`,
+    );
   }
   if (!registeredJobKinds.has(entry.jobKind)) {
     throw new Error(

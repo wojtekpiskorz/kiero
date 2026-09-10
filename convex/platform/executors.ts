@@ -35,6 +35,19 @@
  * - `processing.normalize_photo` (../processing/images/executor.ts, D5):
  *   the accepted-photo normalization executor (architecture protocol step
  *   4) with the echo-template uncertain-outcome semantics.
+ * - `processing.join_multimodal` (../processing/multimodal/join.ts, E4):
+ *   the multimodal join over one mixed source's extraction outcomes —
+ *   partial-safe analysis groups joined from text, D6 transcript versions
+ *   and D5-backed vision extractions (text-only sources no-op here; E3's
+ *   analyze owns them).
+ * - `calendar.reconcile_outcome` (../calendar/sync/executor.ts, G3): the
+ *   per-copy Calendar reconciliation executor (observe before any retry,
+ *   one bounded leg per attempt, uncertain outcomes block blind retries).
+ * - `attention.evaluate_due_intents` (../attention/delivery/executor.ts,
+ *   F2): the durable notification-intent reaction to the three consumed
+ *   events (acceptance creates source intents, a raised clarification
+ *   creates the addressed agent-question intent, a published change set
+ *   only wakes the evaluator).
  */
 
 import type { FunctionReference } from "convex/server";
@@ -48,6 +61,14 @@ import { cleanupRevocationExecutor } from "../access/membership/cleanup";
 import { recomputeDependentsExecutor } from "../memory/recompute/executor";
 import { transcribeSegmentExecutor } from "../processing/audio/executor";
 import { normalizePhotoExecutor } from "../processing/images/executor";
+// E4 amendment (flagged coordinated change): the multimodal-join executor.
+import { joinMultimodalExecutor as e4JoinMultimodalExecutor } from "../processing/multimodal/join";
+import { attentionIntentsExecutor } from "../attention/delivery/executor";
+
+// G3 append (flagged shared-file change, the D5/D6 precedent): the
+// calendar.reconcile_outcome executor implementation lives in G3's owned
+// path; this registry entry is its composition point.
+import { reconcileOutcomeExecutor } from "../calendar/sync/executor";
 
 /** One durable job row (the executable counterpart of an outbox event). */
 export type DurableJobDoc = Doc<"durableJobs">;
@@ -55,16 +76,27 @@ export type DurableJobDoc = Doc<"durableJobs">;
 /** What one executor attempt decided. */
 export type JobOutcome =
   | { readonly outcome: "succeeded" }
-  | { readonly outcome: "failed"; readonly errorKind: string; readonly retryable: boolean }
+  | {
+      readonly outcome: "failed";
+      readonly errorKind: string;
+      readonly retryable: boolean;
+    }
   /** The effect leaves the transaction: the named action records the outcome. */
-  | { readonly outcome: "external"; readonly action: FunctionReference<"action", "internal"> }
+  | {
+      readonly outcome: "external";
+      readonly action: FunctionReference<"action", "internal">;
+    }
   /** Durable continuation (workflow): its onComplete records the outcome. */
   | { readonly outcome: "delegated" };
 
 /** One durable job executor for a job kind. */
 export interface JobExecutor {
   readonly jobKind: DurableJobKind;
-  execute(ctx: MutationCtx, job: DurableJobDoc, input: unknown): Promise<JobOutcome>;
+  execute(
+    ctx: MutationCtx,
+    job: DurableJobDoc,
+    input: unknown,
+  ): Promise<JobOutcome>;
   onSucceeded?(ctx: MutationCtx, job: DurableJobDoc): Promise<void>;
   onFailed?(ctx: MutationCtx, job: DurableJobDoc): Promise<void>;
 }
@@ -78,4 +110,8 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [recomputeDependentsExecutor.jobKind]: recomputeDependentsExecutor,
   [transcribeSegmentExecutor.jobKind]: transcribeSegmentExecutor,
   [normalizePhotoExecutor.jobKind]: normalizePhotoExecutor,
+
+  [e4JoinMultimodalExecutor.jobKind]: e4JoinMultimodalExecutor,
+  [reconcileOutcomeExecutor.jobKind]: reconcileOutcomeExecutor,
+  [attentionIntentsExecutor.jobKind]: attentionIntentsExecutor,
 };

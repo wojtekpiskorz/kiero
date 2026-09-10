@@ -49,10 +49,11 @@ describe("composed registry integrity", () => {
     // (recoverAccount, gmInspectCompany, gmOnboardCompany, gmActivateCompany,
     // gmRestoreAdministrator, gmEndCompanyAlpha); 68/40 since the C3
     // amendment added the catalog and validate-value operations; 69/41 with
-    // C4's work.promoteChecklistItem and work.eventChanged;
+    // C4's work.promoteChecklistItem and work.eventChanged; 71/41 with H1's
+    // readFindingHistory and readClarifications exposition reads;
     // naive greps of `kind: "operation"` overcount by one because
     // registration.ts declares the interface field.)
-    expect(operationNames).toHaveLength(69);
+    expect(operationNames).toHaveLength(71);
     expect(eventNames).toHaveLength(41);
     for (const name of operationNames) {
       expect(operations[name]?.name).toBe(name);
@@ -77,7 +78,9 @@ describe("composed registry integrity", () => {
       "search.",
       "integrations.",
     ]) {
-      const count = Object.keys(operations).filter((name) => name.startsWith(prefix)).length;
+      const count = Object.keys(operations).filter((name) =>
+        name.startsWith(prefix),
+      ).length;
       expect(count, prefix).toBeGreaterThan(0);
     }
   });
@@ -85,14 +88,25 @@ describe("composed registry integrity", () => {
   it("registers the four named cross-module consumer seams", () => {
     // access-revocation cleanup
     expect(
-      eventConsumers.filter((c) => c.jobKind === "access.cleanup_revocation").length,
+      eventConsumers.filter((c) => c.jobKind === "access.cleanup_revocation")
+        .length,
     ).toBeGreaterThanOrEqual(2);
     // reanalysis (linked new run)
-    expect(eventConsumers.some((c) => c.eventName === "operations.reanalysisRequested")).toBe(true);
+    expect(
+      eventConsumers.some(
+        (c) => c.eventName === "operations.reanalysisRequested",
+      ),
+    ).toBe(true);
     // deletion
-    expect(eventConsumers.some((c) => c.eventName === "sources.sourcePurged")).toBe(true);
+    expect(
+      eventConsumers.some((c) => c.eventName === "sources.sourcePurged"),
+    ).toBe(true);
     // Calendar outcomes
-    expect(eventConsumers.some((c) => c.eventName === "calendar.copyOutcomeRecorded")).toBe(true);
+    expect(
+      eventConsumers.some(
+        (c) => c.eventName === "calendar.copyOutcomeRecorded",
+      ),
+    ).toBe(true);
     // Every consumer edge points at a declared event and a registered executor.
     for (const consumer of eventConsumers) {
       expect(events[consumer.eventName], consumer.eventName).toBeDefined();
@@ -105,10 +119,13 @@ describe("composed registry integrity", () => {
   it("derives coherent features and rejects incoherent hand-written parts", () => {
     // One feature per executor; consumed edges and executed job kinds are
     // derived from the executor/consumer tables, never hand-written.
-    // 9 executors: platform.echo (A3) + B3 cleanup + E3 extract/analyze +
-    // D5 normalize + D6 transcribe (each lane's sanctioned append).
-    expect(features).toHaveLength(9);
-    expect(features.every((feature) => feature.providesOperations.length === 0)).toBe(true);
+    // 11 executors: platform.echo (A3) + B3 cleanup + E3 extract/analyze +
+    // D5 normalize + D6 transcribe + C5 recompute + G3 calendar.reconcile +
+    // E4 join + F2 attention.evaluate (each lane's sanctioned append).
+    expect(features).toHaveLength(11);
+    expect(
+      features.every((feature) => feature.providesOperations.length === 0),
+    ).toBe(true);
     // The sourceAccepted edge belongs to processing.extract (the executor of
     // processing.extract_fragments), not processing.analyze.
     const extract = features.find((f) => f.featureId === "processing.extract");
@@ -130,9 +147,9 @@ describe("composed registry integrity", () => {
         executesJobs: [],
       }),
     ];
-    expect(() => assertFeaturesCoherent(drifted, operations, events)).toThrowError(
-      /unknown operation drifted.nonexistentOperation/,
-    );
+    expect(() =>
+      assertFeaturesCoherent(drifted, operations, events),
+    ).toThrowError(/unknown operation drifted.nonexistentOperation/);
     expect(() =>
       assertFeaturesCoherent(
         [
@@ -150,12 +167,20 @@ describe("composed registry integrity", () => {
         events,
       ),
     ).toThrowError(/unknown event drifted.nonexistentEvent/);
-    expect(() => assertFeaturesCoherent(features, operations, events)).not.toThrow();
+    expect(() =>
+      assertFeaturesCoherent(features, operations, events),
+    ).not.toThrow();
     // Cross-check: derived edges equal declared edges; dropping one feature
     // (and with it its executor coverage) must throw.
-    expect(() => assertFeaturesCoverRegistrations(features, executors, eventConsumers)).not.toThrow();
     expect(() =>
-      assertFeaturesCoverRegistrations(features.slice(1), executors, eventConsumers),
+      assertFeaturesCoverRegistrations(features, executors, eventConsumers),
+    ).not.toThrow();
+    expect(() =>
+      assertFeaturesCoverRegistrations(
+        features.slice(1),
+        executors,
+        eventConsumers,
+      ),
     ).toThrowError(/expected exactly 1|has no feature/);
   });
 
@@ -165,7 +190,9 @@ describe("composed registry integrity", () => {
       throw new Error("expected at least one registered executor");
     }
     const duplicated = [...executors, first];
-    expect(() => assertNoDuplicateExecutors(duplicated)).toThrowError(/duplicate executor/);
+    expect(() => assertNoDuplicateExecutors(duplicated)).toThrowError(
+      /duplicate executor/,
+    );
     expect(() => assertNoDuplicateExecutors(executors)).not.toThrow();
   });
 });
@@ -177,7 +204,12 @@ describe("fail-closed placeholders", () => {
     expect(Schema.is(ClosedError)(error)).toBe(true);
     // No internals leak: the closed error has no stack/cause/detail fields.
     const encoded = Schema.encodeSync(ClosedError)(error);
-    expect(Object.keys(encoded).sort()).toEqual(["_tag", "code", "message", "operation"]);
+    expect(Object.keys(encoded).sort()).toEqual([
+      "_tag",
+      "code",
+      "message",
+      "operation",
+    ]);
   });
 
   it("result envelopes decode on both branches", () => {
@@ -189,7 +221,10 @@ describe("fail-closed placeholders", () => {
     expect(err._tag).toBe("error");
     // Envelope rejects a raw internal error without the closed shape.
     expect(() =>
-      Schema.decodeUnknownSync(ResultEnvelope)({ _tag: "error", error: new Error("boom") }),
+      Schema.decodeUnknownSync(ResultEnvelope)({
+        _tag: "error",
+        error: new Error("boom"),
+      }),
     ).toThrow();
   });
 });
@@ -216,7 +251,9 @@ describe("envelopes decode end to end", () => {
     const command = Schema.decodeUnknownSync(CommandEnvelope)({
       operation: "memory.correctFinding",
       input: { findingId: "f1" },
-      expectedRevisions: [{ recordTable: "findings", recordId: "f1", revision: 3 }],
+      expectedRevisions: [
+        { recordTable: "findings", recordId: "f1", revision: 3 },
+      ],
       idempotencyKey: newIdempotencyKey(),
     });
     expect(command.expectedRevisions[0]?.revision).toBe(3);
@@ -224,7 +261,9 @@ describe("envelopes decode end to end", () => {
       Schema.decodeUnknownSync(CommandEnvelope)({
         operation: "memory.correctFinding",
         input: {},
-        expectedRevisions: [{ recordTable: "findings", recordId: "f1", revision: 0 }],
+        expectedRevisions: [
+          { recordTable: "findings", recordId: "f1", revision: 0 },
+        ],
       }),
     ).toThrow();
   });
@@ -261,7 +300,10 @@ describe("envelopes decode end to end", () => {
       jobKey: "job_00000000-0000-4000-8000-000000000000",
       kind: "deletion.purge_source",
       input: { sourceId: "s1" },
-      provenance: { companyId: parseTableId("companies", "c1"), sourceId: "s1" },
+      provenance: {
+        companyId: parseTableId("companies", "c1"),
+        sourceId: "s1",
+      },
       policy: { maxAttempts: 3, backoffBaseMs: 1000 },
       state: "queued",
     });

@@ -35,6 +35,8 @@ import { acceptTables } from "./sources/accept/schema";
 import { uploadsTables } from "./sources/uploads/schema";
 // D6 amendment (flagged coordinated change): the audio STT fragment.
 import { audioTables } from "./processing/audio/schema";
+// E4 amendment (flagged coordinated change): the multimodal-join fragment.
+import { multimodalTables } from "./processing/multimodal/schema";
 import { platformTables } from "./platform/schema";
 import { searchTables } from "./search/schema";
 import { readStateTables } from "./attention/read-state/schema";
@@ -42,6 +44,9 @@ import { preferencesTables } from "./attention/preferences/schema";
 import { deliveryTables } from "./attention/delivery/schema";
 import { calendarConnectionTables } from "./calendar/connection/schema";
 import { calendarProjectionTables } from "./calendar/projection/schema";
+// G3 append (flagged shared-file change, the G1/G2 precedent): the sync
+// attempt ledger and the proof-only fake-event store.
+import { calendarSyncTables } from "./calendar/sync/schema";
 import { exportsTables } from "./operations/exports/schema";
 import { deletionTables } from "./operations/deletion/schema";
 import { backupsTables } from "./operations/backups/schema";
@@ -59,6 +64,7 @@ const fragments: ReadonlyArray<Record<string, TableDefinition>> = [
   acceptTables,
   uploadsTables,
   audioTables,
+  multimodalTables,
   platformTables,
   searchTables,
   readStateTables,
@@ -66,6 +72,7 @@ const fragments: ReadonlyArray<Record<string, TableDefinition>> = [
   deliveryTables,
   calendarConnectionTables,
   calendarProjectionTables,
+  calendarSyncTables,
   exportsTables,
   deletionTables,
   backupsTables,
@@ -116,6 +123,7 @@ export default defineSchema({
   ...acceptTables,
   ...uploadsTables,
   ...audioTables,
+  ...multimodalTables,
   ...platformTables,
   ...searchTables,
   ...readStateTables,
@@ -123,6 +131,7 @@ export default defineSchema({
   ...deliveryTables,
   ...calendarConnectionTables,
   ...calendarProjectionTables,
+  ...calendarSyncTables,
   ...exportsTables,
   ...deletionTables,
   ...backupsTables,

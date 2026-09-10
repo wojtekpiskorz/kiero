@@ -41,7 +41,11 @@
 import { internalMutation } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { MutationCtx } from "../_generated/server";
-import { eventConsumers, newDurableJobKey, type DurableJobKind } from "@kiero/contracts";
+import {
+  eventConsumers,
+  newDurableJobKey,
+  type DurableJobKind,
+} from "@kiero/contracts";
 import { registerDurableJob } from "./publish";
 
 const BATCH_SIZE = 10;
@@ -122,7 +126,11 @@ function projectOneEdge(
     return {
       kind: "job",
       jobKind,
-      input: { kind: "session", membershipId: null, sessionId: payload.sessionId },
+      input: {
+        kind: "session",
+        membershipId: null,
+        sessionId: payload.sessionId,
+      },
       dedupKey: rowDedupKey,
     };
   }
@@ -134,6 +142,38 @@ function projectOneEdge(
       jobKind,
       input: { dedupKey: rowDedupKey, message: payload.message },
       dedupKey: rowDedupKey,
+    };
+  }
+  // E4 registration (issue #38 owns these edges' projections): the accepted
+  // source projects onto the multimodal join (STT ordering + the joined
+  // partial-safe analysis; the executor resolves the source's initial
+  // analysis run from `null`, the way D6's orders anchor), and a requested
+  // reanalysis projects onto the kicker's NEW run so a mixed source re-joins
+  // its extraction outcomes. Dedup keys derive from the payload's source
+  // identity, never the row's, so the acceptance publisher and this edge
+  // can never collide across kinds.
+  if (jobKind === "processing.join_multimodal") {
+    if (eventName === "operations.reanalysisRequested") {
+      return {
+        kind: "job",
+        jobKind,
+        input: {
+          sourceId: payload.sourceId,
+          processingRunId: payload.newRunId ?? null,
+          reanalysisOfRunId: payload.reanalysisOfRunId ?? null,
+        },
+        dedupKey: `processing.join_multimodal:${String(payload.sourceId)}:reanalysis:${String(payload.newRunId ?? "")}`,
+      };
+    }
+    return {
+      kind: "job",
+      jobKind,
+      input: {
+        sourceId: payload.sourceId,
+        processingRunId: null,
+        reanalysisOfRunId: null,
+      },
+      dedupKey: `processing.join_multimodal:${String(payload.sourceId)}`,
     };
   }
   // C5 registration (issue #28 owns these edges' projections): withdrawal
@@ -201,8 +241,72 @@ function projectOneEdge(
     return {
       kind: "job",
       jobKind,
-      input: { sourceId: payload.sourceId, attachmentIds: payload.attachmentIds ?? [] },
+      input: {
+        sourceId: payload.sourceId,
+        attachmentIds: payload.attachmentIds ?? [],
+      },
       dedupKey: `processing.normalize_photo:${String(payload.sourceId)}`,
+    };
+  }
+  // G3 registration (issue #47 owns this declared consumer proof): a
+  // recorded Calendar outcome change projects onto ONE bounded
+  // reconciliation of that copy — the durable observation that resolves
+  // unknown outcomes (never a blind retry; the executor's uncertain
+  // failures re-block registration). The row's dedup identity is the
+  // job's, so one outcome change registers one job.
+  if (jobKind === "calendar.reconcile_outcome") {
+    return {
+      kind: "job",
+      jobKind,
+      input: { copyId: payload.copyId, lastKnownOutcome: payload.outcome },
+      dedupKey: rowDedupKey,
+    };
+  }
+  // F2 registration (issue #42 owns these edges' projections): the three
+  // intent-source events project onto `attention.evaluate_due_intents`.
+  // The dedup keys are derived from each event's SUBJECT (source,
+  // clarification, change set), never the outbox row — the acceptance row's
+  // key already carries the extract job, and a differently-keyed duplicate
+  // event still collapses onto the same semantic intents. The
+  // change-set-published payload carries no source id; the executor
+  // resolves the change set's source itself.
+  if (jobKind === "attention.evaluate_due_intents") {
+    if (eventName === "sources.sourceAccepted") {
+      return {
+        kind: "job",
+        jobKind,
+        input: {
+          trigger: "source_accepted",
+          sourceId: payload.sourceId,
+          clarificationId: null,
+          changeSetId: null,
+        },
+        dedupKey: `attention.evaluate_due_intents:source:${String(payload.sourceId)}`,
+      };
+    }
+    if (eventName === "memory.clarificationRaised") {
+      return {
+        kind: "job",
+        jobKind,
+        input: {
+          trigger: "clarification_raised",
+          sourceId: null,
+          clarificationId: payload.clarificationId,
+          changeSetId: null,
+        },
+        dedupKey: `attention.evaluate_due_intents:clarification:${String(payload.clarificationId)}`,
+      };
+    }
+    return {
+      kind: "job",
+      jobKind,
+      input: {
+        trigger: "change_set_published",
+        sourceId: null,
+        clarificationId: null,
+        changeSetId: payload.changeSetId,
+      },
+      dedupKey: `attention.evaluate_due_intents:changeset:${String(payload.changeSetId)}`,
     };
   }
   return { kind: "unprojected_edge", jobKind };
@@ -222,11 +326,15 @@ export function projectEventToJobInputs(
   payload: Record<string, unknown>,
   rowDedupKey: string,
 ): EventProjection[] {
-  const edges = eventConsumers.filter((consumer) => consumer.eventName === eventName);
+  const edges = eventConsumers.filter(
+    (consumer) => consumer.eventName === eventName,
+  );
   if (edges.length === 0) {
     return [{ kind: "no_consumer" }];
   }
-  return edges.map((edge) => projectOneEdge(eventName, edge.jobKind, payload, rowDedupKey));
+  return edges.map((edge) =>
+    projectOneEdge(eventName, edge.jobKind, payload, rowDedupKey),
+  );
 }
 
 /** Processes one batch of pending outbox rows. */
@@ -255,7 +363,9 @@ export async function drainBatch(ctx: MutationCtx): Promise<void> {
           companyId: row.companyId,
           policy: { maxAttempts: 3, backoffBaseMs: 2_000 },
           jobKey: newDurableJobKey(),
-          ...(projection.dedupKey === undefined ? {} : { dedupKey: projection.dedupKey }),
+          ...(projection.dedupKey === undefined
+            ? {}
+            : { dedupKey: projection.dedupKey }),
         });
         registeredAny = true;
         sawConsumerEdge = true;
@@ -309,7 +419,11 @@ export const drainOutbox = internalMutation({
       .withIndex("by_delivery", (q) => q.eq("deliveryState", "pending"))
       .take(1);
     if (remaining.length > 0) {
-      await ctx.scheduler.runAfter(1_000, internal.platform.outbox.drainOutbox, {});
+      await ctx.scheduler.runAfter(
+        1_000,
+        internal.platform.outbox.drainOutbox,
+        {},
+      );
     }
   },
 });

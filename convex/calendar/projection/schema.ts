@@ -22,6 +22,9 @@
  *   selection (default: all projects, independent of notification
  *   preferences) and the honest suspension reason of the last projection
  *   pass (a lost or refresh-unknown connection suspends publishing).
+ * - G3 amendment (round-2 concurrency fix): `calendarCopies.syncAttemptSeq`
+ *   is G3's attempt-claim counter, like the remote-ledger columns below —
+ *   G2's projection pass never writes it.
  *
  * Tables: calendarCopies, calendarSyncState.
  */
@@ -113,6 +116,15 @@ export const calendarProjectionTables = {
     hiddenOrigin: v.optional(hideOrigin),
     hiddenAtMs: v.optional(shared.tsMs),
     remoteOutcome: calendarRemoteOutcome,
+    /**
+     * G3's attempt-claim counter: bumped in the SAME transaction that
+     * inserts an attempt row, so the attempt dedup key is minted from a
+     * PERSISTED sequence instead of a read-then-used row count. Two racing
+     * prepares for one copy conflict on THIS document; Convex retries the
+     * loser into a view that counts the winner's row, so the same key —
+     * and the same external leg — can never be minted twice.
+     */
+    syncAttemptSeq: v.optional(v.number()),
     updatedAtMs: shared.tsMs,
   })
     .index("by_connection", ["connectionId"])

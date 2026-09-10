@@ -93,6 +93,10 @@ export const TABLE_ID_NAMES = [
   "processingRuns",
   "processingSteps",
   "processingAttempts",
+  // processing/multimodal (E4 amendment, flagged coordinated change, the
+  // D6 precedent): the vision-extraction order rows over retained image
+  // representations (issue #38).
+  "visionOrders",
   "durableJobs",
   "outboxEvents",
   // A3 certification amendment: observable external-effect ledger used by the
@@ -111,6 +115,11 @@ export const TABLE_ID_NAMES = [
   // calendar/projection
   "calendarCopies",
   "calendarSyncState",
+  // calendar/sync (G3 amendment, the G1/G2 closed-inventory precedent):
+  // the per-leg attempt/outcome ledger, and the proof-only fake-Google
+  // event store the guarded fixtures write.
+  "calendarSyncAttempts",
+  "calendarProofEvents",
   // operations/exports
   "exports",
   "exportSourceLinks",

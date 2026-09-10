@@ -11,7 +11,7 @@ import { jobExecutors } from "../../convex/platform/executors";
 import { echoExecutor } from "../../convex/platform/echo";
 
 describe("convex executor composition", () => {
-  it("registers exactly the implemented executors (platform + B3 + C5 + D6 + E3 lanes)", () => {
+  it("registers exactly the implemented executors (platform + B3 + C5 + D6 + E3/E4 lanes)", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
       [
         "platform.echo_delivery",
@@ -27,14 +27,22 @@ describe("convex executor composition", () => {
         // proof for the accepted-photo normalization edge).
         "processing.normalize_photo",
 
+        // F2's sanctioned append (issue #42 owns the notification-intent
+        // lane: the durable reaction to the three consumed events).
+        "attention.evaluate_due_intents",
         // E3's sanctioned append (issue #37 owns the text-analysis lane:
         // the mechanical A3 analyze executor is replaced behind the same
         // seam by the real workflow, and the extract edge is implemented).
         "processing.extract_fragments",
-        // C5's sanctioned append (issue #28 owns the recomputation lane:
-        // withdrawal marking, the updating cascade and the linked
-        // re-analysis registrations).
+
+        // C5's sanctioned append (issue #28 owns the recomputation lane).
         "memory.recompute_dependents",
+        // G3's sanctioned append (issue #47 owns the declared consumer
+        // proof for the calendar.copyOutcomeRecorded edge).
+        "calendar.reconcile_outcome",
+        // E4's sanctioned append (issue #38 owns the multimodal join; the
+        // contracts amendment registering the kind is flagged there).
+        "processing.join_multimodal",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");
@@ -42,13 +50,15 @@ describe("convex executor composition", () => {
 
   it("every registered kind exists in the A2/A3 registry executor table", () => {
     for (const kind of Object.keys(jobExecutors)) {
-      expect(executors.some((entry) => entry.jobKind === kind), kind).toBe(true);
+      expect(
+        executors.some((entry) => entry.jobKind === kind),
+        kind,
+      ).toBe(true);
     }
   });
 
   it("unimplemented kinds (the fail-closed placeholders) stay unimplemented", () => {
     expect(jobExecutors["deletion.purge_source"]).toBeUndefined();
-    expect(jobExecutors["calendar.reconcile_outcome"]).toBeUndefined();
   });
 });
 
@@ -66,7 +76,11 @@ describe("temporal cross-precision bound ordering (A2 deferral resolved by A3)",
 
   it("accepts equal period starts (a bound and the period containing it)", () => {
     expect(() =>
-      decode({ _tag: "range", start: { _tag: "month", month: "2026-05" }, end: { _tag: "month", month: "2026-05" } }),
+      decode({
+        _tag: "range",
+        start: { _tag: "month", month: "2026-05" },
+        end: { _tag: "month", month: "2026-05" },
+      }),
     ).not.toThrow();
   });
 
