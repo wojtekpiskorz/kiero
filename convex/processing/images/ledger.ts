@@ -53,6 +53,7 @@ import {
   decideReceivedCleanup,
   decideRetentionStep,
   decideRetainedSelection,
+  toRepresentationView,
   RecordOutcome,
   VerifyEvidence,
   type RepresentationView,
@@ -167,18 +168,8 @@ async function representationsOf(
     .query("mediaRepresentations")
     .withIndex("by_attachment_role", (q) => q.eq("attachmentId", attachmentId))
     .collect();
-  return rows.map((row) => ({
-    _id: row._id,
-    attachmentId: row.attachmentId,
-    role: row.role,
-    objectKey: row.objectKey,
-    contentHash: row.contentHash,
-    transformVersion: row.transformVersion,
-    ...(row.verifiedAtMs === undefined ? {} : { verifiedAtMs: row.verifiedAtMs }),
-    ...(row.removedAtMs === undefined ? {} : { removedAtMs: row.removedAtMs }),
-    ...(row.exceptionKind === undefined ? {} : { exceptionKind: row.exceptionKind }),
-    ...(row.bytes === undefined ? {} : { bytes: row.bytes }),
-  }));
+  // The ONE row -> view mapping (protocol.ts); mirrors are hazards.
+  return rows.map(toRepresentationView);
 }
 
 /** How many extraction rows still reference one representation. */
@@ -197,14 +188,18 @@ async function extractionReferences(
   return rows.filter((row) => row.representationId === representationId).length;
 }
 
-/** One shared completion: job terminal state plus the outbox row's state. */
+/**
+ * One shared completion: the JOB row's terminal state. Under the multi-edge
+ * outbox decision (see convex/platform/outbox.ts) the publication row is
+ * owned by the drain and per-reaction outcomes live HERE, on durableJobs —
+ * the executor never flips an outbox row.
+ */
 async function completeJob(
   tx: MutationCtx,
   job: JobRow,
   params: {
     jobState: "succeeded" | "failed";
     externalOutcome: "succeeded" | "failed" | "timeout" | "unknown";
-    deliveryState: "delivered" | "failed";
     errorKind?: string;
     finished: boolean;
   },
@@ -219,21 +214,6 @@ async function completeJob(
     updatedAtMs: nowMs,
     ...(params.finished ? { finishedAtMs: nowMs } : {}),
   });
-  if (job.dedupKey === undefined) {
-    return;
-  }
-  const outboxRow = await tx.db
-    .query("outboxEvents")
-    .withIndex("by_dedup", (q) => q.eq("dedupKey", job.dedupKey))
-    .first();
-  if (outboxRow !== null) {
-    await tx.db.patch(outboxRow._id, {
-      deliveryState: params.deliveryState,
-      ...(params.errorKind === undefined || params.errorKind === ""
-        ? {}
-        : { lastErrorKind: params.errorKind }),
-    });
-  }
 }
 
 /** Re-queues one job attempt with backoff (bounded by the row's maxAttempts). */
@@ -708,7 +688,6 @@ export async function reconcileNormalizationTransaction(
     await completeJob(tx, job, {
       jobState: "succeeded",
       externalOutcome: "succeeded",
-      deliveryState: "delivered",
       finished: true,
     });
     return okResult({ reconciled: "completed", attachments, pendingCleanup } satisfies ReconcileResult);
@@ -722,7 +701,6 @@ export async function reconcileNormalizationTransaction(
       externalOutcome: job.externalOutcome === "timeout" || job.externalOutcome === "unknown"
         ? job.externalOutcome
         : "failed",
-      deliveryState: "failed",
       errorKind: "max_attempts_exceeded",
       finished: true,
     });
@@ -761,7 +739,6 @@ export async function recordAttemptOutcomeTransaction(
     await completeJob(tx, job, {
       jobState: "succeeded",
       externalOutcome: "succeeded",
-      deliveryState: "delivered",
       finished: true,
     });
     return okResult({ recorded: true, state: "succeeded" });
@@ -770,7 +747,6 @@ export async function recordAttemptOutcomeTransaction(
     await completeJob(tx, job, {
       jobState: "failed",
       externalOutcome: "failed",
-      deliveryState: "failed",
       ...(errorKind === "" ? {} : { errorKind }),
       finished: true,
     });
@@ -782,20 +758,9 @@ export async function recordAttemptOutcomeTransaction(
     RETRY_BACKOFF_BASE_MS,
   );
   if (transition.to === "in_flight") {
-    // Definite failure with attempts left: re-queue with backoff.
+    // Definite failure with attempts left: re-queue with backoff (the job
+    // row is the outcome carrier; the publication row stays the drain's).
     await requeueJob(tx, job, errorKind);
-    if (job.dedupKey !== undefined) {
-      const outboxRow = await tx.db
-        .query("outboxEvents")
-        .withIndex("by_dedup", (q) => q.eq("dedupKey", job.dedupKey))
-        .first();
-      if (outboxRow !== null) {
-        await tx.db.patch(outboxRow._id, {
-          deliveryState: "pending",
-          nextAttemptAtMs: transition.nextAttemptAtMs,
-        });
-      }
-    }
     return okResult({ recorded: true, state: "queued" });
   }
   // Uncertain (timeout/unknown) or attempts exhausted: record and stop;
@@ -803,7 +768,6 @@ export async function recordAttemptOutcomeTransaction(
   await completeJob(tx, job, {
     jobState: "failed",
     externalOutcome: outcome,
-    deliveryState: "failed",
     ...(errorKind === "" ? {} : { errorKind }),
     finished: transition.to === "failed" ? transition.terminal : true,
   });

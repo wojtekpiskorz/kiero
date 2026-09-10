@@ -7,7 +7,10 @@
  *   for the resumable step machine). The optional `crashAfter` field is the
  *   guarded crash-window proof hook: it stops the drive at a named boundary
  *   so the live evidence can prove the uncertain-outcome semantics and the
- *   reconciliation resumption.
+ *   reconciliation resumption. The hook is dead unless the Worker runs with
+ *   `KIERO_PROBE_ENABLED=1` (a dev/proof variable; production deploys of the
+ *   committed config never set it) — production cannot be told to crash on
+ *   demand.
  * - `POST /images/reconcile` — the cleanup resumption pass: reconciliation
  *   names the received objects whose retained pair is verified; this route
  *   deletes them, marks the rows and confirms completion.
@@ -15,8 +18,10 @@
  * IDENTITY: both routes act as the PLATFORM (the Worker's service
  * credential, the same shared secret the Convex images action presents).
  * There is no user identity on this surface — the Convex side re-derives
- * every row from the durable job the `jobKey` names. The bearer check is a
- * SHA-256 digest compare (never a plaintext equality on the wire secret).
+ * every row from the durable job the `jobKey` names. The bearer check is
+ * the ONE digest-compare definition (convex/operations/telemetry/
+ * serviceToken.ts — deliberately runtime-importable, imported here exactly
+ * like the gateway's other pure Convex-directory modules).
  */
 
 import { errorResult, type ResultEnvelope } from "@kiero/contracts";
@@ -24,6 +29,7 @@ import { unauthenticatedError, validationError } from "@kiero/runtime";
 import type { RouteProvider } from "../composition/registry";
 import type { CrashAfter, ImagesEnv } from "./service";
 import { driveNormalization, resumeCleanup } from "./service";
+import { verifyServiceBearerToken } from "../../../../convex/operations/telemetry/serviceToken";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -36,36 +42,9 @@ function respond(result: ResultEnvelope): Response {
   return jsonResponse(result._tag === "ok" ? 200 : 400, result);
 }
 
-async function digestHex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/**
- * The service-credential check: the bearer value must digest-match the
- * Worker's `KIERO_SERVICE_TOKEN` secret binding. (The Convex side compares
- * the same way in operations/telemetry/serviceToken.ts; this is the
- * gateway-side mirror of that one definition.)
- */
-async function requireServiceCredential(
-  request: Request,
-  env: ImagesEnv,
-): Promise<boolean> {
-  const authorization = request.headers.get("authorization");
-  if (authorization === null || !authorization.startsWith("Bearer ")) {
-    return false;
-  }
-  const secret = env.KIERO_SERVICE_TOKEN;
-  if (secret === undefined || secret === "") {
-    return false;
-  }
-  const presented = authorization.slice("Bearer ".length);
-  if (presented.length !== secret.length) {
-    return false;
-  }
-  return (await digestHex(presented)) === (await digestHex(secret));
+/** The service-credential check: the ONE shared digest-compare definition. */
+function requireServiceCredential(request: Request, env: ImagesEnv): Promise<boolean> {
+  return verifyServiceBearerToken(request.headers.get("authorization"), env.KIERO_SERVICE_TOKEN);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -100,8 +79,12 @@ async function normalizeRoute(request: Request, env: ImagesEnv): Promise<Respons
   if (typeof jobKey !== "string" || jobKey.length === 0) {
     return respond(errorResult(validationError("job_key_missing")));
   }
+  // The crash hook is proof-only: dead unless the Worker runs with the
+  // probe variable set (never set by the committed production config).
   const stop: CrashAfter | undefined =
-    crashAfter === "record" || crashAfter === "verify" ? crashAfter : undefined;
+    env.KIERO_PROBE_ENABLED === "1" && (crashAfter === "record" || crashAfter === "verify")
+      ? crashAfter
+      : undefined;
   return respond(await driveNormalization(env, jobKey, stop));
 }
 

@@ -13,6 +13,7 @@ import { Schema } from "effect";
 import {
   MAX_INPUT_BYTES,
   NORMALIZE_TRANSFORM_VERSION,
+  compareTransformVersions,
   RETAINED_MAX_EDGE,
   RETENTION_EXCEPTION_KINDS,
   RetentionExceptionKind,
@@ -317,6 +318,19 @@ describe("decideRetainedSelection", () => {
     const newer = rep({ role: "retained", verifiedAtMs: 1, transformVersion: "d5.normalize/2" });
     expect(decideRetainedSelection([older, newer])).toBe(newer);
     expect(decideRetainedSelection([newer, older])).toBe(newer);
+  });
+
+  it("version precedence is numeric-aware, not string-ordered (/10 beats /2)", () => {
+    const two = rep({ role: "retained", verifiedAtMs: 1, transformVersion: "d5.normalize/2" });
+    const ten = rep({ role: "retained", verifiedAtMs: 1, transformVersion: "d5.normalize/10" });
+    expect(decideRetainedSelection([two, ten])).toBe(ten);
+    expect(decideRetainedSelection([ten, two])).toBe(ten);
+    expect(compareTransformVersions("d5.normalize/2", "d5.normalize/10")).toBeLessThan(0);
+    expect(compareTransformVersions("d5.normalize/10", "d5.normalize/2")).toBeGreaterThan(0);
+    expect(compareTransformVersions("d5.normalize/1", "d5.normalize/1")).toBe(0);
+    // Non-numeric segments stay lexicographic; equal versions fall through
+    // to the id tiebreak (tested below).
+    expect(compareTransformVersions("d5.normalize/1", "d5.normalize/1b")).toBeLessThan(0);
   });
 
   it("ties break deterministically by representation id (stable across observations)", () => {

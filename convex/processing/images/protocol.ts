@@ -371,12 +371,41 @@ export function decideRetentionStep(
 }
 
 /**
+ * Numeric-aware transform-version ordering: segments between "." and "/"
+ * compare numerically when both are numeric ("d5.normalize/10" is GREATER
+ * than "d5.normalize/2"), lexicographically otherwise. Negative for a
+ * before b, positive for a after b.
+ */
+export function compareTransformVersions(a: string, b: string): number {
+  const aSegments = a.split(/[./]/);
+  const bSegments = b.split(/[./]/);
+  const length = Math.max(aSegments.length, bSegments.length);
+  for (let index = 0; index < length; index += 1) {
+    const left = aSegments[index] ?? "";
+    const right = bSegments[index] ?? "";
+    const leftNumeric = /^\d+$/.test(left) ? Number(left) : null;
+    const rightNumeric = /^\d+$/.test(right) ? Number(right) : null;
+    if (leftNumeric !== null && rightNumeric !== null) {
+      if (leftNumeric !== rightNumeric) {
+        return leftNumeric - rightNumeric;
+      }
+      continue;
+    }
+    if (left !== right) {
+      return left < right ? -1 : 1;
+    }
+  }
+  return 0;
+}
+
+/**
  * The deterministic CURRENT retained representation of one attachment (what
  * E4's vision anchors and D3's reads must resolve to): verified normalized
  * rows win over the retained-original exception; among verified normalized
- * rows the greatest transform version wins (explicit version precedence,
- * then creation time, then id — a stable total order), so racing two
- * transform versions never flips the selection between observations.
+ * rows the greatest transform version wins (numeric-aware version
+ * precedence, then creation time, then id — a stable total order), so
+ * racing two transform versions never flips the selection between
+ * observations.
  */
 export function decideRetainedSelection(
   representations: readonly RepresentationView[],
@@ -393,12 +422,50 @@ export function decideRetainedSelection(
     if (aException !== bException) {
       return aException - bException;
     }
-    if (a.transformVersion !== b.transformVersion) {
-      return a.transformVersion < b.transformVersion ? 1 : -1;
+    const byVersion = compareTransformVersions(a.transformVersion, b.transformVersion);
+    if (byVersion !== 0) {
+      return -byVersion;
     }
     return a._id < b._id ? -1 : 1;
   });
   return ranked[0] ?? null;
+}
+
+/**
+ * The ONE mapping from a mediaRepresentations row (any reader: ledger
+ * transactions, probes, inspections) to the pure view the retention
+ * decisions read. Mirrors of this mapping are hazards, not copies.
+ */
+export function toRepresentationView(row: {
+  readonly _id: string;
+  readonly attachmentId: string;
+  readonly role: "received" | "retained" | "thumbnail" | "processing";
+  readonly objectKey: string;
+  readonly contentHash: string;
+  readonly transformVersion: string;
+  readonly verifiedAtMs?: number | undefined;
+  readonly removedAtMs?: number | undefined;
+  readonly exceptionKind?: string | undefined;
+  readonly bytes?: number | undefined;
+  readonly width?: number | undefined;
+  readonly height?: number | undefined;
+  readonly mimeType?: string | undefined;
+}): RepresentationView {
+  return {
+    _id: row._id,
+    attachmentId: row.attachmentId,
+    role: row.role,
+    objectKey: row.objectKey,
+    contentHash: row.contentHash,
+    transformVersion: row.transformVersion,
+    ...(row.verifiedAtMs === undefined ? {} : { verifiedAtMs: row.verifiedAtMs }),
+    ...(row.removedAtMs === undefined ? {} : { removedAtMs: row.removedAtMs }),
+    ...(row.exceptionKind === undefined ? {} : { exceptionKind: row.exceptionKind }),
+    ...(row.bytes === undefined ? {} : { bytes: row.bytes }),
+    ...(row.width === undefined ? {} : { width: row.width }),
+    ...(row.height === undefined ? {} : { height: row.height }),
+    ...(row.mimeType === undefined ? {} : { mimeType: row.mimeType }),
+  };
 }
 
 /** The reference facts the received-bytes cleanup rule checks. */

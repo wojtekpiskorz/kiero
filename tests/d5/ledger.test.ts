@@ -548,26 +548,18 @@ describe("the attempt outcome recording (echo-template semantics)", () => {
     const actor = await seedActor(ctx, label);
     const seeded = await seedImage("one", { company: actor.companyId });
     const job = await seedJob(actor.companyId, seeded.sourceId, [seeded.attachmentId]);
-    await ctx.db.insert("outboxEvents", {
-      eventId: `evt-${label}`,
-      companyId: actor.companyId,
-      eventName: "sources.sourceAccepted",
-      envelopeJson: "{}",
-      deliveryState: "in_flight",
-      attempts: 0,
-      nextAttemptAtMs: 1,
-      dedupKey: `processing.normalize_photo:${job.sourceId}`,
-      createdAtMs: 1,
-    });
     return { job, sourceId: job.sourceId };
   }
 
-  it("succeeded completes the job and delivers the outbox row", async () => {
+  it("succeeded completes the JOB row (the publication row is the drain's, never the executor's)", async () => {
     const { job } = await jobFixture("d5out1");
     const result = valueOf(await recordAttemptOutcomeTransaction(tx(), job.jobKey, "succeeded", false, ""));
     expect(result.state).toBe("succeeded");
-    expect(ctx.db.rows("durableJobs").find((row) => row.jobKey === job.jobKey)?.externalOutcome).toBe("succeeded");
-    expect(ctx.db.rows("outboxEvents")[0]?.deliveryState).toBe("delivered");
+    const jobRow = ctx.db.rows("durableJobs").find((row) => row.jobKey === job.jobKey);
+    expect(jobRow?.externalOutcome).toBe("succeeded");
+    expect(jobRow?.finishedAtMs).toBeGreaterThan(0);
+    // The multi-edge decision: the executor never writes an outbox row.
+    expect(ctx.db.rows("outboxEvents")).toHaveLength(0);
   });
 
   it("a definite failure with attempts left re-queues with backoff", async () => {

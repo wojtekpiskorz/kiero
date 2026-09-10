@@ -575,6 +575,22 @@ const n1Final = await waitForTerminal(A, n1.attachmentId);
     job?.state === "succeeded" && job?.externalOutcome === "succeeded" ? "PASS" : "FAIL",
     `state=${job?.state} outcome=${job?.externalOutcome} attempts=${job?.attempts}/${job?.maxAttempts}`,
   );
+  // ROW-TERMINAL SEMANTICS (the multi-edge decision): the publication row
+  // is the drain's — delivered once every registered edge's reaction
+  // registered (extract + normalize both projected at this head); no row
+  // waits in_flight, and outcomes live on the job rows.
+  const companyState = await imagesStateOf(A);
+  const acceptedRows = companyState.value.outbox.filter((row) => row.eventName === "sources.sourceAccepted");
+  const inFlightRows = companyState.value.outbox.filter((row) => row.deliveryState === "in_flight");
+  record(
+    "N1h the sourceAccepted publication rows are terminal (delivered; none in_flight; outcomes on job rows)",
+    acceptedRows.length >= 1 &&
+      acceptedRows.every((row) => row.deliveryState === "delivered") &&
+      inFlightRows.length === 0
+      ? "PASS"
+      : "FAIL",
+    `acceptedRows=${acceptedRows.map((r) => r.deliveryState).join(",")} inFlight=${inFlightRows.length}`,
+  );
 }
 
 // --- N2: the small-dimensions photo (no upscaling, still normalized) ----------------
@@ -677,8 +693,8 @@ const n5Final = await waitForTerminal(A, n5.attachmentId);
   record(
     "R1a replaying the succeeded job changes nothing (same ids, same hashes, no new rows)",
     requeued._tag === "ok" &&
-      JSON.stringify(before.representations.map((r) => [r.representationId, r.contentHash])) ===
-        JSON.stringify(after.representations.map((r) => [r.representationId, r.contentHash])) &&
+      JSON.stringify(before.representations.map((r) => [r._id, r.contentHash])) ===
+        JSON.stringify(after.representations.map((r) => [r._id, r.contentHash])) &&
       job?.state === "succeeded"
       ? "PASS"
       : "FAIL",

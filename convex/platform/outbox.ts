@@ -1,14 +1,28 @@
 /**
- * The outbox drain (A3): the bridge between published events and durable
- * consumer work.
+ * The outbox drain (A3; multi-edge row semantics decided by D5): the bridge
+ * between published events and durable consumer work.
  *
  * Drain runs as a scheduled internal mutation. For each pending outbox row
  * it looks up the registered consumer edges for that event name in the A2/A3
  * composed registry and registers the matching durable job (the reaction is
- * durable, never inline), then marks the row in_flight. A publisher that
- * already registered the work atomically in its own transaction (same dedup
- * key) is recognized and not double-registered. Events with no registered
- * consumer edge are marked delivered immediately (nothing awaits them).
+ * durable, never inline). A publisher that already registered the work
+ * atomically in its own transaction (same dedup key) is recognized and not
+ * double-registered. Events with no registered consumer edge are marked
+ * delivered immediately (nothing awaits them).
+ *
+ * ROW SEMANTICS UNDER MULTI-EDGE FAN-OUT (the D5 decision, 2026-09-10): the
+ * outbox row is the PUBLICATION RECORD, and the DRAIN owns its terminal
+ * transition — `delivered` once every registered edge's reaction is
+ * registered. Per-reaction outcomes live on the `durableJobs` rows (state,
+ * externalOutcome, attempts, finishedAtMs — the A3 round-2 outcome
+ * carriers; H3 inspects those, not this row). No row waits `in_flight` for
+ * a completing executor, because under fan-out one row cannot represent
+ * several executors' outcomes. Executors whose projections carry the row's
+ * dedup identity (echo, B3's cleanup) still flip their own row — those
+ * flips are idempotent writes on a row the drain already delivered; the
+ * retryable-echo path may set a delivered row back to `pending`, after
+ * which the drain re-runs, dedup-skips and re-delivers — bounded and
+ * converging.
  *
  * An edge WITHOUT a projection fails LOUDLY: the row is marked failed with
  * `lastErrorKind: "consumer_projection_missing"` and the drain keeps
@@ -200,9 +214,9 @@ export async function drainBatch(ctx: MutationCtx): Promise<void> {
       }
     }
     if (registeredAny) {
-      // in_flight: at least one durable reaction is registered (or was
-      // already); the completing executors flip the row to delivered/failed.
-      await ctx.db.patch(row._id, { deliveryState: "in_flight" });
+      // The publication record is terminal: every registered edge's durable
+      // reaction is registered (per-reaction outcomes live on the job rows).
+      await ctx.db.patch(row._id, { deliveryState: "delivered" });
       continue;
     }
     if (!sawConsumerEdge) {

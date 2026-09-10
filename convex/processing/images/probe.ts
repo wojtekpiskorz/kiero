@@ -43,7 +43,7 @@ import {
   callImagesExecutor,
 } from "./executor";
 import { recordAttemptOutcomeTransaction } from "./ledger";
-import { decideRetainedSelection, type RepresentationView } from "./protocol";
+import { decideRetainedSelection, toRepresentationView, type RepresentationView } from "./protocol";
 import { reconcileNormalizationTransaction } from "./ledger";
 
 /** The read surface the caller resolution needs (query and mutation ctx both fit). */
@@ -78,21 +78,8 @@ async function representationsOfAttachment(
     .query("mediaRepresentations")
     .withIndex("by_attachment_role", (q) => q.eq("attachmentId", attachmentId))
     .collect();
-  return rows.map((row) => ({
-    _id: row._id,
-    attachmentId: row.attachmentId,
-    role: row.role,
-    objectKey: row.objectKey,
-    contentHash: row.contentHash,
-    transformVersion: row.transformVersion,
-    ...(row.verifiedAtMs === undefined ? {} : { verifiedAtMs: row.verifiedAtMs }),
-    ...(row.removedAtMs === undefined ? {} : { removedAtMs: row.removedAtMs }),
-    ...(row.exceptionKind === undefined ? {} : { exceptionKind: row.exceptionKind }),
-    ...(row.bytes === undefined ? {} : { bytes: row.bytes }),
-    ...(row.width === undefined ? {} : { width: row.width }),
-    ...(row.height === undefined ? {} : { height: row.height }),
-    ...(row.mimeType === undefined ? {} : { mimeType: row.mimeType }),
-  }));
+  // The ONE row -> view mapping (protocol.ts); mirrors are hazards.
+  return rows.map(toRepresentationView);
 }
 
 /** Loads a normalize job and refuses unless it belongs to the company. */
@@ -174,19 +161,7 @@ async function inspectionBody(db: CallerDb, auth: CallerAuth): Promise<ResultEnv
         ...(row.sourceId === undefined ? {} : { sourceId: row.sourceId }),
         objectKey: row.objectKey,
         ...(row.receivedBytes === undefined ? {} : { receivedBytes: row.receivedBytes }),
-        representations: representations.map((view) => ({
-          representationId: view._id,
-          role: view.role,
-          objectKey: view.objectKey,
-          transformVersion: view.transformVersion,
-          ...(view.verifiedAtMs === undefined ? {} : { verifiedAtMs: view.verifiedAtMs }),
-          ...(view.removedAtMs === undefined ? {} : { removedAtMs: view.removedAtMs }),
-          ...(view.exceptionKind === undefined ? {} : { exceptionKind: view.exceptionKind }),
-          ...(view.bytes === undefined ? {} : { bytes: view.bytes }),
-          ...(view.width === undefined ? {} : { width: view.width }),
-          ...(view.height === undefined ? {} : { height: view.height }),
-          ...(view.mimeType === undefined ? {} : { mimeType: view.mimeType }),
-        })),
+        representations,
         ...(selection === null
           ? { retainedSelection: null }
           : {
@@ -206,7 +181,20 @@ async function inspectionBody(db: CallerDb, auth: CallerAuth): Promise<ResultEnv
     .query("durableJobs")
     .withIndex("by_company", (q) => q.eq("companyId", companyId))
     .collect();
+  // The publication records of this company's events, with their terminal
+  // drain states (the multi-edge decision: the row is the publication
+  // record; delivered means every registered edge's reaction registered).
+  const outboxRows = await db
+    .query("outboxEvents")
+    .withIndex("by_company", (q) => q.eq("companyId", companyId))
+    .collect();
   return okResult({
+    outbox: outboxRows.map((row) => ({
+      eventId: row.eventId,
+      eventName: row.eventName,
+      deliveryState: row.deliveryState,
+      ...(row.lastErrorKind === undefined ? {} : { lastErrorKind: row.lastErrorKind }),
+    })),
     attachments: imageAttachments,
     normalizeJobs: jobs
       .filter((job) => job.kind === "processing.normalize_photo")

@@ -14,16 +14,26 @@
  * 2. normalize reads the received object, decides (oversized / unsupported
  *    / normalize) with the pure decision, runs the selected normalizer,
  *    checks the conversion quality, writes the retained + thumbnail
- *    objects and proves them durable (head + full re-read hash);
+ *    objects and proves them durable (head + full re-read hash) — the
+ *    evidence computed THERE is what record and verify consume (no
+ *    write-then-immediately-reread);
  * 3. `record` writes the unverified rows — or the explicit retained-
  *    original exception row, WITHOUT reading oversized inputs at all;
  * 4. `verify` stamps verifiedAtMs on the cross-checked evidence and
  *    publishes `sources.representationRetained`;
  * 5. ONLY THEN the received bytes are deleted and `cleanup` marks the row.
  *
- * The crash-window proof hook (`crashAfter`) stops the drive at a named
- * boundary by throwing — the Worker answers non-JSON, the Convex action
- * records the UNCERTAIN outcome, and reconciliation owns the resumption.
+ * Every path that reaches verification runs the SAME shared tail
+ * (`verifyTail`): the verify bridge step, the crash hook, then the
+ * received-byte cleanup driven by the verify step's OWN decision — never a
+ * fabricated one. A drive resuming at the `cleanup` step re-derives the
+ * decision through the idempotent verify replay (a deduplicated verify
+ * returns the original cleanup decision).
+ *
+ * The crash-window proof hook (`crashAfter`, gated on KIERO_PROBE_ENABLED
+ * at the route) stops the drive at a named boundary by throwing — the
+ * Worker answers non-JSON, the Convex action records the UNCERTAIN
+ * outcome, and reconciliation owns the resumption.
  */
 
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
@@ -42,12 +52,18 @@ import {
   decideNormalization,
   sniffImageFormat,
   type RecordOutcome,
+  type RetentionExceptionKind,
   type SniffedFormat,
   type VerifyEvidence,
 } from "../../../../convex/processing/images/protocol";
 
 /** The env the images lane consumes overall (bridge + bucket + normalizer). */
-export type ImagesEnv = BridgeEnv & NormalizerEnv & { readonly MEDIA_BUCKET: R2Bucket };
+export type ImagesEnv = BridgeEnv &
+  NormalizerEnv & {
+    readonly MEDIA_BUCKET: R2Bucket;
+    /** Proof-only dev variable; never set by the committed production config. */
+    readonly KIERO_PROBE_ENABLED?: string;
+  };
 
 /** Where the crash-window proof stops the drive. */
 export type CrashAfter = "record" | "verify";
@@ -64,34 +80,27 @@ interface AttachmentPlan {
   readonly thumbnailObjectKey: string;
 }
 
-/** The recorded fields of one derived output. */
-interface DerivedOutput {
-  readonly objectKey: string;
-  readonly bytes: number;
-  readonly contentHash: string;
-  readonly width: number;
-  readonly height: number;
-  readonly mimeType: string;
-}
-
 /** One attachment's typed outcome in the drive's result. */
 type AttachmentOutcome = {
   readonly attachmentId: string;
   readonly state: string;
   readonly outcome:
     | "normalized"
-    | "oversized_input"
-    | "unsupported_input"
-    | "conversion_failed"
-    | "quality_unresolved"
+    | RetentionExceptionKind
     | "already_terminal";
 };
+
+/** The durability evidence pair of one attachment's derived objects. */
+interface EvidencePair {
+  readonly retained: VerifyEvidence;
+  readonly thumbnail: VerifyEvidence;
+}
 
 function valueOf(envelope: ResultEnvelope): Record<string, unknown> | null {
   return envelope._tag === "ok" ? (envelope.value as Record<string, unknown>) : null;
 }
 
-/** Durability evidence of one already-written object (head + full re-read). */
+/** Durability evidence of one already-written object (full re-read + hash). */
 async function evidenceOf(
   env: ImagesEnv,
   objectKey: string,
@@ -105,6 +114,16 @@ async function evidenceOf(
     contentHash: reread.sha256Hex,
     bytes: reread.bytes.length,
   };
+}
+
+/** Collects the evidence pair for already-written derived objects. */
+async function collectEvidence(env: ImagesEnv, plan: AttachmentPlan): Promise<EvidencePair | null> {
+  const retained = await evidenceOf(env, plan.retainedObjectKey);
+  const thumbnail = await evidenceOf(env, plan.thumbnailObjectKey);
+  if (retained === null || thumbnail === null) {
+    return null;
+  }
+  return { retained, thumbnail };
 }
 
 /** Encodes one derived kind through the selected normalizer. */
@@ -126,36 +145,40 @@ async function writeAndProve(
   env: ImagesEnv,
   objectKey: string,
   output: { bytes: Uint8Array; width: number; height: number; mimeType: string },
-): Promise<DerivedOutput | null> {
+): Promise<VerifyEvidence> {
   const hash = await sha256Hex(output.bytes);
   await putObject(env.MEDIA_BUCKET, objectKey, output.bytes, output.mimeType);
   const verified = await verifyObject(env.MEDIA_BUCKET, objectKey, hash, output.bytes.length);
   if (!verified.ok) {
-    return null;
+    throw new Error(`derived object not durable: ${verified.reason}`);
   }
-  return {
-    objectKey,
-    bytes: verified.evidence.bytes,
-    contentHash: verified.evidence.contentHash,
-    width: output.width,
-    height: output.height,
-    mimeType: output.mimeType,
-  };
+  return verified.evidence;
 }
+
+/** What one completed normalization produced. */
+type NormalizationResult =
+  | { readonly kind: "exception"; readonly exceptionKind: RetentionExceptionKind }
+  | {
+      readonly kind: "normalized";
+      readonly outcome: RecordOutcome;
+      readonly evidence: EvidencePair;
+    };
 
 /**
  * Runs the whole normalization of one attachment: decide (pure), encode,
  * write, prove. Oversized and unsupported inputs are decided WITHOUT a
  * full read (a ranged head sniff decides formats). Conversion failures and
- * unresolved quality are typed exceptions that keep the original.
+ * unresolved quality are typed exceptions that keep the original. The
+ * durability evidence computed at write time is returned WITH the outcome
+ * so record and verify consume it directly.
  */
 async function normalizeAttachment(
   env: ImagesEnv,
   normalizer: PhotoNormalizer,
   plan: AttachmentPlan,
-): Promise<{ ok: true; outcome: RecordOutcome } | { ok: false; error: ResultEnvelope }> {
+): Promise<{ ok: true; result: NormalizationResult } | { ok: false; error: ResultEnvelope }> {
   if (plan.receivedBytes > MAX_INPUT_BYTES) {
-    return { ok: true, outcome: { _tag: "exception", exceptionKind: "oversized_input" } };
+    return { ok: true, result: { kind: "exception", exceptionKind: "oversized_input" } };
   }
   const head = await readHead(env.MEDIA_BUCKET, plan.receivedObjectKey, 64);
   if (head === null) {
@@ -167,7 +190,7 @@ async function normalizeAttachment(
     supportedFormats: normalizer.supportedFormats as readonly SniffedFormat[],
   });
   if (decision.decision === "retain_original") {
-    return { ok: true, outcome: { _tag: "exception", exceptionKind: decision.exceptionKind } };
+    return { ok: true, result: { kind: "exception", exceptionKind: decision.exceptionKind } };
   }
   const input = await readAll(env.MEDIA_BUCKET, plan.receivedObjectKey);
   if (input === null) {
@@ -181,7 +204,7 @@ async function normalizeAttachment(
   } catch {
     // The executor failed to decode or encode: a typed conversion failure
     // keeps the received original as the inspectable exception.
-    return { ok: true, outcome: { _tag: "exception", exceptionKind: "conversion_failed" } };
+    return { ok: true, result: { kind: "exception", exceptionKind: "conversion_failed" } };
   }
   const quality = decideConversionQuality({
     inputBytes: input.bytes.length,
@@ -191,17 +214,43 @@ async function normalizeAttachment(
     plannedMaxEdge: RETAINED_MAX_EDGE,
   });
   if (!quality.resolved) {
-    return { ok: true, outcome: { _tag: "exception", exceptionKind: "quality_unresolved" } };
+    return { ok: true, result: { kind: "exception", exceptionKind: "quality_unresolved" } };
   }
-  const retained = await writeAndProve(env, plan.retainedObjectKey, retainedOutput);
-  const thumbnail = await writeAndProve(env, plan.thumbnailObjectKey, thumbnailOutput);
-  if (retained === null || thumbnail === null) {
+  try {
+    const retainedEvidence = await writeAndProve(env, plan.retainedObjectKey, retainedOutput);
+    const thumbnailEvidence = await writeAndProve(env, plan.thumbnailObjectKey, thumbnailOutput);
+    return {
+      ok: true,
+      result: {
+        kind: "normalized",
+        outcome: {
+          _tag: "normalized",
+          retained: {
+            objectKey: plan.retainedObjectKey,
+            contentHash: retainedEvidence.contentHash,
+            bytes: retainedEvidence.bytes,
+            width: retainedOutput.width,
+            height: retainedOutput.height,
+            mimeType: retainedOutput.mimeType,
+          },
+          thumbnail: {
+            objectKey: plan.thumbnailObjectKey,
+            contentHash: thumbnailEvidence.contentHash,
+            bytes: thumbnailEvidence.bytes,
+            width: thumbnailOutput.width,
+            height: thumbnailOutput.height,
+            mimeType: thumbnailOutput.mimeType,
+          },
+        },
+        evidence: { retained: retainedEvidence, thumbnail: thumbnailEvidence },
+      },
+    };
+  } catch {
     return {
       ok: false,
       error: errorResult(unavailableError(true, "derived_object_not_durable")),
     };
   }
-  return { ok: true, outcome: { _tag: "normalized", retained, thumbnail } };
 }
 
 /** Records one attachment's typed outcome (idempotent). */
@@ -214,22 +263,24 @@ async function recordOutcomeStep(
   return imagesStep(env, "record", jobKey, { attachmentId, outcome });
 }
 
-/** Verifies one attachment from R2 evidence, then cleans the received bytes. */
-async function verifyAndCleanup(
+/**
+ * THE shared tail every verification-reaching path runs: the verify bridge
+ * step on real evidence, the crash hook, then the received-byte cleanup
+ * driven by the verify step's OWN decision (a deduplicated replay returns
+ * the original decision, so a `cleanup`-state resumption re-derives it
+ * here instead of fabricating one).
+ */
+async function verifyTail(
   env: ImagesEnv,
   jobKey: string,
   plan: AttachmentPlan,
+  evidence: EvidencePair,
   crashAfter?: CrashAfter,
 ): Promise<ResultEnvelope> {
-  const retainedEvidence = await evidenceOf(env, plan.retainedObjectKey);
-  const thumbnailEvidence = await evidenceOf(env, plan.thumbnailObjectKey);
-  if (retainedEvidence === null || thumbnailEvidence === null) {
-    return errorResult(unavailableError(true, "derived_object_not_durable"));
-  }
   const verified = await imagesStep(env, "verify", jobKey, {
     attachmentId: plan.attachmentId,
-    retained: retainedEvidence,
-    thumbnail: thumbnailEvidence,
+    retained: evidence.retained,
+    thumbnail: evidence.thumbnail,
   });
   const value = valueOf(verified);
   if (value === null) {
@@ -240,17 +291,7 @@ async function verifyAndCleanup(
     // removed — reconciliation must finish without a second conversion.
     throw new Error("images drive: deliberate stop after verify");
   }
-  return finishCleanup(env, jobKey, plan, value);
-}
-
-/** Deletes the received bytes (when allowed) and marks the row. */
-async function finishCleanup(
-  env: ImagesEnv,
-  jobKey: string,
-  plan: AttachmentPlan,
-  verifiedValue: Record<string, unknown>,
-): Promise<ResultEnvelope> {
-  const cleanupKey = verifiedValue.cleanupObjectKey;
+  const cleanupKey = value.cleanupObjectKey;
   if (typeof cleanupKey === "string" && cleanupKey !== "") {
     await deleteObject(env.MEDIA_BUCKET, cleanupKey);
     const cleaned = await imagesStep(env, "cleanup", jobKey, {
@@ -261,6 +302,54 @@ async function finishCleanup(
     }
   }
   return okResult({ cleaned: typeof cleanupKey === "string" && cleanupKey !== "" });
+}
+
+/**
+ * Runs one attachment's full conversion path: normalize (with evidence),
+ * record, then the shared verify tail. Exception outcomes record their
+ * typed row and finish without verification (the received bytes ARE the
+ * archive).
+ */
+async function normalizeRecordAndVerify(
+  env: ImagesEnv,
+  normalizer: PhotoNormalizer,
+  jobKey: string,
+  plan: AttachmentPlan,
+  crashAfter?: CrashAfter,
+): Promise<{ ok: true; outcome: AttachmentOutcome } | { ok: false; error: ResultEnvelope }> {
+  const normalized = await normalizeAttachment(env, normalizer, plan);
+  if (!normalized.ok) {
+    return normalized;
+  }
+  const recorded = await recordOutcomeStep(env, jobKey, plan.attachmentId, outcomeOf(normalized.result));
+  if (recorded._tag === "error") {
+    return { ok: false, error: recorded };
+  }
+  if (normalized.result.kind === "exception") {
+    return {
+      ok: true,
+      outcome: { attachmentId: plan.attachmentId, state: "exception", outcome: normalized.result.exceptionKind },
+    };
+  }
+  if (crashAfter === "record") {
+    // The deliberate crash-window: rows recorded, not yet verified.
+    throw new Error("images drive: deliberate stop after record");
+  }
+  const done = await verifyTail(env, jobKey, plan, normalized.result.evidence, crashAfter);
+  if (done._tag === "error") {
+    return { ok: false, error: done };
+  }
+  return {
+    ok: true,
+    outcome: { attachmentId: plan.attachmentId, state: "cleaned", outcome: "normalized" },
+  };
+}
+
+/** The record-step payload of one normalization result. */
+function outcomeOf(result: NormalizationResult): RecordOutcome {
+  return result.kind === "exception"
+    ? { _tag: "exception", exceptionKind: result.exceptionKind }
+    : result.outcome;
 }
 
 /**
@@ -285,59 +374,50 @@ export async function driveNormalization(
   const attachments = (plan.attachments ?? []) as AttachmentPlan[];
   const outcomes: AttachmentOutcome[] = [];
   for (const attachment of attachments) {
-    if (attachment.step === "none" || attachment.step === "cleanup") {
-      if (attachment.step === "cleanup") {
-        // Crash-after-verify resumption INSIDE a later drive: the retained
-        // pair is already verified; only the received bytes remain.
-        const done = await finishCleanup(
-          env,
-          jobKey,
-          attachment,
-          { cleanupObjectKey: attachment.receivedObjectKey },
-        );
-        if (done._tag === "error") {
-          return done;
-        }
-      }
+    if (attachment.step === "none") {
       outcomes.push({
         attachmentId: attachment.attachmentId,
-        state: attachment.step === "cleanup" ? "cleaned" : attachment.state,
+        state: attachment.state,
         outcome: "already_terminal",
       });
       continue;
     }
-    if (attachment.step === "verify") {
-      // Recorded rows exist; only verification (and cleanup) remain.
-      const evidence = await evidenceOf(env, attachment.retainedObjectKey);
-      const thumbEvidence = await evidenceOf(env, attachment.thumbnailObjectKey);
-      if (evidence === null || thumbEvidence === null) {
-        // Rows without objects (never producible by this drive's order, but
-        // a foreign writer or a lost object lands here): re-normalize into
-        // the same deterministic keys rather than verifying ghosts.
-        const renormalized = await normalizeAttachment(env, resolved.normalizer, attachment);
-        if (!renormalized.ok) {
-          return renormalized.error;
+    if (attachment.step === "cleanup") {
+      // Crash-after-verify resumption: the retained pair is verified; the
+      // idempotent verify replay re-derives the cleanup decision from real
+      // evidence (no fabricated decision).
+      const evidence = await collectEvidence(env, attachment);
+      if (evidence === null) {
+        // Verified rows without objects (a foreign writer or a lost
+        // object): re-normalize into the same deterministic keys rather
+        // than verifying ghosts.
+        const redone = await normalizeRecordAndVerify(env, resolved.normalizer, jobKey, attachment, crashAfter);
+        if (!redone.ok) {
+          return redone.error;
         }
-        const recorded = await recordOutcomeStep(env, jobKey, attachment.attachmentId, renormalized.outcome);
-        if (recorded._tag === "error") {
-          return recorded;
-        }
-        if (renormalized.outcome._tag === "exception") {
-          outcomes.push({
-            attachmentId: attachment.attachmentId,
-            state: "exception",
-            outcome: renormalized.outcome.exceptionKind,
-          });
-          continue;
-        }
-        const done = await verifyAndCleanup(env, jobKey, attachment, crashAfter);
-        if (done._tag === "error") {
-          return done;
-        }
-        outcomes.push({ attachmentId: attachment.attachmentId, state: "cleaned", outcome: "normalized" });
+        outcomes.push(redone.outcome);
         continue;
       }
-      const done = await verifyAndCleanup(env, jobKey, attachment, crashAfter);
+      const done = await verifyTail(env, jobKey, attachment, evidence);
+      if (done._tag === "error") {
+        return done;
+      }
+      outcomes.push({ attachmentId: attachment.attachmentId, state: "cleaned", outcome: "normalized" });
+      continue;
+    }
+    if (attachment.step === "verify") {
+      // Recorded rows exist; only verification (and cleanup) remain — from
+      // the objects actually in R2.
+      const evidence = await collectEvidence(env, attachment);
+      if (evidence === null) {
+        const redone = await normalizeRecordAndVerify(env, resolved.normalizer, jobKey, attachment, crashAfter);
+        if (!redone.ok) {
+          return redone.error;
+        }
+        outcomes.push(redone.outcome);
+        continue;
+      }
+      const done = await verifyTail(env, jobKey, attachment, evidence, crashAfter);
       if (done._tag === "error") {
         return done;
       }
@@ -345,31 +425,11 @@ export async function driveNormalization(
       continue;
     }
     // step === "normalize": the full conversion path.
-    const normalized = await normalizeAttachment(env, resolved.normalizer, attachment);
-    if (!normalized.ok) {
-      return normalized.error;
+    const done = await normalizeRecordAndVerify(env, resolved.normalizer, jobKey, attachment, crashAfter);
+    if (!done.ok) {
+      return done.error;
     }
-    const recorded = await recordOutcomeStep(env, jobKey, attachment.attachmentId, normalized.outcome);
-    if (recorded._tag === "error") {
-      return recorded;
-    }
-    if (normalized.outcome._tag === "exception") {
-      outcomes.push({
-        attachmentId: attachment.attachmentId,
-        state: "exception",
-        outcome: normalized.outcome.exceptionKind,
-      });
-      continue;
-    }
-    if (crashAfter === "record") {
-      // The deliberate crash-window: rows recorded, not yet verified.
-      throw new Error("images drive: deliberate stop after record");
-    }
-    const done = await verifyAndCleanup(env, jobKey, attachment, crashAfter);
-    if (done._tag === "error") {
-      return done;
-    }
-    outcomes.push({ attachmentId: attachment.attachmentId, state: "cleaned", outcome: "normalized" });
+    outcomes.push(done.outcome);
   }
   return okResult({
     jobKey,
