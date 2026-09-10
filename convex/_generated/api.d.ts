@@ -121,6 +121,11 @@ import type * as sources_accept_acceptance from "../sources/accept/acceptance.js
 import type * as sources_accept_commands from "../sources/accept/commands.js";
 import type * as sources_accept_dispatch from "../sources/accept/dispatch.js";
 import type * as sources_accept_probe from "../sources/accept/probe.js";
+import type * as sources_media_access_access from "../sources/media_access/access.js";
+import type * as sources_media_access_commands from "../sources/media_access/commands.js";
+import type * as sources_media_access_http from "../sources/media_access/http.js";
+import type * as sources_media_access_probe from "../sources/media_access/probe.js";
+import type * as sources_media_access_protocol from "../sources/media_access/protocol.js";
 import type * as sources_probe_shared from "../sources/probe_shared.js";
 import type * as sources_read_probe from "../sources/read/probe.js";
 import type * as sources_read_rows from "../sources/read/rows.js";
@@ -260,6 +265,11 @@ declare const fullApi: ApiFromModules<{
   "sources/accept/commands": typeof sources_accept_commands;
   "sources/accept/dispatch": typeof sources_accept_dispatch;
   "sources/accept/probe": typeof sources_accept_probe;
+  "sources/media_access/access": typeof sources_media_access_access;
+  "sources/media_access/commands": typeof sources_media_access_commands;
+  "sources/media_access/http": typeof sources_media_access_http;
+  "sources/media_access/probe": typeof sources_media_access_probe;
+  "sources/media_access/protocol": typeof sources_media_access_protocol;
   "sources/probe_shared": typeof sources_probe_shared;
   "sources/read/probe": typeof sources_read_probe;
   "sources/read/rows": typeof sources_read_rows;
