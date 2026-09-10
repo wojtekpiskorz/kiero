@@ -98,15 +98,15 @@ async function completeJob(
 
 /**
  * Fails the job and answers the envelope with the SAME closed kind, so the
- * durable row and the caller's error can never diverge (review round 1:
- * eleven hand-synced pairs and one bare envelope exit).
+ * durable row and the caller's error can never diverge.
  */
 async function failJob(
   tx: MutationCtx,
   job: JobLike,
   kind: string,
 ): Promise<ResultEnvelope> {
-  return failJob(tx, job, kind);
+  await completeJob(tx, job, { state: "failed", errorKind: kind });
+  return errorResult(validationError(kind));
 }
 
 /**

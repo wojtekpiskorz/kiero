@@ -68,7 +68,7 @@ const TRANSCRIPT_SEG1 = `Ekipa hydrauliczna zaczyna instalację w poniedziałek 
 const TRANSCRIPT_SEG2 = `Kontrola jakości dachu zaplanowana na piątek (${RUN})`;
 const FINDING_KEY = `termin_dostawy_dachowki_${RUN}`;
 const FINDING_TEXT_V1 = `Dachówka zostanie dostarczona 20 października (${RUN})`;
-const FINDING_TEXT_V2 = `Dachówka zostanie dostarczona 27 października (${RUN})`;
+const FINDING_TEXT_V2 = `Dachówka przyjeżdża dopiero pod koniec miesiąca (${RUN})`;
 
 // --- service drives ------------------------------------------------------------
 
@@ -537,7 +537,7 @@ const linksNoneOf = (result, banned) =>
     );
     return job !== undefined && (job.state === "succeeded" || job.state === "failed");
   });
-  const newText = await queryEvidence({ query: `dostarczona 27 pazdziernika (${RUN})`, limit: 10 }, serviceSession);
+  const newText = await queryEvidence({ query: `przyjeżdża pod koniec miesiąca (${RUN})`, limit: 10 }, serviceSession);
   check(
     "S10b the corrected current revision is indexed after the refresh",
     isOk(newText) && value(newText).entries.length > 0,

@@ -44,21 +44,13 @@ import {
   type CandidateSignals,
   type RetrievalFilters,
 } from "@kiero/retrieval";
-import { runEmbedding, type OpenRouterCredentials } from "@kiero/providers";
+import { openRouterCredentialsFromEnv, runEmbedding } from "@kiero/providers";
 import { internal } from "../_generated/api";
 import type { ActionCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import type { ScopedContext } from "./views";
 
 /** Reads the server-held OpenRouter key; presence only, never its value. */
-function openRouterCredentials(): OpenRouterCredentials | null {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (apiKey === undefined || apiKey === "") {
-    return null;
-  }
-  return { apiKey };
-}
-
 /** The decoded query input (the contract shape, after dispatch decode). */
 export interface QueryEvidenceInput {
   readonly query: string;
@@ -117,7 +109,7 @@ export async function runEvidenceQuery(
   });
   // Query-side embedding (one bounded provider pass over the folded query).
   let queryVector: readonly number[] | null = null;
-  const credentials = openRouterCredentials();
+  const credentials = openRouterCredentialsFromEnv();
   const anyEmbedded = rows.some((row) => row.hasEmbedding);
   if (options.simulateEmbeddingOutage !== true && credentials !== null && anyEmbedded) {
     const call = await runEmbedding(credentials, {

@@ -28,7 +28,7 @@
 import { v } from "convex/values";
 import { Schema } from "effect";
 import { executors } from "@kiero/contracts";
-import { runEmbedding, type OpenRouterCredentials } from "@kiero/providers";
+import { openRouterCredentialsFromEnv, runEmbedding } from "@kiero/providers";
 import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { MutationCtx } from "../_generated/server";
@@ -197,9 +197,8 @@ export const indexWork = internalQuery({
 });
 
 /**
- * The ONE keying rule for index-entry drafts and rows (review round 1: it
- * lived in three functions): fragment identity first, then finding, then
- * the source-only entry.
+ * The ONE keying rule for index-entry drafts and rows: fragment identity
+ * first, then finding, then the source-only entry.
  */
 export function draftKeyOf<
   T extends {
@@ -216,14 +215,6 @@ export function draftKeyOf<
 }
 
 /** Reads the server-held OpenRouter key; presence only, never its value. */
-function openRouterCredentials(): OpenRouterCredentials | null {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (apiKey === undefined || apiKey === "") {
-    return null;
-  }
-  return { apiKey };
-}
-
 /** Records a typed terminal failure from the external half. */
 export const failJob = internalMutation({
   args: { jobKey: v.string(), errorKind: v.string() },
@@ -257,7 +248,7 @@ export const runIndexPass = internalAction({
       });
       return;
     }
-    const credentials = openRouterCredentials();
+    const credentials = openRouterCredentialsFromEnv();
     const embedded = new Set(loaded.work.alreadyEmbedded);
     const rows: IndexRowInput[] = [];
     for (const draft of loaded.work.drafts) {
@@ -300,7 +291,6 @@ export const runIndexPass = internalAction({
   },
 });
 
-/** Exposed for the focused unit tests: the draft key derivation. */
 /** Narrow type re-export so tests pin the Convex id branding. */
 export type SearchEntryDoc = Doc<"searchEntries">;
 export type GenerationId = Id<"searchIndexGenerations">;
