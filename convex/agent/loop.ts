@@ -19,7 +19,10 @@
  * load-time finding revisions against CURRENT counters: a mid-run
  * correction triggers one bounded refresh (the model re-reads the
  * refreshed state and narrows the answer or asks a clarification), never
- * an answer over a superseded world.
+ * an answer over a superseded world. The gate refuses by default: a
+ * vanished question world, a recheck or reload that fails, and a spent
+ * refresh budget all refuse the submit; accept only follows a recheck
+ * that ran and said current.
  *
  * The structured answer returns in the command result for company
  * conversation views (H1 renders it; J2/J3 qualify it). Durable
@@ -80,6 +83,14 @@ export const ANSWER_FLOW_PIPELINE_VERSION = "e6.answer/2" as const;
 /** The model-configuration version label recorded with every answer. */
 export const ANSWER_MODEL_CONFIGURATION_VERSION = "e6.routing#chat_analysis" as const;
 
+/** One turn's execution log entry: tool names, bounded args, results. */
+export interface TurnLogEntry {
+  readonly turn: number;
+  readonly calls: string[];
+  readonly args: string[];
+  readonly results: string[];
+}
+
 /** The wire result of one answer run (v.any()-shaped on the boundary). */
 export interface AnswerRunResult {
   readonly versions: {
@@ -108,12 +119,7 @@ export interface AnswerRunResult {
   readonly finalText: string;
   /** The E2 failure kind, recorded only on a provider_failed run. */
   readonly failure?: string;
-  readonly turnLog: readonly {
-    turn: number;
-    calls: string[];
-    args: string[];
-    results: string[];
-  }[];
+  readonly turnLog: readonly TurnLogEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -428,12 +434,12 @@ async function runCheckedExecution(
 // The bounded answer loop (round-resumable core + driving wrappers).
 // ---------------------------------------------------------------------------
 
-/** Encodes one turn's log entry: tool names, bounded args, results. */
+/** Encodes one turn's log entry (the TurnLogEntry wire shape). */
 function turnLogEntry(
   turn: number,
   calls: readonly DecodedAnswerCall[],
   results: readonly string[],
-): AnswerRoundState["turnLog"][number] {
+): TurnLogEntry {
   return {
     turn,
     calls: calls.map((call) => call.name),
@@ -456,12 +462,14 @@ type SubmitGate =
 /**
  * The staleness gate over one `agent_submit_answer` (the pure decision
  * work lives in @kiero/agent/tools): the recheck runs FIRST, and its
- * decision is handled honestly: a world that vanished mid-run, or a
- * mandated refresh whose reload fails, REFUSES the submit so the answer
- * never lands over a missing or unreloadable question world; a refresh
- * within the bounded budget reloads the context and hands the model the
- * refreshed state to answer against; only a current world accepts into
- * the answer-contract reducer.
+ * decision is handled honestly, refusing by default: a world that
+ * vanished mid-run, a recheck that throws (no comparison ever ran), a
+ * mandated refresh whose reload fails or throws, and a spent refresh
+ * budget all REFUSE the submit so the answer never lands over a missing,
+ * unknowable or superseded world; a refresh within the bounded budget
+ * reloads the context and hands the model the refreshed state to answer
+ * against; only a recheck that ran and said current accepts into the
+ * answer-contract reducer.
  */
 async function gateSubmitFreshness(
   ctx: ActionCtx,
@@ -479,9 +487,10 @@ async function gateSubmitFreshness(
       })),
     }),
   );
+  // A recheck that throws never said current: the gate fails closed.
   const decision: AnswerFreshnessDecision = recheck.ok
     ? (recheck.value as { decision: AnswerFreshnessDecision }).decision
-    : { decision: "current" };
+    : { decision: "abort", reason: "staleness_recheck_failed" };
   const plan = planSubmitFreshness(decision, refreshes);
   if (plan.kind === "refuse") {
     return { kind: "refused", toolResult: plan.toolResult };
@@ -489,14 +498,17 @@ async function gateSubmitFreshness(
   if (plan.kind === "accept") {
     return { kind: "accept" };
   }
-  const reloaded = await ctx.runMutation(internal.agent.loop.loadAnswerStage, {
-    questionSourceId,
-    runId,
-  });
-  const stage = refreshedSubmitStage(reloaded as {
-    context?: AnswerContext;
-    error?: string;
-  });
+  const reloaded = await tryMutation(() =>
+    ctx.runMutation(internal.agent.loop.loadAnswerStage, {
+      questionSourceId,
+      runId,
+    }),
+  );
+  const stage = refreshedSubmitStage(
+    reloaded.ok
+      ? (reloaded.value as { context?: AnswerContext; error?: string })
+      : {},
+  );
   if (stage.kind === "refused") {
     return stage;
   }
@@ -525,12 +537,7 @@ export interface AnswerRoundState {
   readonly refreshes: number;
   readonly finalText: string;
   readonly observedModels: readonly string[];
-  readonly turnLog: readonly {
-    turn: number;
-    calls: string[];
-    args: string[];
-    results: string[];
-  }[];
+  readonly turnLog: readonly TurnLogEntry[];
 }
 
 /** One round's outcome: the next resumable state, or the finished result. */
@@ -805,7 +812,7 @@ function answerResult(
     refreshes: number;
     observedModels: readonly string[];
     finalText: string;
-    turnLog: readonly { turn: number; calls: string[]; args: string[]; results: string[] }[];
+    turnLog: readonly TurnLogEntry[];
     failure?: string;
   },
 ): AnswerRunResult {

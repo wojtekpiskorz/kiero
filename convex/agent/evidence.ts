@@ -121,8 +121,8 @@ export const searchEvidenceRows = internalQuery({
       (a, b) => b.fraction - a.fraction || b.sourceSentAtMs - a.sourceSentAtMs,
     );
     const hits: EvidenceHit[] = [];
-    for (const ranked_hit of ranked.slice(0, MAX_EVIDENCE_SEARCH_RESULTS)) {
-      const candidate = candidates.find((row) => row._id === ranked_hit.sourceId);
+    for (const rankedHit of ranked.slice(0, MAX_EVIDENCE_SEARCH_RESULTS)) {
+      const candidate = candidates.find((row) => row._id === rankedHit.sourceId);
       if (candidate === undefined) {
         continue;
       }
@@ -134,18 +134,18 @@ export const searchEvidenceRows = internalQuery({
           rows.find(
             (row) =>
               row.anchor._tag === "text_range" &&
-              row.anchor.startOffset === ranked_hit.startOffset &&
-              row.anchor.endOffset === ranked_hit.endOffset,
+              row.anchor.startOffset === rankedHit.startOffset &&
+              row.anchor.endOffset === rankedHit.endOffset,
           ),
         );
       hits.push({
         sourceId: candidate._id,
-        sourceSentAtMs: ranked_hit.sourceSentAtMs,
-        startOffset: ranked_hit.startOffset,
-        endOffset: ranked_hit.endOffset,
+        sourceSentAtMs: rankedHit.sourceSentAtMs,
+        startOffset: rankedHit.startOffset,
+        endOffset: rankedHit.endOffset,
         quote: candidate.authorText.slice(
-          ranked_hit.startOffset,
-          Math.min(ranked_hit.endOffset, ranked_hit.startOffset + MAX_EVIDENCE_QUOTE_CHARS),
+          rankedHit.startOffset,
+          Math.min(rankedHit.endOffset, rankedHit.startOffset + MAX_EVIDENCE_QUOTE_CHARS),
         ),
         existingFragmentId: fragment?._id ?? null,
       });

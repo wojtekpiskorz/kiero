@@ -15,7 +15,8 @@
  *   the updating gate, ambiguity → clarification);
  * - `decideAnswerFreshness` + the submit gate: the in-flight staleness
  *   recheck decision and its honest handling (refresh, or refuse when
- *   the question world vanished mid-run);
+ *   the world vanished, the recheck failed, or the refresh budget is
+ *   spent);
  * - `parseTextToolCalls`: the text-encoded tool-call rescue through the
  *   same declared-schemas decode authority;
  * - `tokenize`/`inflectionMatch`/`overlapLocation`: the pure,

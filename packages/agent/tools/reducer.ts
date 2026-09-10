@@ -510,14 +510,16 @@ export interface AnswerFreshnessInput {
 }
 
 /**
- * Why the world a submit was computed against is gone: the question
- * source row vanished or stopped being active mid-run, or the mandated
- * context refresh could not reload.
+ * Why the world a submit was computed against is gone or unknowable: the
+ * question source row vanished or stopped being active mid-run, the
+ * mandated context refresh could not reload, or the staleness recheck
+ * itself failed so no comparison ever ran.
  */
 export type AnswerAbortReason =
   | "question_source_missing"
   | "question_source_not_active"
-  | "context_reload_failed";
+  | "context_reload_failed"
+  | "staleness_recheck_failed";
 
 /**
  * The recheck decision: current; refreshed with the moved findings; or
@@ -579,17 +581,30 @@ function abortReasonText(reason: AnswerAbortReason): string {
       return "źródło pytania nie jest już aktywne";
     case "context_reload_failed":
       return "odświeżenie kontekstu nie powiodło się";
+    case "staleness_recheck_failed":
+      return "sprawdzenie aktualności kontekstu nie powiodło się";
   }
 }
 
 /**
  * The refusal a submit earns when the world it was computed against is
- * gone: the answer must not land, so the model is told to finish WITHOUT
- * `agent_submit_answer` (the honest end of a run whose question world
- * vanished or whose mandated refresh could not reload).
+ * gone or unknowable: the answer must not land, so the model is told to
+ * finish WITHOUT `agent_submit_answer` (the honest end of a run whose
+ * question world vanished, whose recheck or refresh could not run, or
+ * whose refresh could not reload).
  */
 export function vanishedSubmitRefusal(reason: AnswerAbortReason): string {
   return `ODRZUCONO: ${abortReasonText(reason)}. Odpowiedź nie może zostać przyjęta; zakończ bez agent_submit_answer`;
+}
+
+/**
+ * The refusal a submit earns when the recheck says the world moved but
+ * the bounded refresh budget is already spent: the answer must not land
+ * over a superseded state, so the model is told to finish WITHOUT
+ * `agent_submit_answer` (the run's honest `gave_up` end).
+ */
+export function refreshBudgetSpentSubmitRefusal(): string {
+  return `ODRZUCONO: kontekst się zmienił ponownie, a limit odświeżeń (${MAX_ANSWER_REFRESHES}) został już wykorzystany. Odpowiedź nie może zostać przyjęta na nieaktualnym stanie; zakończ bez agent_submit_answer`;
 }
 
 /** The loop's plan for one submit after the staleness recheck decided. */
@@ -599,11 +614,13 @@ export type SubmitFreshnessPlan =
   | { readonly kind: "refuse"; readonly toolResult: string };
 
 /**
- * Plans the handling of one submit from a staleness decision: an ABORT
- * (the question source vanished mid-run) REFUSES the submit, so the
- * answer never lands over a world that is gone; a refresh within the
- * bounded budget plans the one reload; everything else accepts into the
- * answer contract reducer.
+ * Plans the handling of one submit from a staleness decision, refusing
+ * by default: an ABORT (the question source vanished mid-run, or the
+ * recheck itself failed) REFUSES the submit, so the answer never lands
+ * over a world that is gone or unknowable; a refresh decision past the
+ * spent budget refuses too, never accepting over a superseded world; a
+ * refresh within the bounded budget plans the one reload; only a
+ * decision of CURRENT accepts into the answer contract reducer.
  */
 export function planSubmitFreshness(
   decision: AnswerFreshnessDecision,
@@ -612,11 +629,13 @@ export function planSubmitFreshness(
   if (decision.decision === "abort") {
     return { kind: "refuse", toolResult: vanishedSubmitRefusal(decision.reason) };
   }
-  if (decision.decision === "refresh" && refreshes < MAX_ANSWER_REFRESHES) {
-    return {
-      kind: "refresh",
-      movedFindingIds: decision.moved.map((moved) => moved.findingId),
-    };
+  if (decision.decision === "refresh") {
+    return refreshes < MAX_ANSWER_REFRESHES
+      ? {
+          kind: "refresh",
+          movedFindingIds: decision.moved.map((moved) => moved.findingId),
+        }
+      : { kind: "refuse", toolResult: refreshBudgetSpentSubmitRefusal() };
   }
   return { kind: "accept" };
 }

@@ -679,20 +679,48 @@ describe("the submit freshness gate (planSubmitFreshness/refreshedSubmitStage)",
     });
   });
 
-  it("accepts a current world; a refresh past the budget falls through to the reducer", () => {
+  it("refuses the submit when the staleness recheck itself failed (no comparison ran)", () => {
+    const plan = planSubmitFreshness(
+      { decision: "abort", reason: "staleness_recheck_failed" },
+      0,
+    );
+    expect(plan.kind).toBe("refuse");
+    if (plan.kind === "refuse") {
+      expect(plan.toolResult).toContain("ODRZUCONO");
+      expect(plan.toolResult).toContain(
+        "sprawdzenie aktualności kontekstu nie powiodło się",
+      );
+      expect(plan.toolResult).toContain("zakończ bez agent_submit_answer");
+    }
+  });
+
+  it("refuses a not-current world once the refresh budget is spent (never an answer over a superseded world)", () => {
+    const plan = planSubmitFreshness(
+      {
+        decision: "refresh",
+        moved: [
+          { findingId: "findings_delivery", loadRevision: 1, currentRevision: 2 },
+        ],
+      },
+      MAX_ANSWER_REFRESHES,
+    );
+    expect(plan.kind).toBe("refuse");
+    if (plan.kind === "refuse") {
+      expect(plan.toolResult).toContain("ODRZUCONO");
+      expect(plan.toolResult).toContain(
+        `limit odświeżeń (${MAX_ANSWER_REFRESHES}) został już wykorzystany`,
+      );
+      expect(plan.toolResult).toContain("nieaktualnym stanie");
+      expect(plan.toolResult).toContain("zakończ bez agent_submit_answer");
+    }
+  });
+
+  it("accepts a current world, even at a spent budget (a recheck that ran and said current)", () => {
     expect(planSubmitFreshness({ decision: "current" }, 0)).toEqual({
       kind: "accept",
     });
     expect(
-      planSubmitFreshness(
-        {
-          decision: "refresh",
-          moved: [
-            { findingId: "findings_delivery", loadRevision: 1, currentRevision: 2 },
-          ],
-        },
-        MAX_ANSWER_REFRESHES,
-      ),
+      planSubmitFreshness({ decision: "current" }, MAX_ANSWER_REFRESHES),
     ).toEqual({ kind: "accept" });
   });
 });
