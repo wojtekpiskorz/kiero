@@ -229,16 +229,13 @@ export function findAnswerMembership(
 }
 
 /**
- * The findings an established statement may rest on: current, `known` and
- * not updating. Everything else (conflicted, unknown, updating) is honest
- * EXCLUSION material — disclosed, never asserted.
+ * Whether one finding is ESTABLISHED: current, `known` and not updating.
+ * Everything else (conflicted, unknown, updating) is honest EXCLUSION
+ * material: disclosed, never asserted. The single home of the predicate
+ * (the answer reducer's inference-basis check runs it per finding).
  */
-export function establishedFindings(
-  context: AnswerContext,
-): readonly AnswerFinding[] {
-  return context.findings.filter(
-    (finding) => !finding.updating && finding.knowledgeTag === "known",
-  );
+export function isEstablishedFinding(finding: AnswerFinding): boolean {
+  return !finding.updating && finding.knowledgeTag === "known";
 }
 
 /**

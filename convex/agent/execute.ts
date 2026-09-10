@@ -30,7 +30,11 @@ import {
   decideAnswerFreshness,
   type AnswerFreshnessDecision,
 } from "@kiero/agent/tools";
-import { bridgeIdentity, resolveRequestContext } from "../platform/context";
+import {
+  authorSessionId,
+  bridgeIdentity,
+  resolveRequestContext,
+} from "../platform/context";
 import { dispatchMemoryCommand } from "../memory/findings/dispatch";
 import {
   ensureFragment,
@@ -45,23 +49,6 @@ import {
 import { internalMutation, type MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { currentFindingRevisions } from "./context";
-
-/**
- * The author session: the agent acts within the question author's firm
- * permissions through a server-resolved session row (the E3 pattern).
- */
-async function authorSessionId(
-  db: MutationCtx["db"],
-  authorUserId: Id<"users">,
-): Promise<Id<"sessions"> | null> {
-  const session = await db
-    .query("sessions")
-    .withIndex("by_user_started", (q) => q.eq("userId", authorUserId))
-    .order("desc")
-    .filter((q) => q.eq(q.field("revokedAtMs"), undefined))
-    .first();
-  return session?._id ?? null;
-}
 
 /** One cited evidence reference in wire form (as the loop hands it over). */
 interface EvidenceWire {
@@ -91,10 +78,9 @@ async function ensureEvidenceFragment(
   }
   const extractionId = await resolveTextExtraction(db, source._id, null);
   if (extractionId === null) {
-    // Whole-source basis when no reliable fragment/extraction exists.
-    return ensureFragment(db, source._id, await requireWholeSourceExtraction(db, source._id), {
-      _tag: "whole_source",
-    });
+    // No text extraction exists for this source (D1 seeds text rows, so
+    // this is a genuine anomaly): the evidence cannot be anchored at all.
+    throw new Error("agent: text_extraction_missing");
   }
   if (evidence.startOffset === null || evidence.endOffset === null) {
     return ensureFragment(db, source._id, extractionId, { _tag: "whole_source" });
@@ -104,18 +90,6 @@ async function ensureEvidenceFragment(
     startOffset: evidence.startOffset,
     endOffset: evidence.endOffset,
   });
-}
-
-/** The fallback extraction for whole-source evidence (D1 seeds text rows). */
-async function requireWholeSourceExtraction(
-  db: MutationCtx["db"],
-  sourceId: Id<"sources">,
-): Promise<Id<"extractions">> {
-  const resolved = await resolveTextExtraction(db, sourceId, null);
-  if (resolved !== null) {
-    return resolved;
-  }
-  throw new Error("agent: text_extraction_missing");
 }
 
 // ---------------------------------------------------------------------------
@@ -327,15 +301,12 @@ export const stalenessRecheck = internalMutation({
   handler: async (ctx, args): Promise<{ decision: AnswerFreshnessDecision }> => {
     const source = await ctx.db.get(args.questionSourceId);
     if (source === null) {
+      // The question source vanished mid-run: the honest decision is an
+      // ABORT (never a fabricated refresh shape decideAnswerFreshness
+      // cannot produce). The loop REFUSES the submit, so the answer
+      // never lands over a world whose question no longer exists.
       return {
-        decision: {
-          decision: "refresh",
-          moved: args.loadRevisions.map((expectation) => ({
-            findingId: expectation.findingId,
-            loadRevision: expectation.revision,
-            currentRevision: expectation.revision,
-          })),
-        },
+        decision: { decision: "abort", reason: "question_source_missing" },
       };
     }
     const current = await currentFindingRevisions(

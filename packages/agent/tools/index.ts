@@ -13,7 +13,14 @@
  * - `applyAnswerToolCall`: the decoded-not-executed answer-contract
  *   reducer (grounded vs ungrounded, corroboration is a second witness,
  *   the updating gate, ambiguity → clarification);
- * - `decideAnswerFreshness`: the in-flight staleness recheck decision;
+ * - `decideAnswerFreshness` + the submit gate: the in-flight staleness
+ *   recheck decision and its honest handling (refresh, or refuse when
+ *   the question world vanished mid-run);
+ * - `parseTextToolCalls`: the text-encoded tool-call rescue through the
+ *   same declared-schemas decode authority;
+ * - `tokenize`/`inflectionMatch`/`overlapLocation`: the pure,
+ *   inflection-tolerant matching half of the tenant-scoped evidence
+ *   search;
  * - the versioned Polish dialogue builder (system prompt, question
  *   message, tool-result encodings).
  *
@@ -27,3 +34,5 @@ export * from "./context";
 export * from "./tools";
 export * from "./reducer";
 export * from "./prompt";
+export * from "./rescue";
+export * from "./evidence";

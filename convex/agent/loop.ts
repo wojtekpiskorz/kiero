@@ -29,12 +29,10 @@
  * produces ARE durable rows through their registered operations.
  */
 
-import { Schema } from "effect";
 import { v } from "convex/values";
 import { runChatTurn, type AnyChatToolSpec, type OpenRouterCredentials } from "@kiero/providers";
 import {
   ANSWER_TOOLS,
-  MAX_ANSWER_REFRESHES,
   MAX_ANSWER_TURNS,
   ANSWER_PROMPT_VERSION,
   ANSWER_SCHEMA_VERSION,
@@ -49,13 +47,17 @@ import {
   extendEvidenceLedger,
   finalTurnInstruction,
   noAnswerNudge,
+  parseTextToolCalls,
+  planSubmitFreshness,
   questionUserMessage,
   recordClarificationRaised,
   recordDomainChange,
   refreshedStateMessage,
+  refreshedSubmitStage,
   toolResultMessage,
   type AnswerContext,
   type AnswerEvidenceEntry,
+  type AnswerFreshnessDecision,
   type AnswerState,
   type DecodedAnswerCall,
   type SubmittedAnswer,
@@ -150,101 +152,6 @@ interface ExecutionOutcome {
 }
 
 /**
- * Extracts text-encoded tool calls (the flash-model fallback shape): when
- * the model writes `{"narzedzie":...,"argumenty":...}` as PROSE instead of
- * a real tool call, the loop still decodes it through the DECLARED tool's
- * schema — the same decode authority, fail-closed on any malformed shape —
- * and hands it to the same reducer/checked paths. No gate is bypassed: an
- * undeclared name or undecodable arguments make this return nothing and the
- * turn stays plain text.
- */
-function parseTextToolCalls(text: string): DecodedAnswerCall[] {
-  const calls: DecodedAnswerCall[] = [];
-  let cursor = 0;
-  while (cursor < text.length) {
-    const marker = text.indexOf('"narzedzie"', cursor);
-    if (marker === -1) {
-      break;
-    }
-    // Walk back to the nearest opening brace, forward to its match.
-    let start = -1;
-    for (let i = marker; i >= 0; i -= 1) {
-      if (text[i] === "{") {
-        start = i;
-        break;
-      }
-      if (text[i] === "}") {
-        break; // a closer before an opener: not an object start
-      }
-    }
-    if (start === -1) {
-      cursor = marker + 1;
-      continue;
-    }
-    let depth = 0;
-    let end = -1;
-    let inString = false;
-    let escaped = false;
-    for (let i = start; i < text.length; i += 1) {
-      const ch = text[i];
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (ch === "\\") {
-        escaped = true;
-        continue;
-      }
-      if (ch === '"') {
-        inString = !inString;
-        continue;
-      }
-      if (inString) {
-        continue;
-      }
-      if (ch === "{") {
-        depth += 1;
-      } else if (ch === "}") {
-        depth -= 1;
-        if (depth === 0) {
-          end = i;
-          break;
-        }
-      }
-    }
-    if (end === -1) {
-      cursor = marker + 1;
-      continue;
-    }
-    cursor = end + 1;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text.slice(start, end + 1));
-    } catch {
-      continue;
-    }
-    if (typeof parsed !== "object" || parsed === null) {
-      continue;
-    }
-    const candidate = parsed as { narzedzie?: unknown; argumenty?: unknown };
-    if (typeof candidate.narzedzie !== "string") {
-      continue;
-    }
-    const spec = ANSWER_TOOLS.find((tool) => tool.name === candidate.narzedzie);
-    if (spec === undefined) {
-      continue; // undeclared name: stays text, never widens the surface
-    }
-    try {
-      const arguments_ = Schema.decodeUnknownSync(spec.input)(candidate.argumenty);
-      calls.push({ id: `text-${calls.length}`, name: spec.name, arguments: arguments_ });
-    } catch {
-      // Malformed arguments: the call stays unexecutable (fail closed).
-    }
-  }
-  return calls;
-}
-
-/**
  * Runs one internal mutation defensively: a thrown technical error (id
  * validation, transient storage) becomes a REFUSAL tool result the model
  * can act on instead of failing the whole answer action. Checked-domain
@@ -324,6 +231,37 @@ async function runEvidenceSearch(
   };
 }
 
+/**
+ * The shared technical refusal for one checked execution that never
+ * produced an outcome envelope (a thrown technical error, or a malformed
+ * envelope the loop cannot read).
+ */
+function technicalExecutionRefusal(what: string): string {
+  return `ODRZUCONO: wykonanie ${what} nie powiodło się (błąd techniczny)`;
+}
+
+/**
+ * Runs one checked execution and unwraps its result envelope: a thrown
+ * technical error (id validation, transient storage) or a malformed
+ * envelope becomes the shared technical refusal the model can act on
+ * instead of failing the whole answer action; a well-formed envelope
+ * reaches the caller for its case-specific outcome check.
+ */
+async function runExecution<T extends object>(
+  run: () => Promise<unknown>,
+  what: string,
+): Promise<{ ok: true; envelope: T } | { ok: false; toolResult: string }> {
+  const executed = await tryMutation(run);
+  if (!executed.ok) {
+    return { ok: false, toolResult: technicalExecutionRefusal(what) };
+  }
+  const unwrapped = envelopeValue<T>(executed.value);
+  if (!unwrapped.ok) {
+    return { ok: false, toolResult: technicalExecutionRefusal(what) };
+  }
+  return { ok: true, envelope: unwrapped.value };
+}
+
 /** Runs one write tool through its checked execution mutation. */
 async function runCheckedExecution(
   ctx: ActionCtx,
@@ -353,37 +291,27 @@ async function runCheckedExecution(
           ...(entry.startOffset === null ? {} : { startOffset: entry.startOffset }),
           ...(entry.endOffset === null ? {} : { endOffset: entry.endOffset }),
         }));
-      const executed = await tryMutation(() =>
-        ctx.runMutation(internal.agent.execute.executeClarification, {
-          questionSourceId,
-          question: args.question,
-          scopeKind: args.scopeKind,
-          ...(args.scopeKind === "project" && args.projectId !== null
-            ? { projectId: args.projectId as Id<"projects"> }
-            : {}),
-          evidence,
-        }),
-      );
-      if (!executed.ok) {
-        return {
-          state,
-          toolResult: "ODRZUCONO: wykonanie sprawy do wyjaśnienia nie powiodło się (błąd techniczny)",
-          done: false,
-        };
-      }
-      const unwrapped = envelopeValue<{
+      const executed = await runExecution<{
         outcome?: string;
         clarificationId?: string;
         error?: string;
-      }>(executed.value);
-      if (!unwrapped.ok) {
-        return {
-          state,
-          toolResult: "ODRZUCONO: wykonanie sprawy do wyjaśnienia nie powiodło się (błąd techniczny)",
-          done: false,
-        };
+      }>(
+        () =>
+          ctx.runMutation(internal.agent.execute.executeClarification, {
+            questionSourceId,
+            question: args.question,
+            scopeKind: args.scopeKind,
+            ...(args.scopeKind === "project" && args.projectId !== null
+              ? { projectId: args.projectId as Id<"projects"> }
+              : {}),
+            evidence,
+          }),
+        "sprawy do wyjaśnienia",
+      );
+      if (!executed.ok) {
+        return { state, toolResult: executed.toolResult, done: false };
       }
-      const envelope = unwrapped.value;
+      const envelope = executed.envelope;
       if (envelope.outcome !== "raised" || envelope.clarificationId === undefined) {
         return {
           state,
@@ -402,22 +330,19 @@ async function runCheckedExecution(
     }
     case "agent_resolve_clarification": {
       const args = call.arguments as { clarificationId: string; resolutionNote: string };
-      const executed = await tryMutation(() =>
-        ctx.runMutation(internal.agent.execute.executeResolveClarification, {
-          questionSourceId,
-          clarificationId: args.clarificationId as Id<"clarifications">,
-          resolutionNote: args.resolutionNote,
-        }),
+      const executed = await runExecution<{ outcome?: string; error?: string }>(
+        () =>
+          ctx.runMutation(internal.agent.execute.executeResolveClarification, {
+            questionSourceId,
+            clarificationId: args.clarificationId as Id<"clarifications">,
+            resolutionNote: args.resolutionNote,
+          }),
+        "rozstrzygnięcia",
       );
       if (!executed.ok) {
-        return {
-          state,
-          toolResult: "ODRZUCONO: wykonanie rozstrzygnięcia nie powiodło się (błąd techniczny)",
-          done: false,
-        };
+        return { state, toolResult: executed.toolResult, done: false };
       }
-      const unwrapped = envelopeValue<{ outcome?: string; error?: string }>(executed.value);
-      const envelope = unwrapped.ok ? unwrapped.value : { outcome: "technical_error" };
+      const envelope = executed.envelope;
       return {
         state,
         toolResult:
@@ -430,34 +355,24 @@ async function runCheckedExecution(
     case "agent_change_task":
     case "agent_change_event": {
       const kind = call.name === "agent_change_task" ? "task" : "event";
-      const executed = await tryMutation(() =>
-        ctx.runMutation(internal.agent.execute.executeWorkChange, {
-          questionSourceId,
-          kind,
-          input: call.arguments,
-        }),
-      );
-      if (!executed.ok) {
-        return {
-          state,
-          toolResult: "ODRZUCONO: wykonanie zmiany nie powiodło się (błąd techniczny)",
-          done: false,
-        };
-      }
-      const unwrapped = envelopeValue<{
+      const executed = await runExecution<{
         outcome?: string;
         entityId?: string;
         revision?: number;
         error?: string;
-      }>(executed.value);
-      if (!unwrapped.ok) {
-        return {
-          state,
-          toolResult: "ODRZUCONO: wykonanie zmiany nie powiodło się (błąd techniczny)",
-          done: false,
-        };
+      }>(
+        () =>
+          ctx.runMutation(internal.agent.execute.executeWorkChange, {
+            questionSourceId,
+            kind,
+            input: call.arguments,
+          }),
+        "zmiany",
+      );
+      if (!executed.ok) {
+        return { state, toolResult: executed.toolResult, done: false };
       }
-      const envelope = unwrapped.value;
+      const envelope = executed.envelope;
       if (envelope.outcome !== "changed" || envelope.entityId === undefined) {
         return {
           state,
@@ -478,22 +393,19 @@ async function runCheckedExecution(
     }
     case "agent_validate_extension_value": {
       const args = call.arguments as { versionId: string; value: unknown };
-      const executed = await tryMutation(() =>
-        ctx.runMutation(internal.agent.execute.executeExtensionValidate, {
-          questionSourceId,
-          versionId: args.versionId as Id<"extensionVersions">,
-          value: args.value,
-        }),
+      const executed = await runExecution<{ outcome?: string; error?: string }>(
+        () =>
+          ctx.runMutation(internal.agent.execute.executeExtensionValidate, {
+            questionSourceId,
+            versionId: args.versionId as Id<"extensionVersions">,
+            value: args.value,
+          }),
+        "walidacji",
       );
       if (!executed.ok) {
-        return {
-          state,
-          toolResult: "ODRZUCONO: wykonanie walidacji nie powiodło się (błąd techniczny)",
-          done: false,
-        };
+        return { state, toolResult: executed.toolResult, done: false };
       }
-      const unwrapped = envelopeValue<{ outcome?: string; error?: string }>(executed.value);
-      const envelope = unwrapped.ok ? unwrapped.value : { outcome: "technical_error" };
+      const envelope = executed.envelope;
       return {
         state,
         toolResult:
@@ -515,6 +427,87 @@ async function runCheckedExecution(
 // ---------------------------------------------------------------------------
 // The bounded answer loop (round-resumable core + driving wrappers).
 // ---------------------------------------------------------------------------
+
+/** Encodes one turn's log entry: tool names, bounded args, results. */
+function turnLogEntry(
+  turn: number,
+  calls: readonly DecodedAnswerCall[],
+  results: readonly string[],
+): AnswerRoundState["turnLog"][number] {
+  return {
+    turn,
+    calls: calls.map((call) => call.name),
+    args: calls.map((call) => JSON.stringify(call.arguments).slice(0, 120)),
+    results: [...results],
+  };
+}
+
+/** The staleness gate's verdict over one submit attempt. */
+type SubmitGate =
+  | { readonly kind: "accept" }
+  | { readonly kind: "refused"; readonly toolResult: string }
+  | {
+      readonly kind: "refreshed";
+      readonly context: AnswerContext;
+      readonly nudge: string;
+      readonly refreshResult: string;
+    };
+
+/**
+ * The staleness gate over one `agent_submit_answer` (the pure decision
+ * work lives in @kiero/agent/tools): the recheck runs FIRST, and its
+ * decision is handled honestly: a world that vanished mid-run, or a
+ * mandated refresh whose reload fails, REFUSES the submit so the answer
+ * never lands over a missing or unreloadable question world; a refresh
+ * within the bounded budget reloads the context and hands the model the
+ * refreshed state to answer against; only a current world accepts into
+ * the answer-contract reducer.
+ */
+async function gateSubmitFreshness(
+  ctx: ActionCtx,
+  questionSourceId: Id<"sources">,
+  runId: string,
+  context: AnswerContext,
+  refreshes: number,
+): Promise<SubmitGate> {
+  const recheck = await tryMutation(() =>
+    ctx.runMutation(internal.agent.execute.stalenessRecheck, {
+      questionSourceId,
+      loadRevisions: answerRevisionSnapshotOf(context).map((entry) => ({
+        findingId: entry.findingId as Id<"findings">,
+        revision: entry.revision,
+      })),
+    }),
+  );
+  const decision: AnswerFreshnessDecision = recheck.ok
+    ? (recheck.value as { decision: AnswerFreshnessDecision }).decision
+    : { decision: "current" };
+  const plan = planSubmitFreshness(decision, refreshes);
+  if (plan.kind === "refuse") {
+    return { kind: "refused", toolResult: plan.toolResult };
+  }
+  if (plan.kind === "accept") {
+    return { kind: "accept" };
+  }
+  const reloaded = await ctx.runMutation(internal.agent.loop.loadAnswerStage, {
+    questionSourceId,
+    runId,
+  });
+  const stage = refreshedSubmitStage(reloaded as {
+    context?: AnswerContext;
+    error?: string;
+  });
+  if (stage.kind === "refused") {
+    return stage;
+  }
+  return {
+    kind: "refreshed",
+    context: stage.context,
+    nudge: `${contextRefreshedNudge(plan.movedFindingIds)}\n\n${refreshedStateMessage(stage.context)}`,
+    refreshResult:
+      "ODRZUCONO: kontekst się zmienił — odświeżono stan, złóż odpowiedź ponownie.",
+  };
+}
 
 /** One replayed message turn in the wire shape both halves understand. */
 export interface AnswerMessageWire {
@@ -733,55 +726,31 @@ export async function runAnswerRound(
         toolCall.arguments as { query: string; projectId: string | null },
       );
     } else if (toolCall.name === "agent_submit_answer") {
-      // The staleness recheck FIRST: an answer over a superseded world is
-      // refused and the model re-reads the refreshed state (bounded once).
-      const recheck = await tryMutation(() =>
-        ctx.runMutation(internal.agent.execute.stalenessRecheck, {
-          questionSourceId,
-          loadRevisions: answerRevisionSnapshotOf(context).map((entry) => ({
-            findingId: entry.findingId as Id<"findings">,
-            revision: entry.revision,
-          })),
-        }),
+      // The staleness gate FIRST: an answer over a superseded world is
+      // refused and the model re-reads the refreshed state (bounded
+      // once); a world that vanished mid-run REFUSES the submit outright.
+      const gate = await gateSubmitFreshness(
+        ctx,
+        questionSourceId,
+        current.runId,
+        context,
+        refreshes,
       );
-      const decision = recheck.ok
-        ? (recheck.value as {
-            decision: { decision: string; moved?: { findingId: string }[] };
-          }).decision
-        : { decision: "current" };
-      if (decision.decision === "refresh" && refreshes < MAX_ANSWER_REFRESHES) {
-        const refreshed = await ctx.runMutation(internal.agent.loop.loadAnswerStage, {
-          questionSourceId,
-          runId: current.runId,
+      if (gate.kind === "refused") {
+        outcome = { state, toolResult: gate.toolResult, done: false };
+      } else if (gate.kind === "refreshed") {
+        context = gate.context;
+        messages.push({
+          role: "user",
+          content: [{ kind: "text", text: gate.nudge }],
         });
-        const refreshedStage = refreshed as { context?: AnswerContext; error?: string };
-        if (refreshedStage.context !== undefined) {
-          context = refreshedStage.context;
-          messages.push({
-            role: "user",
-            content: [
-              {
-                kind: "text",
-                text: `${contextRefreshedNudge(
-                  (decision.moved ?? []).map((moved) => moved.findingId),
-                )}\n\n${refreshedStateMessage(context)}`,
-              },
-            ],
-          });
-          results.push(
-            "ODRZUCONO: kontekst się zmienił — odświeżono stan, złóż odpowiedź ponownie.",
-          );
-          turnLog.push({
-            turn: turns,
-            calls: activeCalls.map((c) => c.name),
-            args: activeCalls.map((c) => JSON.stringify(c.arguments).slice(0, 120)),
-            results,
-          });
-          refreshes += 1;
-          return { kind: "continue", next: nextState() };
-        }
+        results.push(gate.refreshResult);
+        turnLog.push(turnLogEntry(turns, activeCalls, results));
+        refreshes += 1;
+        return { kind: "continue", next: nextState() };
+      } else {
+        outcome = applyAnswerToolCall(state, context, decoded);
       }
-      outcome = applyAnswerToolCall(state, context, decoded);
     } else {
       // Validation against the tenant-filtered context, then the checked
       // execution — an agent plan is untrusted input at both seams.
@@ -802,12 +771,7 @@ export async function runAnswerRound(
       ],
     });
   }
-  turnLog.push({
-    turn: turns,
-    calls: activeCalls.map((c) => c.name),
-    args: activeCalls.map((c) => JSON.stringify(c.arguments).slice(0, 120)),
-    results,
-  });
+  turnLog.push(turnLogEntry(turns, activeCalls, results));
   if (done) {
     return finish(null, {});
   }

@@ -67,15 +67,6 @@ const evidenceHandle = Schema.String.pipe(
   Schema.check(Schema.isPattern(EvidenceHandlePattern)),
 );
 
-/** Provider-quirk tolerance (the E3 precedent): "null"/"" map to null. */
-export function normalizeStringlyNull(value: string | null): string | null {
-  if (value === null) {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed === "" || trimmed === "null" ? null : value;
-}
-
 /** The input schema of `agent_search_evidence`. */
 export const SearchEvidenceArgs = Schema.Struct({
   /** A Polish phrase to locate in the company's source texts. */

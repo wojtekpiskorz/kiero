@@ -33,8 +33,12 @@
 
 import {
   MAX_ANSWER_CLARIFICATIONS,
+  MAX_ANSWER_REFRESHES,
   MAX_EVIDENCE_LEDGER,
 } from "./versions";
+// The canonical provider-quirk tolerance (the planning surface owns it,
+// like locateQuote; the extraction reducer reuses it the same way).
+import { normalizeStringlyNull } from "../planning/tools";
 import {
   findAnswerClarification,
   findAnswerContact,
@@ -43,6 +47,7 @@ import {
   findAnswerMembership,
   findAnswerProject,
   findAnswerTask,
+  isEstablishedFinding,
   owedDisclosures,
   type AnswerContext,
   type AnswerEvidenceEntry,
@@ -198,7 +203,7 @@ function statementRefusal(
       if (finding === undefined) {
         return `podstawa wniosku ${findingId} nie jest ustaleniem z kontekstu`;
       }
-      if (finding.updating || finding.knowledgeTag !== "known") {
+      if (!isEstablishedFinding(finding)) {
         const recordedText =
           typeof finding.value === "object" &&
           finding.value !== null &&
@@ -292,7 +297,7 @@ function applyAskClarification(
 ): AnswerReducerOutcome {
   const args: AskClarificationArgs = {
     ...rawArgs,
-    projectId: normalizeProjectId(rawArgs.projectId),
+    projectId: normalizeStringlyNull(rawArgs.projectId),
   };
   if (state.clarificationsRaised.length >= MAX_ANSWER_CLARIFICATIONS) {
     return refuse(state, `limit ${MAX_ANSWER_CLARIFICATIONS} spraw w jednym uruchomieniu`);
@@ -308,26 +313,18 @@ function applyAskClarification(
     }
     entries.push(entry);
   }
+  // The schema enforces at least one evidenceId and every entry resolved
+  // above, so at least one distinct source always stands; no dead
+  // emptiness check is needed here.
   const distinctSources = new Set(entries.map((entry) => entry.sourceId));
-  if (distinctSources.size < 1) {
-    return refuse(state, "sprawa do wyjaśnienia wymaga co najmniej jednego dosłownego cytatu");
-  }
   // The execution half (checked memory.raiseClarification) runs in the
   // Convex layer; the reducer only admits the validated question into the
   // plan and forbids a simultaneous value guess.
   return {
     state,
-    toolResult: `PYTANIE PRZYJĘTE DO WYKONANIA (${entries.length} cytaty, ${distinctSources.size} źródeł); nie podawaj jednocześnie wartości rozstrzygającej.`,
+    toolResult: `PYTANIE PRZYJĘTE DO WYKONANIU (${entries.length} cytaty, ${distinctSources.size} źródeł); nie podawaj jednocześnie wartości rozstrzygającej.`,
     done: false,
   };
-}
-
-function normalizeProjectId(value: string | null): string | null {
-  if (value === null) {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed === "" || trimmed === "null" ? null : value;
 }
 
 // ---------------------------------------------------------------------------
@@ -366,10 +363,10 @@ function applyChangeTask(
 ): AnswerReducerOutcome {
   const args: ChangeTaskArgs = {
     ...rawArgs,
-    taskId: normalizeProjectId(rawArgs.taskId),
-    executorContactId: normalizeProjectId(rawArgs.executorContactId),
-    coordinatorMembershipId: normalizeProjectId(rawArgs.coordinatorMembershipId),
-    deadlineFindingId: normalizeProjectId(rawArgs.deadlineFindingId),
+    taskId: normalizeStringlyNull(rawArgs.taskId),
+    executorContactId: normalizeStringlyNull(rawArgs.executorContactId),
+    coordinatorMembershipId: normalizeStringlyNull(rawArgs.coordinatorMembershipId),
+    deadlineFindingId: normalizeStringlyNull(rawArgs.deadlineFindingId),
   };
   if (findAnswerProject(context, args.projectId) === undefined) {
     return refuse(state, "projectId nie wskazuje projektu tej firmy z kontekstu");
@@ -424,8 +421,8 @@ function applyChangeEvent(
 ): AnswerReducerOutcome {
   const args: ChangeEventArgs = {
     ...rawArgs,
-    eventId: normalizeProjectId(rawArgs.eventId),
-    timeFindingId: normalizeProjectId(rawArgs.timeFindingId),
+    eventId: normalizeStringlyNull(rawArgs.eventId),
+    timeFindingId: normalizeStringlyNull(rawArgs.timeFindingId),
   };
   if (findAnswerProject(context, args.projectId) === undefined) {
     return refuse(state, "projectId nie wskazuje projektu tej firmy z kontekstu");
@@ -512,7 +509,21 @@ export interface AnswerFreshnessInput {
   readonly currentRevisions: ReadonlyMap<string, number>;
 }
 
-/** The recheck decision: current, or refreshed with the moved findings. */
+/**
+ * Why the world a submit was computed against is gone: the question
+ * source row vanished or stopped being active mid-run, or the mandated
+ * context refresh could not reload.
+ */
+export type AnswerAbortReason =
+  | "question_source_missing"
+  | "question_source_not_active"
+  | "context_reload_failed";
+
+/**
+ * The recheck decision: current; refreshed with the moved findings; or
+ * ABORT, the honest third variant for a world that vanished mid-run,
+ * which REFUSES the submit (the answer must not land).
+ */
 export type AnswerFreshnessDecision =
   | { readonly decision: "current" }
   | {
@@ -522,7 +533,8 @@ export type AnswerFreshnessDecision =
         loadRevision: number;
         currentRevision: number;
       }[];
-    };
+    }
+  | { readonly decision: "abort"; readonly reason: AnswerAbortReason };
 
 /**
  * Compares the run's input-revision version against CURRENT counters. A
@@ -530,7 +542,10 @@ export type AnswerFreshnessDecision =
  * answer/change landing) forces a refresh: the run re-reads the current
  * state and either narrows the answer or asks a clarification — it never
  * lands a change computed against a superseded world. Findings that
- * vanished are not "moved" (nothing stale-addresses them).
+ * vanished are not "moved" (nothing stale-addresses them). This function
+ * never decides "abort": a vanished QUESTION world is the Convex
+ * sentinel's call, an honest input this type carries instead of
+ * fabricating a fake refresh shape.
  */
 export function decideAnswerFreshness(
   input: AnswerFreshnessInput,
@@ -553,6 +568,80 @@ export function decideAnswerFreshness(
   return moved.length === 0
     ? { decision: "current" }
     : { decision: "refresh", moved };
+}
+
+/** The Polish explanation of one abort reason (product text). */
+function abortReasonText(reason: AnswerAbortReason): string {
+  switch (reason) {
+    case "question_source_missing":
+      return "źródło pytania zniknęło w trakcie uruchomienia";
+    case "question_source_not_active":
+      return "źródło pytania nie jest już aktywne";
+    case "context_reload_failed":
+      return "odświeżenie kontekstu nie powiodło się";
+  }
+}
+
+/**
+ * The refusal a submit earns when the world it was computed against is
+ * gone: the answer must not land, so the model is told to finish WITHOUT
+ * `agent_submit_answer` (the honest end of a run whose question world
+ * vanished or whose mandated refresh could not reload).
+ */
+export function vanishedSubmitRefusal(reason: AnswerAbortReason): string {
+  return `ODRZUCONO: ${abortReasonText(reason)}. Odpowiedź nie może zostać przyjęta; zakończ bez agent_submit_answer`;
+}
+
+/** The loop's plan for one submit after the staleness recheck decided. */
+export type SubmitFreshnessPlan =
+  | { readonly kind: "accept" }
+  | { readonly kind: "refresh"; readonly movedFindingIds: readonly string[] }
+  | { readonly kind: "refuse"; readonly toolResult: string };
+
+/**
+ * Plans the handling of one submit from a staleness decision: an ABORT
+ * (the question source vanished mid-run) REFUSES the submit, so the
+ * answer never lands over a world that is gone; a refresh within the
+ * bounded budget plans the one reload; everything else accepts into the
+ * answer contract reducer.
+ */
+export function planSubmitFreshness(
+  decision: AnswerFreshnessDecision,
+  refreshes: number,
+): SubmitFreshnessPlan {
+  if (decision.decision === "abort") {
+    return { kind: "refuse", toolResult: vanishedSubmitRefusal(decision.reason) };
+  }
+  if (decision.decision === "refresh" && refreshes < MAX_ANSWER_REFRESHES) {
+    return {
+      kind: "refresh",
+      movedFindingIds: decision.moved.map((moved) => moved.findingId),
+    };
+  }
+  return { kind: "accept" };
+}
+
+/**
+ * Reads one refreshed-context reload's stage envelope: a stage that
+ * reloaded hands the refreshed context through; a stage WITHOUT one (the
+ * reload refused the source or failed technically) REFUSES the submit,
+ * never a fall-through that accepts the answer over the stale in-memory
+ * context the run still holds.
+ */
+export function refreshedSubmitStage(
+  stage: { readonly context?: AnswerContext; readonly error?: string },
+):
+  | { readonly kind: "refreshed"; readonly context: AnswerContext }
+  | { readonly kind: "refused"; readonly toolResult: string } {
+  if (stage.context === undefined) {
+    const reason: AnswerAbortReason =
+      stage.error === "question_source_missing" ||
+      stage.error === "question_source_not_active"
+        ? stage.error
+        : "context_reload_failed";
+    return { kind: "refused", toolResult: vanishedSubmitRefusal(reason) };
+  }
+  return { kind: "refreshed", context: stage.context };
 }
 
 /** Appends search results to the ledger, bounded (the loop calls this). */

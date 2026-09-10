@@ -15,11 +15,14 @@ import {
   ANSWER_TOOLS_VERSION,
   ASK_CLARIFICATION_TOOL,
   CHANGE_TASK_TOOL,
+  MAX_ANSWER_REFRESHES,
   SUBMIT_ANSWER_TOOL,
   applyAnswerToolCall,
   decideAnswerFreshness,
   emptyAnswerState,
   extendEvidenceLedger,
+  planSubmitFreshness,
+  refreshedSubmitStage,
   type AnswerContext,
   type AnswerEvidenceEntry,
   type DecodedAnswerCall,
@@ -609,6 +612,88 @@ describe("decideAnswerFreshness", () => {
       currentRevisions: new Map(),
     });
     expect(decision.decision).toBe("current");
+  });
+
+  it("never decides abort itself (a vanished question world is the sentinel's honest input)", () => {
+    // The Convex sentinel emits { decision: "abort", reason: ... } when the
+    // question source row is gone; the comparison itself only ever says
+    // current or refresh, so no fabricated refresh shapes exist.
+    const decision = decideAnswerFreshness({
+      loadRevisions: [{ findingId: "findings_deposit", revision: 2 }],
+      currentRevisions: new Map([["findings_deposit", 2]]),
+    });
+    expect(decision).toEqual({ decision: "current" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The submit freshness gate: a vanished world refuses, never accepts.
+// ---------------------------------------------------------------------------
+
+describe("the submit freshness gate (planSubmitFreshness/refreshedSubmitStage)", () => {
+  it("refuses the submit when the question source vanished mid-run", () => {
+    const plan = planSubmitFreshness(
+      { decision: "abort", reason: "question_source_missing" },
+      0,
+    );
+    expect(plan.kind).toBe("refuse");
+    if (plan.kind === "refuse") {
+      expect(plan.toolResult).toContain("ODRZUCONO");
+      expect(plan.toolResult).toContain("źródło pytania zniknęło");
+      expect(plan.toolResult).toContain("zakończ bez agent_submit_answer");
+    }
+  });
+
+  it("refuses the submit when a mandated refresh cannot reload the context", () => {
+    const refused = refreshedSubmitStage({ error: "question_source_missing" });
+    expect(refused.kind).toBe("refused");
+    if (refused.kind === "refused") {
+      expect(refused.toolResult).toContain("ODRZUCONO");
+      expect(refused.toolResult).toContain("Odpowiedź nie może zostać przyjęta");
+    }
+    const thrown = refreshedSubmitStage({});
+    expect(thrown.kind).toBe("refused");
+  });
+
+  it("hands the refreshed context through on a successful reload", () => {
+    const context = contextOf();
+    expect(refreshedSubmitStage({ context })).toEqual({
+      kind: "refreshed",
+      context,
+    });
+  });
+
+  it("plans the bounded reload for a refresh decision within budget", () => {
+    const plan = planSubmitFreshness(
+      {
+        decision: "refresh",
+        moved: [
+          { findingId: "findings_delivery", loadRevision: 1, currentRevision: 2 },
+        ],
+      },
+      0,
+    );
+    expect(plan).toEqual({
+      kind: "refresh",
+      movedFindingIds: ["findings_delivery"],
+    });
+  });
+
+  it("accepts a current world; a refresh past the budget falls through to the reducer", () => {
+    expect(planSubmitFreshness({ decision: "current" }, 0)).toEqual({
+      kind: "accept",
+    });
+    expect(
+      planSubmitFreshness(
+        {
+          decision: "refresh",
+          moved: [
+            { findingId: "findings_delivery", loadRevision: 1, currentRevision: 2 },
+          ],
+        },
+        MAX_ANSWER_REFRESHES,
+      ),
+    ).toEqual({ kind: "accept" });
   });
 });
 
