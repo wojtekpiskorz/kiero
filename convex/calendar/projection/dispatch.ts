@@ -1,12 +1,14 @@
 /**
- * Calendar projection command dispatch wiring (G2): the SAME checked path
- * A3 proved and G1/C4 reuse, with this lane's handler registry and policy.
+ * Calendar projection command dispatch wiring (G2, extended by G5): the SAME
+ * checked path A3 proved and G1/C4 reuse, with this lane's handler registry
+ * and policy.
  *
- * The registry implements exactly ONE certified operation today —
+ * The registry implements exactly TWO certified operations today:
  * `calendar.setCopyHidden` (write): the actor's personal hide or explicit
- * restore of one copy. `calendar.reconcileCopy` is G3's lane and stays
- * unregistered: it fails closed `unsupported` here, honestly, until G3
- * implements it.
+ * restore of one copy, and `calendar.setSelection` (write, G5 issue #107):
+ * the actor's personal project selection. `calendar.reconcileCopy` is G3's
+ * lane and stays unregistered: it fails closed `unsupported` here, honestly,
+ * until G3 implements it.
  *
  * Everything resolves through B1's identity source (provision-or-refresh,
  * then the canonical user -> earliest active membership -> company chain),
@@ -18,10 +20,11 @@ import { calendarOperations, type ResultEnvelope } from "@kiero/contracts";
 import { dispatchCommand, membershipPolicy, type AccessPolicy, type HandlerRegistry } from "@kiero/runtime";
 import type { MutationCtx } from "../../_generated/server";
 import { DEFAULT_DEVICE_LABEL, resolveAccessContextWithProvisioning } from "../../access/identity/resolution";
-import { performSetCopyHidden } from "./operations";
+import { performSetCopyHidden, performSetSelection } from "./operations";
 
-// The contract entry this handler implements (decode authority).
+// The contract entries these handlers implement (decode authority).
 export const setCopyHiddenEntry = calendarOperations["calendar.setCopyHidden"];
+export const setSelectionEntry = calendarOperations["calendar.setSelection"];
 
 /** G2's registered policy: the certified membership semantics, unchanged. */
 export const calendarProjectionPolicy: AccessPolicy = {
@@ -43,6 +46,16 @@ export function calendarProjectionHandlers(): HandlerRegistry<MutationCtx> {
         return performSetCopyHidden(tx, context, {
           copyId: decoded.copyId,
           hidden: decoded.hidden,
+        });
+      },
+    },
+    "calendar.setSelection": {
+      intent: "write",
+      run: async (tx, context, input) => {
+        const decoded = Schema.decodeUnknownSync(setSelectionEntry.input)(input);
+        return performSetSelection(tx, context, {
+          mode: decoded.mode,
+          ...(decoded.mode === "explicit" ? { projectIds: decoded.projectIds } : {}),
         });
       },
     },

@@ -118,9 +118,21 @@ export interface CopyRowView {
   readonly remoteOutcome: "confirmed" | "absent" | "unknown";
 }
 
+/**
+ * The boss's effective project selection (G5): the stored calendarSyncState
+ * column when present, the all-projects default otherwise. An explicit
+ * selection always carries a (possibly empty) list.
+ */
+export interface SelectionView {
+  readonly mode: "all_projects" | "explicit";
+  readonly projectIds: readonly string[] | null;
+}
+
 /** The G2 projectionOverview shape the settings surface consumes. */
 export interface ProjectionOverviewView {
   readonly state: string;
+  /** Null on the lean branches: no own connection means no scope to read. */
+  readonly selection: SelectionView | null;
   readonly copies: readonly CopyRowView[];
   readonly sync: {
     readonly state: "idle" | "syncing" | "needs_reconcile";
@@ -154,13 +166,25 @@ export const settingsCopy = {
   reconnectPointer: "Aby wznowić synchronizację, wróć do sekcji połączenia powyżej i użyj przycisku „Połącz ponownie”.",
   cleanupResidueNote:
     "Po odłączeniu Kiero nie potwierdziło jeszcze usunięcia swoich wpisów z kalendarza Google. Sprawdź kalendarz i usuń wpisy Kiero ręcznie, jeśli zostały.",
-  // Personal project scope
+  // Personal project scope (G5: the certified calendar.setSelection write
+  // exists, so the honest not-yet-available notice is gone and the editor
+  // copy below took its place: the flagged G4-file amendment of issue #107)
   scopeHeading: "Wybrane projekty",
   scopeIntro:
     "Wybór projektów jest osobisty: decyduje, które terminy firmy trafiają do Twojego kalendarza, i nie zmienia faktów firmy ani wyciszenia powiadomień innych szefów.",
-  scopeAll: "Dzisiaj kalendarz pokazuje terminy wszystkich projektów firmy.",
-  scopeEditUnavailable:
-    "Zawężenie wyboru do konkretnych projektów nie jest jeszcze dostępne; powstanie razem z operacją wyboru w zapleczu Kiero.",
+  scopeEditMode: "Wybierz, których projektów terminy mają trafiać do Twojego kalendarza.",
+  scopeModeAll: "Wszystkie projekty firmy",
+  scopeModeExplicit: "Tylko wybrane projekty",
+  scopeCount: (n: number): string => `Liczba wybranych projektów: ${n}.`,
+  scopeExplicitEmpty:
+    "Nie wybrano żadnego projektu: kalendarz przestanie pokazywać terminy, dopóki nie wybierzesz choć jednego projektu.",
+  scopeSave: "Zapisz wybór projektów",
+  scopeSaved:
+    "Wybór projektów zapisany. Kalendarz uwzględni go podczas najbliższej synchronizacji.",
+  scopeProjectNotFound:
+    "Nie znaleziono jednego z projektów. Odśwież stronę i spróbuj ponownie.",
+  scopeNextSyncNote:
+    "Zapisany wybór zadziała podczas najbliższej synchronizacji kalendarza.",
   personalFieldsNote:
     "Twoje osobiste ustawienia wpisów w Google — przypomnienia, kolory, notatki — pozostają Twoje i Kiero ich nie nadpisuje.",
   // Copies list

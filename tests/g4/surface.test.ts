@@ -140,14 +140,17 @@ function control(html: string, label: string): string | null {
 // ---------------------------------------------------------------------------
 
 describe("the calendar settings registration (A4 composition)", () => {
-  it("stays mounted at /kalendarz and names exactly the four certified operations G1+G4 consume", () => {
+  it("stays mounted at /kalendarz and names exactly the five certified operations G1+G4+G5 consume", () => {
     expect(calendarEntry?.implementation).toBe("mounted");
     expect(calendarEntry?.routePath).toBe("/kalendarz");
+    // G5 (issue #107) appended the personal project-selection write to the
+    // same entry: the minimal flagged amendment of this pin (G4's precedent).
     expect(calendarEntry?.consumedOperations).toEqual([
       "calendar.connectCalendar",
       "calendar.disconnectCalendar",
       "calendar.setCopyHidden",
       "calendar.reconcileCopy",
+      "calendar.setSelection",
     ]);
     for (const operation of calendarEntry?.consumedOperations ?? []) {
       expect(operation in operations).toBe(true);
@@ -407,7 +410,7 @@ describe("honesty rules (criterion 3)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Criterion 2: personal scope and hidden items, without fake editability.
+// Criterion 2: personal scope and hidden items, honestly editable since G5.
 // ---------------------------------------------------------------------------
 
 describe("personal scope honesty (criterion 2)", () => {
@@ -418,18 +421,21 @@ describe("personal scope honesty (criterion 2)", () => {
     expect(settingsCopy.copiesIntro).toContain("nie anuluje zadania");
   });
 
-  it("renders the honest scope display without any edit control", () => {
-    const html = renderPanel(createElement(ScopeSection));
-    expect(html).toContain(settingsCopy.scopeAll);
-    expect(html).toContain(settingsCopy.scopeEditUnavailable);
+  it("renders the scope editor on the certified write (G5's follow-up)", () => {
+    // G5 (issue #107) landed calendar.setSelection and mounted the control
+    // in this G4-owned section (criterion 3's one-line follow-up): the old
+    // "no fake edit control" pin flipped with the prerequisite's arrival,
+    // the same flagged-amendment rule this file's registration pin used.
+    const html = renderPanel(
+      createElement(ScopeSection, { selection: { mode: "all_projects", projectIds: null } }),
+    );
+    expect(html).toContain(settingsCopy.scopeEditMode);
+    expect(html).toContain(settingsCopy.scopeModeAll);
+    expect(html).toContain(settingsCopy.scopeModeExplicit);
+    expect(html).toContain(settingsCopy.scopeSave);
+    expect(html).toContain(settingsCopy.scopeNextSyncNote);
     expect(html).toContain(settingsCopy.personalFieldsNote);
-    // No fake editor: the certified write interface for narrowing the
-    // selection (calendar.setSelection, flagged in G2's report) does not
-    // exist yet, so the surface renders no control that could only fail.
-    expect(html).not.toContain("<select");
-    expect(html).not.toContain("<input");
-    expect(html).not.toContain("<button");
-    expect("calendar.setSelection" in operations).toBe(false);
+    expect("calendar.setSelection" in operations).toBe(true);
   });
 });
 

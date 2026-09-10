@@ -21,7 +21,7 @@
 
 import { v } from "convex/values";
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
-import { notFoundError, type RequestContext } from "@kiero/runtime";
+import { notFoundError, validationError, type RequestContext } from "@kiero/runtime";
 import {
   decideProjectionMode,
   decideSyncStateTransition,
@@ -515,4 +515,98 @@ export async function performSetCopyHidden(
     updatedAtMs: Date.now(),
   });
   return okResult({ copyId: id });
+}
+
+// ---------------------------------------------------------------------------
+// Personal project selection (calendar.setSelection, G5).
+// ---------------------------------------------------------------------------
+
+/**
+ * `calendar.setSelection`: the actor's OWN personal decision about which
+ * projects' terms reach their calendar ("Wybór projektów jest osobisty").
+ * Like the hide rules above, the semantics live HERE by construction:
+ * there is deliberately no pure decision module for them:
+ *
+ * - Ownership is the actor's own connection in the actor's own firm (the
+ *   sibling hide's checks): a foreign or firmless row is not_found, no
+ *   existence leak. The connection's STATE is irrelevant on purpose: the
+ *   selection is a Kiero-side preference the next projection pass consumes
+ *   whenever the connection publishes again (it survives disconnects and
+ *   reconnects, exactly like a personal hide).
+ * - A stale or foreign project id (deleted, or another firm's) is
+ *   not_found, no existence leak: the sibling command discipline over
+ *   every id the input carries. Duplicated ids are malformed input and
+ *   fail `validation` before anything is written.
+ * - An EMPTY explicit list is accepted: the honest opt-out that projects
+ *   nothing (every subject falls out_of_personal_scope on the next pass).
+ * - The write touches ONLY the sync row's `selectedProjects` (plus its
+ *   `updatedAtMs`): the projection pass patches its own columns and never
+ *   this one, so the selection survives every pass unchanged until the
+ *   boss edits it here again. No event is published: the certified module
+ *   surface has no selection event, and the pass consuming the column is
+ *   G2's designed trigger, not a fan-out G5 invents.
+ */
+export async function performSetSelection(
+  ctx: MutationCtx,
+  context: RequestContext,
+  input: { readonly mode: "all_projects" | "explicit"; readonly projectIds?: readonly string[] },
+): Promise<ResultEnvelope> {
+  const actorUserId = ctx.db.normalizeId("users", context.actor.userId);
+  const actorCompanyId = ctx.db.normalizeId("companies", context.actor.companyId);
+  if (actorUserId === null || actorCompanyId === null) {
+    return errorResult(notFoundError("calendarConnections"));
+  }
+  const connection = await ctx.db
+    .query("calendarConnections")
+    .withIndex("by_user", (q) => q.eq("userId", actorUserId))
+    .first();
+  if (connection === null || connection.companyId !== actorCompanyId) {
+    // Not the actor's own connection in the actor's own firm: not_found.
+    return errorResult(notFoundError("calendarConnections"));
+  }
+
+  let stored: { mode: "all_projects" } | { mode: "explicit"; projectIds: Id<"projects">[] };
+  if (input.mode === "all_projects") {
+    stored = { mode: "all_projects" };
+  } else {
+    const ids: Id<"projects">[] = [];
+    const seen = new Set<string>();
+    for (const rawId of input.projectIds ?? []) {
+      const id = ctx.db.normalizeId("projects", rawId);
+      if (id === null) {
+        return errorResult(notFoundError("projects"));
+      }
+      if (seen.has(id)) {
+        return errorResult(validationError("duplicate_project_ids"));
+      }
+      seen.add(id);
+      const project = await ctx.db.get(id);
+      if (project === null || project.companyId !== connection.companyId) {
+        // Stale or foreign project id: not_found, no existence leak.
+        return errorResult(notFoundError("projects"));
+      }
+      ids.push(id);
+    }
+    stored = { mode: "explicit", projectIds: ids };
+  }
+
+  const syncRow = await syncStateOf(ctx.db, connection._id);
+  const nowMs = Date.now();
+  if (syncRow === null) {
+    await ctx.db.insert("calendarSyncState", {
+      connectionId: connection._id,
+      state: "idle",
+      selectedProjects: stored,
+      updatedAtMs: nowMs,
+    });
+  } else {
+    await ctx.db.patch(syncRow._id, {
+      selectedProjects: stored,
+      updatedAtMs: nowMs,
+    });
+  }
+  return okResult({
+    mode: stored.mode,
+    projectIds: stored.mode === "explicit" ? stored.projectIds : null,
+  });
 }

@@ -55,8 +55,9 @@ describe("composed registry integrity", () => {
     // registration.ts declares the interface field.)
     // 73 since the H1 amendment added the two memory reads, F3 added
     // attention.revokePushSubscription and F4 added
-    // attention.evaluateDueReminders.
-    expect(operationNames).toHaveLength(73);
+    // attention.evaluateDueReminders; 74 since G5 (issue #107) landed the
+    // certified calendar.setSelection entry G2's report had flagged.
+    expect(operationNames).toHaveLength(74);
     expect(eventNames).toHaveLength(41);
     for (const name of operationNames) {
       expect(operations[name]?.name).toBe(name);
