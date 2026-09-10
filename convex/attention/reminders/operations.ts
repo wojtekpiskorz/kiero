@@ -771,8 +771,15 @@ export async function performSnoozeTaskReminders(
     .withIndex("by_recipient_state", (q) =>
       q.eq("recipientUserId", userId).eq("state", "pending"),
     )
-    .filter((q) => q.eq(q.field("taskId"), taskId))
+    .filter((q) =>
+      q.eq(q.field("taskId"), taskId) &&
+      q.eq(q.field("semanticKind"), "task_reminder"),
+    )
     .collect();
+  // The semanticKind predicate keeps the defer inside THIS lane's intents:
+  // taskId is an optional column on the shared table, and a future lane
+  // writing it would otherwise have its intents silently deferred by a
+  // task snooze (independent review, round 2).
   for (const intent of pending) {
     if (intent.dueAtMs < input.untilMs) {
       await tx.db.patch(intent._id, { dueAtMs: input.untilMs });
