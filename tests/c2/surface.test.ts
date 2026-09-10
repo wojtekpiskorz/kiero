@@ -9,8 +9,8 @@
  *   invented time components;
  * - the schema fragment keeps knowledge states separate from business
  *   progress and extraction confidence, and pins the provenance vocabulary;
- * - the lane registers exactly its six operations under the checked path and
- *   leaves the extension operations (C3) failing closed `unsupported`.
+ * - the lane registers its six findings operations under the checked path
+ *   (C3 amendment: the extension operations joined the same registry).
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -293,15 +293,23 @@ describe("the C2 schema fragment (knowledge separate from progress)", () => {
 });
 
 describe("the memory dispatch registration", () => {
-  it("registers exactly this lane's six operations with their intents", () => {
+  // C3 amendment (flagged): the registry now also carries the extensions
+  // lane's four operations (memory.defineExtension, versionExtensionDefinition,
+  // searchExtensionCatalog, validateExtensionValue); the extension surface no
+  // longer fails closed `unsupported`.
+  it("registers the six findings operations plus the C3 extension operations", () => {
     const handlers = memoryHandlers();
     expect(Object.keys(handlers).sort()).toEqual([
       "memory.correctFinding",
+      "memory.defineExtension",
       "memory.prepareChangeSet",
       "memory.publishChangeSet",
       "memory.raiseClarification",
       "memory.readCurrentFindings",
       "memory.resolveClarification",
+      "memory.searchExtensionCatalog",
+      "memory.validateExtensionValue",
+      "memory.versionExtensionDefinition",
     ]);
     expect(handlers["memory.readCurrentFindings"]?.intent).toBe("read");
     for (const name of [
@@ -315,7 +323,9 @@ describe("the memory dispatch registration", () => {
     }
   });
 
-  it("fails closed unsupported on the extension operations this lane does not own", async () => {
+  it("keeps an operation NO lane implements failing closed unsupported", async () => {
+    // C3 amendment (flagged): memory.defineExtension is implemented now; the
+    // fail-closed proof moves to an operation still outside every registry.
     const result = await dispatchCommand(
       {
         resolveContext: async () => contextFixture(),
@@ -325,10 +335,7 @@ describe("the memory dispatch registration", () => {
       // The unsupported path refuses before any handler runs, so the ctx is
       // never dereferenced; typed for the registry, null for the test.
       null as unknown as Parameters<typeof dispatchCommand<MutationCtx>>[1],
-      envelope("memory.defineExtension", {
-        name: "Grubość płytki",
-        fields: [{ fieldId: "mm", label: "Milimetry", kind: "quantity" }],
-      }),
+      envelope("memory.recomputeDepents", {}),
     );
     expect(result._tag).toBe("error");
     if (result._tag === "error") {

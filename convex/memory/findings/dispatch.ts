@@ -22,6 +22,7 @@ import {
   type RequestContext,
 } from "@kiero/runtime";
 import { bridgeIdentity, identityFromConvexAuth, resolveRequestContext } from "../../platform/context";
+import { extensionHandlers } from "../extensions/dispatch";
 import type { MutationCtx } from "../../_generated/server";
 import { performPrepareChangeSet } from "./prepare";
 import { performPublishChangeSet } from "./publish";
@@ -41,10 +42,16 @@ import type {
 } from "./semantics";
 
 /**
- * Handler table for memory findings mutation-transaction dispatches
- * (exported for tests). `memory.readCurrentFindings` is registered here so
- * the operation is reachable through the SAME checked command path (the
- * barebones UI query in ./functions.ts is the reactive convenience read).
+ * Handler table for memory mutation-transaction dispatches (exported for
+ * tests). `memory.readCurrentFindings` is registered here so the operation
+ * is reachable through the SAME checked command path (the barebones UI query
+ * in ./functions.ts is the reactive convenience read).
+ *
+ * C3 amendment (additive, flagged): the extension operations this dispatch
+ * left fail-closed `unsupported` are now registered from the extensions
+ * lane's own registry (memory.defineExtension, versionExtensionDefinition,
+ * searchExtensionCatalog, validateExtensionValue) — one merged handler table,
+ * one checked path.
  *
  * The dispatch decodes the envelope input ONCE and hands the handler the
  * DECODED value (packages/runtime command.ts passes `decodedInput.value`).
@@ -95,15 +102,15 @@ export function memoryHandlers(): HandlerRegistry<MutationCtx> {
       run: (tx, context, input) =>
         performResolveClarification(tx, context, input as ResolveClarificationInput),
     },
+    ...extensionHandlers(),
   };
 }
 
 /**
- * Dispatches one memory findings command envelope inside a mutation
+ * Dispatches one memory command envelope inside a mutation
  * transaction. The optional `serviceSessionId` marks the service-bridge
  * path (identity verified before this point); without it, Convex Auth is
- * the only identity source. Unimplemented memory operations (the extension
- * definition surface belongs to C3) fail closed `unsupported`.
+ * the only identity source.
  */
 export async function dispatchMemoryCommand(
   ctx: MutationCtx,
