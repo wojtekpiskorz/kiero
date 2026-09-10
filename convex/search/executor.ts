@@ -201,13 +201,13 @@ export const indexWork = internalQuery({
  * lived in three functions): fragment identity first, then finding, then
  * the source-only entry.
  */
-export function draftKeyOf(input: {
-  readonly sourceFragmentId?: string;
-  readonly findingId?: string;
-  readonly sourceId?: string;
-  readonly generationId?: string;
-  readonly companyId?: string;
-}): string {
+export function draftKeyOf<
+  T extends {
+    readonly sourceFragmentId?: string;
+    readonly findingId?: string;
+    readonly sourceId?: string;
+  },
+>(input: T): string {
   return input.sourceFragmentId !== undefined
     ? `fragment:${input.sourceFragmentId}`
     : input.findingId !== undefined
