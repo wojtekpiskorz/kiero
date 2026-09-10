@@ -182,7 +182,7 @@ export const settingsCopy = {
   restoreCopy: "Przywróć w kalendarzu",
   checkCopy: "Sprawdź teraz",
   checkNowHint:
-    "Są pozycje wymagające doprowadzenia do porządku: użyj przycisku „Sprawdź teraz” przy pozycjach poniżej.",
+    "Są terminy wymagające doprowadzenia do porządku: użyj przycisku „Sprawdź teraz” przy terminach poniżej.",
   actionsUnavailableNote:
     "Działania na kopiach są teraz niedostępne, bo kalendarz nie jest połączony. Połącz kalendarz ponownie, żeby nimi zarządzać.",
   hideDone: "Kopia ukryta. Zadanie lub zdarzenie w Kiero pozostaje bez zmian.",
@@ -239,6 +239,16 @@ export function syncStatusLines(overview: SyncOverviewView): readonly StatusLine
 
 /** The next actions recovery offers for one syncOverview (honest, bounded). */
 export type SyncNextAction = "reconnect" | "check_now" | "check_google_manually";
+
+/**
+ * The recovery copy per action: one total map the compiler enforces, so a
+ * future fourth action cannot silently render a wrong note.
+ */
+export const syncNextActionCopy: Record<SyncNextAction, { readonly role: "status" | "note"; readonly text: string }> = {
+  reconnect: { role: "status", text: settingsCopy.reconnectPointer },
+  check_now: { role: "status", text: settingsCopy.checkNowHint },
+  check_google_manually: { role: "note", text: settingsCopy.cleanupResidueNote },
+};
 
 /** Which recoveries the overview honestly offers (never a blind recreate). */
 export function syncNextActions(overview: SyncOverviewView): readonly SyncNextAction[] {

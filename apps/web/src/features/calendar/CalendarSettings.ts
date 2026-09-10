@@ -31,6 +31,7 @@ import {
   copyStatusLabel,
   settingsCopy,
   subjectHref,
+  syncNextActionCopy,
   syncNextActions,
   syncStatusLines,
   type CopyRowView,
@@ -114,13 +115,8 @@ export function DiagnosticsSection({
   // honestly offers, never a blind recreate.
   const actions = syncNextActions(overview);
   for (const action of actions) {
-    if (action === "reconnect") {
-      children.push(createElement("p", { role: "status" }, settingsCopy.reconnectPointer));
-    } else if (action === "check_now") {
-      children.push(createElement("p", { role: "status" }, settingsCopy.checkNowHint));
-    } else {
-      children.push(createElement("p", { role: "note" }, settingsCopy.cleanupResidueNote));
-    }
+    const line = syncNextActionCopy[action];
+    children.push(createElement("p", { role: line.role }, line.text));
   }
   children.push(
     createElement(
