@@ -24,6 +24,7 @@ import type { QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { decideRetainedSelection, toRepresentationView } from "../images/protocol";
 import {
+  completedByNewest,
   completedVisionOrdersByNewest,
   observationIdOf,
   type CoverageSourceView,
@@ -154,13 +155,12 @@ export async function loadCompletedTranscriptSegments(
   db: LoaderDb,
   view: CoverageSourceView,
 ): Promise<TranscriptSegmentView[]> {
+  // The shared rule, newest first: the first order seen per attachment is
+  // its newest completed version, the same function the coverage decision
+  // uses (round-3: the third hand-rolled copy of this selection).
   const newest = new Map<string, TranscriptOrderView>();
-  for (const order of view.transcriptOrders) {
-    if (order.state !== "complete" || order.extractionId === null) {
-      continue;
-    }
-    const existing = newest.get(order.attachmentId);
-    if (existing === undefined || (order.finishedAtMs ?? 0) > (existing.finishedAtMs ?? 0)) {
+  for (const order of completedByNewest(view.transcriptOrders)) {
+    if (!newest.has(order.attachmentId)) {
       newest.set(order.attachmentId, order);
     }
   }

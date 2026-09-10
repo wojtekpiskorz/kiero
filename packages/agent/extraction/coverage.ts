@@ -71,7 +71,11 @@ export interface JoinedCoverageSnapshot {
 export type JoinedCompleteness =
   /** Every required input complete: the whole source was inspectable. */
   | "complete"
-  /** Some inputs pending/failed/superseded: conclusions over them stay pending. */
+  /**
+   * Some inputs pending/failed/superseded: conclusions over them stay
+   * pending (a replaced input still grounds its newest-pinned conclusions
+   * immediately, per the header's replaced-by-newer-version rule).
+   */
   | "partial_unresolved_inputs"
   /** Every unresolved input is externally blocked (resumable). */
   | "blocked_external";
@@ -141,6 +145,26 @@ export interface VisionOrderView {
 }
 
 /**
+ * The ONE version-selection rule both modalities share: completed orders,
+ * newest completion first. The vision and audio coverage decisions derive
+ * from it and the loader takes its head per attachment, so the coverage
+ * decision and the loader's evidence pin can never disagree on which
+ * version won (round-3: the audio side held by two synchronized copies,
+ * not by one function).
+ */
+export function completedByNewest<
+  T extends {
+    readonly state: string;
+    readonly extractionId: string | null;
+    readonly finishedAtMs: number | null;
+  },
+>(orders: readonly T[]): T[] {
+  return orders
+    .filter((order) => order.state === "complete" && order.extractionId !== null)
+    .sort((a, b) => (b.finishedAtMs ?? 0) - (a.finishedAtMs ?? 0));
+}
+
+/**
  * The completed vision orders over one representation, NEWEST completion
  * first (the audio lane's rule, mirrored): more than one channel may
  * complete over the same representation, and the newest completed order's
@@ -150,9 +174,7 @@ export interface VisionOrderView {
 export function completedVisionOrdersByNewest(
   orders: readonly VisionOrderView[],
 ): VisionOrderView[] {
-  return orders
-    .filter((order) => order.state === "complete" && order.extractionId !== null)
-    .sort((a, b) => (b.finishedAtMs ?? 0) - (a.finishedAtMs ?? 0));
+  return completedByNewest(orders);
 }
 
 /** One image attachment's inspectable representation + vision orders. */
@@ -200,9 +222,7 @@ export function audioAttachmentStatus(
       lastErrorKind: "transcript_not_ordered",
     };
   }
-  const complete = orders
-    .filter((order) => order.state === "complete" && order.extractionId !== null)
-    .sort((a, b) => (b.finishedAtMs ?? 0) - (a.finishedAtMs ?? 0));
+  const complete = completedByNewest(orders);
   if (complete.length > 0) {
     // Newer COMPLETED orders than the selected one: the older extraction is
     // superseded — informational, the selected stays usable evidence.
