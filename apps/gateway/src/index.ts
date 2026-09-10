@@ -1,10 +1,16 @@
 /**
  * @kiero/gateway: the Cloudflare Worker entry (A3; telemetry wiring by I2;
+ * uploads lane routing by D2; images lane routing by D5).
+
  * uploads lane routing by D2; media read routing by D3).
  *
  * Routes resolve through the composition registry
  * (`./composition/registry.ts`); the platform lane's routes live in
  * `./platform/routes.ts`, the uploads lane's in `./uploads/routes.ts`, the
+ * images lane's in `./images/routes.ts`, and all call Convex through their
+ * verified bridges. Unknown paths, including unmatched `/platform/*`,
+ * `/uploads/*` and `/images/*` paths, answer with the sanitized
+
  * media lane's in `./media/routes.ts`, and all call Convex through their
  * verified bridges. Unknown paths, including unmatched `/platform/*`,
  * `/uploads/*` and `/media/*` paths, answer with the sanitized
@@ -23,9 +29,10 @@ import type { BridgeEnv } from "./platform/bridge";
 import type { UploadsEnv } from "./uploads/r2";
 import type { MediaEnv } from "./media/r2";
 import type { TelemetryEnv } from "./telemetry/emit";
+import type { NormalizerEnv } from "./images/normalizer";
 
 /** The Worker bindings the gateway routes consume (see platform/bridge.ts). */
-export type Env = BridgeEnv & TelemetryEnv & UploadsEnv & MediaEnv;
+export type Env = BridgeEnv & TelemetryEnv & UploadsEnv & MediaEnv & NormalizerEnv;
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -35,6 +42,7 @@ export default {
       if (
         url.pathname.startsWith("/platform/") ||
         url.pathname.startsWith("/uploads/") ||
+        url.pathname.startsWith("/images/") ||
         url.pathname.startsWith("/media/")
       ) {
         const route = matchRoute(request.method, url.pathname);

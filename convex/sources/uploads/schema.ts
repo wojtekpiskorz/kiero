@@ -142,5 +142,32 @@ export const uploadsTables = {
     /** Present once the archival representation is verified durable. */
     verifiedAtMs: v.optional(shared.tsMs),
     createdAtMs: shared.tsMs,
+    /**
+     * D5 amendment (the fragment's "+D5" ownership in the contracts
+     * manifest): object size in bytes of this representation's R2 object.
+     */
+    bytes: v.optional(v.float64()),
+    /** D5: the representation's content type (e.g. `image/webp`). */
+    mimeType: v.optional(v.string()),
+    /**
+     * D5: present once the temporary received bytes were removed AFTER the
+     * retained representation verified durable (the row stays as the
+     * provenance record of what was received).
+     */
+    removedAtMs: v.optional(shared.tsMs),
+    /**
+     * D5: the typed honest outcome that kept the RECEIVED original as the
+     * retained representation (the CONTEXT.md exception). Closed vocabulary
+     * owned by convex/processing/images/protocol.ts (pinned at runtime by
+     * tests/d5, the fragments.test.ts pattern for fragment-local unions).
+     */
+    exceptionKind: v.optional(
+      v.union(
+        v.literal("oversized_input"),
+        v.literal("unsupported_input"),
+        v.literal("conversion_failed"),
+        v.literal("quality_unresolved"),
+      ),
+    ),
   }).index("by_attachment_role", ["attachmentId", "role"]),
 } as const;

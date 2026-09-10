@@ -139,6 +139,15 @@ export const analyzeChangePlanInput = Schema.Struct({
   reanalysisOfRunId: Schema.NullOr(tableIdSchema("processingRuns")),
 });
 
+// D5 amendment (issue #33): the photo-normalization executor input. The
+// accepted source's attachment ids ride the `sources.sourceAccepted` payload
+// verbatim (audio attachments are skipped by the executor); the source id
+// anchors tenancy and the deterministic job dedup key.
+export const normalizePhotoInput = Schema.Struct({
+  sourceId: tableIdSchema("sources"),
+  attachmentIds: Schema.Array(tableIdSchema("attachments")),
+});
+
 // A3 certification amendment: the platform's external-delivery proof executor.
 export const echoDeliveryInput = Schema.Struct({
   dedupKey: Schema.NonEmptyString,
@@ -192,6 +201,16 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "processing.analyze_change_plan",
     input: analyzeChangePlanInput,
   }),
+  // D5 amendment (issue #33): the accepted-photo normalization executor
+  // (architecture protocol step 4 — normalize before ordinary vision). It
+  // consumes `sources.sourceAccepted` through its own edge; the extraction
+  // job the acceptance transaction registers stays E3's.
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("processing.normalize"),
+    jobKind: "processing.normalize_photo",
+    input: normalizePhotoInput,
+  }),
   // A3 certification amendment: the platform's external-delivery proof
   // executor (echo stand-in; business lanes keep their own kinds).
   executorEntry({
@@ -230,6 +249,10 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   // processing.analyze was the inconsistency; the executor table is the
   // authority and its input shape is extraction, not change-plan analysis).
   consumer("sources.sourceAccepted", "processing.extract_fragments"),
+  // D5 amendment (issue #33): acceptance also fans out photo normalization
+  // (protocol step 4) through its own consumer edge; the drain projects the
+  // event payload onto both edges and each job carries a distinct dedup key.
+  consumer("sources.sourceAccepted", "processing.normalize_photo"),
   // Requested reanalysis runs as a linked new analysis run.
   consumer("operations.reanalysisRequested", "processing.analyze_change_plan"),
   // A3 certification amendment: the platform's echo publication drains into

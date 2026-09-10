@@ -29,6 +29,8 @@ import {
   telemetryHealthHandler,
 } from "./operations/telemetry/http";
 import { uploadsBridgeHandler, uploadsStateHandler } from "./sources/uploads/http";
+import { imagesBridgeHandler } from "./processing/images/http";
+
 import { mediaAccessHandler } from "./sources/media_access/http";
 import {
   calendarStartHandler,
@@ -54,6 +56,8 @@ http.route({ path: "/platform/telemetry/heartbeat", method: "POST", handler: hea
 http.route({ path: "/platform/telemetry/health", method: "GET", handler: telemetryHealthHandler });
 http.route({ path: "/sources/uploads/bridge", method: "POST", handler: uploadsBridgeHandler });
 http.route({ path: "/sources/uploads/state", method: "POST", handler: uploadsStateHandler });
+http.route({ path: "/processing/images/bridge", method: "POST", handler: imagesBridgeHandler });
+
 http.route({ path: "/sources/media/access", method: "POST", handler: mediaAccessHandler });
 
 http.route({ path: "/calendar/oauth/start", method: "POST", handler: calendarStartHandler });

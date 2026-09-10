@@ -19,6 +19,10 @@ describe("convex executor composition", () => {
         // B3's sanctioned append (issue #22 owns the declared consumer
         // proof for the access-revocation edges).
         "access.cleanup_revocation",
+        // D5's sanctioned append (issue #33 owns the declared consumer
+        // proof for the accepted-photo normalization edge).
+        "processing.normalize_photo",
+
         // E3's sanctioned append (issue #37 owns the text-analysis lane:
         // the mechanical A3 analyze executor is replaced behind the same
         // seam by the real workflow, and the extract edge is implemented).

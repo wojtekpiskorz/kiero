@@ -1,5 +1,7 @@
 /**
  * Gateway composition registry (A3; uploads provider appended by D2;
+ * Calendar OAuth provider by G1; images provider by D5).
+
  * Calendar OAuth provider by G1; media provider by D3).
  *
  * The single place route providers and executor registrations compose, so
@@ -8,6 +10,11 @@
  *
  * - `routeProviders`: each provider owns its routes and, when it has
  *   parameterized paths, its own `match` for them; the platform lane's
+ *   provider, the D2 uploads lane's provider and the D5 images lane's
+ *   provider are imported below. `matchRoute` stays generic: exact match
+ *   over all providers' route tables first, then each provider's optional
+ *   `match`. D3's range reads become the next provider using this seam.
+
  *   provider, the D2 uploads lane's provider and the D3 media lane's
  *   provider are imported below. `matchRoute` stays generic: exact match
  *   over all providers' route tables first, then each provider's optional
@@ -21,6 +28,8 @@
 
 import { platformRoutes, type GatewayRoute } from "../platform/routes";
 import { uploadsRouteProvider } from "../uploads/routes";
+import { imagesRouteProvider } from "../images/routes";
+
 import { mediaRouteProvider } from "../media/routes";
 
 import { calendarOAuthProvider } from "../calendar-oauth/routes";
@@ -42,6 +51,8 @@ export interface RouteProvider {
 export const routeProviders: readonly RouteProvider[] = [
   { providerId: "platform", routes: platformRoutes },
   uploadsRouteProvider,
+  imagesRouteProvider,
+
   mediaRouteProvider,
 
   calendarOAuthProvider,
