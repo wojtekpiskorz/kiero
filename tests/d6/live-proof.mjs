@@ -472,12 +472,11 @@ record(
 );
 const attempts = (await transcriptState(A, transcriptId)).value.transcripts[0]?.attempts ?? [];
 record(
-  "L3k per-attempt history on the platform tables (processingAttempts rows with model + outcome)",
-  attempts.filter((row) => row.stepSequence < 100_000).length >= finalSegments.filter((row) => row.state === "succeeded" && row.text !== undefined).length - 0
+  "L3k per-attempt history on the platform tables (processingAttempts rows with model + outcome, D6-only keyspace)",
+  attempts.length >= finalSegments.filter((row) => row.state === "succeeded" && row.text !== undefined).length
     ? "PASS"
     : "FAIL",
   attempts
-    .filter((row) => row.stepSequence < 100_000)
     .map((row) => `${row.stepSequence}.${row.attempt}=${row.outcome}${row.model ? `@${row.model}` : ""}`)
     .join(","),
 );

@@ -105,8 +105,9 @@ export function planSegments(
   return { ok: true, segments };
 }
 
-/** The mutable states a checkpoint row can carry. */
-export type SegmentState = "pending" | "running" | "succeeded" | "failed";
+/** The states a checkpoint row can carry (D6 never writes "running": an
+ * interrupted pass leaves the segment `pending`, which resume re-attempts). */
+export type SegmentState = "pending" | "succeeded" | "failed";
 
 /** The slim checkpoint shape the pure decisions read. */
 export interface SegmentCheckpoint {
@@ -148,9 +149,11 @@ export function deriveTranscriptStatus(
 }
 
 /**
- * Resume bookkeeping: the first segment that is not yet succeeded (pending,
- * running or failed alike), or null when every required segment is done —
- * the index a restarted run continues from.
+ * Resume bookkeeping: the first segment that is not yet succeeded, or null
+ * when every required segment is done. The inspection surface reports this
+ * per order for operators and the evidence script; the workflow itself
+ * skips completed segments through the per-segment checkpoint rows (the
+ * same decision, read from the rows it already loads).
  */
 export function nextUnfinishedSegment(
   requiredCount: number,
@@ -177,8 +180,15 @@ export function canonicalConfig(config: SegmentationConfig): string {
   });
 }
 
+/** The minimal interval identity a manifest fingerprint is derived from. */
+export interface ManifestInterval {
+  readonly segmentIndex: number;
+  readonly startMs: number;
+  readonly endMs: number;
+}
+
 /** Canonical JSON of an interval manifest (key order is part of identity). */
-export function canonicalManifest(segments: readonly PlannedSegment[]): string {
+export function canonicalManifest(segments: readonly ManifestInterval[]): string {
   return JSON.stringify(
     segments.map((segment) => ({
       segmentIndex: segment.segmentIndex,
@@ -189,7 +199,7 @@ export function canonicalManifest(segments: readonly PlannedSegment[]): string {
 }
 
 /** SHA-256 hex digest of the canonical manifest (WebCrypto; universal). */
-export async function manifestFingerprint(segments: readonly PlannedSegment[]): Promise<string> {
+export async function manifestFingerprint(segments: readonly ManifestInterval[]): Promise<string> {
   const digest = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(canonicalManifest(segments)),

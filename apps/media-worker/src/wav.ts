@@ -97,7 +97,7 @@ export function parseWav(bytes: Uint8Array): WavParseResult {
         bitsPerSample: view.getUint16(payload + 14, true),
       };
     } else if (chunkId === "data" && data === null) {
-      // RLIFF chunk sizes are uint32; the payload may extend beyond the
+      // RIFF chunk sizes are uint32; the payload may extend beyond the
       // buffer window when the caller supplied only the file head.
       data = { offset: payload, bytes: chunkSize };
     }

@@ -38,15 +38,25 @@ export type SegmentBytesResult =
   | { readonly ok: true; readonly audioBase64: string; readonly durationMs: number }
   | { readonly ok: false; readonly code: SegmentBytesRefusal };
 
-/** The request shape the media executor's `/segment` endpoint expects. */
+/**
+ * The request shape the media executor's `/segment` endpoint expects.
+ */
 interface SegmentCall {
   readonly objectKey: string;
   readonly startMs: number;
   readonly endMs: number;
 }
 
-/** Resolves one segment through the deployed media executor, if configured. */
-export async function segmentFromMediaWorker(call: SegmentCall): Promise<SegmentBytesResult> {
+/**
+ * The ONE media-executor call skeleton (review finding 4): URL/token guard,
+ * bearer POST, closed status mapping and JSON decode. Both call sites
+ * (`/probe`, `/segment`) shape-check the decoded body themselves; this
+ * helper owns everything they would otherwise duplicate.
+ */
+async function callMediaWorker(
+  path: "probe" | "segment",
+  payload: unknown,
+): Promise<{ ok: true; body: unknown } | { ok: false; code: SegmentBytesRefusal }> {
   const base = process.env.KIERO_MEDIA_WORKER_URL;
   const token = process.env.KIERO_MEDIA_WORKER_TOKEN;
   if (base === undefined || base === "" || token === undefined || token === "") {
@@ -54,31 +64,37 @@ export async function segmentFromMediaWorker(call: SegmentCall): Promise<Segment
   }
   let response: Response;
   try {
-    response = await fetch(`${base.replace(/\/$/, "")}/segment`, {
+    response = await fetch(`${base.replace(/\/$/, "")}/${path}`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        op: "segment",
-        objectKey: call.objectKey,
-        startMs: call.startMs,
-        endMs: call.endMs,
-      }),
+      body: JSON.stringify(payload),
     });
   } catch {
     return { ok: false, code: "media_worker_unreachable" };
   }
+  // 401 (bad token), 404/422 (typed protocol refusals) and 503 (executor
+  // not configured) are all DEFINITE refusals; anything else unexpected is
+  // unreachable-grade.
   if (response.status === 401 || response.status === 404 || response.status === 422 || response.status === 503) {
     return { ok: false, code: "media_worker_refused" };
   }
   if (!response.ok) {
     return { ok: false, code: "media_worker_unreachable" };
   }
-  let body: unknown;
   try {
-    body = await response.json();
+    return { ok: true, body: await response.json() };
   } catch {
     return { ok: false, code: "media_worker_malformed_response" };
   }
+}
+
+/** Resolves one segment through the deployed media executor, if configured. */
+export async function segmentFromMediaWorker(call: SegmentCall): Promise<SegmentBytesResult> {
+  const called = await callMediaWorker("segment", { op: "segment", ...call });
+  if (!called.ok) {
+    return { ok: false, code: called.code };
+  }
+  const body = called.body;
   if (
     typeof body !== "object" || body === null ||
     typeof (body as { audioBase64?: unknown }).audioBase64 !== "string" ||
@@ -100,30 +116,11 @@ export async function probeFromMediaWorker(
   | { ok: true; format: "wav"; durationMs: number }
   | { ok: false; code: SegmentBytesRefusal }
 > {
-  const base = process.env.KIERO_MEDIA_WORKER_URL;
-  const token = process.env.KIERO_MEDIA_WORKER_TOKEN;
-  if (base === undefined || base === "" || token === undefined || token === "") {
-    return { ok: false, code: "media_worker_not_configured" };
+  const called = await callMediaWorker("probe", { op: "probe", objectKey });
+  if (!called.ok) {
+    return { ok: false, code: called.code };
   }
-  let response: Response;
-  try {
-    response = await fetch(`${base.replace(/\/$/, "")}/probe`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ op: "probe", objectKey }),
-    });
-  } catch {
-    return { ok: false, code: "media_worker_unreachable" };
-  }
-  if (!response.ok) {
-    return { ok: false, code: "media_worker_refused" };
-  }
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    return { ok: false, code: "media_worker_malformed_response" };
-  }
+  const body = called.body;
   if (
     typeof body !== "object" || body === null ||
     (body as { format?: unknown }).format !== "wav" ||

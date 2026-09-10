@@ -111,7 +111,7 @@ describe("manifest planning", () => {
 
 describe("pending-vs-complete derivation", () => {
   const checkpoints = (states: string[]) =>
-    states.map((state, index) => ({ segmentIndex: index, state: state as "pending" | "succeeded" | "failed" | "running" }));
+    states.map((state, index) => ({ segmentIndex: index, state: state as "pending" | "succeeded" | "failed" }));
 
   it("complete requires EVERY required segment", () => {
     expect(deriveTranscriptStatus(3, checkpoints(["succeeded", "succeeded", "succeeded"]))).toBe("complete");
@@ -153,11 +153,11 @@ describe("resume bookkeeping", () => {
     ).toBeNull();
   });
 
-  it("a running checkpoint (interrupted mid-segment) resumes at that segment", () => {
+  it("a pending checkpoint (an interrupted mid-segment pass) resumes at that segment", () => {
     expect(
       nextUnfinishedSegment(3, [
         { segmentIndex: 0, state: "succeeded" },
-        { segmentIndex: 1, state: "running" },
+        { segmentIndex: 1, state: "pending" },
       ]),
     ).toBe(1);
   });

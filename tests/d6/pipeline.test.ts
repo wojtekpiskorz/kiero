@@ -37,6 +37,7 @@ import {
   type SegmentAttemptOutcome,
 } from "../../convex/processing/audio/executor";
 import { asTx, fakeCtx, type FakeCtx } from "../d2/harness";
+import { sha256HexOfBytes } from "../../convex/processing/audio/segmentation";
 
 const TABLES = [
   "companies",
@@ -59,7 +60,10 @@ let ctx: FakeCtx;
 const FIXTURE_SECONDS = 4.8;
 
 /** Seeds one planned-order transcript over the proof stash (channel inline). */
-async function seedProofTranscript(targetSegmentMs: number): Promise<string> {
+async function seedProofTranscript(
+  targetSegmentMs: number,
+  options?: { proofBytesSha256?: string },
+): Promise<string> {
   const bytes = toneWav({ seconds: FIXTURE_SECONDS });
   const companyId = await ctx.db.insert("companies", { name: "c", createdAtMs: Date.now() });
   const sourceId = await ctx.db.insert("sources", {
@@ -95,6 +99,7 @@ async function seedProofTranscript(targetSegmentMs: number): Promise<string> {
     segmentCount: 0,
     state: "planning",
     proofAudioBase64: bytesToBase64(bytes),
+    ...(options?.proofBytesSha256 === undefined ? {} : { proofBytesSha256: options.proofBytesSha256 }),
     createdAtMs: Date.now(),
     updatedAtMs: Date.now(),
   });
@@ -466,4 +471,89 @@ it("the journal outcome schema decodes every outcome shape", () => {
     expect(typeof shape).toBe("object");
   }
   expect(() => Schema.decodeUnknownSync(Schema.Struct({ kind: Schema.String }))(shapes[0])).not.toThrow();
+});
+
+describe("review round-1 wiring: pins and attempt history", () => {
+  it("a proof stash mutated after ordering refuses planning (hash pin COMPARED)", async () => {
+    const transcriptId = await seedProofTranscript(1_200, { proofBytesSha256: "0".repeat(64) });
+    const outcome = await ensureManifestTransaction(asTx(ctx), transcriptId as never);
+    expect(outcome).toMatchObject({ ok: false, code: "proof_stash_hash_mismatch" });
+    const transcript = ctx.db.rows("audioTranscripts")[0];
+    expect(transcript).toMatchObject({ state: "planning", lastErrorKind: "proof_stash_hash_mismatch" });
+    expect(ctx.db.rows("audioSegments")).toHaveLength(0);
+  });
+
+  it("a correct hash pin plans normally (the pin equals the stash digest)", async () => {
+    const bytes = toneWav({ seconds: 2 });
+    const pin = await sha256HexOfBytes(bytes);
+    const companyId = await ctx.db.insert("companies", { name: "c", createdAtMs: Date.now() });
+    const transcriptId = await ctx.db.insert("audioTranscripts", {
+      companyId,
+      sourceId: "k0sources000000000000000",
+      attachmentId: "k0att00att00att00att0000",
+      representationId: "k0rep00rep00rep00rep0000",
+      processingRunId: "k0processingruns00000000",
+      pipelineVersion: "d6.stt/1",
+      sttRoutingVersion: "e2.0",
+      segmentationConfigJson: JSON.stringify({ targetSegmentMs: 1_200, minTailSegmentMs: 200 }),
+      bytesChannel: "proof_inline",
+      segmentCount: 0,
+      state: "planning",
+      proofAudioBase64: bytesToBase64(bytes),
+      proofBytesSha256: pin,
+      createdAtMs: Date.now(),
+      updatedAtMs: Date.now(),
+    });
+    const outcome = await ensureManifestTransaction(asTx(ctx), transcriptId as never);
+    expect(outcome).toMatchObject({ ok: true });
+  });
+
+  it("assembly REFUSES publication when the stored manifest coordinates moved", async () => {
+    const transcriptId = await seedProofTranscript(1_200);
+    await ensureManifestTransaction(asTx(ctx), transcriptId as never);
+    for (let index = 0; index < 4; index += 1) {
+      await recordSegmentOutcomeTransaction(asTx(ctx), {
+        transcriptId: transcriptId as never,
+        segmentIndex: index,
+        outcome: successOutcome(index, `t${index}`),
+      });
+    }
+    // The adversarial coordinate move after planning.
+    const victim = ctx.db.rows("audioSegments").find((row) => row.segmentIndex === 1);
+    if (victim === undefined) {
+      throw new Error("segment row missing");
+    }
+    await ctx.db.patch(victim._id, { startMs: 9_999 });
+    const assembled = await assembleTranscriptTransaction(asTx(ctx), transcriptId as never);
+    expect(assembled).toMatchObject({ complete: false, lastErrorKind: "manifest_fingerprint_mismatch" });
+    expect(ctx.db.rows("extractions")).toHaveLength(0);
+    expect(ctx.db.rows("sourceFragments")).toHaveLength(0);
+    const transcript = ctx.db.rows("audioTranscripts")[0];
+    expect(transcript).toMatchObject({ state: "failed", lastErrorKind: "manifest_fingerprint_mismatch" });
+  });
+
+  it("provider attempts number sequentially within a pass (no duplicate attempt:1)", async () => {
+    const transcriptId = await seedProofTranscript(1_200);
+    await ensureManifestTransaction(asTx(ctx), transcriptId as never);
+    const fallbackOutcome: SegmentAttemptOutcome = {
+      kind: "succeeded",
+      text: "x",
+      servedModels: ["microsoft/mai-transcribe-2", "openai/whisper-large-v3"],
+      providerAttempts: [
+        { model: "microsoft/mai-transcribe-2", outcome: "failed", errorKind: "provider_unavailable", startedAtMs: 0, finishedAtMs: 1 },
+        { model: "openai/whisper-large-v3", outcome: "succeeded", startedAtMs: 1, finishedAtMs: 2 },
+      ],
+    };
+    await recordSegmentOutcomeTransaction(asTx(ctx), {
+      transcriptId: transcriptId as never,
+      segmentIndex: 0,
+      outcome: fallbackOutcome,
+    });
+    const stepId = ctx.db.rows("processingSteps")[0]?._id;
+    const numbers = ctx.db
+      .rows("processingAttempts")
+      .filter((row) => row.stepId === stepId)
+      .map((row) => row.attempt);
+    expect(numbers).toEqual([1, 2]);
+  });
 });

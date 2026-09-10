@@ -67,6 +67,12 @@ export const audioTables = {
     bytesChannel,
     /** Planned total duration in ms; present once the manifest is planned. */
     audioDurationMs: v.optional(v.float64()),
+    /**
+     * Planning-time sha-256 of the canonical interval manifest; assembly
+     * re-derives it from the stored rows and refuses publication if the
+     * coordinates moved (immutable-manifest enforcement).
+     */
+    manifestSha256: v.optional(v.string()),
     /** Required segment count; 0 until planned, immutable once set. */
     segmentCount: shared.counter,
     state: v.union(
@@ -113,8 +119,9 @@ export const audioTables = {
     endMs: v.float64(),
     durationMs: v.float64(),
     state: v.union(
+      // No "running" state (review finding 3): D6 never wrote it — an
+      // interrupted pass leaves the segment `pending`, which resume retries.
       v.literal("pending"),
-      v.literal("running"),
       v.literal("succeeded"),
       v.literal("failed"),
     ),

@@ -36,9 +36,14 @@ function hex(bytes: Uint8Array): string {
 }
 
 async function hmac(key: Uint8Array | string, value: string): Promise<Uint8Array> {
+  // Copy into a plain ArrayBuffer-backed view: WebCrypto's BufferSource
+  // rejects SharedArrayBuffer-backed views under the strict lib types both
+  // compile programs use.
+  const keyBytes =
+    typeof key === "string" ? encoder.encode(key) : new Uint8Array(key);
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
-    typeof key === "string" ? encoder.encode(key) : key,
+    keyBytes,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],

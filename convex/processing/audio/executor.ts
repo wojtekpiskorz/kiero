@@ -43,6 +43,7 @@ import { workflow } from "../../platform/pipeline";
 import type { JobExecutor, JobOutcome } from "../../platform/executors";
 import {
   deriveTranscriptStatus,
+  manifestFingerprint,
   planSegments,
   type SegmentationConfig,
 } from "./segmentation";
@@ -57,14 +58,85 @@ import {
 /** Bounded provider passes per segment across ALL resumes of one order. */
 export const SEGMENT_MAX_ATTEMPTS = 3;
 
-/** Sequence base of the probe-armed per-segment failure markers. */
-export const PROBE_FAILURE_MARKER_BASE = 100_000;
+/**
+ * Step-sequence keyspace (review round 1, the E3 collision fix).
+ *
+ * D6 orders anchor to the source's INITIAL analysis run — the same run
+ * whose step journal E3's text stages own (`convex/processing/text`:
+ * extract step 10, stages 20/30, clarifications 500+, groups 1000+, and
+ * the failure/outcome marker bases 100_000/200_000). D6's segment steps
+ * and probe markers therefore live at dedicated bases far OUTSIDE every
+ * E3 range, and every (run, sequence) lookup additionally checks
+ * `stepKind`, so a text+audio source can never cross-wire the two lanes'
+ * journals (a D6 step attaching attempts to an E3 stage, or a disarm
+ * deleting an E3 marker). Pinned against E3's exported constants by
+ * tests/d6/keyspace.test.ts.
+ */
+export const SEGMENT_STEP_BASE = 1_000_000;
+export const SEGMENT_MARKER_BASE = 5_000_000;
 
-/** The marker step kind on `processingSteps` (probe fixture control only). */
+/** The step kinds D6 writes on `processingSteps` (lookup guards). */
+export const SEGMENT_STEP_KIND = "stt_segment";
 export const PROBE_FAILURE_MARKER_KIND = "d6_probe_fail_segment";
 
 /** Provider failures classified uncertain by E2's event mapping. */
-const UNCERTAIN_FAILURE_KINDS = new Set(["deadline_exceeded", "connection_failed"]);
+export const UNCERTAIN_FAILURE_KINDS = new Set(["deadline_exceeded", "connection_failed"]);
+
+/** The db read surface the marker helpers need (any Convex ctx fits). */
+type StepsDb = Pick<MutationCtx["db"], "query">;
+
+/**
+ * The probe-armed failure marker row for one segment (stepKind-guarded).
+ * Rows are COLLECTED and filtered by kind, not `.first()`-checked: at a
+ * shared (run, sequence) key the first row is arbitrary, and the guard must
+ * find D6's marker regardless of a foreign lane's row at the same sequence.
+ */
+export async function segmentFailureMarkerRow(
+  db: StepsDb,
+  runId: Id<"processingRuns">,
+  segmentIndex: number,
+) {
+  const rows = await db
+    .query("processingSteps")
+    .withIndex("by_run_sequence", (q) =>
+      q.eq("runId", runId).eq("sequence", SEGMENT_MARKER_BASE + segmentIndex),
+    )
+    .collect();
+  return rows.find((row) => row.stepKind === PROBE_FAILURE_MARKER_KIND) ?? null;
+}
+
+/** Arms the deterministic segment failure (insert-if-absent, guarded). */
+export async function ensureSegmentFailureMarker(
+  ctx: MutationCtx,
+  runId: Id<"processingRuns">,
+  segmentIndex: number,
+): Promise<void> {
+  const existing = await segmentFailureMarkerRow(ctx.db, runId, segmentIndex);
+  if (existing !== null) {
+    return;
+  }
+  await ctx.db.insert("processingSteps", {
+    runId,
+    stepKind: PROBE_FAILURE_MARKER_KIND,
+    sequence: SEGMENT_MARKER_BASE + segmentIndex,
+    state: "failed",
+    outputRef: "armed",
+    startedAtMs: Date.now(),
+    finishedAtMs: Date.now(),
+  });
+}
+
+/** Disarms the marker; a foreign-kind row at the same sequence is NOT touched. */
+export async function removeSegmentFailureMarker(
+  ctx: MutationCtx,
+  runId: Id<"processingRuns">,
+  segmentIndex: number,
+): Promise<void> {
+  const marker = await segmentFailureMarkerRow(ctx.db, runId, segmentIndex);
+  if (marker !== null) {
+    await ctx.db.delete(marker._id);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Stage 1: manifest planning.
@@ -98,6 +170,15 @@ export async function ensureManifestTransaction(
       if (!measured.ok) {
         await patchPlanningRefusal(ctx, transcriptId, measured.code);
         return { ok: false, code: measured.code };
+      }
+      // The order-time pin is COMPARED, not just stored (review finding 3):
+      // a stash mutated after ordering refuses planning.
+      if (
+        transcript.proofBytesSha256 !== undefined &&
+        transcript.proofBytesSha256 !== measured.sha256Hex
+      ) {
+        await patchPlanningRefusal(ctx, transcriptId, "proof_stash_hash_mismatch");
+        return { ok: false, code: "proof_stash_hash_mismatch" };
       }
       durationMs = measured.durationMs;
     } else {
@@ -137,6 +218,9 @@ export async function ensureManifestTransaction(
       audioDurationMs: durationMs,
       segmentCount: plan.segments.length,
       state: "pending",
+      // The immutability pin: assembly re-derives this fingerprint from the
+      // stored rows and refuses to publish over moved coordinates.
+      manifestSha256: await manifestFingerprint(plan.segments),
       lastErrorKind: undefined,
       updatedAtMs: nowMs,
     });
@@ -211,14 +295,7 @@ export const segmentWork = internalQuery({
         q.eq("transcriptId", args.transcriptId).eq("segmentIndex", args.segmentIndex),
       )
       .first();
-    const marker = await ctx.db
-      .query("processingSteps")
-      .withIndex("by_run_sequence", (q) =>
-        q
-          .eq("runId", transcript.processingRunId)
-          .eq("sequence", PROBE_FAILURE_MARKER_BASE + args.segmentIndex),
-      )
-      .first();
+    const marker = await segmentFailureMarkerRow(ctx.db, transcript.processingRunId, args.segmentIndex);
     const representation =
       transcript.bytesChannel === "media_worker"
         ? await ctx.db.get(transcript.representationId)
@@ -420,13 +497,20 @@ export async function recordSegmentOutcomeTransaction(
   }
   // The platform step row for this segment (insert-if-absent).
   const stepId = await ensureStepRow(ctx, transcript.processingRunId, params.segmentIndex, outcome);
-  // One processingAttempts row per provider attempt of this pass.
-  if (outcome.providerAttempts !== undefined) {
-    let attemptNo = attempts - outcome.providerAttempts.length + 1;
+  // One processingAttempts row per provider attempt of this pass. Attempt
+  // numbers continue the step's existing history (review minor: the old
+  // clamp could emit two rows numbered 1 on a first-pass route fallback).
+  if (outcome.providerAttempts !== undefined && outcome.providerAttempts.length > 0) {
+    const existingAttempts = await ctx.db
+      .query("processingAttempts")
+      .withIndex("by_step_attempt", (q) => q.eq("stepId", stepId))
+      .collect();
+    let attemptNo = existingAttempts.length;
     for (const attempt of outcome.providerAttempts) {
+      attemptNo += 1;
       await ctx.db.insert("processingAttempts", {
         stepId,
-        attempt: Math.max(attemptNo, 1),
+        attempt: attemptNo,
         outcome: attempt.outcome,
         provider: "openrouter",
         model: attempt.model,
@@ -434,7 +518,6 @@ export async function recordSegmentOutcomeTransaction(
         startedAtMs: attempt.startedAtMs,
         finishedAtMs: attempt.finishedAtMs,
       });
-      attemptNo += 1;
     }
   }
   // Recompute the honest transcript state from the checkpoint rows.
@@ -465,7 +548,12 @@ export const recordSegmentOutcome = internalMutation({
     }),
 });
 
-/** The per-segment platform step row (insert-if-absent on run+sequence). */
+/**
+ * The per-segment platform step row: insert-if-absent at the D6-only
+ * `SEGMENT_STEP_BASE + segmentIndex` keyspace, with the `stepKind` guard on
+ * the lookup so a foreign lane's row at the same sequence can never be
+ * adopted (or clobbered) as a segment step.
+ */
 async function ensureStepRow(
   ctx: MutationCtx,
   runId: Id<"processingRuns">,
@@ -474,15 +562,18 @@ async function ensureStepRow(
 ): Promise<Id<"processingSteps">> {
   const existing = await ctx.db
     .query("processingSteps")
-    .withIndex("by_run_sequence", (q) => q.eq("runId", runId).eq("sequence", segmentIndex))
-    .first();
-  if (existing !== null) {
-    return existing._id;
+    .withIndex("by_run_sequence", (q) =>
+      q.eq("runId", runId).eq("sequence", SEGMENT_STEP_BASE + segmentIndex),
+    )
+    .collect();
+  const ours = existing.find((row) => row.stepKind === SEGMENT_STEP_KIND);
+  if (ours !== undefined) {
+    return ours._id;
   }
   return ctx.db.insert("processingSteps", {
     runId,
-    stepKind: "stt_segment",
-    sequence: segmentIndex,
+    stepKind: SEGMENT_STEP_KIND,
+    sequence: SEGMENT_STEP_BASE + segmentIndex,
     state: outcome.kind === "succeeded" ? "succeeded" : "failed",
     startedAtMs: Date.now(),
     finishedAtMs: Date.now(),
@@ -520,8 +611,8 @@ export async function assembleTranscriptTransaction(
   const uncertain = segments.some(
     (segment) =>
       segment.state === "failed" &&
-      (segment.lastErrorKind === "deadline_exceeded" ||
-        segment.lastErrorKind === "connection_failed"),
+      segment.lastErrorKind !== undefined &&
+      UNCERTAIN_FAILURE_KINDS.has(segment.lastErrorKind),
   );
   const succeededCount = segments.filter((segment) => segment.state === "succeeded").length;
   if (status !== "complete") {
@@ -542,6 +633,36 @@ export async function assembleTranscriptTransaction(
   if (transcript.extractionId !== undefined) {
     // Idempotent assembly: the version exists; never a second one.
     return { complete: true, succeeded: segments.length, total: transcript.segmentCount, uncertain: false };
+  }
+  // Immutability check (review finding 3): the stored planning-time
+  // fingerprint must equal the fingerprint of the rows being assembled —
+  // coordinates that moved since planning refuse publication, loudly.
+  if (transcript.manifestSha256 !== undefined) {
+    const derived = await manifestFingerprint(
+      segments
+        .slice()
+        .sort((a, b) => a.segmentIndex - b.segmentIndex)
+        .map((segment) => ({
+          segmentIndex: segment.segmentIndex,
+          startMs: segment.startMs,
+          endMs: segment.endMs,
+        })),
+    );
+    if (derived !== transcript.manifestSha256) {
+      await ctx.db.patch(transcriptId, {
+        state: "failed",
+        lastErrorKind: "manifest_fingerprint_mismatch",
+        finishedAtMs: Date.now(),
+        updatedAtMs: Date.now(),
+      });
+      return {
+        complete: false,
+        succeeded: succeededCount,
+        total: transcript.segmentCount,
+        uncertain,
+        lastErrorKind: "manifest_fingerprint_mismatch",
+      };
+    }
   }
   // The immutable extraction version for this order: model = the models
   // that actually served (per-segment truth lives on the segment rows).

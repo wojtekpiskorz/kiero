@@ -32,9 +32,11 @@ import { forbiddenError, unauthenticatedError } from "@kiero/runtime";
 import { resolveAccessContextFromConvexAuth } from "../../access/identity/resolution";
 import { probeDisabled, probeGuardEnabled } from "../../sources/probe_shared";
 import { orderAudioTranscript } from "./orders";
+import { nextUnfinishedSegment } from "./segmentation";
 import {
-  PROBE_FAILURE_MARKER_BASE,
-  PROBE_FAILURE_MARKER_KIND,
+  SEGMENT_STEP_KIND,
+  ensureSegmentFailureMarker,
+  removeSegmentFailureMarker,
 } from "./executor";
 
 /** The read surface the caller resolution needs (query and mutation ctx fit). */
@@ -136,28 +138,14 @@ export const armSegmentFailure = internalMutation({
     if (runId === null) {
       return errorResult(forbiddenError("transcript_run_missing", "audioTranscripts"));
     }
-    const sequence = PROBE_FAILURE_MARKER_BASE + args.segmentIndex;
-    const existing = await ctx.db
-      .query("processingSteps")
-      .withIndex("by_run_sequence", (q) => q.eq("runId", runId).eq("sequence", sequence))
-      .first();
+    // The shared, stepKind-guarded marker helpers (the same authority the
+    // workflow's segment lookup uses): arming/disarming can never touch a
+    // foreign lane's rows even at a colliding sequence.
     if (args.arm) {
-      if (existing === null) {
-        await ctx.db.insert("processingSteps", {
-          runId,
-          stepKind: PROBE_FAILURE_MARKER_KIND,
-          sequence,
-          state: "failed",
-          outputRef: "armed",
-          startedAtMs: Date.now(),
-          finishedAtMs: Date.now(),
-        });
-      }
+      await ensureSegmentFailureMarker(ctx, runId, args.segmentIndex);
       return okResult({ armed: true, segmentIndex: args.segmentIndex });
     }
-    if (existing !== null) {
-      await ctx.db.delete(existing._id);
-    }
+    await removeSegmentFailureMarker(ctx, runId, args.segmentIndex);
     return okResult({ armed: false, segmentIndex: args.segmentIndex });
   },
 });
@@ -248,10 +236,12 @@ export const transcriptInspection = internalQuery({
         .query("audioSegments")
         .withIndex("by_transcript_index", (q) => q.eq("transcriptId", transcript._id))
         .collect();
-      const steps = await ctx.db
-        .query("processingSteps")
-        .withIndex("by_run_sequence", (q) => q.eq("runId", transcript.processingRunId))
-        .collect();
+      const steps = (
+        await ctx.db
+          .query("processingSteps")
+          .withIndex("by_run_sequence", (q) => q.eq("runId", transcript.processingRunId))
+          .collect()
+      ).filter((step) => step.stepKind === SEGMENT_STEP_KIND);
       const attempts = [];
       for (const step of steps) {
         const rows = await ctx.db
@@ -278,6 +268,7 @@ export const transcriptInspection = internalQuery({
       const extraction = extractionId === undefined ? null : await ctx.db.get(extractionId);
       out.push({
         transcriptId: transcript._id,
+        nextUnfinishedSegmentIndex: nextUnfinishedSegment(transcript.segmentCount, segments),
         attachmentId: transcript.attachmentId,
         sourceId: transcript.sourceId,
         state: transcript.state,
