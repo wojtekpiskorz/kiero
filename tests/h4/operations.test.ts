@@ -13,6 +13,7 @@
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
 import { operationsOperations, parseTableId } from "@kiero/contracts";
+import { MAX_INSPECT_JOBS } from "../../convex/operations/processing/cores";
 import {
   performInspectProcessingRun,
   performRequestReanalysis,
@@ -210,6 +211,36 @@ describe("inspection (the audited read)", () => {
     if (result._tag === "ok") {
       const value = Schema.decodeUnknownSync(inspectEntry.result)(result.value);
       expect(value.steps.map((step) => step.stepKind)).toEqual(["publish_group"]);
+    }
+  });
+
+  it("bounds the jobs projection by the routed cores constant, not a magic slice", async () => {
+    const db = fakeProcessingDb();
+    seedAuthority(db);
+    seedFailedRun(db);
+    for (let index = 0; index < MAX_INSPECT_JOBS + 2; index += 1) {
+      db.processingJobs.push({
+        jobId: `k57job${`${index}`.padStart(4, "0")}q2x9w7c1vbn8hj6t0a5q`,
+        runId: RUN_ID,
+        kind: "processing.analyze_change_plan",
+        state: "queued",
+        attempts: 0,
+        maxAttempts: 3,
+        lastErrorKind: null,
+        externalOutcome: null,
+      });
+    }
+    const result = await performInspectProcessingRun(
+      fakeProcessingTx(db),
+      authority,
+      inspectInput(RUN_ID),
+    );
+    expect(result._tag).toBe("ok");
+    if (result._tag === "ok") {
+      const value = Schema.decodeUnknownSync(inspectEntry.result)(result.value);
+      // The read is bounded by MAX_INSPECT_JOBS end to end: the cores
+      // constant rides the store contract, so raising it widens the read.
+      expect(value.jobs).toHaveLength(MAX_INSPECT_JOBS);
     }
   });
 

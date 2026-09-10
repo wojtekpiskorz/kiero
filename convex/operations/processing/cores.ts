@@ -220,6 +220,10 @@ function stepRetryable(
  * 5. `workflow_identity_missing`: the run has no resumable workflow identity;
  * 6. `workflow_version_unsupported`: the run's pipeline version is not one
  *    this deployment can resume.
+ *
+ * The ok half carries the CERTIFIED workflow identity (guard 5 passed), so
+ * the caller resumes with the certified value instead of re-parsing the
+ * checkpoint under an assertion.
  */
 export function decideRetry(args: {
   readonly runState: ProcessingRunView["state"];
@@ -227,7 +231,7 @@ export function decideRetry(args: {
   readonly expectedRunState: ProcessingRunView["state"];
   readonly pipelineVersion: string;
   readonly workflowId: string | null;
-}): { readonly ok: true } | RetryDenial {
+}): { readonly ok: true; readonly workflowId: string } | RetryDenial {
   if (args.expectedRunState !== args.runState) {
     return { ok: false, kind: "conflict", code: "run_state_stale" };
   }
@@ -246,7 +250,7 @@ export function decideRetry(args: {
   if (!pipelineVersionRetryable(args.pipelineVersion)) {
     return { ok: false, kind: "unsupported", code: "workflow_version_unsupported" };
   }
-  return { ok: true };
+  return { ok: true, workflowId: args.workflowId };
 }
 
 /**

@@ -24,8 +24,8 @@
  *   with per-level cooldown bookkeeping.
  *
  * B4 amendment (issue #23, coordinated with I2): `auditRecords` carries the
- * GM request's stated basis and closed outcome plus a `by_grant_time` index
- *; the protected record the issue requires ("GM actor, target company,
+ * GM request's stated basis and closed outcome plus a `by_grant_time` index;
+ * the protected record the issue requires ("GM actor, target company,
  * operation, reason and outcome") and the read path for the alpha-metrics
  * exclusion and H4's audit views.
  *

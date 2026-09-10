@@ -49,6 +49,7 @@ import {
   MAX_INSPECT_ATTEMPTS,
   MAX_INSPECT_CHANGE_SETS,
   MAX_INSPECT_DIAGNOSTICS,
+  MAX_INSPECT_JOBS,
   MAX_INSPECT_STEPS,
   deriveBlockers,
   diagnosticsForTarget,
@@ -73,6 +74,41 @@ async function actingGrantOpen(tx: ProcessingTx, authority: GmAuthority): Promis
 }
 
 /**
+ * The single writer of this lane's protected audit row: B4's single-writer
+ * shape (the `audit` helper in access/gm/operations.ts, whose only
+ * `insertAudit` call site it is), extended with the operator's stated
+ * target revision and the operation's run scope. This is the ONLY
+ * `insertProcessingAudit` call site, so the next auditRecords column means
+ * touching this function alone, not one literal per outcome path. The row
+ * stamps its own `atMs`: this lane's rows record audit time, they do not
+ * share a clock with the effect writes.
+ */
+async function audit(
+  tx: ProcessingTx,
+  args: {
+    readonly authority: GmAuthority;
+    readonly companyId: string | null;
+    readonly operationName: string;
+    readonly basis: string;
+    readonly outcome: string;
+    readonly gmTargetRevision: string;
+    readonly processingRunId: string | null;
+  },
+): Promise<void> {
+  await tx.insertProcessingAudit({
+    actorUserId: args.authority.userId,
+    gmGrantId: args.authority.grantId,
+    companyId: args.companyId,
+    operationName: args.operationName,
+    gmBasis: args.basis,
+    outcome: args.outcome,
+    gmTargetRevision: args.gmTargetRevision,
+    processingRunId: args.processingRunId,
+    atMs: Date.now(),
+  });
+}
+
+/**
  * The audited refusal every denied GM processing operation returns: the
  * trail records the attempt under the acting grant with the closed outcome
  * code and the operator's stated target revision; the envelope maps the
@@ -90,16 +126,14 @@ async function refuseProcessing(
     readonly denial: GmCompanyAccessDenial;
   },
 ): Promise<ResultEnvelope> {
-  await tx.insertProcessingAudit({
-    actorUserId: authority.userId,
-    gmGrantId: authority.grantId,
+  await audit(tx, {
+    authority,
     companyId: args.companyId,
     operationName: args.operationName,
-    gmBasis: args.basis,
+    basis: args.basis,
     outcome: args.denial.code,
     gmTargetRevision: args.gmTargetRevision,
     processingRunId: args.processingRunId,
-    atMs: Date.now(),
   });
   if (args.denial.kind === "not_found") {
     return errorResult(notFoundError("companies", args.denial.code));
@@ -107,31 +141,6 @@ async function refuseProcessing(
   return errorResult(
     forbiddenError(args.denial.code, args.denial.code === "gm_mode_not_active" ? "gm" : "company"),
   );
-}
-
-/** Writes the ok-side audit row in the caller's transaction. */
-async function auditOk(
-  tx: ProcessingTx,
-  authority: GmAuthority,
-  args: {
-    readonly operationName: string;
-    readonly basis: string;
-    readonly companyId: string | null;
-    readonly processingRunId: string | null;
-    readonly gmTargetRevision: string;
-  },
-): Promise<void> {
-  await tx.insertProcessingAudit({
-    actorUserId: authority.userId,
-    gmGrantId: authority.grantId,
-    companyId: args.companyId,
-    operationName: args.operationName,
-    gmBasis: args.basis,
-    outcome: "ok",
-    gmTargetRevision: args.gmTargetRevision,
-    processingRunId: args.processingRunId,
-    atMs: Date.now(),
-  });
 }
 
 /** The per-company authority decision over one target company (B4's rule). */
@@ -181,16 +190,14 @@ export async function performInspectProcessingRun(
   }
   const run = await tx.runById(input.processingRunId);
   if (run === null) {
-    await tx.insertProcessingAudit({
-      actorUserId: authority.userId,
-      gmGrantId: authority.grantId,
+    await audit(tx, {
+      authority,
       companyId: null,
       operationName: "operations.inspectProcessingRun",
-      gmBasis: basis.value,
+      basis: basis.value,
       outcome: "processing_run_not_found",
       gmTargetRevision: runTargetRevision(input.processingRunId, "unknown"),
       processingRunId: null,
-      atMs: Date.now(),
     });
     return errorResult(notFoundError("processingRuns", "processing_run_not_found"));
   }
@@ -211,16 +218,14 @@ export async function performInspectProcessingRun(
 
   const source = await tx.sourceById(run.sourceId);
   if (source === null) {
-    await tx.insertProcessingAudit({
-      actorUserId: authority.userId,
-      gmGrantId: authority.grantId,
+    await audit(tx, {
+      authority,
       companyId: run.companyId,
       operationName: "operations.inspectProcessingRun",
-      gmBasis: basis.value,
+      basis: basis.value,
       outcome: "source_not_found",
       gmTargetRevision: runTargetRevision(run.runId, run.state),
       processingRunId: run.runId,
-      atMs: Date.now(),
     });
     return errorResult(notFoundError("sources", "source_not_found"));
   }
@@ -230,7 +235,7 @@ export async function performInspectProcessingRun(
   const attempts = (
     await tx.attemptsOfSteps(steps.map((step) => step.stepId))
   ).slice(0, MAX_INSPECT_ATTEMPTS);
-  const jobs = await tx.jobsOfRun(run.runId);
+  const jobs = await tx.jobsOfRun(run.runId, MAX_INSPECT_JOBS);
   const derivedChanges = await tx.changeSetsOfSource(run.sourceId, MAX_INSPECT_CHANGE_SETS);
   const diagnostics = diagnosticsForTarget(
     await tx.recentDiagnostics(DIAGNOSTIC_SCAN_ROWS),
@@ -240,12 +245,14 @@ export async function performInspectProcessingRun(
   );
   const blockers = deriveBlockers({ run, source, steps, jobs });
 
-  await auditOk(tx, authority, {
+  await audit(tx, {
+    authority,
+    companyId: run.companyId,
     operationName: "operations.inspectProcessingRun",
     basis: basis.value,
-    companyId: run.companyId,
-    processingRunId: run.runId,
+    outcome: "ok",
     gmTargetRevision: runTargetRevision(run.runId, run.state),
+    processingRunId: run.runId,
   });
   return okResult(
     Schema.decodeUnknownSync(inspectProcessingRunEntry.result)({
@@ -339,31 +346,27 @@ export async function performRetryProcessingStep(
   }
   const step = await tx.stepById(input.stepId);
   if (step === null) {
-    await tx.insertProcessingAudit({
-      actorUserId: authority.userId,
-      gmGrantId: authority.grantId,
+    await audit(tx, {
+      authority,
       companyId: null,
       operationName: "operations.retryProcessingStep",
-      gmBasis: basis.value,
+      basis: basis.value,
       outcome: "processing_step_not_found",
       gmTargetRevision: runTargetRevision(input.stepId, input.expectedRunState),
       processingRunId: null,
-      atMs: Date.now(),
     });
     return errorResult(notFoundError("processingSteps", "processing_step_not_found"));
   }
   const run = await tx.runById(step.runId);
   if (run === null) {
-    await tx.insertProcessingAudit({
-      actorUserId: authority.userId,
-      gmGrantId: authority.grantId,
+    await audit(tx, {
+      authority,
       companyId: null,
       operationName: "operations.retryProcessingStep",
-      gmBasis: basis.value,
+      basis: basis.value,
       outcome: "processing_run_not_found",
       gmTargetRevision: runTargetRevision(step.runId, input.expectedRunState),
       processingRunId: null,
-      atMs: Date.now(),
     });
     return errorResult(notFoundError("processingRuns", "processing_run_not_found"));
   }
@@ -392,16 +395,14 @@ export async function performRetryProcessingStep(
   if (!decision.ok) {
     // The audited refusal: the closed code records exactly which guard
     // refused (stale revision, already-running stage, unsupported version).
-    await tx.insertProcessingAudit({
-      actorUserId: authority.userId,
-      gmGrantId: authority.grantId,
+    await audit(tx, {
+      authority,
       companyId: run.companyId,
       operationName: "operations.retryProcessingStep",
-      gmBasis: basis.value,
+      basis: basis.value,
       outcome: decision.code,
       gmTargetRevision: runTargetRevision(run.runId, input.expectedRunState),
       processingRunId: run.runId,
-      atMs: Date.now(),
     });
     if (decision.kind === "unsupported") {
       return errorResult(unsupportedError("operations.retryProcessingStep", decision.code));
@@ -409,16 +410,19 @@ export async function performRetryProcessingStep(
     return errorResult(conflictError(decision.code));
   }
 
-  const workflowId = parseWorkflowIdentity(run.checkpoint)!;
   const target = restartTargetOfStep(step.stepKind);
   await tx.patchRunRunning(run.runId);
-  await tx.restartRunWorkflow(workflowId, target);
-  await auditOk(tx, authority, {
+  // The ok half certified the workflow identity (guard 5): the checkpoint
+  // parsed once above, and its certified value resumes the workflow here.
+  await tx.restartRunWorkflow(decision.workflowId, target);
+  await audit(tx, {
+    authority,
+    companyId: run.companyId,
     operationName: "operations.retryProcessingStep",
     basis: basis.value,
-    companyId: run.companyId,
-    processingRunId: run.runId,
+    outcome: "ok",
     gmTargetRevision: runTargetRevision(run.runId, input.expectedRunState),
+    processingRunId: run.runId,
   });
   return okResult(
     Schema.decodeUnknownSync(retryProcessingStepEntry.result)({
@@ -453,16 +457,14 @@ export async function performRequestReanalysis(
   }
   const source = await tx.sourceById(input.sourceId);
   if (source === null) {
-    await tx.insertProcessingAudit({
-      actorUserId: authority.userId,
-      gmGrantId: authority.grantId,
+    await audit(tx, {
+      authority,
       companyId: null,
       operationName: "operations.requestReanalysis",
-      gmBasis: basis.value,
+      basis: basis.value,
       outcome: "source_not_found",
       gmTargetRevision: sourceTargetRevision(input.expectedLatestRunId),
       processingRunId: null,
-      atMs: Date.now(),
     });
     return errorResult(notFoundError("sources", "source_not_found"));
   }
@@ -489,16 +491,14 @@ export async function performRequestReanalysis(
     latestRunId,
   });
   if (!decision.ok) {
-    await tx.insertProcessingAudit({
-      actorUserId: authority.userId,
-      gmGrantId: authority.grantId,
+    await audit(tx, {
+      authority,
       companyId: source.companyId,
       operationName: "operations.requestReanalysis",
-      gmBasis: basis.value,
+      basis: basis.value,
       outcome: decision.code,
       gmTargetRevision: sourceTargetRevision(input.expectedLatestRunId),
       processingRunId: null,
-      atMs: Date.now(),
     });
     return errorResult(conflictError(decision.code));
   }
@@ -516,12 +516,14 @@ export async function performRequestReanalysis(
     newRunId,
     reanalysisOfRunId: latestRunId,
   });
-  await auditOk(tx, authority, {
+  await audit(tx, {
+    authority,
+    companyId: source.companyId,
     operationName: "operations.requestReanalysis",
     basis: basis.value,
-    companyId: source.companyId,
-    processingRunId: newRunId,
+    outcome: "ok",
     gmTargetRevision: sourceTargetRevision(latestRunId),
+    processingRunId: newRunId,
   });
   return okResult(
     Schema.decodeUnknownSync(requestReanalysisEntry.result)({

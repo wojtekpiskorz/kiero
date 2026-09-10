@@ -62,14 +62,15 @@ export interface ProcessingTx extends GmTx {
   stepById(stepId: string): Promise<StepView | null>;
   stepsOfRun(runId: string): Promise<StepView[]>;
   attemptsOfSteps(stepIds: readonly string[]): Promise<AttemptView[]>;
-  jobsOfRun(runId: string): Promise<JobView[]>;
+  jobsOfRun(runId: string, limit: number): Promise<JobView[]>;
   sourceById(sourceId: string): Promise<SourceView | null>;
   latestRunOfSource(sourceId: string): Promise<ProcessingRunView | null>;
   changeSetsOfSource(sourceId: string, limit: number): Promise<ChangeSetView[]>;
   recentDiagnostics(limit: number): Promise<DiagnosticEventView[]>;
   /** Returns the run to running before the workflow resumes (same identity). */
   patchRunRunning(runId: string): Promise<boolean>;
-  /** Resumes the run's workflow from its journal; `null` restarts from start. */
+  /** Resumes the run's workflow from its journal; `from: "start"` means a
+   * full restart (journal replay re-executes only unjournaled steps). */
   restartRunWorkflow(workflowId: string, from: "model" | "group" | "start"): Promise<void>;
   insertReanalysisRun(row: ReanalysisRunInsert): Promise<string>;
   publishReanalysisRequested(publication: ReanalysisPublication): Promise<string>;

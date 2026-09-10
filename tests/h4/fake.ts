@@ -184,11 +184,11 @@ export function fakeProcessingTx(db: FakeProcessingDb): ProcessingTx {
       db.attempts
         .filter((row) => stepIds.includes(row.stepId))
         .sort((a, b) => a.attempt - b.attempt),
-    jobsOfRun: async (runId) =>
+    jobsOfRun: async (runId, limit) =>
       db.processingJobs
         .filter((row) => row.runId === runId)
         .map(({ runId: _runId, ...job }) => job)
-        .slice(0, 10),
+        .slice(0, limit),
     sourceById: async (sourceId) => {
       const row = db.sources.get(sourceId);
       if (row === undefined) {

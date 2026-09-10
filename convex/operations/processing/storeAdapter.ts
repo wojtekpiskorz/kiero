@@ -2,7 +2,8 @@
  * The generated-ctx adapter (H4): maps the Convex mutation context onto the
  * GM processing store surfaces from ./store.ts, composed OVER B4's adapter
  * (`gmTx`) for every authority read/write; the GM authority seam is
- * consumed, not duplicated.
+ * consumed, not duplicated. The workflow restart mapping is E3's exported
+ * `restartAnalysisWorkflow`, consumed the same way.
  *
  * `normalizeId` is the proved id bridge (A3): the cores speak plain-string
  * ids, typed index chains live only here. Projections stay bounded and
@@ -13,9 +14,9 @@
 import type { WorkflowId } from "@convex-dev/workflow";
 import type { MutationCtx } from "../../_generated/server";
 import type { Doc } from "../../_generated/dataModel";
-import { internal } from "../../_generated/api";
 import { workflow } from "../../platform/pipeline";
 import { publishEvent } from "../../platform/publish";
+import { restartAnalysisWorkflow } from "../../processing/text/analyze";
 import { deriveProcessingState } from "../../sources/read/rows";
 import { gmTx } from "../../access/gm/storeAdapter";
 import { REANALYSIS_PIPELINE_PLACEHOLDER } from "./cores";
@@ -135,7 +136,7 @@ export function processingTx(tx: MutationCtx): ProcessingTx {
       }
       return views.sort((a, b) => a.attempt - b.attempt);
     },
-    jobsOfRun: async (runId) => {
+    jobsOfRun: async (runId, limit) => {
       // No by_run index exists on durableJobs (the A2 fragment owns the
       // table): scope by the run's company through by_company, then filter
       // on processingRunId. Bounded output; alpha-scale scan.
@@ -151,7 +152,7 @@ export function processingTx(tx: MutationCtx): ProcessingTx {
         .query("durableJobs")
         .withIndex("by_company", (q) => q.eq("companyId", runRow.companyId))
         .filter((q) => q.eq(q.field("processingRunId"), runId2))
-        .take(10);
+        .take(limit);
       return rows.map(jobViewOf);
     },
     sourceById: async (sourceId) => {
@@ -246,14 +247,10 @@ export function processingTx(tx: MutationCtx): ProcessingTx {
       const typed = workflowId as WorkflowId;
       if (from === "start") {
         await workflow.restart(tx, typed, {});
-      } else if (from === "model") {
-        await workflow.restart(tx, typed, {
-          from: internal.processing.text.analyze.modelAnalysisStage,
-        });
       } else {
-        await workflow.restart(tx, typed, {
-          from: internal.processing.text.analyze.publishGroupStage,
-        });
+        // E3's own restart mapping (the helper's docblock names this GM path
+        // as its consumer): one home for the stage restart semantics.
+        await restartAnalysisWorkflow(tx, typed, from);
       }
     },
     insertReanalysisRun: async (row) => {

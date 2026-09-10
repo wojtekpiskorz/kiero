@@ -14,7 +14,7 @@ export { signInCopy } from "../../sign-in/state";
 
 /** Polish copy for the GM processing surface (stable product text). */
 export const gmProcessingCopy = {
-  title: "GM - inspekcja przetwarzania",
+  title: "GM — inspekcja przetwarzania",
   bannerIntro:
     "Tryb GM aktywny. Każda czynność na tym panelu zapisuje się w chronionym dzienniku wraz z podstawą.",
   accessPanelLink: "Przejdź do panelu dostępu GM",

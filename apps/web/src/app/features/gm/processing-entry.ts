@@ -21,8 +21,8 @@ import { GmProcessingFeature } from "../../../features/gm/processing/GmProcessin
 export const gmProcessingFeatureEntry = appFeatureEntry({
   featureId: "operations.processing",
   routePath: "/gm-przetwarzanie",
-  navLabel: "GM - przetwarzanie",
-  screenHeading: "GM - inspekcja przetwarzania",
+  navLabel: "GM — przetwarzanie",
+  screenHeading: "GM — inspekcja przetwarzania",
   consumedOperations: [
     "operations.inspectProcessingRun",
     "operations.retryProcessingStep",

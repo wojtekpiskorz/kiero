@@ -16,6 +16,7 @@ import {
   MAX_INSPECT_ATTEMPTS,
   MAX_INSPECT_CHANGE_SETS,
   MAX_INSPECT_DIAGNOSTICS,
+  MAX_INSPECT_JOBS,
   MAX_INSPECT_STEPS,
   REANALYSIS_PIPELINE_PLACEHOLDER,
   RETRYABLE_PIPELINE_VERSIONS,
@@ -93,7 +94,7 @@ describe("decideRetry (the check order)", () => {
   };
 
   it("allows a failed compatible stage of a failed run", () => {
-    expect(decideRetry(eligible)).toEqual({ ok: true });
+    expect(decideRetry(eligible)).toEqual({ ok: true, workflowId: "wf-1" });
   });
 
   it("stale revision first: the inspected state must still be the run's state", () => {
@@ -117,7 +118,7 @@ describe("decideRetry (the check order)", () => {
     // The stuck shape: a stage still running/pending inside a FAILED run
     // (the workflow died around it) is retryable work.
     for (const stepState of ["running", "pending"] as const) {
-      expect(decideRetry({ ...eligible, stepState })).toEqual({ ok: true });
+      expect(decideRetry({ ...eligible, stepState })).toEqual({ ok: true, workflowId: "wf-1" });
     }
     // A running row on a SUCCEEDED run is not retryable (conservative: only
     // failed steps of partial-completion runs are).
@@ -154,7 +155,7 @@ describe("decideRetry (the check order)", () => {
         runState: "succeeded",
         expectedRunState: "succeeded",
       }),
-    ).toEqual({ ok: true });
+    ).toEqual({ ok: true, workflowId: "wf-1" });
   });
 });
 
@@ -340,6 +341,7 @@ describe("the inspection projection helpers", () => {
   it("the projection bounds are sane and consistent", () => {
     expect(MAX_INSPECT_STEPS).toBe(50);
     expect(MAX_INSPECT_ATTEMPTS).toBe(100);
+    expect(MAX_INSPECT_JOBS).toBe(10);
     expect(MAX_INSPECT_CHANGE_SETS).toBe(10);
     expect(MAX_INSPECT_DIAGNOSTICS).toBe(20);
     expect(DIAGNOSTIC_SCAN_ROWS).toBeGreaterThanOrEqual(MAX_INSPECT_DIAGNOSTICS);
