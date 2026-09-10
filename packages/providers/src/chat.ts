@@ -59,6 +59,20 @@ export interface OpenRouterCredentials {
   readonly apiKey: string;
 }
 
+/**
+ * The server-held OpenRouter key from the environment; presence only, never
+ * its value. E5 append (flagged coordinated change): the canonical reader;
+ * the copies in D6's audio executor, E3's analyze and the ai dispatch are
+ * proposed follow-ups for their own lanes.
+ */
+export function openRouterCredentialsFromEnv(): OpenRouterCredentials | null {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (apiKey === undefined || apiKey === "") {
+    return null;
+  }
+  return { apiKey };
+}
+
 /** Typed message content: plain text or inline image data for vision routes. */
 export type ChatContent =
   | { readonly kind: "text"; readonly text: string }

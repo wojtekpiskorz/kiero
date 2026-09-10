@@ -334,19 +334,25 @@ describe("the declared consumer edge (access revocation drains durably)", () => 
     // projection; all four edges fan out from sources.sourceAccepted.
     // C5 (issue #28) owns the recomputation-edge projections, so the
     // still-unprojected example is the permanent-deletion seam (I4's lane).
-    const projections = projectEventToJobInputs(
-      "sources.sourceAccepted",
-      {},
-      "d",
-    );
+    // E5 amendment (issue #39, flagged coordinated append): the purge event
+    // now also fans out to the derived-search refresh edge (projected), so
+    // the unprojected deletion seam rides ALONGSIDE a projected edge.
+    const projections = projectEventToJobInputs("sources.sourceAccepted", {}, "d");
+    expect(projections.map((projection) => projection.kind)).toEqual(["job", "job", "job", "job"]);
+    const purged = projectEventToJobInputs("sources.sourcePurged", { sourceId: "s1" }, "d");
+    expect(purged.map((projection) => projection.kind).sort()).toEqual(["job", "unprojected_edge"]);
+    expect(purged).toContainEqual({ kind: "unprojected_edge", jobKind: "deletion.purge_source" });
+    expect(purged).toContainEqual({
+      kind: "job",
+      jobKind: "search.index_generation",
+      input: { generationId: null, mode: "refresh_source", sourceId: "s1", findingId: null },
+      dedupKey: "search.index_generation:refresh_source:s1",
+    });
     expect(projections.map((projection) => projection.kind)).toEqual([
       "job",
       "job",
       "job",
       "job",
     ]);
-    expect(
-      projectEventToJobInputs("sources.sourcePurged", { sourceId: "s1" }, "d"),
-    ).toEqual([{ kind: "unprojected_edge", jobKind: "deletion.purge_source" }]);
   });
 });

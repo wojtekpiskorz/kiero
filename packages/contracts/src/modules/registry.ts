@@ -114,7 +114,7 @@ export const revokedAccessCleanupInput = Schema.Struct({
  * amendment on the B3 input-shape precedent (additive, flagged): `reason`
  * and `withdrawnByUserId` join the certified shape as NULLABLE fields so
  * the drain can project event payloads that do not carry them, while the
- * withdrawal transaction registers the job with the real values — the
+ * withdrawal transaction registers the job with the real values - the
  * marking revisions record the withdrawal's reason and actor.
  */
 export const recomputeDependentsInput = Schema.Struct({
@@ -172,7 +172,7 @@ export const echoDeliveryInput = Schema.Struct({
 });
 
 // D6 amendment (flagged coordinated change, the B3 precedent): the first
-// model-call job kind gets its executor registration — the prerequisite E2's
+// model-call job kind gets its executor registration - the prerequisite E2's
 // dispatch named. Per-segment STT executes through the durable path; the
 // transcript row is the order the workflow owns.
 export const transcribeSegmentInput = Schema.Struct({
@@ -205,6 +205,47 @@ export const attentionIntentsInput = Schema.Struct({
   sourceId: Schema.NullOr(tableIdSchema("sources")),
   clarificationId: Schema.NullOr(tableIdSchema("clarifications")),
   changeSetId: Schema.NullOr(tableIdSchema("changeSets")),
+});
+
+// E5 amendment (issue #39, flagged coordinated change on the B3/F2
+// precedent): the derived-search index executor input. `build` is the full
+// generation pass `search.startIndexGeneration` registers; the two refresh
+// modes are the drain's projections of the consumed lifecycle events
+// (withdrawal/purge drop a source's derived rows; a revised finding's rows
+// are rebuilt from its current revision). `generationId` is nullable so the
+// drain can register a refresh without naming a generation: null refreshes
+// every non-retired generation (the event payload carries no generation).
+export const searchIndexInput = Schema.Struct({
+  generationId: Schema.NullOr(tableIdSchema("searchIndexGenerations")),
+  mode: Schema.Literals(["build", "refresh_source", "refresh_finding"]),
+  sourceId: Schema.NullOr(tableIdSchema("sources")),
+  findingId: Schema.NullOr(tableIdSchema("findings")),
+});
+
+// F3 amendment (issue #43, flagged coordinated change - the F2 precedent):
+// the web-push delivery executor input. The drain projects the delivered
+// intent's own event onto this shape; the executor's prepare re-reads the
+// intent (state, rights, subscriptions, preview) at delivery time instead
+// of trusting the event payload.
+export const deliverPushInput = Schema.Struct({
+  notificationIntentId: tableIdSchema("notificationIntents"),
+});
+
+// F4 amendment (issue #44, flagged coordinated change on the F2 precedent):
+// the task-reminder scheduling executor input. The drain projects the three
+// consumed events onto this shape; the nullable ids let every trigger
+// share one closed input. Both work events (`work.taskChanged` and
+// `work.taskStateChanged`) project onto the ONE `task_changed` trigger:
+// the recompute re-reads the live task row, so the state event needs no
+// reaction of its own (PR #102 review round 1 dropped the certified but
+// never-produced `task_state_changed` literal). The work events' dedup
+// identity already carries the task revision
+// (`work.<event>:<id>:<revision>`), so the projection rides the row's key
+// and every distinct change registers its own job while replays collapse.
+export const attentionRemindersInput = Schema.Struct({
+  trigger: Schema.Literals(["task_changed", "finding_revised"]),
+  taskId: Schema.NullOr(tableIdSchema("tasks")),
+  findingId: Schema.NullOr(tableIdSchema("findings")),
 });
 
 function decodeFeatureId(value: string): Schema.Schema.Type<typeof FeatureId> {
@@ -255,7 +296,7 @@ export const executors: readonly ExecutorEntry[] = [
     input: analyzeChangePlanInput,
   }),
   // D5 amendment (issue #33): the accepted-photo normalization executor
-  // (architecture protocol step 4 — normalize before ordinary vision). It
+  // (architecture protocol step 4 - normalize before ordinary vision). It
   // consumes `sources.sourceAccepted` through its own edge; the extraction
   // job the acceptance transaction registers stays E3's.
   executorEntry({
@@ -292,7 +333,7 @@ export const executors: readonly ExecutorEntry[] = [
     input: joinMultimodalInput,
   }),
   // F2 amendment (issue #42, flagged coordinated change): the durable
-  // notification-intent executor — intent creation from the consumed
+  // notification-intent executor - intent creation from the consumed
   // events plus the due-time evaluator kick
   // (`convex/attention/delivery/executor.ts` implements it).
   executorEntry({
@@ -300,6 +341,35 @@ export const executors: readonly ExecutorEntry[] = [
     executorId: decodeFeatureId("attention.evaluate"),
     jobKind: "attention.evaluate_due_intents",
     input: attentionIntentsInput,
+  }),
+  // E5 amendment (issue #39, flagged coordinated change): the derived-search
+  // index executor (`convex/search/executor.ts` implements it). The
+  // versioned generation builds and the scoped lifecycle refreshes of the
+  // disposable index rows.
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("search.index"),
+    jobKind: "search.index_generation",
+    input: searchIndexInput,
+  }),
+  // F3 amendment (issue #43, flagged coordinated change): the web-push
+  // transport executor - the per-device delivery of one delivered intent
+  // (`convex/attention/push/executor.ts` implements it).
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("attention.push"),
+    jobKind: "attention.deliver_push",
+    input: deliverPushInput,
+  }),
+  // F4 amendment (issue #44, flagged coordinated change): the durable
+  // task-reminder scheduling executor - the semantic slot recompute from
+  // the consumed work events and bound-deadline revisions
+  // (`convex/attention/reminders/executor.ts` implements it).
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("attention.reminders"),
+    jobKind: "attention.schedule_task_reminders",
+    input: attentionRemindersInput,
   }),
 ];
 
@@ -325,7 +395,7 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceWithdrawn", "memory.recompute_dependents"),
   consumer("memory.dependentsMarkedStale", "memory.recompute_dependents"),
   // C5 registration (issue #28 owns the revalidation half of this edge):
-  // every revised finding drains into one bounded dependent walk — a basis
+  // every revised finding drains into one bounded dependent walk - a basis
   // that became non-known propagates updating markings through the
   // dependentsMarkedStale cascade; a basis that became known again
   // revalidates its updating dependents by registering their linked
@@ -369,6 +439,31 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceAccepted", "attention.evaluate_due_intents"),
   consumer("memory.clarificationRaised", "attention.evaluate_due_intents"),
   consumer("memory.changeSetPublished", "attention.evaluate_due_intents"),
+  // E5 amendment (issue #39, flagged coordinated change): derived search
+  // rows are refreshed through the same durable edges as every other
+  // derivative. Withdrawal and purge drop a source's index rows; a revised
+  // finding rebuilds its rows from the CURRENT revision. Hydration remains
+  // the authority even before these jobs run: query-time checks re-read the
+  // canonical records, so a stale derived row can never authorize an answer.
+  consumer("sources.sourceWithdrawn", "search.index_generation"),
+  consumer("sources.sourcePurged", "search.index_generation"),
+  consumer("memory.findingRevised", "search.index_generation"),
+  // F3 amendment (issue #43, flagged coordinated change): every delivered
+  // notification intent drains into the web-push transport. The projection
+  // derives its dedup identity from the intent, so a replayed or
+  // differently-keyed duplicate event collapses onto the same per-device
+  // delivery rows (issue 43: semantic intent plus subscription).
+  consumer("attention.intentDelivered", "attention.deliver_push"),
+  // F4 amendment (issue #44, flagged coordinated change): the task-reminder
+  // scheduling edges. Every task change (creation, deadline binding,
+  // coordinator, reopen) recomputes the semantic slots; a revision of a
+  // bound deadline finding recomputes every task bound to it (a date
+  // correction does not touch the task row). Each edge rides the row's
+  // revision-carrying dedup identity, so distinct changes register
+  // distinct jobs while replays collapse.
+  consumer("work.taskChanged", "attention.schedule_task_reminders"),
+  consumer("work.taskStateChanged", "attention.schedule_task_reminders"),
+  consumer("memory.findingRevised", "attention.schedule_task_reminders"),
 ];
 
 /**

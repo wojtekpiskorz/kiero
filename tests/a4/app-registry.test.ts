@@ -129,16 +129,16 @@ describe("the shipped host features", () => {
     }
   });
 
-  it("registers every feature as pending with a note, except the mounted lanes (H1 conversation + memory, B3 membership, B4 GM, G1 calendar, H4 GM processing); only the conversation carries its own placeholder screen", () => {
+  it("registers every feature as pending with a note, except the mounted lanes (H1 conversation + memory, B3 membership, B4 GM, G1 calendar, F3 notifications, H4 GM processing); only the conversation carries its own placeholder screen", () => {
     // B3 (issue #22) is the first lane to mount a real screen through this
     // registry: the sanctioned sign-in + membership host composition.
     // B4 (issue #23) mounts the audited GM operator surface the same way;
     // G1 (issue #45) mounts the Calendar connection screen; J1 (issue #60)
     // mounted the core-text conversation surface on the default route, and
     // H1 (issue #49) replaced that mount with the full conversation UI and
-    // added the memory route.
-    // H4 append (issue #52, flagged cross-lane list amendment): the audited
-    // GM processing inspector mounts beside B4's GM surface.
+    // added the memory route; F3 (issue #43) mounts the web push settings
+    // screen; H4 (issue #52) mounts the audited GM processing inspector
+    // beside B4's GM surface.
     const mounted = appFeatures.filter((entry) => entry.implementation === "mounted");
     expect(mounted.map((entry) => entry.featureId)).toEqual([
       "conversation.company",
@@ -147,6 +147,7 @@ describe("the shipped host features", () => {
       "access.gm",
       "operations.processing",
       "calendar.connection",
+      "attention.push",
     ]);
     for (const mountedEntry of mounted) {
       expect(mountedEntry.screen).toBeTypeOf("function");

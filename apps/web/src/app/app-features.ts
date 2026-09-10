@@ -15,6 +15,8 @@ import { projectsFeatureEntry } from "./features/projects/entry";
 import { membershipFeatureEntry } from "./features/membership/entry";
 import { calendarFeatureEntry } from "./features/calendar/entry";
 import { gmAccessFeatureEntry } from "./features/gm/entry";
+// F3's sanctioned host mount: the Polish web push settings screen.
+import { notificationsFeatureEntry } from "./features/notifications/entry";
 // H4's sanctioned host mount: the audited GM processing inspector (entry
 // file owns the shape, this line the wiring).
 import { gmProcessingFeatureEntry } from "./features/gm/processing-entry";
@@ -39,4 +41,7 @@ export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
   // G1's sanctioned host mount: the optional personal Calendar connection
   // (sign-in gate reused; connection lifecycle only, never identity).
   calendarFeatureEntry,
+  // F3's sanctioned host mount: the web push settings screen (device
+  // registration, permission/subscription state, recovery guidance).
+  notificationsFeatureEntry,
 ]);
