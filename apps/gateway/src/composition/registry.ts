@@ -1,6 +1,8 @@
 /**
  * Gateway composition registry (A3; uploads provider appended by D2;
  * Calendar OAuth provider by G1; images provider by D5).
+
+ * Calendar OAuth provider by G1; media provider by D3).
  *
  * The single place route providers and executor registrations compose, so
  * parallel lanes add their own provider files here (imports only) without
@@ -13,6 +15,11 @@
  *   over all providers' route tables first, then each provider's optional
  *   `match`. D3's range reads become the next provider using this seam.
 
+ *   provider, the D2 uploads lane's provider and the D3 media lane's
+ *   provider are imported below. `matchRoute` stays generic: exact match
+ *   over all providers' route tables first, then each provider's optional
+ *   `match`.
+
  * - `schedulerConsumers`: what this Worker consumes from durable execution
  *   (the Convex-side executors own the work; the gateway currently hosts
  *   none; media/export/backup executors join in later lanes and are the
@@ -22,6 +29,8 @@
 import { platformRoutes, type GatewayRoute } from "../platform/routes";
 import { uploadsRouteProvider } from "../uploads/routes";
 import { imagesRouteProvider } from "../images/routes";
+
+import { mediaRouteProvider } from "../media/routes";
 
 import { calendarOAuthProvider } from "../calendar-oauth/routes";
 
@@ -43,6 +52,8 @@ export const routeProviders: readonly RouteProvider[] = [
   { providerId: "platform", routes: platformRoutes },
   uploadsRouteProvider,
   imagesRouteProvider,
+
+  mediaRouteProvider,
 
   calendarOAuthProvider,
 ];

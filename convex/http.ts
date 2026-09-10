@@ -1,6 +1,10 @@
 /**
  * Convex HTTP actions composition entry (A3; telemetry routes appended by
- * I2; sources/uploads routes by D2; Calendar OAuth routes by G1).
+ * I2; sources/uploads routes by D2; Calendar OAuth routes by G1;
+ * sources media-access route by D3, under its deployable module path
+ * `sources/media_access` — Convex rejects hyphenated module path
+ * components, so the issue's literal `sources/media-access/**` namespace
+ * ships as `sources/media_access/**`; the lane's exclusivity is unchanged).
  *
  * Convex serves the default export of the `http` module as the deployment's
  * HTTP router. Route handlers live in their owning lane files; this entry
@@ -26,6 +30,8 @@ import {
 } from "./operations/telemetry/http";
 import { uploadsBridgeHandler, uploadsStateHandler } from "./sources/uploads/http";
 import { imagesBridgeHandler } from "./processing/images/http";
+
+import { mediaAccessHandler } from "./sources/media_access/http";
 import {
   calendarStartHandler,
   calendarCallbackHandler,
@@ -51,6 +57,8 @@ http.route({ path: "/platform/telemetry/health", method: "GET", handler: telemet
 http.route({ path: "/sources/uploads/bridge", method: "POST", handler: uploadsBridgeHandler });
 http.route({ path: "/sources/uploads/state", method: "POST", handler: uploadsStateHandler });
 http.route({ path: "/processing/images/bridge", method: "POST", handler: imagesBridgeHandler });
+
+http.route({ path: "/sources/media/access", method: "POST", handler: mediaAccessHandler });
 
 http.route({ path: "/calendar/oauth/start", method: "POST", handler: calendarStartHandler });
 http.route({ path: "/calendar/oauth/callback", method: "GET", handler: calendarCallbackHandler });
