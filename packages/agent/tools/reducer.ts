@@ -124,12 +124,19 @@ export interface AnswerReducerOutcome {
   readonly state: AnswerState;
   /** The Polish tool-result text shown to the model for this call. */
   readonly toolResult: string;
+  /**
+   * The structured refusal verdict: the message when the reducer refused
+   * this call, null when it did not. Callers branch on this FIELD, never
+   * on the tool-result prose — a reworded refusal must not be able to
+   * fork the routing between a refused plan and a checked execution.
+   */
+  readonly refusal: string | null;
   /** Marks the terminal accepted answer (the loop stops after it). */
   readonly done: boolean;
 }
 
 function refuse(state: AnswerState, message: string): AnswerReducerOutcome {
-  return { state, toolResult: `ODRZUCONO: ${message}`, done: false };
+  return { state, refusal: message, toolResult: `ODRZUCONO: ${message}`, done: false };
 }
 
 function resolveEvidence(
@@ -281,6 +288,7 @@ function applySubmitAnswer(
   };
   return {
     state: { ...state, submitted },
+    refusal: null,
     toolResult: `ODPOWIEDŹ PRZYJĘTA: ${args.statements.length} zdań, ujawnienia: ${args.disclosures.updatingFindingIds.length} aktualizowanych, ${args.disclosures.processingSourceIds.length} przetwarzanych.`,
     done: true,
   };
@@ -322,7 +330,8 @@ function applyAskClarification(
   // plan and forbids a simultaneous value guess.
   return {
     state,
-    toolResult: `PYTANIE PRZYJĘTE DO WYKONANIU (${entries.length} cytaty, ${distinctSources.size} źródeł); nie podawaj jednocześnie wartości rozstrzygającej.`,
+    refusal: null,
+    toolResult: `PYTANIE PRZYJĘTE DO WYKONANIA (${entries.length} cytaty, ${distinctSources.size} źródeł); nie podawaj jednocześnie wartości rozstrzygającej.`,
     done: false,
   };
 }
@@ -347,6 +356,7 @@ function applyResolveClarification(
   }
   return {
     state,
+    refusal: null,
     toolResult: "ROZSTRZYGNIĘCIE PRZYJĘTE DO WYKONANIA; notatka zostanie zapisana z autorem.",
     done: false,
   };
@@ -409,6 +419,7 @@ function applyChangeTask(
   }
   return {
     state,
+    refusal: null,
     toolResult: "ZMIANA ZADANIA PRZYJĘTA DO WYKONANIA przez sprawdzone reguły; wynik zobaczysz dalej.",
     done: false,
   };
@@ -456,6 +467,7 @@ function applyChangeEvent(
   }
   return {
     state,
+    refusal: null,
     toolResult: "ZMIANA ZDARZENIA PRZYJĘTA DO WYKONANIA przez sprawdzone reguły; wynik zobaczysz dalej.",
     done: false,
   };

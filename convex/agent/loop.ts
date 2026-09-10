@@ -14,6 +14,9 @@
  * agent plan is untrusted input everywhere: decoded by the adapter,
  * re-validated against the tenant-filtered context by the pure reducer,
  * and finally executed by the same checked cores the UI dispatches.
+ * `dispatchAnswerToolCall` owns the routing of every declared tool name
+ * through these halves; a tool declared in the vocabulary but absent
+ * from that dispatch is dead and fails the routing test.
  *
  * Before an answer is accepted, the staleness recheck compares the run's
  * load-time finding revisions against CURRENT counters: a mid-run
@@ -40,6 +43,9 @@ import {
   ANSWER_PROMPT_VERSION,
   ANSWER_SCHEMA_VERSION,
   ANSWER_TOOLS_VERSION,
+  SEARCH_EVIDENCE_TOOL,
+  SUBMIT_ANSWER_TOOL,
+  VALIDATE_EXTENSION_TOOL,
   answerRevisionSnapshotOf,
   answerSystemPrompt,
   applyAnswerToolCall,
@@ -151,7 +157,7 @@ export const loadAnswerStage = internalMutation({
 // ---------------------------------------------------------------------------
 
 /** One routed tool execution's outcome as the loop sees it. */
-interface ExecutionOutcome {
+export interface ExecutionOutcome {
   readonly toolResult: string;
   readonly state: AnswerState;
   readonly done: boolean;
@@ -197,14 +203,23 @@ async function runEvidenceSearch(
   state: AnswerState,
   args: { query: string; projectId: string | null },
 ): Promise<ExecutionOutcome> {
-  const result = await ctx.runQuery(internal.agent.evidence.searchEvidenceRows, {
-    questionSourceId: context.question.sourceId as Id<"sources">,
-    query: args.query,
-    ...(args.projectId === null
-      ? {}
-      : { projectId: args.projectId as Id<"projects"> }),
-  });
-  const envelope = result as {
+  // The one mid-run QUERY runs as defensively as every write and both
+  // gate mutations: a transient failure becomes the shared technical
+  // refusal the model can retry, never a thrown action after durable
+  // changes may already have landed.
+  const result = await tryMutation(() =>
+    ctx.runQuery(internal.agent.evidence.searchEvidenceRows, {
+      questionSourceId: context.question.sourceId as Id<"sources">,
+      query: args.query,
+      ...(args.projectId === null
+        ? {}
+        : { projectId: args.projectId as Id<"projects"> }),
+    }),
+  );
+  if (!result.ok) {
+    return { state, toolResult: technicalExecutionRefusal("wyszukiwania"), done: false };
+  }
+  const envelope = result.value as {
     value?: {
       hits?: {
         sourceId: string;
@@ -521,6 +536,102 @@ async function gateSubmitFreshness(
   };
 }
 
+/** One dispatched tool call: its execution, or a gate-mandated refresh. */
+export type DispatchedAnswerCall =
+  | { readonly kind: "executed"; readonly result: ExecutionOutcome }
+  | {
+      /** The gate reloaded the context: the round continues refreshed. */
+      readonly kind: "refresh";
+      readonly context: AnswerContext;
+      readonly nudge: string;
+      readonly refreshResult: string;
+    };
+
+/**
+ * Routes ONE decoded tool call through the loop's halves — the seam the
+ * routing test drives. Three shapes exist and every declared tool must
+ * live on one of them (a declared-but-dead tool is a wiring bug):
+ *
+ * - `agent_search_evidence` and `agent_validate_extension_value` go
+ *   STRAIGHT to their Convex executors: the reducer has nothing to
+ *   validate them against (the search extends the ledger from query
+ *   results; `AnswerContext` carries no extension versions), so reaching
+ *   the reducer would be the wiring mistake its default case refuses.
+ * - `agent_submit_answer` passes the staleness gate first (refuse,
+ *   refresh, or accept), and only an accepted gate hands the call to the
+ *   answer-contract reducer.
+ * - every checked write is validated by the reducer against the
+ *   tenant-filtered context and then executes through its checked Convex
+ *   dispatch — an agent plan is untrusted input at both seams. The
+ *   branch is on the reducer's structured `refusal` FIELD, never on the
+ *   tool-result prose, so a reworded refusal cannot fork the routing.
+ */
+export async function dispatchAnswerToolCall(
+  ctx: ActionCtx,
+  questionSourceId: Id<"sources">,
+  runId: string,
+  context: AnswerContext,
+  state: AnswerState,
+  refreshes: number,
+  call: DecodedAnswerCall,
+): Promise<DispatchedAnswerCall> {
+  if (call.name === SEARCH_EVIDENCE_TOOL) {
+    return {
+      kind: "executed",
+      result: await runEvidenceSearch(
+        ctx,
+        context,
+        state,
+        call.arguments as { query: string; projectId: string | null },
+      ),
+    };
+  }
+  if (call.name === VALIDATE_EXTENSION_TOOL) {
+    return {
+      kind: "executed",
+      result: await runCheckedExecution(ctx, context, state, call),
+    };
+  }
+  if (call.name === SUBMIT_ANSWER_TOOL) {
+    // The staleness gate FIRST: an answer over a superseded world is
+    // refused and the model re-reads the refreshed state (bounded
+    // once); a world that vanished mid-run REFUSES the submit outright.
+    const gate = await gateSubmitFreshness(
+      ctx,
+      questionSourceId,
+      runId,
+      context,
+      refreshes,
+    );
+    if (gate.kind === "refused") {
+      return {
+        kind: "executed",
+        result: { state, toolResult: gate.toolResult, done: false },
+      };
+    }
+    if (gate.kind === "refreshed") {
+      return {
+        kind: "refresh",
+        context: gate.context,
+        nudge: gate.nudge,
+        refreshResult: gate.refreshResult,
+      };
+    }
+    return { kind: "executed", result: applyAnswerToolCall(state, context, call) };
+  }
+  // Checked writes: reducer validation against the tenant-filtered
+  // context, then the checked execution. A refused plan stops at the
+  // refusal (the structured verdict, not the prose) — nothing executes.
+  const validated = applyAnswerToolCall(state, context, call);
+  if (validated.refusal !== null) {
+    return { kind: "executed", result: validated };
+  }
+  return {
+    kind: "executed",
+    result: await runCheckedExecution(ctx, context, validated.state, call),
+  };
+}
+
 /** One replayed message turn in the wire shape both halves understand. */
 export interface AnswerMessageWire {
   readonly role: "user" | "assistant";
@@ -724,50 +835,29 @@ export async function runAnswerRound(
       name: toolCall.name,
       arguments: toolCall.arguments,
     };
-    let outcome: ExecutionOutcome;
-    if (toolCall.name === "agent_search_evidence") {
-      outcome = await runEvidenceSearch(
-        ctx,
-        context,
-        state,
-        toolCall.arguments as { query: string; projectId: string | null },
-      );
-    } else if (toolCall.name === "agent_submit_answer") {
-      // The staleness gate FIRST: an answer over a superseded world is
-      // refused and the model re-reads the refreshed state (bounded
-      // once); a world that vanished mid-run REFUSES the submit outright.
-      const gate = await gateSubmitFreshness(
-        ctx,
-        questionSourceId,
-        current.runId,
-        context,
-        refreshes,
-      );
-      if (gate.kind === "refused") {
-        outcome = { state, toolResult: gate.toolResult, done: false };
-      } else if (gate.kind === "refreshed") {
-        context = gate.context;
-        messages.push({
-          role: "user",
-          content: [{ kind: "text", text: gate.nudge }],
-        });
-        results.push(gate.refreshResult);
-        turnLog.push(turnLogEntry(turns, activeCalls, results));
-        refreshes += 1;
-        return { kind: "continue", next: nextState() };
-      } else {
-        outcome = applyAnswerToolCall(state, context, decoded);
-      }
-    } else {
-      // Validation against the tenant-filtered context, then the checked
-      // execution — an agent plan is untrusted input at both seams.
-      const validated = applyAnswerToolCall(state, context, decoded);
-      if (validated.toolResult.startsWith("ODRZUCONO")) {
-        outcome = validated;
-      } else {
-        outcome = await runCheckedExecution(ctx, context, validated.state, decoded);
-      }
+    const dispatched = await dispatchAnswerToolCall(
+      ctx,
+      questionSourceId,
+      current.runId,
+      context,
+      state,
+      refreshes,
+      decoded,
+    );
+    if (dispatched.kind === "refresh") {
+      // The gate refreshed the context mid-turn: hand the model the
+      // refreshed state and continue the run (bounded by the budget).
+      context = dispatched.context;
+      messages.push({
+        role: "user",
+        content: [{ kind: "text", text: dispatched.nudge }],
+      });
+      results.push(dispatched.refreshResult);
+      turnLog.push(turnLogEntry(turns, activeCalls, results));
+      refreshes += 1;
+      return { kind: "continue", next: nextState() };
     }
+    const outcome = dispatched.result;
     state = outcome.state;
     results.push(outcome.toolResult.slice(0, 300));
     done = done || outcome.done;
