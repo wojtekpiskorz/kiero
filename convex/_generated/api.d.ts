@@ -117,6 +117,7 @@ import type * as memory_extensions_validate from "../memory/extensions/validate.
 import type * as memory_extensions_version from "../memory/extensions/version.js";
 import type * as memory_findings_corrections from "../memory/findings/corrections.js";
 import type * as memory_findings_dispatch from "../memory/findings/dispatch.js";
+import type * as memory_findings_exposition from "../memory/findings/exposition.js";
 import type * as memory_findings_functions from "../memory/findings/functions.js";
 import type * as memory_findings_plan from "../memory/findings/plan.js";
 import type * as memory_findings_prepare from "../memory/findings/prepare.js";
@@ -319,6 +320,7 @@ declare const fullApi: ApiFromModules<{
   "memory/extensions/version": typeof memory_extensions_version;
   "memory/findings/corrections": typeof memory_findings_corrections;
   "memory/findings/dispatch": typeof memory_findings_dispatch;
+  "memory/findings/exposition": typeof memory_findings_exposition;
   "memory/findings/functions": typeof memory_findings_functions;
   "memory/findings/plan": typeof memory_findings_plan;
   "memory/findings/prepare": typeof memory_findings_prepare;

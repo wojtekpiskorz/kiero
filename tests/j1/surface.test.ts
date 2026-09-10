@@ -5,8 +5,14 @@
  *
  * The identity repairs (C2's public memory entries, D1's public accept and
  * read entries) cross the real Convex resolution chain; they are proved
- * LIVE with real user tokens in ./live-proof.mjs, per the repo rule that a
- * test mirroring helpers cannot discharge an integration proof.
+ * LIVE with real user tokens, per the repo rule that a test mirroring
+ * helpers cannot discharge an integration proof.
+ *
+ * H1 amendment (issue #49): the send loop, copy and renderers graduated
+ * from the core-text feature into the conversation feature
+ * (apps/web/src/features/conversation), which replaced this mount through
+ * the declared entry. These assertions keep testing the SAME invariants
+ * against the graduated surface; the send-command shapes are unchanged.
  */
 
 import { describe, expect, it } from "vitest";
@@ -20,20 +26,16 @@ import { appFeatures } from "../../apps/web/src/app/app-features";
 import { resolveFeatureScreen } from "../../apps/web/src/app/feature-pending";
 import { AppServicesProvider } from "../../apps/web/src/app/providers";
 import { loadAppConfig } from "../../apps/web/src/app/config";
-import { textConversationFeatureEntry } from "../../apps/web/src/composition/text";
-import {
-  findingValueLabel,
-  justSentNotice,
-  knowledgeStateLabel,
-  processingStateLabels,
-} from "../../apps/web/src/features/core-text/state";
+import { conversationFeatureEntry } from "../../apps/web/src/app/features/conversation/entry";
+import { justSentNotice, processingStateLabels } from "../../apps/web/src/features/conversation/state";
+import { findingValueLabel, knowledgeStateLabel } from "../../apps/web/src/features/memory/state";
 
 /** A representative uploads id (the table-id wire pattern). */
 const TEMPLATE_UPLOAD_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f";
 
-describe("the text composition mount (J1's sanctioned conversation entry)", () => {
-  it("builds the mounted default-route entry through the composition seam", () => {
-    const entry = textConversationFeatureEntry();
+describe("the conversation mount (J1's loop graduated into H1's entry)", () => {
+  it("builds the mounted default-route entry through the host wiring point", () => {
+    const entry = conversationFeatureEntry;
     expect(entry.featureId).toBe("conversation.company");
     expect(entry.routePath).toBe("/");
     expect(entry.implementation).toBe("mounted");
@@ -42,8 +44,9 @@ describe("the text composition mount (J1's sanctioned conversation entry)", () =
     }
   });
 
-  it("declares exactly the send operations the surface commands", () => {
-    expect([...textConversationFeatureEntry().consumedOperations].sort()).toEqual([
+  it("declares the send operations the surface commands plus F1's read marking", () => {
+    expect([...conversationFeatureEntry.consumedOperations].sort()).toEqual([
+      "attention.markSourceRead",
       "sources.acceptSource",
       "sources.prepareUpload",
     ]);
