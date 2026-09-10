@@ -9,10 +9,9 @@ import { Schema } from "effect";
 import { DateRange, executors } from "@kiero/contracts";
 import { jobExecutors } from "../../convex/platform/executors";
 import { echoExecutor } from "../../convex/platform/echo";
-import { analyzeChangePlanExecutor } from "../../convex/platform/pipeline";
 
 describe("convex executor composition", () => {
-  it("registers exactly the platform mechanical executors plus the B3/D6 appends", () => {
+  it("registers exactly the implemented executors (platform + B3 + D6 + E3 lanes)", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
       [
         "platform.echo_delivery",
@@ -23,10 +22,14 @@ describe("convex executor composition", () => {
         // D6's sanctioned append (issue #34 owns per-segment STT; the
         // contracts amendment registering the kind is flagged there).
         "processing.transcribe_segment",
+
+        // E3's sanctioned append (issue #37 owns the text-analysis lane:
+        // the mechanical A3 analyze executor is replaced behind the same
+        // seam by the real workflow, and the extract edge is implemented).
+        "processing.extract_fragments",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");
-    expect(analyzeChangePlanExecutor.jobKind).toBe("processing.analyze_change_plan");
   });
 
   it("every registered kind exists in the A2/A3 registry executor table", () => {

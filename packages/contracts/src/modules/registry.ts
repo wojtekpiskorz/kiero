@@ -118,9 +118,19 @@ export const reconcileOutcomeInput = Schema.Struct({
   lastKnownOutcome: CalendarRemoteOutcome,
 });
 
+/**
+ * E3 amendment (issue #37): the drain projects `sources.sourceAccepted`
+ * onto this input, but the certified D1 payload carries no `extractionId`
+ * (the acceptance transaction registers the extract job itself with the
+ * real id). The id is therefore nullable: `null` means "resolve the
+ * source's text extraction in-company" (exactly one exists per D1 source),
+ * and the drain's registration collapses onto the publisher's row anyway
+ * through the shared dedup key. The B3 precedent for input-shape
+ * amendments made by the edge-owning lane.
+ */
 export const extractFragmentsInput = Schema.Struct({
   sourceId: tableIdSchema("sources"),
-  extractionId: tableIdSchema("extractions"),
+  extractionId: Schema.NullOr(tableIdSchema("extractions")),
 });
 
 export const analyzeChangePlanInput = Schema.Struct({

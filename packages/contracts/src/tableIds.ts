@@ -85,6 +85,10 @@ export const TABLE_ID_NAMES = [
   "tasks",
   "checklistItems",
   "events",
+  // C4 amendment (flagged, I2 precedent): the immutable change history of
+  // tasks, checklist items and events — actor, time and evidence basis per
+  // change (issue #27 acceptance: "immutable history").
+  "workRevisions",
   // platform (durable execution + outbox)
   "processingRuns",
   "processingSteps",

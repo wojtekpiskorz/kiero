@@ -2,33 +2,34 @@
  * The durable processing pipeline (A3): @convex-dev/workflow, the one
  * canonical workflow engine, composed with the native scheduler.
  *
- * `processing.analyze_change_plan` is the registered job kind whose
- * mechanical execution the platform owns in this proof window: the run row
- * and the workflow are created in ONE transaction (the executor runs inside
- * the durable job's mutation), each stage records a `processingSteps` row
- * idempotently (insert-if-absent on the run+sequence index) and computes its
- * payload with Effect 4 RC, and `onComplete` records the terminal outcome on
- * both the job and the run. No provider call and no business memory write
- * happens here: lanes D6/E2/E3 replace the stage computations behind the
- * same seam.
+ * What remains here is the platform's OWN mechanical proof workflow
+ * (`processingPipeline`, driven by the guarded probes): the run row and the
+ * workflow are created in ONE transaction, each stage records a
+ * `processingSteps` row idempotently (insert-if-absent on the run+sequence
+ * index) and computes its payload with Effect 4 RC, and `onComplete`
+ * records the terminal outcome on both the job and the run. No provider
+ * call and no business memory write happens here.
  *
  * Crash/restart semantics proved here (P06 at platform level): a workflow
  * whose stage N fails deterministically leaves stages 1..N-1 committed
  * exactly once; restarting from the journal resumes AFTER them without
- * re-executing committed stages, verified by counting step rows.
+ * re-executing committed stages, verified by counting step rows. The
+ * `WorkflowManager` instance this module owns also powers E3's real
+ * text-analysis workflow (convex/processing/text/analyze.ts), which
+ * replaced the mechanical executor for `processing.analyze_change_plan`
+ * behind the same seam.
  */
 
-import { Effect, Schema } from "effect";
+import { Effect } from "effect";
 import { v } from "convex/values";
 import { WorkflowManager, start, vResultValidator, type WorkflowId } from "@convex-dev/workflow";
-import { analyzeChangePlanInput, okResult } from "@kiero/contracts";
+import { okResult } from "@kiero/contracts";
 import type { ResultEnvelope } from "@kiero/contracts";
 import { components } from "../_generated/api";
 import { internalMutation, internalAction, internalQuery } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import type { JobExecutor, JobOutcome } from "./executors";
 
 /** The one workflow manager instance (component installed in convex.config.ts). */
 export const workflow = new WorkflowManager(components.workflow);
@@ -37,7 +38,6 @@ const PIPELINE_VERSION = "a3-mechanical-1";
 const PROMPT_VERSION = "a3-none";
 const SCHEMA_VERSION = "a3-1";
 const MODEL_CONFIGURATION_VERSION = "a3-none";
-const PROOF_STAGE_COUNT = 3;
 /** Sequence base for failure-marker step rows (kept outside 1..N). */
 const FAILURE_MARKER_BASE = 10_000;
 
@@ -346,31 +346,3 @@ async function disarmFailureMarker(
     await ctx.db.delete(marker._id);
   }
 }
-
-/** The registered executor for `processing.analyze_change_plan`. */
-export const analyzeChangePlanExecutor: JobExecutor = {
-  jobKind: "processing.analyze_change_plan",
-  execute: async (ctx, job, input) => {
-    // Decode authority: the registry executor schema for this kind.
-    const decoded = Schema.decodeUnknownSync(analyzeChangePlanInput)(input);
-    // The run row already exists (created by the operation that published
-    // the reanalysis event); the workflow starts atomically in this job's
-    // transaction and completes it via onComplete. `normalizeId` is the
-    // runtime id well-formedness check the A2 contracts deferred to A3.
-    const runId = ctx.db.normalizeId("processingRuns", decoded.processingRunId);
-    if (runId === null) {
-      return { outcome: "failed", errorKind: "processing_run_id_invalid", retryable: false };
-    }
-    await start(
-      ctx,
-      internal.platform.pipeline.processingPipeline,
-      { jobKey: job.jobKey, runId, stageCount: PROOF_STAGE_COUNT },
-      {
-        onComplete: internal.platform.pipeline.completeAnalysis,
-        context: { jobKey: job.jobKey, runId },
-        startAsync: true,
-      },
-    );
-    return { outcome: "delegated" } satisfies JobOutcome;
-  },
-};

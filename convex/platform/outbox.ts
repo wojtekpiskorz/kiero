@@ -70,6 +70,24 @@ export function projectEventToJobInput(
       },
     };
   }
+  // E3 registration (issue #37 owns this edge's projection): an accepted
+  // source drains into `processing.extract_fragments`. The certified D1
+  // payload carries no extractionId (the acceptance transaction already
+  // registered the job itself, with the real id, under the SAME dedup
+  // key), so the projection hands `null` and the executor resolves the
+  // source's text extraction in-company; the registration collapses onto
+  // the publisher's row through the shared dedup identity.
+  if (edge.jobKind === "processing.extract_fragments") {
+    return {
+      kind: "job",
+      jobKind: edge.jobKind,
+      input: {
+        sourceId: payload.sourceId,
+        extractionId: payload.extractionId ?? null,
+      },
+      dedupKey: rowDedupKey,
+    };
+  }
   // B3 registration (issue #22 owns the declared consumer proof): the two
   // access-revocation edges project onto `access.cleanup_revocation`. The
   // membership payload carries its revocation instant and the successor

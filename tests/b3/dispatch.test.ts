@@ -299,9 +299,11 @@ describe("the declared consumer edge (access revocation drains durably)", () => 
   });
 
   it("leaves events without a registered edge undelivered by consumers", () => {
-    expect(projectEventToJobInput("sources.sourceAccepted", {}, "d")).toEqual({
+    // E3 owns the sources.sourceAccepted projection now; the still-
+    // unprojected example is C5's recomputation edge.
+    expect(projectEventToJobInput("memory.dependentsMarkedStale", {}, "d")).toEqual({
       kind: "unprojected_edge",
-      jobKind: "processing.extract_fragments",
+      jobKind: "memory.recompute_dependents",
     });
   });
 });

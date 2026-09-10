@@ -111,6 +111,11 @@ import type * as processing_audio_media from "../processing/audio/media.js";
 import type * as processing_audio_orders from "../processing/audio/orders.js";
 import type * as processing_audio_probe from "../processing/audio/probe.js";
 import type * as processing_audio_segmentation from "../processing/audio/segmentation.js";
+import type * as processing_text_analysisContext from "../processing/text/analysisContext.js";
+import type * as processing_text_analyze from "../processing/text/analyze.js";
+import type * as processing_text_extract from "../processing/text/extract.js";
+import type * as processing_text_journal from "../processing/text/journal.js";
+import type * as processing_text_probe from "../processing/text/probe.js";
 import type * as projects_dispatch from "../projects/dispatch.js";
 import type * as projects_functions from "../projects/functions.js";
 import type * as projects_operations from "../projects/operations.js";
@@ -132,6 +137,13 @@ import type * as sources_uploads_http from "../sources/uploads/http.js";
 import type * as sources_uploads_ledger from "../sources/uploads/ledger.js";
 import type * as sources_uploads_probe from "../sources/uploads/probe.js";
 import type * as sources_uploads_protocol from "../sources/uploads/protocol.js";
+import type * as work_dispatch from "../work/dispatch.js";
+import type * as work_functions from "../work/functions.js";
+import type * as work_operations from "../work/operations.js";
+import type * as work_policy from "../work/policy.js";
+import type * as work_probe from "../work/probe.js";
+import type * as work_read from "../work/read.js";
+import type * as work_references from "../work/references.js";
 
 import type {
   ApiFromModules,
@@ -243,6 +255,11 @@ declare const fullApi: ApiFromModules<{
   "processing/audio/orders": typeof processing_audio_orders;
   "processing/audio/probe": typeof processing_audio_probe;
   "processing/audio/segmentation": typeof processing_audio_segmentation;
+  "processing/text/analysisContext": typeof processing_text_analysisContext;
+  "processing/text/analyze": typeof processing_text_analyze;
+  "processing/text/extract": typeof processing_text_extract;
+  "processing/text/journal": typeof processing_text_journal;
+  "processing/text/probe": typeof processing_text_probe;
   "projects/dispatch": typeof projects_dispatch;
   "projects/functions": typeof projects_functions;
   "projects/operations": typeof projects_operations;
@@ -264,6 +281,13 @@ declare const fullApi: ApiFromModules<{
   "sources/uploads/ledger": typeof sources_uploads_ledger;
   "sources/uploads/probe": typeof sources_uploads_probe;
   "sources/uploads/protocol": typeof sources_uploads_protocol;
+  "work/dispatch": typeof work_dispatch;
+  "work/functions": typeof work_functions;
+  "work/operations": typeof work_operations;
+  "work/policy": typeof work_policy;
+  "work/probe": typeof work_probe;
+  "work/read": typeof work_read;
+  "work/references": typeof work_references;
 }>;
 
 /**
