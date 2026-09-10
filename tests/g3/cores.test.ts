@@ -25,6 +25,8 @@ import {
   KIERO_SEMANTIC_PROPERTY,
   MAX_CREATE_ATTEMPTS,
   OBSERVATION_REFRESH_MS,
+  attemptOutcomeOfMutation as attemptOutcomeOfMutationFn,
+  attemptOutcomeOfObservation as attemptOutcomeOfObservationFn,
   attemptStillWanted,
   canonicalJson,
   createEventBody,
@@ -39,6 +41,11 @@ import {
   type CopySyncView,
   type ObservedEvent,
 } from "../../convex/calendar/sync/cores";
+
+const mappers = {
+  attemptOutcomeOfMutation: attemptOutcomeOfMutationFn,
+  attemptOutcomeOfObservation: attemptOutcomeOfObservationFn,
+};
 
 const CONNECTION: ConnectionSyncView = {
   state: "connected",
@@ -574,6 +581,33 @@ describe("convergence on idempotent replays", () => {
   });
 });
 
+describe("the attempt-outcome mappers (exhaustive by construction)", () => {
+  it("maps every mutation report onto the attempt vocabulary", () => {
+    const { attemptOutcomeOfMutation } = mappers;
+    expect(attemptOutcomeOfMutation({ kind: "applied", eventId: "e" })).toBe("succeeded");
+    expect(attemptOutcomeOfMutation({ kind: "applied" })).toBe("succeeded");
+    expect(attemptOutcomeOfMutation({ kind: "gone" })).toBe("succeeded");
+    expect(attemptOutcomeOfMutation({ kind: "definitely_failed" })).toBe("failed");
+    expect(attemptOutcomeOfMutation({ kind: "calendar_gone" })).toBe("failed");
+    expect(attemptOutcomeOfMutation({ kind: "unknown" })).toBe("unknown");
+  });
+
+  it("maps every observation result onto the attempt vocabulary", () => {
+    const { attemptOutcomeOfObservation } = mappers;
+    expect(
+      attemptOutcomeOfObservation({
+        kind: "present",
+        eventId: "e",
+        status: "confirmed",
+        managed: managedFieldsOf(payload("A")),
+      }),
+    ).toBe("succeeded");
+    expect(attemptOutcomeOfObservation({ kind: "empty" })).toBe("succeeded");
+    expect(attemptOutcomeOfObservation({ kind: "calendar_gone" })).toBe("failed");
+    expect(attemptOutcomeOfObservation({ kind: "unknown" })).toBe("unknown");
+  });
+});
+
 describe("the stale-attempt guard", () => {
   const basis = {
     semanticId: "sem",
@@ -581,7 +615,6 @@ describe("the stale-attempt guard", () => {
     desiredState: "projected" as const,
     hidden: false,
     payloadHash: canonicalJson(payload("A")),
-    remoteOutcome: "unknown" as const,
   };
 
   it("accepts an unchanged basis", () => {

@@ -25,9 +25,14 @@
 
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
-import { shared } from "../../schema/shared";
+import { shared, type ValueValidator } from "../../schema/shared";
 
-/** The external leg kinds one attempt can be (one bounded call each). */
+/**
+ * The external leg kinds one attempt can be (one bounded call each). The
+ * single spelling of the vocabulary: the row validators below are BUILT
+ * from this list, so a kind added here flows into the schema and drift
+ * fails typecheck instead of dropping out of a hand-copied union.
+ */
 export const SYNC_LEG_KINDS = [
   "create",
   "update",
@@ -40,7 +45,8 @@ export type SyncLegKind = (typeof SYNC_LEG_KINDS)[number];
 /**
  * A leg's outcome — the A3 `ExternalOutcome` vocabulary, PINNED by type to
  * @kiero/runtime so the attempt rows and the durable-job outcome columns
- * can never disagree about what "uncertain" means.
+ * can never disagree about what "uncertain" means. The row validator is
+ * built from this list.
  */
 export const SYNC_ATTEMPT_OUTCOMES = [
   "succeeded",
@@ -49,6 +55,18 @@ export const SYNC_ATTEMPT_OUTCOMES = [
   "unknown",
 ] as const;
 export type SyncAttemptOutcome = (typeof SYNC_ATTEMPT_OUTCOMES)[number];
+
+/**
+ * One closed string vocabulary's validator, built from its constant list
+ * (no cast: the annotation is a real pin — widening the literals would
+ * fail typecheck here, not silently widen the row type).
+ */
+function vocabularyOf<T extends string>(kinds: readonly T[]): ValueValidator<T> {
+  return v.union(...kinds.map((kind) => v.literal(kind)));
+}
+
+const syncLegKindValue = vocabularyOf(SYNC_LEG_KINDS);
+const syncAttemptOutcomeValue = vocabularyOf(SYNC_ATTEMPT_OUTCOMES);
 
 export const calendarSyncTables = {
   /**
@@ -62,21 +80,10 @@ export const calendarSyncTables = {
     copyId: shared.calendarCopyId,
     /** The semantic id the leg targeted (an account switch re-mints it). */
     semanticId: v.string(),
-    legKind: v.union(
-      v.literal("create"),
-      v.literal("update"),
-      v.literal("delete"),
-      v.literal("observe_get"),
-      v.literal("observe_list"),
-    ),
+    legKind: syncLegKindValue,
     /** The machine decision that fired the leg (audit/diagnostics only). */
     decisionReason: v.string(),
-    outcome: v.union(
-      v.literal("succeeded"),
-      v.literal("failed"),
-      v.literal("timeout"),
-      v.literal("unknown"),
-    ),
+    outcome: syncAttemptOutcomeValue,
     /** Sanitized closed error kind of the failure, when there was one. */
     errorKind: v.optional(v.string()),
     /** The desire basis the leg derived from (the stale-attempt guard). */

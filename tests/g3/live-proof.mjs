@@ -387,7 +387,11 @@ const connH = connBySubject(1);
 const connT = connBySubject(2);
 const connG = connBySubject(3);
 const connR = connBySubject(4);
-row("connections", [connH, connT, connG, connG, connR].filter(Boolean).length + " of 4 resolved");
+row(
+  "connections",
+  new Set([connH, connT, connG, connR].filter(Boolean).map((c) => c.connectionId)).size +
+    " of 4 resolved",
+);
 
 // --- Phase 1: the first sync pass ---------------------------------------------
 

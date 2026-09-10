@@ -32,7 +32,6 @@ describe("convex executor composition", () => {
         // seam by the real workflow, and the extract edge is implemented).
         "processing.extract_fragments",
 
-
         // C5's sanctioned append (issue #28 owns the recomputation lane).
         "memory.recompute_dependents",
         // G3's sanctioned append (issue #47 owns the declared consumer

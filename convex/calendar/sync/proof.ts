@@ -184,18 +184,3 @@ export const g3ProofReconcileCopy = action({
   },
 });
 
-/** One explicit reconciliation attempt through the REAL runner (proof). */
-export const runOneForProof = action({
-  args: { copyId: v.id("calendarCopies") },
-  handler: async (ctx, args): Promise<ResultEnvelope> => {
-    if (!guardEnabled()) {
-      return disabled();
-    }
-    return okResult(
-      await ctx.runAction(internal.calendar.sync.functions.runOneAttemptPublic, {
-        copyId: args.copyId,
-        forceObservation: true,
-      }),
-    );
-  },
-});

@@ -689,6 +689,47 @@ export function observationFromMutation(
 }
 
 // ---------------------------------------------------------------------------
+// Attempt-outcome words (exhaustive mappings over the report families).
+// ---------------------------------------------------------------------------
+
+/**
+ * The attempt-outcome word one MUTATION report implies (the A3
+ * `ExternalOutcome` vocabulary: a definite answer — applied, or the
+ * idempotent 404 — is a completed leg; a refused or access-lost shape is
+ * a failure; only `unknown` is uncertain). Exhaustive by construction: a
+ * new report kind fails this switch at compile time.
+ */
+export function attemptOutcomeOfMutation(
+  report: MutationReport,
+): "succeeded" | "failed" | "unknown" {
+  switch (report.kind) {
+    case "applied":
+    case "gone":
+      return "succeeded";
+    case "definitely_failed":
+    case "calendar_gone":
+      return "failed";
+    case "unknown":
+      return "unknown";
+  }
+}
+
+/** The attempt-outcome word one OBSERVATION result implies. */
+export function attemptOutcomeOfObservation(
+  observation: ObservationResult,
+): "succeeded" | "failed" | "unknown" {
+  switch (observation.kind) {
+    case "present":
+    case "empty":
+      return "succeeded";
+    case "calendar_gone":
+      return "failed";
+    case "unknown":
+      return "unknown";
+  }
+}
+
+// ---------------------------------------------------------------------------
 // The stale-attempt guard (acceptance side).
 // ---------------------------------------------------------------------------
 
@@ -699,7 +740,6 @@ export interface AttemptBasis {
   readonly desiredState: "projected" | "withdrawn";
   readonly hidden: boolean;
   readonly payloadHash: string | null;
-  readonly remoteOutcome: RemoteOutcome;
 }
 
 /** The current view the completion re-reads. */

@@ -27,12 +27,15 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { publishEvent } from "../../platform/publish";
 import { earliestActiveCompanyId } from "../connection/operations";
 import {
+  attemptStillWanted,
   decideMutationTransition,
   decideObservationTransition,
   observationFromMutation,
   canonicalJson,
   decideCopyLeg,
   type AbsenceContext,
+  type AttemptBasis,
+  type CompletionView,
   type AttemptStats,
   type ConnectionSyncView,
   type CopySyncView,
@@ -46,6 +49,7 @@ import {
   type SyncSuspensionReason,
 } from "./cores";
 import type { DesiredGoogleEvent } from "@kiero/domain";
+import type { ValueValidator } from "../../schema/shared";
 
 // ---------------------------------------------------------------------------
 // Row plumbing.
@@ -276,10 +280,52 @@ export const prepareCopyAttempt = internalMutation({
 // Complete: record the outcome, apply the transition, publish the change.
 // ---------------------------------------------------------------------------
 
-/** The leg result the action runner reports (protocol outcomes mapped). */
+/** The leg result the action runner reports (the protocol's outcomes). */
 export type LegResult =
   | { readonly kind: "observation"; readonly observation: ObservationResult }
-  | { readonly kind: "mutation"; readonly report: MutationReport; readonly eventId?: string };
+  | {
+      readonly kind: "mutation";
+      readonly report: MutationReport;
+      readonly eventId?: string | undefined;
+    };
+
+/**
+ * The LegResult argument validator, built from the same shapes the pure
+ * cores consume (G1's completeCallbackTransaction standard: no `v.any()`,
+ * no cast — the transition and hide detection run on VALIDATED input).
+ */
+const legResultValue: ValueValidator<LegResult> = v.union(
+  v.object({
+    kind: v.literal("observation"),
+    observation: v.union(
+      v.object({
+        kind: v.literal("present"),
+        eventId: v.string(),
+        status: v.union(v.literal("confirmed"), v.literal("cancelled")),
+        managed: v.object({
+          summary: v.string(),
+          description: v.string(),
+          start: v.object({ date: v.optional(v.string()), dateTime: v.optional(v.string()) }),
+          end: v.object({ date: v.optional(v.string()), dateTime: v.optional(v.string()) }),
+        }),
+      }),
+      v.object({ kind: v.literal("empty") }),
+      v.object({ kind: v.literal("calendar_gone") }),
+      v.object({ kind: v.literal("unknown") }),
+    ),
+  }),
+  v.object({
+    kind: v.literal("mutation"),
+    report: v.union(
+      v.object({ kind: v.literal("applied"), eventId: v.optional(v.string()) }),
+      v.object({ kind: v.literal("gone") }),
+      v.object({ kind: v.literal("calendar_gone") }),
+      v.object({ kind: v.literal("definitely_failed") }),
+      v.object({ kind: v.literal("unknown") }),
+    ),
+    eventId: v.optional(v.string()),
+  }),
+);
 
 /** What the completion recorded (for the runner's/job's own state). */
 export interface CompletionRecord {
@@ -291,24 +337,32 @@ export interface CompletionRecord {
 }
 
 /**
- * The stale-attempt guard (pure half, exported for tests): the durable
- * basis columns on the attempt row versus the copy row as it reads NOW. A
- * job that went stale (a newer correction, withdrawal, hide or restore
- * landed while its external call was in flight) may still record its
- * LEDGER FACTS but never its desire-derived effects (hide detection).
+ * The stale-attempt guard's row adapters: the durable basis columns on
+ * the attempt row and the copy row as it reads NOW, mapped onto the pure
+ * module's types. The ONE comparison lives in cores (`attemptStillWanted`,
+ * unit-pinned there); a job that went stale (a newer correction,
+ * withdrawal, hide or restore landed while its external call was in
+ * flight) may still record its LEDGER FACTS but never its desire-derived
+ * effects (hide detection).
  */
-export function attemptBasisMatches(
-  attempt: Pick<Doc<"calendarSyncAttempts">, "semanticId" | "desiredRevisionId" | "desiredState" | "hiddenBasis" | "desiredPayloadHash">,
-  copy: Doc<"calendarCopies">,
-): boolean {
-  return (
-    attempt.semanticId === copy.semanticId &&
-    attempt.desiredRevisionId === copy.desiredRevisionId &&
-    attempt.desiredState === copy.desiredState &&
-    attempt.hiddenBasis === copy.hidden &&
-    (attempt.desiredPayloadHash ?? null) ===
-      (copy.payload === undefined ? null : canonicalJson(copy.payload))
-  );
+function attemptBasisOfRow(attempt: Doc<"calendarSyncAttempts">): AttemptBasis {
+  return {
+    semanticId: attempt.semanticId,
+    desiredRevisionId: attempt.desiredRevisionId,
+    desiredState: attempt.desiredState,
+    hidden: attempt.hiddenBasis,
+    payloadHash: attempt.desiredPayloadHash ?? null,
+  };
+}
+
+function completionViewOfRow(copy: Doc<"calendarCopies">): CompletionView {
+  return {
+    semanticId: copy.semanticId,
+    desiredRevisionId: copy.desiredRevisionId,
+    desiredState: copy.desiredState,
+    hidden: copy.hidden,
+    payloadHash: copy.payload === undefined ? null : canonicalJson(copy.payload),
+  };
 }
 
 export const completeCopyAttempt = internalMutation({
@@ -321,7 +375,7 @@ export const completeCopyAttempt = internalMutation({
       v.literal("unknown"),
     ),
     errorKind: v.optional(v.string()),
-    result: v.any(),
+    result: legResultValue,
   },
   handler: async (ctx, args): Promise<CompletionRecord | null> => {
     const attempt = await ctx.db
@@ -340,11 +394,11 @@ export const completeCopyAttempt = internalMutation({
       });
       return null;
     }
-    const result = args.result as LegResult;
+    const result: LegResult = args.result;
     const nowMs = Date.now();
     const view = copySyncView(copy);
     const facts = await attemptFactsOf(ctx.db, copy);
-    const stale = !attemptBasisMatches(attempt, copy);
+    const stale = !attemptStillWanted(attemptBasisOfRow(attempt), completionViewOfRow(copy));
 
     let googleEventId: string | null = copy.googleEventId ?? null;
     let remoteOutcome: RemoteOutcome = copy.remoteOutcome;

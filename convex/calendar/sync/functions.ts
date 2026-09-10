@@ -40,11 +40,14 @@ import { earliestActiveCompanyId } from "../connection/operations";
 import {
   createCalendarEvent,
   deleteCalendarEvent,
-  getCalendarEvent,
   listEventsBySemanticId,
-  managedFieldsOfBody,
+  observeEventById,
   updateCalendarEvent,
 } from "./protocol";
+import {
+  attemptOutcomeOfMutation,
+  attemptOutcomeOfObservation,
+} from "./cores";
 import type { LegResult } from "./operations";
 import { dispatchCalendarSyncCommand } from "./dispatch";
 
@@ -202,144 +205,67 @@ async function runOneAttempt(
   };
   switch (leg.leg) {
     case "create": {
-      const answer = await createCalendarEvent({ ...base, body: leg.body });
-      const result: LegResult =
-        answer.kind === "created"
-          ? { kind: "mutation", report: { kind: "applied", eventId: answer.eventId }, eventId: answer.eventId }
-          : answer.kind === "unknown"
-            ? { kind: "mutation", report: { kind: "unknown" } }
-            : answer.kind === "calendar_gone"
-              ? { kind: "mutation", report: { kind: "calendar_gone" } }
-              : answer.kind === "definitely_failed"
-                ? { kind: "mutation", report: { kind: "definitely_failed" } }
-                : { kind: "mutation", report: { kind: "gone" } };
-      return await finishAttempt(ctx, prepared.attemptDedupKey, answer.kind, result);
+      const report = await createCalendarEvent({ ...base, body: leg.body });
+      return await finishAttempt(ctx, prepared.attemptDedupKey, {
+        kind: "mutation",
+        report,
+        ...(report.kind === "applied" && report.eventId !== undefined
+          ? { eventId: report.eventId }
+          : {}),
+      });
     }
     case "update": {
-      const answer = await updateCalendarEvent({ ...base, eventId: leg.eventId, body: leg.body });
-      const result: LegResult =
-        answer.kind === "applied"
-          ? { kind: "mutation", report: { kind: "applied" } }
-          : answer.kind === "gone"
-            ? { kind: "mutation", report: { kind: "gone" } }
-            : answer.kind === "calendar_gone"
-              ? { kind: "mutation", report: { kind: "calendar_gone" } }
-              : answer.kind === "definitely_failed"
-                ? { kind: "mutation", report: { kind: "definitely_failed" } }
-                : { kind: "mutation", report: { kind: "unknown" } };
-      return await finishAttempt(ctx, prepared.attemptDedupKey, answer.kind, result);
+      const report = await updateCalendarEvent({ ...base, eventId: leg.eventId, body: leg.body });
+      return await finishAttempt(ctx, prepared.attemptDedupKey, { kind: "mutation", report });
     }
     case "delete": {
-      const answer = await deleteCalendarEvent({ ...base, eventId: leg.eventId });
-      const result: LegResult =
-        answer.kind === "applied"
-          ? { kind: "mutation", report: { kind: "applied" } }
-          : answer.kind === "gone"
-            ? { kind: "mutation", report: { kind: "gone" } }
-            : answer.kind === "calendar_gone"
-              ? { kind: "mutation", report: { kind: "calendar_gone" } }
-              : answer.kind === "definitely_failed"
-                ? { kind: "mutation", report: { kind: "definitely_failed" } }
-                : { kind: "mutation", report: { kind: "unknown" } };
-      return await finishAttempt(ctx, prepared.attemptDedupKey, answer.kind, result);
+      const report = await deleteCalendarEvent({ ...base, eventId: leg.eventId });
+      return await finishAttempt(ctx, prepared.attemptDedupKey, { kind: "mutation", report });
     }
     case "observe_get": {
-      const answer = await getCalendarEvent({ ...base, eventId: leg.eventId });
-      if (answer.kind === "present") {
-        return await finishAttempt(
-          ctx,
-          prepared.attemptDedupKey,
-          "present",
-          observationResultOf(answer.kind, answer.eventId, answer.status, managedFieldsOfBody(answer.body)),
-        );
-      }
-      if (answer.kind === "gone") {
-        // 404 ambiguity: ONE bounded disambiguating read (a list cannot
-        // duplicate an effect). Calendar answers -> the event is gone;
-        // calendar 404s -> calendar_access_lost.
-        const list = await listEventsBySemanticId({
-          ...base,
-          semanticId: prepared.semanticId,
-        });
-        return await finishAttempt(
-          ctx,
-          prepared.attemptDedupKey,
-          list.kind === "unknown" ? "unknown" : "list_" + list.kind,
-          list.kind === "present"
-            ? observationResultOf("present", list.eventId, list.status, managedFieldsOfBody(list.body))
-            : { kind: "observation", observation: { kind: list.kind === "empty" ? "empty" : list.kind === "calendar_gone" ? "calendar_gone" : "unknown" } },
-        );
-      }
-      return await finishAttempt(
-        ctx,
-        prepared.attemptDedupKey,
-        answer.kind,
-        { kind: "observation", observation: { kind: answer.kind === "calendar_gone" ? "calendar_gone" : "unknown" } },
-      );
+      // The 404 ambiguity (event gone vs calendar gone) is resolved inside
+      // the protocol by ONE bounded disambiguating list read.
+      const observation = await observeEventById({
+        ...base,
+        eventId: leg.eventId,
+        semanticId: prepared.semanticId,
+      });
+      return await finishAttempt(ctx, prepared.attemptDedupKey, {
+        kind: "observation",
+        observation,
+      });
     }
     case "observe_list": {
-      const answer = await listEventsBySemanticId({ ...base, semanticId: leg.semanticId });
-      const result: LegResult =
-        answer.kind === "present"
-          ? {
-              kind: "observation",
-              observation: {
-                kind: "present",
-                eventId: answer.eventId,
-                status: answer.status,
-                managed: managedFieldsOfBody(answer.body),
-              },
-            }
-          : { kind: "observation", observation: { kind: answer.kind === "empty" ? "empty" : answer.kind === "calendar_gone" ? "calendar_gone" : "unknown" } };
-      return await finishAttempt(ctx, prepared.attemptDedupKey, answer.kind, result);
+      const observation = await listEventsBySemanticId({
+        ...base,
+        semanticId: leg.semanticId,
+      });
+      return await finishAttempt(ctx, prepared.attemptDedupKey, {
+        kind: "observation",
+        observation,
+      });
     }
   }
 }
 
-/** Narrows a protocol observation into the cores' observation result. */
-function observationResultOf(
-  _kind: "present",
-  eventId: string,
-  status: "confirmed" | "cancelled",
-  managed: ReturnType<typeof managedFieldsOfBody>,
-): LegResult {
-  return { kind: "observation", observation: { kind: "present", eventId, status, managed } };
-}
-
-/** Maps the protocol's outcome kind onto the attempt vocabulary. */
-function attemptOutcomeOf(protocolKind: string): "succeeded" | "failed" | "unknown" | "timeout" {
-  if (
-    protocolKind === "created" ||
-    protocolKind === "applied" ||
-    protocolKind === "present" ||
-    protocolKind === "empty" ||
-    protocolKind.startsWith("list_empty") ||
-    protocolKind.startsWith("list_present") ||
-    protocolKind.startsWith("list_calendar_gone")
-  ) {
-    return "succeeded";
-  }
-  if (protocolKind === "unknown" || protocolKind.startsWith("list_unknown")) {
-    return "unknown";
-  }
-  if (protocolKind === "timeout") {
-    return "timeout";
-  }
-  return "failed";
-}
-
+/**
+ * Records one leg's outcome: the attempt-outcome word comes from the
+ * cores' exhaustive mappers, and an uncertain leg carries its sanitized
+ * error kind (the platform's blind-retry block reads the row).
+ */
 async function finishAttempt(
   ctx: ActionCtx,
   attemptDedupKey: string,
-  protocolKind: string,
   result: LegResult,
 ): Promise<OneAttemptOutcome> {
-  const outcome = attemptOutcomeOf(protocolKind);
+  const outcome =
+    result.kind === "mutation"
+      ? attemptOutcomeOfMutation(result.report)
+      : attemptOutcomeOfObservation(result.observation);
   const completion = await ctx.runMutation(internal.calendar.sync.operations.completeCopyAttempt, {
     attemptDedupKey,
     outcome,
     ...(outcome === "unknown" ? { errorKind: "external_uncertain" } : {}),
-    ...(outcome === "timeout" ? { errorKind: "external_timeout" } : {}),
     result,
   });
   return {
