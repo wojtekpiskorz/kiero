@@ -8,7 +8,18 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { performStartIndexGeneration } from "../../convex/search/generations";
+import { performStartIndexGeneration, STALE_BUILD_JOB_MS } from "../../convex/search/generations";
+import { EMBED_HEARTBEAT_BATCH } from "../../convex/search/executor";
+import { EMBEDDING_ATTEMPT_DEADLINE_MS } from "@kiero/providers";
+
+describe("the liveness arithmetic (heartbeat vs staleness window)", () => {
+  it("keeps a heartbeating pass inside the window even at the worst per-attempt deadline", () => {
+    // The liveness guarantee is this inequality: two full batches at the
+    // worst-case per-attempt deadline must stay under the staleness
+    // window, or a live whole-corpus pass gets retired again (round 2).
+    expect(EMBED_HEARTBEAT_BATCH * EMBEDDING_ATTEMPT_DEADLINE_MS * 2).toBeLessThan(STALE_BUILD_JOB_MS);
+  });
+});
 import { asTx, fakeCtx } from "../d2/harness";
 
 let ctx: ReturnType<typeof fakeCtx>;

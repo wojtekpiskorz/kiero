@@ -263,10 +263,11 @@ export const heartbeatJob = internalMutation({
  * legitimately outlasts the staleness window keeps proving liveness while
  * it makes progress. A batch's worst case (16 x the 30 s per-attempt
  * embedding deadline, @kiero/providers routing) stays under half the
- * 15-minute window, so a live pass can never look stale between
- * heartbeats.
+ * 15-minute window (14 x 30s = 420s < 450s; the exact inequality is
+ * pinned in tests/j2/stale-generation.test.ts), so a live pass can
+ * never look stale between heartbeats.
  */
-const EMBED_HEARTBEAT_BATCH = 16;
+export const EMBED_HEARTBEAT_BATCH = 14;
 
 /** The external embedding pass and batch record (the scheduled action). */
 export const runIndexPass = internalAction({

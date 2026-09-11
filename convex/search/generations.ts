@@ -52,7 +52,7 @@ const BUILD_RETRY_POLICY = { maxAttempts: 3, backoffBaseMs: 2_000 } as const;
  * build; the batch size is chosen so a live pass's worst inter-heartbeat
  * gap stays under half that window.
  */
-const STALE_BUILD_JOB_MS = 15 * 60 * 1000;
+export const STALE_BUILD_JOB_MS = 15 * 60 * 1000;
 
 async function retireInterruptedBuilding(
   tx: MutationCtx,
