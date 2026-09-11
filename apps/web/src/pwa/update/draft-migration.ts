@@ -18,8 +18,12 @@
  */
 
 /** Mirrors D4's private DB/store names; tests/i7 drift-guard both. */
+// The mirrored D4 constants (round 2): the migration opens the SAME
+// database D4's composer owns, so the name, store and version drift-guard
+// against apps/web/src/storage/drafts/store.ts (its DB_NAME/STORE/DB_VERSION).
 export const DRAFTS_DB_NAME = "kiero-drafts";
 export const DRAFTS_STORE_NAME = "entries";
+export const DRAFTS_DB_VERSION = 1;
 /** Every draft metadata record key ends with this suffix (D4's convention). */
 export const DRAFT_KEY_SUFFIX = "#draft";
 
@@ -51,10 +55,14 @@ export interface MigrationIdbTransaction {
 
 export interface MigrationIdbDatabase {
   transaction(stores: string[], mode: "readonly" | "readwrite"): MigrationIdbTransaction;
+  /** The probe surface (round 2): presence, version and teardown. */
+  readonly objectStoreNames?: { contains(name: string): boolean };
+  readonly version?: number;
+  close?(): void;
 }
 
 export interface MigrationIdbFactory {
-  open(name: string, version: number): MigrationIdbRequest;
+  open(name: string, version?: number): MigrationIdbRequest;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,8 +199,14 @@ export async function migrateBrowserDraftStore(
     };
   }
   return new Promise<DraftMigrationReport>((resolve) => {
-    const openRequest = idb.open(DRAFTS_DB_NAME, 1);
-    openRequest.onerror = () => {
+    // Probe first (round 2): opening a nonexistent database at version 1
+    // would CREATE it empty (without the store), making the transaction
+    // below throw inside onsuccess with the promise forever unsettled -
+    // and poisoning the profile for D4's own open (its onupgradeneeded
+    // never fires on the now-existing version-1 database). A database
+    // that does not exist simply has no drafts to migrate.
+    const probeRequest = idb.open(DRAFTS_DB_NAME);
+    probeRequest.onerror = () => {
       resolve({
         status: "store-unavailable",
         draftRecords: 0,
@@ -202,26 +216,70 @@ export async function migrateBrowserDraftStore(
         problems: ["indexeddb open failed"],
       });
     };
-    openRequest.onsuccess = () => {
-      const database = openRequest.result as MigrationIdbDatabase;
-      const readTx = database.transaction([DRAFTS_STORE_NAME], "readonly");
-      const keysRequest = readTx.objectStore(DRAFTS_STORE_NAME).getAllKeys();
-      readTx.onerror = () => {
+    probeRequest.onsuccess = () => {
+      const probed = probeRequest.result as MigrationIdbDatabase & { version?: number };
+      const storeMissing =
+        probed.objectStoreNames === undefined ||
+        !probed.objectStoreNames.contains(DRAFTS_STORE_NAME);
+      probed.close?.();
+      if (storeMissing || (probed.version ?? 0) < DRAFTS_DB_VERSION) {
         resolve({
           status: "store-unavailable",
           draftRecords: 0,
           migrated: 0,
           alreadyCurrent: 0,
           leftIntact: 0,
-          problems: ["read transaction failed"],
+          problems: ["drafts database not present"],
         });
+        return;
+      }
+      const openRequest = idb.open(DRAFTS_DB_NAME, DRAFTS_DB_VERSION);
+      openRequest.onerror = () => {
+        resolve({
+          status: "store-unavailable",
+          draftRecords: 0,
+          migrated: 0,
+          alreadyCurrent: 0,
+          leftIntact: 0,
+          problems: ["indexeddb open failed"],
+        });
+        return;
       };
-      keysRequest.onsuccess = () => {
-        const keys = Array.isArray(keysRequest.result) ? keysRequest.result : [];
-        const draftKeys = keys.filter(
-          (key): key is string => typeof key === "string" && key.endsWith(DRAFT_KEY_SUFFIX),
-        );
-        void migrateKeys(database, draftKeys).then(resolve);
+      openRequest.onsuccess = () => {
+        const database = openRequest.result as MigrationIdbDatabase;
+        try {
+          const readTx = database.transaction([DRAFTS_STORE_NAME], "readonly");
+      const keysRequest = readTx.objectStore(DRAFTS_STORE_NAME).getAllKeys();
+      readTx.onerror = () => {
+          resolve({
+            status: "store-unavailable",
+            draftRecords: 0,
+            migrated: 0,
+            alreadyCurrent: 0,
+            leftIntact: 0,
+            problems: ["read transaction failed"],
+          });
+        };
+        keysRequest.onsuccess = () => {
+          const keys = Array.isArray(keysRequest.result) ? keysRequest.result : [];
+          const draftKeys = keys.filter(
+            (key): key is string => typeof key === "string" && key.endsWith(DRAFT_KEY_SUFFIX),
+          );
+          void migrateKeys(database, draftKeys).then(resolve);
+        };
+      } catch {
+        // A structural surprise (e.g. the store vanished between the probe
+        // and the open) resolves honestly instead of hanging the cached
+        // prepare promise (round 2).
+        resolve({
+          status: "store-unavailable",
+          draftRecords: 0,
+          migrated: 0,
+          alreadyCurrent: 0,
+          leftIntact: 0,
+          problems: ["drafts store unreadable"],
+        });
+      }
       };
     };
   });
