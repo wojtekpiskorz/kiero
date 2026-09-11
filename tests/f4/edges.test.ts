@@ -5,13 +5,13 @@
  * is PR #102 review round 1; fixtures live in tests/f4/fixtures.ts).
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { okResult, parseTableId } from "@kiero/contracts";
 import { dispatchCommand, membershipPolicy } from "@kiero/runtime";
 import { valueOf } from "../d2/harness";
 import { projectEventToJobInputs } from "../../convex/platform/outbox";
 import { performChangeTask } from "../../convex/work/operations";
-import { reminderClock, taskRemindersExecutor } from "../../convex/attention/reminders/executor";
+import { taskRemindersExecutor } from "../../convex/attention/reminders/executor";
 import { remindersHandlers } from "../../convex/attention/reminders/dispatch";
 import {
   T0,
@@ -36,11 +36,15 @@ beforeEach(() => {
   useFakeContext();
 });
 
+// The repo's one deliberate answer for clock-dependent suites (round 2):
+// pin Date itself to the fixtures' T0 anchor, so the executor's Date.now()
+// reads the authored relationship (T0 < the seeded deadline) with zero
+// production seams. Only Date is faked; timers and microtasks stay real.
 beforeEach(() => {
-  reminderClock.nowMs = T0;
+  vi.useFakeTimers({ now: T0, toFake: ["Date"] });
 });
 afterEach(() => {
-  reminderClock.nowMs = null;
+  vi.useRealTimers();
 });
 
 describe("the outbox projections", () => {

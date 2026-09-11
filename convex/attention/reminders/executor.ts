@@ -40,19 +40,6 @@ export interface TaskRemindersJobInput {
   readonly findingId: string | null;
 }
 
-/**
- * The executor's clock (F4 date-bomb repair, flagged cross-lane): the
- * deterministic tests anchor every fixture to T0 but the executor read the
- * real wall clock, so the seeded deadline (2026-09-11) aged the suite's
- * expectations past their meaning once real time passed it. Production
- * never sets this; tests set it once per case to their anchor.
- */
-export const reminderClock: { nowMs: number | null } = { nowMs: null };
-
-function reminderNow(): number {
-  return reminderClock.nowMs ?? Date.now();
-}
-
 /** The registered executor for `attention.schedule_task_reminders`. */
 export const taskRemindersExecutor: JobExecutor = {
   jobKind: "attention.schedule_task_reminders",
@@ -76,7 +63,7 @@ export const taskRemindersExecutor: JobExecutor = {
       if (taskId === null) {
         return { outcome: "failed", errorKind: "task_id_invalid", retryable: false };
       }
-      const result = await performRecomputeTaskReminders(ctx, taskId, reminderNow());
+      const result = await performRecomputeTaskReminders(ctx, taskId, Date.now());
       return result._tag === "ok"
         ? { outcome: "succeeded" }
         : { outcome: "failed", errorKind: result.error.code, retryable: false };
@@ -99,7 +86,7 @@ export const taskRemindersExecutor: JobExecutor = {
       .filter((q) => q.eq(q.field("deadlineFindingId"), findingId))
       .take(FINDING_SCAN_LIMIT);
     for (const task of bound) {
-      const result = await performRecomputeTaskReminders(ctx, task._id, reminderNow());
+      const result = await performRecomputeTaskReminders(ctx, task._id, Date.now());
       if (result._tag === "error") {
         return { outcome: "failed", errorKind: result.error.code, retryable: false };
       }
