@@ -45,8 +45,11 @@ export interface PlannedMarking {
  * to a source cause) the source-attribution field.
  */
 export interface MarkingStamp {
-  /** The revision origin of the lane (`withdrawal_marking` / `reassignment_marking`). */
-  readonly origin: "withdrawal_marking" | "reassignment_marking";
+  /**
+   * The revision origin of the lane (`withdrawal_marking` /
+   * `reassignment_marking` / `purge_marking`).
+   */
+  readonly origin: "withdrawal_marking" | "reassignment_marking" | "purge_marking";
   /** The encoded knowledge state every marking writes (computed once per run). */
   readonly knowledgeState: ReturnType<typeof encodeKnowledgeState>;
   /**
@@ -56,7 +59,8 @@ export interface MarkingStamp {
    */
   readonly attribution?:
     | { readonly kind: "withdrawnSourceId"; readonly sourceId: Id<"sources"> }
-    | { readonly kind: "reassignedSourceId"; readonly sourceId: Id<"sources"> };
+    | { readonly kind: "reassignedSourceId"; readonly sourceId: Id<"sources"> }
+    | { readonly kind: "purgedSourceId"; readonly sourceId: Id<"sources"> };
 }
 
 /**
@@ -130,7 +134,9 @@ export async function commitMarkings(
         ? {}
         : args.stamp.attribution.kind === "withdrawnSourceId"
           ? { withdrawnSourceId: args.stamp.attribution.sourceId }
-          : { reassignedSourceId: args.stamp.attribution.sourceId }),
+          : args.stamp.attribution.kind === "purgedSourceId"
+            ? { purgedSourceId: args.stamp.attribution.sourceId }
+            : { reassignedSourceId: args.stamp.attribution.sourceId }),
       recordedByUserId: args.actorUserId,
       recordedAtMs: nowMs,
     });

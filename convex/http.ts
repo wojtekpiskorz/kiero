@@ -37,6 +37,10 @@ import { mediaAccessHandler } from "./sources/media_access/http";
 // firm-export lane's HTTP boundaries - the per-user download channel and
 // the service-credentialed build channel the export Worker calls.
 import { exportAccessHandler, exportsBridgeHandler } from "./operations/exports/http";
+// I4 append (flagged shared-file change, the I3 sanctioned pattern): the
+// deletion lane's service-credentialed purge bridge (the gateway Worker's
+// authoritative media-key read).
+import { deletionBridgeHandler } from "./operations/deletion/http";
 import {
   calendarStartHandler,
   calendarCallbackHandler,
@@ -100,6 +104,9 @@ http.route({ path: "/sources/media/access", method: "POST", handler: mediaAccess
 // (service-credentialed) on the same composition seam.
 http.route({ path: "/operations/exports/access", method: "POST", handler: exportAccessHandler });
 http.route({ path: "/operations/exports/bridge", method: "POST", handler: exportsBridgeHandler });
+
+// I4 append: the deletion purge bridge (service-credentialed).
+http.route({ path: "/operations/deletion/bridge", method: "POST", handler: deletionBridgeHandler });
 
 http.route({ path: "/calendar/oauth/start", method: "POST", handler: calendarStartHandler });
 http.route({ path: "/calendar/oauth/callback", method: "GET", handler: calendarCallbackHandler });

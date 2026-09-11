@@ -90,7 +90,13 @@ async function companyConversationPage(
     .withIndex("by_company_order", (q) => q.eq("companyId", companyId))
     .order("desc")
     .paginate(pagination);
-  const page = await Promise.all(raw.page.map((source) => conversationRow(db, source)));
+  // I4 append (flagged, the D3 lifecycle rule): a permanently deleted
+  // source never appears in the conversation. The page-level filter keeps
+  // the index read unchanged; a page after a purge may run shorter than
+  // the cursor's page size (accepted for alpha volume - the alternative
+  // is a lifecycle-compound index, a coordinated schema change).
+  const visible = raw.page.filter((source) => source.lifecycle !== "purged");
+  const page = await Promise.all(visible.map((source) => conversationRow(db, source)));
   return Schema.decodeUnknownSync(ConversationPage)({
     page,
     isDone: raw.isDone,
@@ -126,6 +132,12 @@ async function projectConversationPage(
     seen.add(link.sourceId);
     const source = await db.get(link.sourceId);
     if (source === null || source.companyId !== companyId) {
+      continue;
+    }
+    // I4 append (flagged, the same lifecycle rule as the company page): a
+    // purged source leaves the project conversation too (its content is
+    // gone; the ledger keeps only the content-free record).
+    if (source.lifecycle === "purged") {
       continue;
     }
     rows.push(await conversationRow(db, source));

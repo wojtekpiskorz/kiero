@@ -247,6 +247,9 @@ export const shared = {
   exportId: v.id("exports"),
   gmAccessGrantId: v.id("gmAccessGrants"),
   searchIndexGenerationId: v.id("searchIndexGenerations"),
+  // I4 append (flagged, one line, the sibling pattern): the deletion
+  // ledger's row reference (convex/operations/deletion/ owns the table).
+  deletionRecordId: v.id("deletionRecords"),
 
   /**
    * Monotonic non-negative counter: revisions, versions, attempt counts and

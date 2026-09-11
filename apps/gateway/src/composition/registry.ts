@@ -38,6 +38,11 @@ import { exportsRouteProvider } from "../exports/routes";
 
 import { calendarOAuthProvider } from "../calendar-oauth/routes";
 
+// I4 append (flagged shared-file change, the D3/I3 sanctioned pattern): the
+// permanent-deletion purge provider (the service-credentialed media-byte
+// deletion route).
+import { purgeRouteProvider } from "../purge/routes";
+
 /** One lane's route provider. */
 export interface RouteProvider {
   readonly providerId: string;
@@ -62,6 +67,9 @@ export const routeProviders: readonly RouteProvider[] = [
   exportsRouteProvider,
 
   calendarOAuthProvider,
+
+  // I4 append (flagged shared-file change): the deletion purge provider.
+  purgeRouteProvider,
 ];
 
 /**

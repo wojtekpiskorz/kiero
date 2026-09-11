@@ -91,4 +91,17 @@ crons.cron(
   {},
 );
 
+// I4 append (issue #56, flagged shared-file change - the I5 safety-net
+// precedent): the permanent-deletion 24-hour tracking tick. The durable
+// purge job's own retry policy is the fast path; this bounded pass is the
+// deadline's visibility net: un-purged stages past their 24-hour deadline
+// emit the deduplicated ops.deletion.overdue diagnostic (I2's incident
+// surface) and slide their tracking deadline one hour forward.
+crons.cron(
+  "deletion-purge-tick",
+  "*/15 * * * *",
+  internal.operations.deletion.tick.purgeOverdueTick,
+  {},
+);
+
 export default crons;

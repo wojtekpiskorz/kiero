@@ -329,6 +329,24 @@ function projectOneEdge(
       dedupKey: `attention.evaluate_due_intents:changeset:${String(payload.changeSetId)}`,
     };
   }
+  // I4 registration (issue #56 owns this edge's projection): a committed
+  // source purge drains into `deletion.purge_source`. The purge transaction
+  // registers the job itself with the REAL ledger record id under the SAME
+  // dedup key, so this projection collapses onto the publisher's row; the
+  // certified payload carries no record id, so `null` means "resolve the
+  // source's content-free source_purge ledger row in-company" (exactly one
+  // exists; the E3 extractFragmentsInput precedent).
+  if (jobKind === "deletion.purge_source") {
+    return {
+      kind: "job",
+      jobKind,
+      input: {
+        sourceId: payload.sourceId,
+        deletionRecordId: null,
+      },
+      dedupKey: rowDedupKey,
+    };
+  }
   // E5 registration (issue #39 owns these declared consumer proofs): the
   // derived search rows' lifecycle refreshes. The dedup keys derive from each
   // event's SUBJECT plus the refresh mode (the F2 precedent), never the

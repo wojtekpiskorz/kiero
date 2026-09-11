@@ -118,7 +118,10 @@ export default {
         url.pathname.startsWith("/images/") ||
         url.pathname.startsWith("/media/") ||
         // I3 append (flagged, the D3 precedent): the export download route.
-        url.pathname.startsWith("/exports/")
+        url.pathname.startsWith("/exports/") ||
+        // I4 append (flagged, the I3 precedent): the deletion purge route
+        // (service-credentialed; no browser preflight applies).
+        url.pathname.startsWith("/purge/")
       ) {
         const route = matchRoute(request.method, url.pathname);
         if (route === undefined) {

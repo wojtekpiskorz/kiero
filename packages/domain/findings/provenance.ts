@@ -119,7 +119,11 @@ export type RevisionOrigin =
   // project reassignment; withdrawal treats it by its witness rules below
   // (not as an already-marked state, so a later withdrawal of the sole
   // witness still marks unknown).
-  | "reassignment_marking";
+  | "reassignment_marking"
+  // I4 amendment (additive, flagged, the E7 precedent): the support-removal
+  // marking of a permanent source deletion (issue #56). Like a withdrawal
+  // marking it is already an explicit unknown, so replays never re-mark.
+  | "purge_marking";
 
 /**
  * The withdrawal-marking decision (the pure half of "Źródło wycofane"):
@@ -144,7 +148,9 @@ export function decideWithdrawalMarking(args: {
   currentEvidence: readonly EvidenceSupportRef[];
   withdrawnSourceId: string;
 }): WithdrawalDecision {
-  if (args.currentRevisionOrigin === "withdrawal_marking") {
+  // I4 append (flagged, minimal): a purge marking is already an explicit
+  // unknown for its finding, exactly like a withdrawal marking.
+  if (args.currentRevisionOrigin === "withdrawal_marking" || args.currentRevisionOrigin === "purge_marking") {
     return { decision: "retained", basis: "already_marked" };
   }
   if (args.currentRevisionOrigin === "correction") {

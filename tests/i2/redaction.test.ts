@@ -186,9 +186,10 @@ describe("honest events pass unchanged", () => {
     }
   });
 
-  it("the closed kind vocabulary is exactly the fourteen monitor-grouped kinds", () => {
+  it("the closed kind vocabulary is exactly the fifteen monitor-grouped kinds", () => {
     // I5 append (issue #57, flagged shared-file change): ops.backup.stale
-    // joined the recovery/health group (13 -> 14).
-    expect(DIAGNOSTIC_EVENT_KINDS).toHaveLength(14);
+    // joined the recovery/health group (13 -> 14). I4 append (issue #56,
+    // flagged shared-file change): ops.deletion.overdue joined it (14 -> 15).
+    expect(DIAGNOSTIC_EVENT_KINDS).toHaveLength(15);
   });
 });

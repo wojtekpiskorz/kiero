@@ -11,7 +11,7 @@ import { jobExecutors } from "../../convex/platform/executors";
 import { echoExecutor } from "../../convex/platform/echo";
 
 describe("convex executor composition", () => {
-  it("registers exactly the implemented executors (platform + B3 + C5 + D5 + D6 + E3/E4 + F2 + G3 + E5 lanes)", () => {
+  it("registers exactly the implemented executors (platform + B3 + C5 + D5 + D6 + E3/E4 + F2 + G3 + E5 + I4 lanes)", () => {
     expect(Object.keys(jobExecutors).sort()).toEqual(
       [
         "platform.echo_delivery",
@@ -59,6 +59,9 @@ describe("convex executor composition", () => {
         // the declared consumer proof for the attention.intentDelivered
         // edge).
         "attention.deliver_push",
+        // I4's sanctioned append (issue #56 owns the permanent-deletion
+        // purge: the declared consumer proof for the sourcePurged edge).
+        "deletion.purge_source",
       ].sort(),
     );
     expect(echoExecutor.jobKind).toBe("platform.echo_delivery");
@@ -74,7 +77,12 @@ describe("convex executor composition", () => {
   });
 
   it("unimplemented kinds (the fail-closed placeholders) stay unimplemented", () => {
-    expect(jobExecutors["deletion.purge_source"]).toBeUndefined();
+    // I4 implemented deletion.purge_source; the remaining registered kinds
+    // without an executor are the still-unowned seams (none at this join).
+    const unimplemented = executors
+      .map((entry) => entry.jobKind)
+      .filter((kind) => jobExecutors[kind] === undefined);
+    expect(unimplemented).toEqual([]);
   });
 });
 

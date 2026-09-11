@@ -12,7 +12,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { drainBatch, projectEventToJobInputs } from "../../convex/platform/outbox";
+import { drainBatch } from "../../convex/platform/outbox";
 import { asTx, fakeCtx } from "../d2/harness";
 
 let ctx: ReturnType<typeof fakeCtx>;
@@ -130,37 +130,28 @@ describe("drain row semantics (the multi-edge decision)", () => {
     expect(ctx.db.rows("durableJobs")).toHaveLength(0);
   });
 
-  it("an unprojected edge stays LOUD beside a projected sibling (machine-readable)", async () => {
-    // E5 amendment (issue #39, flagged coordinated append): the purge event
-    // gained a PROJECTED sibling edge (the derived-search refresh), so the
-    // multi-edge row semantics apply: the projected edge's job registers,
-    // the row delivers, and the UNPROJECTED deletion edge (I4's seam) still
-    // fails LOUDLY per-edge through the console channel, never a silent
-    // strand. (The all-edges-unprojected `failed` row branch remains in
-    // drainBatch for the first lane that registers an edge without a
-    // projection; no such event exists in the composed registry today, so
-    // it is no longer reachable from real data.)
+  it("a fully projected multi-edge event registers every edge's job and delivers", async () => {
+    // I4 amendment (issue #56, flagged coordinated append): the deletion
+    // edge gained its projection, so sources.sourcePurged now has BOTH
+    // consumer edges projected (the derived-search refresh and the durable
+    // purge). The multi-edge row semantics apply: each edge's job registers
+    // under its own identity, and the row delivers. (The all-edges-
+    // unprojected `failed` branch remains in drainBatch for the first lane
+    // that registers an edge without a projection; no such event exists in
+    // the composed registry today, so it is no longer reachable from real
+    // data.)
     const loud = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       await seedRow("sources.sourcePurged", { sourceId: "k" + "s".repeat(31) }, "dk-purged");
       await drainBatch(tx());
       const row = ctx.db.rows("outboxEvents")[0]!;
       expect(row.deliveryState).toBe("delivered");
-      expect(ctx.db.rows("durableJobs")).toHaveLength(1);
-      expect(ctx.db.rows("durableJobs")[0]?.kind).toBe("search.index_generation");
-      expect(loud).toHaveBeenCalledWith(
-        expect.stringContaining("consumer projection missing"),
-      );
-      // The pure projection still names the unprojected seam exactly.
-      const projections = projectEventToJobInputs(
-        "sources.sourcePurged",
-        { sourceId: "k" + "s".repeat(31) },
-        "dk-purged",
-      );
-      expect(projections).toContainEqual({
-        kind: "unprojected_edge",
-        jobKind: "deletion.purge_source",
-      });
+      expect(ctx.db.rows("durableJobs")).toHaveLength(2);
+      expect(ctx.db.rows("durableJobs").map((job) => job.kind).sort()).toEqual([
+        "deletion.purge_source",
+        "search.index_generation",
+      ]);
+      expect(loud).not.toHaveBeenCalled();
     } finally {
       loud.mockRestore();
     }

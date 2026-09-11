@@ -411,6 +411,13 @@ export async function readSourceExpositionRows(
   if (source === null) {
     return { ok: false, error: notFoundError("sources", "source_not_in_company") };
   }
+  // I4 append (flagged, the D3 media-access rule): a permanently deleted
+  // source's dossier is the same closed not-found - after the committed
+  // tombstone no application read serves the source, and the refusal never
+  // distinguishes deletion from nonexistence.
+  if (source.lifecycle === "purged") {
+    return { ok: false, error: notFoundError("sources", "source_not_in_company") };
+  }
   const links = await db
     .query("sourceProjectLinks")
     .withIndex("by_source", (q) => q.eq("sourceId", sourceId))

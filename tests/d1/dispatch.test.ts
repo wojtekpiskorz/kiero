@@ -74,13 +74,18 @@ describe("sources handler registration (one write operation, nothing else)", () 
     const handlers = sourcesHandlers();
     // C5's sanctioned append (issue #28 owns the withdrawal operation's
     // implementation; D1 owns only acceptance here). E7's sanctioned append
-    // (issue #115) adds the project reassignment the same way.
+    // (issue #115) adds the project reassignment the same way. I4's
+    // sanctioned append (issue #56) adds the permanent deletion (an
+    // administer-intent operation implemented in the deletion lane's own
+    // module).
     expect(Object.keys(handlers).sort()).toEqual([
       "sources.acceptSource",
+      "sources.purgeSource",
       "sources.reassignSource",
       "sources.withdrawSource",
     ]);
     expect(handlers["sources.acceptSource"]?.intent).toBe("write");
+    expect(handlers["sources.purgeSource"]?.intent).toBe("administer");
   });
 });
 

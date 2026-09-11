@@ -49,6 +49,11 @@ export const DIAGNOSTIC_EVENT_KINDS = [
   // the newest VERIFIED manifest's SNAPSHOT age exceeds one hour (or runs
   // exist but none ever verified); deduped per staleness episode.
   "ops.backup.stale",
+  // I4 append (issue #56, flagged shared-file change - the I5 precedent):
+  // permanent-deletion 24-hour tracking. Emitted by the deletion purge tick
+  // when a derivative family's stage is still un-purged past its deadline;
+  // deduped per stage per day.
+  "ops.deletion.overdue",
   // Monitor group 3: costs/limits
   "ops.cost.entry",
   "ops.cost.threshold_warning",
@@ -82,6 +87,8 @@ export const METADATA_KEY_FORMATS = {
   outcome: /^[a-z][a-z0-9_]{1,31}$/,
   status: /^[a-z][a-z0-9_]{1,31}$/,
   jobKind: /^[a-z][a-z0-9_.]{2,63}$/,
+  /** I4 append (flagged): the deletion purge stage vocabulary (dotless). */
+  stageKind: /^[a-z][a-z0-9_]{1,31}$/,
   eventName: /^[a-z][a-z0-9_.]{2,63}$/,
   /** Non-negative integer counters/latencies in milliseconds. */
   latencyMs: /^\d{1,10}$/,
@@ -127,6 +134,7 @@ export const KIND_METADATA_ALLOWLIST: Record<DiagnosticEventKind, readonly Metad
   "ops.health.heartbeat": ["serviceName", "status"],
   "ops.health.silence_detected": ["serviceName", "ageMs", "count"],
   "ops.backup.stale": ["serviceName", "ageMs", "state", "count"],
+  "ops.deletion.overdue": ["sourceId", "stageKind", "state", "attempts", "ageMs"],
   "ops.cost.entry": ["provider", "category", "costMinor", "period", "basis"],
   "ops.cost.threshold_warning": ["period", "totalMinor", "thresholdMinor", "level"],
   "ops.cost.threshold_alert": ["period", "totalMinor", "thresholdMinor", "level"],

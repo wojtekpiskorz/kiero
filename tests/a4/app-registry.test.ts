@@ -145,6 +145,8 @@ describe("the shipped host features", () => {
     // and flips the /co-teraz placeholder to the real per-user screen.
     // J2 (issue #61) RETIRED the /wpis capture entry: the composer joined
     // the conversation surface, so capture.composer no longer composes.
+    // I4 (issue #56) mounts the permanent-deletion surface
+    // (/usuwanie-danych).
     const mounted = appFeatures.filter((entry) => entry.implementation === "mounted");
     expect(mounted.map((entry) => entry.featureId)).toEqual([
       "conversation.company",
@@ -160,6 +162,7 @@ describe("the shipped host features", () => {
       "operations.processing",
       "calendar.connection",
       "attention.push",
+      "operations.deletion",
     ]);
     for (const mountedEntry of mounted) {
       expect(mountedEntry.screen).toBeTypeOf("function");
