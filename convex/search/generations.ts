@@ -22,7 +22,7 @@ import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
 import { conflictError, notFoundError, type RequestContext } from "@kiero/runtime";
 import { INDEX_CANDIDATE, isCompatibleCandidate } from "@kiero/retrieval";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { publishEvent, registerDurableJob } from "../platform/publish";
 
 /** The dedup identity of one generation's build job (the cutover's evidence key). */
@@ -32,6 +32,39 @@ export function buildDedupKey(generationId: string): string {
 
 /** The retry policy of the durable build registration. */
 const BUILD_RETRY_POLICY = { maxAttempts: 3, backoffBaseMs: 2_000 } as const;
+
+/**
+ * A build whose external pass died unrecorded (provider window, crash)
+ * leaves the generation building and the one-at-a-time gate refusing
+ * every later generation forever - the exact uncertain-outcome class the
+ * platform protocol reconciles. A building generation whose build job is
+ * terminally dead (failed/cancelled/absent) or has not updated within the
+ * staleness window retires here (it was never active, so serving is
+ * untouched); a fresh or SUCCEEDED build keeps the gate closed (the
+ * succeeded-awaiting-cutover coexistence is the designed state).
+ */
+const STALE_BUILD_JOB_MS = 15 * 60 * 1000;
+
+async function retireInterruptedBuilding(
+  tx: MutationCtx,
+  building: Doc<"searchIndexGenerations">,
+): Promise<boolean> {
+  const job = await tx.db
+    .query("durableJobs")
+    .withIndex("by_dedup", (q) => q.eq("dedupKey", buildDedupKey(building._id)))
+    .first();
+  const dead =
+    job === null ||
+    job.state === "failed" ||
+    job.state === "cancelled" ||
+    ((job.state === "queued" || job.state === "running") &&
+      Date.now() - (job.updatedAtMs ?? job.createdAtMs ?? 0) > STALE_BUILD_JOB_MS);
+  if (!dead) {
+    return false;
+  }
+  await tx.db.patch(building._id, { state: "retired", retiredAtMs: Date.now() });
+  return true;
+}
 
 /** Starts one generation: candidate check, building row, event, build job. */
 export async function performStartIndexGeneration(
@@ -48,7 +81,10 @@ export async function performStartIndexGeneration(
     .withIndex("by_state", (q) => q.eq("state", "building"))
     .first();
   if (building !== null) {
-    return errorResult(conflictError("generation_already_building"));
+    const retired = await retireInterruptedBuilding(tx, building);
+    if (!retired) {
+      return errorResult(conflictError("generation_already_building"));
+    }
   }
   const generationId = await tx.db.insert("searchIndexGenerations", {
     embeddingModel: input.embeddingModel,
