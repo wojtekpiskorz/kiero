@@ -16,7 +16,14 @@
  * value through it instead of copying the fetch/error-mapping plumbing.
  * The header decides WHO the call acts as: the platform routes pass the
  * Worker's service credential, user-owned lanes pass the browser's
- * credential verbatim.
+ * credential verbatim. The transport itself is credential-agnostic — it
+ * requires only the backend URL; `callPlatform` keeps the service
+ * credential's own presence guard.
+ * (I3 prerequisite repair, flagged: a service-token presence check HERE
+ * broke every USER-credential channel — uploads, media reads, export
+ * downloads — on any gateway deployed per infra/bindings/gateway-worker.md,
+ * which binds no KIERO_SERVICE_TOKEN; the i3 live proof observed every
+ * download answered 503 bridge_not_configured.)
  */
 
 import { Schema } from "effect";
@@ -45,8 +52,7 @@ export async function postBridge(
   authorization: string,
 ): Promise<{ ok: true; body: ResultEnvelope } | { ok: false; error: ResultEnvelope }> {
   const site = env.CONVEX_SITE_URL;
-  const token = env.KIERO_SERVICE_TOKEN;
-  if (site === undefined || site === "" || token === undefined || token === "") {
+  if (site === undefined || site === "") {
     return {
       ok: false,
       error: errorResult(unavailableError(false, "bridge_not_configured")),
@@ -110,6 +116,11 @@ export async function callPlatform(
   env: BridgeEnv,
   command: BridgeCommand,
 ): Promise<ResultEnvelope> {
+  // The platform routes act as the platform: the Worker's own credential,
+  // whose presence this path guards (the transport itself is agnostic).
+  if (env.KIERO_SERVICE_TOKEN === undefined || env.KIERO_SERVICE_TOKEN === "") {
+    return errorResult(unavailableError(false, "bridge_not_configured"));
+  }
   const result = await postBridge(
     env,
     "/platform/bridge",
@@ -119,7 +130,6 @@ export async function callPlatform(
       expectedRevisions: [],
       ...(command.idempotencyKey === undefined ? {} : { idempotencyKey: command.idempotencyKey }),
     },
-    // The platform routes act as the platform: the Worker's own credential.
     `Bearer ${env.KIERO_SERVICE_TOKEN}`,
   );
   if (!result.ok) {
