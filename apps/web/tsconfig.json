@@ -3,7 +3,12 @@
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    // I7 append (flagged shared-file change): the update module imports
+    // tools/migrations/policy.ts with its .ts extension so node
+    // --experimental-strip-types live proofs load the same chain; noEmit
+    // is inherited from the base config.
+    "allowImportingTsExtensions": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
 }

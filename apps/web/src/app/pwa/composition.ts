@@ -91,7 +91,17 @@ function serviceWorkerContainer(): ServiceWorkerContainerLike | undefined {
 
 /**
  * Registers the composed service worker plan. A no-op while no script is
- * composed (today); outside browsers it also stays a no-op.
+ * composed; outside browsers it also stays a no-op.
+ *
+ * I7 append (flagged shared-file change, the D4/F3 sibling pattern): the
+ * registration handle this composition created is now handed to the
+ * composed module hooks, so push registration and the safe update flow
+ * ride the ONE registration path this seam owns. F3's push hook stays
+ * passive by its own contract; I7's update hook starts the safe-point
+ * flow for the worker's scope. The two hooks run as independent legs:
+ * push registration must never wait on the update flow's first poll,
+ * which is network-bound (the backend health read) exactly on the
+ * mobile connections Kiero targets.
  */
 export async function registerPwa(composition: PwaComposition): Promise<void> {
   if (composition.serviceWorkerScript === null) {
@@ -101,5 +111,9 @@ export async function registerPwa(composition: PwaComposition): Promise<void> {
   if (container === undefined) {
     return;
   }
-  await container.register(composition.serviceWorkerScript);
+  const registration = await container.register(composition.serviceWorkerScript);
+  await Promise.all([
+    composition.update?.promptAtSafePoint(registration) ?? Promise.resolve(),
+    composition.push?.register(registration) ?? Promise.resolve(),
+  ]);
 }
