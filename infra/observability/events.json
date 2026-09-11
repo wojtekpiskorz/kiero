@@ -14,6 +14,7 @@
     "ops.outbox.delivery_failed",
     "ops.health.heartbeat",
     "ops.health.silence_detected",
+    "ops.backup.stale",
     "ops.cost.entry",
     "ops.cost.threshold_warning",
     "ops.cost.threshold_alert",
@@ -104,6 +105,12 @@
     "ops.health.silence_detected": [
       "serviceName",
       "ageMs",
+      "count"
+    ],
+    "ops.backup.stale": [
+      "serviceName",
+      "ageMs",
+      "state",
       "count"
     ],
     "ops.cost.entry": [

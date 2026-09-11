@@ -145,6 +145,12 @@ import type * as memory_findings_withdrawal from "../memory/findings/withdrawal.
 import type * as memory_recompute_executor from "../memory/recompute/executor.js";
 import type * as memory_recompute_probe from "../memory/recompute/probe.js";
 import type * as memory_recompute_withdrawal from "../memory/recompute/withdrawal.js";
+import type * as operations_backups_functions from "../operations/backups/functions.js";
+import type * as operations_backups_http from "../operations/backups/http.js";
+import type * as operations_backups_inventory from "../operations/backups/inventory.js";
+import type * as operations_backups_proof from "../operations/backups/proof.js";
+import type * as operations_backups_proofFixtures from "../operations/backups/proofFixtures.js";
+import type * as operations_backups_slot from "../operations/backups/slot.js";
 import type * as operations_exports_access from "../operations/exports/access.js";
 import type * as operations_exports_channel from "../operations/exports/channel.js";
 import type * as operations_exports_executor from "../operations/exports/executor.js";
@@ -397,6 +403,12 @@ declare const fullApi: ApiFromModules<{
   "memory/recompute/executor": typeof memory_recompute_executor;
   "memory/recompute/probe": typeof memory_recompute_probe;
   "memory/recompute/withdrawal": typeof memory_recompute_withdrawal;
+  "operations/backups/functions": typeof operations_backups_functions;
+  "operations/backups/http": typeof operations_backups_http;
+  "operations/backups/inventory": typeof operations_backups_inventory;
+  "operations/backups/proof": typeof operations_backups_proof;
+  "operations/backups/proofFixtures": typeof operations_backups_proofFixtures;
+  "operations/backups/slot": typeof operations_backups_slot;
   "operations/exports/access": typeof operations_exports_access;
   "operations/exports/channel": typeof operations_exports_channel;
   "operations/exports/executor": typeof operations_exports_executor;

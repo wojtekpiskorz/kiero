@@ -76,4 +76,19 @@ crons.interval(
   internal.operations.telemetry.cron.cronTick,
 );
 
+// I5 append (issue #57, flagged shared-file change - the F2/I2 safety-net
+// precedent): the Convex-owned complete-backup schedule tick. The EU backup
+// Container's own cron trigger is the fast path; this tick is the schedule
+// authority's convergence net: it runs the freshness check (emits the
+// deduplicated ops.backup.stale diagnostic when the newest VERIFIED
+// snapshot exceeds one hour) and, when the current 15-minute slot has no
+// row at all (the Container missed its trigger), pings the backup worker's
+// run endpoint best-effort (KIERO_BACKUP_WORKER_URL deployment variable).
+crons.cron(
+  "backup-schedule-tick",
+  "*/15 * * * *",
+  internal.operations.backups.functions.backupTick,
+  {},
+);
+
 export default crons;
