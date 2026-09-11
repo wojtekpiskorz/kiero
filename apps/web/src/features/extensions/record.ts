@@ -35,6 +35,17 @@ import {
 } from "./value-editor";
 
 /** One catalog candidate as the search returns it (wire fields). */
+/**
+ * The version-1 required baseline for the client-side build: on version 1
+ * the candidate's own fields ARE the baseline; on later versions the wire
+ * carries no v1 snapshot and the domain validator owns optionality, so the
+ * client requires NOTHING beyond what the value itself expresses (it must
+ * not over-refuse what the server would accept).
+ */
+function v1BaselineOf(candidate: Candidate): readonly FieldShape[] {
+  return candidate.version === 1 ? candidate.fields : [];
+}
+
 export interface Candidate {
   readonly definitionId: string;
   readonly versionId: string;
@@ -113,6 +124,10 @@ export function ValueSection({
   const [semanticKey, setSemanticKey] = useState("");
   const [versionId, setVersionId] = useState("");
   const [inputs, setInputs] = useState<Record<string, FieldInputSlots>>({});
+  // The accepted evidence basis of THIS statement: set once the source is
+  // durable, cleared on full success or when the statement text changes
+  // (a different statement is a different logical source).
+  const [accepted, setAccepted] = useState<{ statement: string; sourceId: string } | null>(null);
 
   const candidate = candidates.find((entry) => entry.versionId === versionId) ?? null;
 
@@ -120,7 +135,7 @@ export function ValueSection({
     if (candidate === null) {
       return;
     }
-    const built = buildExtensionValue(candidate.fields, candidate.fields, inputs, temporal);
+    const built = buildExtensionValue(candidate.fields, v1BaselineOf(candidate), inputs, temporal);
     if (!built.ok) {
       memory.setNotice({ kind: "error", text: failureHint(built.code, built.code) });
       return;
@@ -133,7 +148,7 @@ export function ValueSection({
     if (candidate === null) {
       return;
     }
-    const built = buildExtensionValue(candidate.fields, candidate.fields, inputs, temporal);
+    const built = buildExtensionValue(candidate.fields, v1BaselineOf(candidate), inputs, temporal);
     if (!built.ok) {
       memory.setNotice({ kind: "error", text: failureHint(built.code, built.code) });
       return;
@@ -141,12 +156,17 @@ export function ValueSection({
     memory.setBusy(true);
     try {
       // The boss's statement becomes a REAL source first (the evidence
-      // basis): the same one-key send loop the conversation rides.
-      const outcome = await source.send({
-        authorText: statement.trim(),
-        timezoneSnapshot: temporal.companyZone,
-        projectHints: [],
-      });
+      // basis): the same one-key send loop the conversation rides. Once a
+      // source is durable the receipt is REUSED on resubmit (the key was
+      // consumed by the acceptance; a re-send would mint a SECOND source).
+      const reusuable = accepted !== null && accepted.statement === statement.trim();
+      const outcome = reusuable
+        ? ({ _tag: "sent", receipt: { sourceId: accepted.sourceId } } as const)
+        : await source.send({
+            authorText: statement.trim(),
+            timezoneSnapshot: temporal.companyZone,
+            projectHints: [],
+          });
       if (outcome._tag === "refused") {
         memory.setNotice({ kind: "error", text: failureHint(outcome.code, outcome.message) });
         return;
@@ -158,6 +178,7 @@ export function ValueSection({
         return;
       }
       const receipt = outcome.receipt;
+      setAccepted({ statement: statement.trim(), sourceId: receipt.sourceId });
       const staged = await memory.run(
         "memory.prepareChangeSet",
         {
@@ -178,9 +199,9 @@ export function ValueSection({
         copy.valueSaved,
       );
       if (staged === null) {
-        // The source is durable; the staged change set is not. A resubmit
-        // re-sends the SAME key, so the evidence still converges on one
-        // source and the second staging attempt publishes.
+        // The source is durable; the staged change set is not. The resubmit
+        // reuses the accepted sourceId above, so the evidence converges on
+        // one source and one witness, and the second staging publishes.
         return;
       }
       const changeSet = Schema.decodeUnknownSync(prepareChangeSetResult)(staged);
@@ -192,6 +213,7 @@ export function ValueSection({
       setStatement("");
       setSemanticKey("");
       setInputs({});
+      setAccepted(null);
     } catch {
       memory.setNotice({ kind: "error", text: signInCopy.failures.network });
     } finally {
@@ -322,7 +344,7 @@ export function CorrectSection({
       return;
     }
     const row = history.data as FindingHistoryWireRow;
-    const built = buildExtensionValue(candidate.fields, candidate.fields, inputs, temporal);
+    const built = buildExtensionValue(candidate.fields, v1BaselineOf(candidate), inputs, temporal);
     if (!built.ok) {
       memory.setNotice({ kind: "error", text: failureHint(built.code, built.code) });
       return;

@@ -262,7 +262,9 @@ export function TaskEditForm({
 export function TaskStateForm({ tasks }: { readonly tasks: readonly TaskView[] }): ReactNode {
   const { run, notice, busy } = useWorkDispatch();
   const [taskId, setTaskId] = useState(tasks[0]?.taskId ?? "");
-  const [state, setState] = useState<(typeof taskStateOrder)[number]>("todo");
+  // The select preselects the CHOSEN task's own state (a waiting task must
+  // not read as Do zrobienia); a task switch follows the new row.
+  const [state, setState] = useState<(typeof taskStateOrder)[number]>(tasks[0]?.state ?? "todo");
   const [waitingReason, setWaitingReason] = useState("");
 
   async function submit(event: SubmitEvent): Promise<void> {
@@ -289,7 +291,13 @@ export function TaskStateForm({ tasks }: { readonly tasks: readonly TaskView[] }
     createElement("p", null, copy.taskStateIntro),
     createElement("form", { onSubmit: (event) => void submit(event) },
       createElement("label", { htmlFor: "task-state-task" }, copy.taskStateTaskLabel),
-      selectOf("task-state-task", taskId, setTaskId, taskOptions(tasks)),
+      selectOf("task-state-task", taskId, (next) => {
+        setTaskId(next);
+        const chosen = tasks.find((task) => task.taskId === next);
+        if (chosen !== undefined) {
+          setState(chosen.state);
+        }
+      }, taskOptions(tasks)),
       createElement("label", { htmlFor: "task-state-select" }, copy.taskStateSelectLabel),
       selectOf("task-state-select", state, (next) => setState(next as (typeof taskStateOrder)[number]),
         taskStateOrder.map((token) =>

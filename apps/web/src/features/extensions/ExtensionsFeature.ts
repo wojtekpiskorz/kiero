@@ -39,6 +39,7 @@ import {
   failureHint,
   fieldKindLabels,
   extensionsCopy as copy,
+  instantLabel,
 } from "./state";
 import { ValueSection, CorrectSection, type Candidate, type FindingsScopeArgs } from "./record";
 import type { FieldShape } from "./value-editor";
@@ -143,7 +144,7 @@ export function CandidateRow({ candidate }: { readonly candidate: Candidate }): 
       candidate.shared ? copy.sharedMark : copy.ownMark,
       // The similarity verdict IS the answer to searchIntro's question.
       ` · ${copy.verdictLabels[candidate.similarity.verdict]}`,
-      ` · ${copy.usageLabel(candidate.usageCount, candidate.lastUsedAtMs === null ? null : `${candidate.lastUsedAtMs}`)}`,
+      ` · ${copy.usageLabel(candidate.usageCount, candidate.lastUsedAtMs === null ? null : instantLabel(candidate.lastUsedAtMs))}`,
     ),
     createElement(
       "details",
