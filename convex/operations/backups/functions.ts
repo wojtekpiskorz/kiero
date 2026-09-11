@@ -290,8 +290,19 @@ export async function beginRunTx(ctx: MutationCtx, nowMs: number = Date.now()): 
 }
 
 export const beginRun = internalMutation({
-  args: {},
-  handler: async (ctx): Promise<BeginResult> => beginRunTx(ctx),
+  args: {
+    /**
+     * PROOF/TEST CLOCK OVERRIDE (never used in production): the tx's
+     * existing `nowMs` parameter, exposed so the guarded proof action can
+     * acquire a slot OTHER than the current one - a live proof must not
+     * wait out the 15-minute grid between scenarios, and a completed slot
+     * is `already_complete` forever by design. The HTTP run route sends no
+     * body, so production always decides on real wall-clock time; the
+     * decision logic itself reads this value unchanged.
+     */
+    nowMs: v.optional(v.float64()),
+  },
+  handler: async (ctx, args): Promise<BeginResult> => beginRunTx(ctx, args.nowMs ?? Date.now()),
 });
 
 // --- complete: server-side closure verification -----------------------------------

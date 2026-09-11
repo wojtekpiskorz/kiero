@@ -30,15 +30,26 @@ function probeDisabled(): ResultEnvelope {
   return errorResult(unsupportedError("operations.backups.probe", "probe_guard_disabled"));
 }
 
-/** Acquires (or refuses) the current slot's run lease. */
+/**
+ * Acquires (or refuses) a run lease. The optional `nowMs` is a PROOF
+ * FIXTURE (the G3 fake-Google precedent): a proof-only clock override that
+ * lets the live proof target a slot other than the current one - completed
+ * scenarios must not wait out the 15-minute grid, and an immediate re-begin
+ * of a verified slot is `already_complete` by design. It only feeds the tx's
+ * existing `nowMs` parameter; every lease/takeover/refusal decision still
+ * runs unchanged on the value it is given. Production begins (the HTTP run
+ * route) pass no body and always use the real clock.
+ */
 export const probeBegin = action({
-  args: {},
-  handler: async (ctx): Promise<ResultEnvelope> => {
+  args: { nowMs: v.optional(v.float64()) },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
     if (!probeGuardEnabled()) {
       return probeDisabled();
     }
     return okResult(
-      await ctx.runMutation(internal.operations.backups.functions.beginRun, {}),
+      await ctx.runMutation(internal.operations.backups.functions.beginRun, {
+        ...(args.nowMs === undefined ? {} : { nowMs: args.nowMs }),
+      }),
     );
   },
 });

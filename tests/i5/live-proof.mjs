@@ -28,25 +28,38 @@
  *      refused (no overlapping writers).
  * - L2 complete set: real export zip + real retained media copied into the
  *      real EU backup bucket; manifest published LAST; row verified with
- *      hashes/sizes; deletion ledger carried separately.
- * - L3 interrupts: deterministic interrupt points (after_export, mid_media,
- *      before_manifest) leave NO manifest; takeover resumes and completes
- *      exactly once.
- * - L4 corruption: a tampered source object fails the run typed; the
- *      freshness tick emits ops.backup.stale from snapshot age.
+ *      hashes/sizes; deletion ledger carried separately. When the service
+ *      credential is available the run rides the REAL HTTP boundary (the
+ *      same bearer-verified .site routes the EU Container uses) instead of
+ *      the probe actions - production entry end to end.
+ * - L3 interrupts: the proof rides the NEXT 15-minute slot (the guarded
+ *      proof-only clock fixture on probeBegin - a completed current slot is
+ *      `already_complete` forever, and waiting out the grid is not proof);
+ *      the interrupt leaves NO manifest with a live lease, and the resume
+ *      begins past that lease so the REAL takeover path
+ *      (`lease_expired` -> attempt 2) completes exactly once.
+ * - L4 corruption: a tampered source object fails the run typed (the proof
+ *      rides the slot after L3's). The freshness tick runs FIRST, before
+ *      any fresh verified snapshot exists: the seeded 125-minute-old
+ *      verified manifest is the newest snapshot, so staleness is real and
+ *      ops.backup.stale is emitted from snapshot age.
  * - L5 retention fixtures: a 49h-old frequent set and a 15d-old daily set
  *      are collected reference-aware (shared pool object survives while a
  *      surviving manifest references it).
  * - L6 deleted-source expiry: purge-recorded sources never enter new sets;
  *      the 14d retention bound keeps backup content inside 30 days
  *      (invariant asserted live in the state read).
- * - L7 health/cost: backup.job heartbeats per attempt; measured cost entries
- *      (backup/export, storage, egress) recorded in the month's accounting.
+ * - L7 health/cost: the HTTP boundary's own effects - backup.job
+ *      heartbeats per attempt and measured cost entries (backup/export,
+ *      storage, egress) recorded by the complete route - read back from
+ *      the public health state. Without the service credential the routes
+ *      refuse (401) and both rows are an explicit NOT RUN.
  */
 
 import { ConvexHttpClient } from "convex/browser";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -62,16 +75,18 @@ const BACKUP_BUCKET = "kiero-dev-backup";
 
 // The client URL comes from the deployment's REPORTED origin, not a guessed
 // regional template: fresh leases answer at https://<name>.convex.cloud
-// while older EU leases answer at <name>.eu-west-1.convex.cloud. Each
-// candidate is probed on the app's own public health route; the origin
-// that answers is the one every client below uses.
+// while older EU leases answer at <name>.eu-west-1.convex.cloud. The probe
+// rides the .site domain's public health route (HTTP routes live on .site,
+// never on .cloud); the winning candidate's .cloud twin is what the action
+// clients below use.
 const ORIGIN_CANDIDATES = [
   `https://${DEPLOYMENT}.convex.cloud`,
   `https://${DEPLOYMENT}.eu-west-1.convex.cloud`,
 ];
 let URL_ = null;
 for (const candidate of ORIGIN_CANDIDATES) {
-  const answers = await fetch(`${candidate}/platform/telemetry/health`)
+  const site = candidate.replace(".convex.cloud", ".convex.site");
+  const answers = await fetch(`${site}/platform/telemetry/health`)
     .then((response) => response.ok)
     .catch(() => false);
   if (answers) {
@@ -82,6 +97,38 @@ for (const candidate of ORIGIN_CANDIDATES) {
 if (URL_ === null) {
   console.error(`[BLOCKED] no origin answered for ${DEPLOYMENT}: ${ORIGIN_CANDIDATES.join(", ")}`);
   process.exit(2);
+}
+
+// HTTP routes (the backups boundary, the health read) live on the .site
+// twin of the winning .cloud origin; action clients use the .cloud origin.
+const SITE = URL_.replace(".convex.cloud", ".convex.site");
+
+// The service credential the REAL HTTP boundary verifies. It comes from the
+// shell env or the gitignored .env.local (the operator sets it deployment-
+// side via `npx convex@1.45.0 env set KIERO_SERVICE_TOKEN`). Only its
+// PRESENCE is ever reported - the value is never printed or logged.
+function readServiceToken() {
+  if (process.env.KIERO_SERVICE_TOKEN !== undefined && process.env.KIERO_SERVICE_TOKEN !== "") {
+    return process.env.KIERO_SERVICE_TOKEN;
+  }
+  try {
+    for (const line of readFileSync(".env.local", "utf8").split("\n")) {
+      if (line.startsWith("KIERO_SERVICE_TOKEN=")) {
+        const value = line.slice("KIERO_SERVICE_TOKEN=".length).trim();
+        return value === "" ? null : value;
+      }
+    }
+  } catch {
+    // no .env.local - probe actions only
+  }
+  return null;
+}
+const SERVICE_TOKEN = readServiceToken();
+if (SERVICE_TOKEN === null) {
+  console.error(
+    "[NOTE] KIERO_SERVICE_TOKEN not found (env or .env.local): the HTTP boundary refuses every route (401)." +
+      " L2 falls back to the guarded probe actions; L7 rows will be NOT RUN.",
+  );
 }
 
 const results = [];
@@ -112,8 +159,11 @@ async function wranglerObjectDelete(bucket, key) {
 }
 
 /** The pinned documented export: operator-authenticated convex CLI. */
+let exportCounter = 0;
 async function exportDatabase(dir) {
-  const zip = join(dir, "snapshot.zip");
+  // Unique name per export: one pass runs several pipelines (L2/L3/L4) and
+  // the CLI refuses to overwrite an existing --path.
+  const zip = join(dir, `snapshot-${(exportCounter += 1)}.zip`);
   await run("npx", ["--yes", "convex@1.45.0", "export", "--path", zip, "--deployment", DEPLOYMENT], {
     env: { ...process.env },
   });
@@ -125,9 +175,16 @@ async function exportDatabase(dir) {
 const { runBackup, setKey, mediaPoolKey, sha256HexOf } = await import(
   "../../apps/backup-worker/src/pipeline.ts"
 );
+// The schedule grid constant from the lane's own decision module (no drift).
+const { SCHEDULE_INTERVAL_MS } = await import("../../convex/operations/backups/slot.ts");
 
-/** The guarded probe actions as the BackupProtocol port. */
-function probeProtocol() {
+/**
+ * The guarded probe actions as the BackupProtocol port. `nowMs` is the
+ * proof-only clock fixture: when given, begin targets the slot containing
+ * that instant instead of the current one (see convex/operations/backups/
+ * proof.ts probeBegin - the fixture is guarded and flagged there).
+ */
+function probeProtocol(nowMs) {
   const valueOf = async (action, args) => {
     const envelope = await probe(action, args);
     if (envelope?._tag !== "ok") {
@@ -136,11 +193,45 @@ function probeProtocol() {
     return envelope.value;
   };
   return {
-    begin: () => valueOf("probeBegin", {}),
+    begin: () => valueOf("probeBegin", nowMs === undefined ? {} : { nowMs }),
     complete: (input) => valueOf("probeComplete", input),
     fail: (manifestId, attempt, reason) => valueOf("probeFail", { manifestId, attempt, reason }),
     sweep: () => valueOf("probeSweep", {}),
     sweepComplete: (input) => valueOf("probeSweepComplete", input),
+  };
+}
+
+/**
+ * The REAL HTTP boundary as the BackupProtocol port: the same
+ * bearer-verified .site routes the EU backup Container enters through
+ * (convex/operations/backups/http.ts), same envelopes, same server
+ * decisions - plus the boundary's own health/cost effects (backup.job
+ * heartbeats, measured cost entries) that the probe actions bypass by
+ * design. HTTP begins always target the REAL current slot (the run route
+ * takes no clock override), so this transport is only for current-slot runs.
+ */
+function httpProtocol(token) {
+  const call = async (path, body) => {
+    const response = await fetch(`${SITE}${path}`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    const envelope = await response.json().catch(() => null);
+    if (envelope?._tag !== "ok") {
+      throw new Error(`http ${path} failed: status=${response.status} ${JSON.stringify(envelope).slice(0, 160)}`);
+    }
+    return envelope.value;
+  };
+  return {
+    begin: () => call("/operations/backups/run"),
+    complete: (input) => call("/operations/backups/complete", input),
+    fail: (manifestId, attempt, reason) => call("/operations/backups/fail", { manifestId, attempt, reason }),
+    sweep: () => call("/operations/backups/sweep"),
+    sweepComplete: (input) => call("/operations/backups/sweep/complete", input),
   };
 }
 
@@ -215,6 +306,28 @@ try {
   });
   record("L0-fixture", seeded?.value?.seeded === true ? "PASS" : "FAIL", JSON.stringify(seeded?.value ?? seeded).slice(0, 120));
 
+  // Between-passes cleanup (probeClear's documented purpose): each pass must
+  // be self-contained. Leftover verified rows from an earlier pass would be
+  // NEWER than the stale fixture below and mask the stale verdict.
+  await probe("probeClear", {});
+
+  // L4-freshness FIRST: the stale fixture must be the NEWEST verified
+  // snapshot at tick time, so this runs before any pass-own verified row
+  // exists (L1/L2 create fresh ones). Seeds a 125-minute-old verified
+  // manifest, ticks the real freshness check, and asserts the real stale
+  // verdict + the ops.backup.stale emission. A re-run inside the same
+  // 15-minute anchor slot observes the emission deduplicated - the episode
+  // was already reported, which is the same rule observed.
+  await probe("probeSeedManifest", { slotAgeMinutes: 125, state: "verified", mediaObjectKeys: [] });
+  const tick = (await probe("probeTick", {}))?.value;
+  record(
+    "L4-freshness",
+    tick?.freshness?.state === "stale" && (tick?.freshness?.emitted === true || tick?.freshness?.reason === "deduplicated")
+      ? "PASS"
+      : "FAIL",
+    JSON.stringify(tick?.freshness).slice(0, 160),
+  );
+
   // L1: lease + overlap.
   const begin1 = (await probe("probeBegin", {}))?.value;
   record(
@@ -228,9 +341,23 @@ try {
     begin2?.status === "refused" && begin2?.reason === "lease_held" ? "PASS" : "FAIL",
     JSON.stringify(begin2).slice(0, 160),
   );
+  // Release the L1 attempt so the L2 pipeline's own begin acquires the
+  // slot (a typed failure ends the attempt; an interrupted run would
+  // resume, never overlap).
+  if (begin1?.status === "acquired") {
+    await probe("probeFail", {
+      manifestId: begin1.manifestId,
+      attempt: begin1.attempt,
+      reason: "proof_l1_overlap_released",
+    });
+  }
 
-  // L2/L3: the real pipeline over the probe protocol + CLI transports.
-  const protocol = probeProtocol();
+  // L2: the real pipeline. With the service credential the protocol port is
+  // the REAL HTTP boundary (bearer-verified .site routes) so the run enters
+  // exactly like the EU Container does and the boundary's own heartbeat/cost
+  // effects exist for L7; without it, the guarded probe actions (the same
+  // server functions, minus the HTTP layer).
+  const protocol = SERVICE_TOKEN !== null ? httpProtocol(SERVICE_TOKEN) : probeProtocol();
   const deps = {
     protocol,
     exporter: {
@@ -250,38 +377,58 @@ try {
     JSON.stringify(l2).slice(0, 200),
   );
   const state1 = (await probe("probeState", {}))?.value;
-  const verifiedRow = state1?.manifests?.find((m) => m.state === "verified");
+  // The L2 run's OWN row (by manifestId - the freshness fixture seeded a
+  // past-dated verified row that must not satisfy this check).
+  const verifiedRow = state1?.manifests?.find((m) => m.manifestId === l2.manifestId);
   record(
     "L2-manifest-row",
-    verifiedRow !== undefined && typeof verifiedRow.manifestHash === "string" ? "PASS" : "FAIL",
+    verifiedRow !== undefined &&
+      verifiedRow.state === "verified" &&
+      typeof verifiedRow.manifestHash === "string" &&
+      /^[a-f0-9]{64}$/.test(verifiedRow.manifestHash)
+      ? "PASS"
+      : "FAIL",
     JSON.stringify(verifiedRow).slice(0, 200),
   );
 
-  // L3: a live interrupt + takeover (needs an acquirable slot; the full
-  // matrix is unit-proven in tests/i5/pipeline.test.ts).
-  const l3begin = (await probe("probeBegin", {}))?.value;
-  if (l3begin?.status === "acquired") {
-    let interrupted = false;
-    try {
-      await runBackup(deps, { interruptAt: "after_export" });
-    } catch (error) {
-      interrupted = error instanceof Error && error.message.includes("pipeline interrupted");
-    }
-    const resumed = await runBackup(deps);
-    record(
-      "L3-interrupt-resume",
-      interrupted && resumed.outcome === "verified" ? "PASS" : "FAIL",
-      `interrupted=${interrupted} resume=${resumed.outcome}`,
-    );
-  } else {
-    record("L3-interrupt-resume", "NOT RUN", `slot not acquirable: ${JSON.stringify(l3begin).slice(0, 120)}`);
+  // L3: a live interrupt + REAL takeover. The proof rides the NEXT slot via
+  // the guarded proof-only clock fixture (L2 just verified the current slot,
+  // which is `already_complete` forever). Attempt 1 begins 1 minute into
+  // that slot, exports, then interrupts (after_export): the row stays
+  // `building` with a live lease and NO manifest. The resume begins 14
+  // minutes into the slot - past attempt 1's 12-minute lease, so the server
+  // decides the real `lease_expired` takeover (attempt 2), still inside the
+  // slot, with its re-anchored lease far in the future for the server's
+  // real-clock completion check. The full interrupt matrix is unit-proven
+  // in tests/i5/pipeline.test.ts.
+  const currentSlot = Math.floor(Date.now() / SCHEDULE_INTERVAL_MS) * SCHEDULE_INTERVAL_MS;
+  const l3Slot = currentSlot + SCHEDULE_INTERVAL_MS;
+  const l3AttemptClock = l3Slot + 60_000;
+  const l3ResumeClock = l3Slot + 14 * 60_000;
+  let interrupted = false;
+  try {
+    await runBackup({ ...deps, protocol: probeProtocol(l3AttemptClock) }, { interruptAt: "after_export" });
+  } catch (error) {
+    interrupted = error instanceof Error && error.message.includes("pipeline interrupted");
   }
+  const resumed = await runBackup({ ...deps, protocol: probeProtocol(l3ResumeClock) });
+  const state3 = (await probe("probeState", {}))?.value;
+  const l3Row = state3?.manifests?.find((m) => m.slotMs === l3Slot);
+  record(
+    "L3-interrupt-resume",
+    interrupted && resumed.outcome === "verified" && l3Row?.state === "verified" && l3Row?.attempts === 2
+      ? "PASS"
+      : "FAIL",
+    `interrupted=${interrupted} resume=${resumed.outcome} attempts=${l3Row?.attempts ?? "?"} state=${l3Row?.state ?? "?"}`,
+  );
 
-  // L4: corruption + freshness. The tampered source is a FRESH fixture whose
-  // pool copy does not exist yet (the copy pass is what catches it; an
+  // L4: corruption + typed failure. The tampered source is a FRESH fixture
+  // whose pool copy does not exist yet (the copy pass is what catches it; an
   // already-stored byte-identical object would be a head-skip resume, by
   // design): the media object stops matching its inventory row's byte count
-  // between seeding and the run, and the run must fail typed.
+  // between seeding and the run, and the run must fail typed. The proof
+  // rides the slot AFTER L3's (fresh, so begin starts attempt 1) through
+  // the same guarded clock fixture.
   const corruptKey = `companies/i5-proof/uploads/corrupt-${Date.now()}/0-image`;
   const tampered = new TextEncoder().encode("tampered bytes");
   const tamperFile = join(dir, "tamper");
@@ -298,27 +445,18 @@ try {
   });
   // Tamper the source AFTER the inventory row recorded it.
   await wranglerObjectPut(MEDIA_BUCKET, corruptKey, tamperFile);
-  // Next slot: wait or reuse after lease expiry is not practical live; the
-  // corruption row uses the CURRENT pipeline against the tampered source.
-  const l4begin = (await probe("probeBegin", {}))?.value;
-  if (l4begin?.status === "acquired") {
-    const l4 = await runBackup(deps);
-    record(
-      "L4-corruption",
-      l4.outcome === "failed" && ["media_hash_mismatch", "media_verify_failed"].includes(l4.reason) ? "PASS" : "FAIL",
-      JSON.stringify(l4).slice(0, 160),
-    );
-  } else {
-    record("L4-corruption", "NOT RUN", `slot not acquirable: ${JSON.stringify(l4begin).slice(0, 120)}`);
-  }
-  // Freshness: seed a stale verified manifest (2h old) and run the tick.
-  await probe("probeSeedManifest", { slotAgeMinutes: 125, state: "verified", mediaObjectKeys: [] });
-  const tick = (await probe("probeTick", {}))?.value;
+  const l4Slot = currentSlot + 2 * SCHEDULE_INTERVAL_MS;
+  const l4 = await runBackup({ ...deps, protocol: probeProtocol(l4Slot + 5 * 60_000) });
   record(
-    "L4-freshness",
-    tick?.freshness?.state === "stale" && tick?.freshness?.emitted === true ? "PASS" : "FAIL",
-    JSON.stringify(tick?.freshness).slice(0, 160),
+    "L4-corruption",
+    l4.outcome === "failed" && ["media_hash_mismatch", "media_verify_failed"].includes(l4.reason) ? "PASS" : "FAIL",
+    JSON.stringify(l4).slice(0, 160),
   );
+  // Re-run hygiene: retained-media fixtures persist across passes (probeClear
+  // clears manifests, not the D3 inventory), so the tampered object must go
+  // back to the bytes its inventory row records - otherwise every LATER
+  // pass's copy pass fails on this fixture instead of its own scenario.
+  await wranglerObjectPut(MEDIA_BUCKET, corruptKey, originalFile);
 
   // L5: retention fixtures (frequent 49h, daily 15d, shared key with a survivor).
   const oldShared = "companies/i5-proof/uploads/old/shared-object";
@@ -363,14 +501,31 @@ try {
     `invariant=${state6?.deletedContentInvariantHolds} (no set outlives 14d < 30d; purge drops exclude new sets)`,
   );
 
-  // L7: health/cost events.
-  const healthUrl = `${URL_}/platform/telemetry/health`;
-  const health = await fetch(healthUrl).then((r) => r.json()).catch(() => null);
-  const telemetry = health?.value?.telemetry ?? {};
-  const heartbeatSeen = JSON.stringify(telemetry).includes("backup.job");
-  const costSeen = JSON.stringify(telemetry?.costs ?? {}).includes("backup");
-  record("L7-heartbeats", heartbeatSeen ? "PASS" : "FAIL", "backup.job present in health state");
-  record("L7-costs", costSeen ? "PASS" : "FAIL", "backup provider present in cost accounting");
+  // L7: the HTTP boundary's own effects, read back from the PUBLIC health
+  // state at the .site origin (HTTP routes never serve on .cloud). The
+  // backup.job heartbeats are recorded by the boundary's begin/complete/fail
+  // routes and the measured cost entries (provider `backup`) by the complete
+  // route - effects the guarded probe actions bypass by design, so this row
+  // requires L2 to have ridden the real boundary (service credential set).
+  if (SERVICE_TOKEN !== null) {
+    const health = await fetch(`${SITE}/platform/telemetry/health`).then((r) => r.json()).catch(() => null);
+    const telemetry = health?.value?.telemetry ?? {};
+    const heartbeatSeen = JSON.stringify(telemetry).includes("backup.job");
+    const costSeen = JSON.stringify(telemetry?.costs ?? {}).includes("backup");
+    record("L7-heartbeats", heartbeatSeen ? "PASS" : "FAIL", "backup.job present in health state");
+    record("L7-costs", costSeen ? "PASS" : "FAIL", "backup provider present in cost accounting");
+  } else {
+    record(
+      "L7-heartbeats",
+      "NOT RUN",
+      "KIERO_SERVICE_TOKEN absent: the HTTP boundary refuses every route (401) and the probe actions bypass the heartbeat layer by design",
+    );
+    record(
+      "L7-costs",
+      "NOT RUN",
+      "KIERO_SERVICE_TOKEN absent: measured cost entries are recorded only by the HTTP complete route",
+    );
+  }
 
   process.exit(summarize() ? 0 : 1);
 } finally {
