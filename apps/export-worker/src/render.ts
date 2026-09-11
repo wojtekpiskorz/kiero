@@ -40,7 +40,7 @@ function raw(html: string): RawCell {
 
 /** An archive-relative link; href and label are id-built, escaped paths. */
 function archiveLink(path: string, label: string): RawCell {
-  return raw(`<a href="../${escapeHtml(path)}">${escapeHtml(label)}</a>`);
+  return raw(`<a href="${escapeHtml(path)}">${escapeHtml(label)}</a>`);
 }
 
 function row(items: readonly (string | RawCell)[]): string {

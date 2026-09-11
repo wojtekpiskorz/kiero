@@ -32,7 +32,10 @@
  * - `sourceCount`/`mediaCount`: bounded counts for the status screen and
  *   the audit; never content.
  * - Index `by_company_created`: the administrator's status list, newest
- *   first; `by_state_until`: the expiry sweep's range.
+ *   first. (No state/until range index: expiry is swept per export id by
+ *   the action scheduled at publish time, and cleanup is scheduled by the
+ *   one invalidation core at the moment of invalidation; no query ranges
+ *   over state.)
  *
  * Tables: exports, exportSourceLinks.
  */
@@ -83,8 +86,7 @@ export const exportsTables = {
     cleanedAtMs: v.optional(shared.tsMs),
   })
     .index("by_company_state", ["companyId", "state"])
-    .index("by_company_created", ["companyId", "createdAtMs"])
-    .index("by_state_until", ["state", "availableUntilMs"]),
+    .index("by_company_created", ["companyId", "createdAtMs"]),
 
   /** Which sources an archive contains; drives immediate invalidation. */
   exportSourceLinks: defineTable({

@@ -57,6 +57,11 @@
       "name": "kiero-dev-export-container",
       // I3: node:22-slim, zero-build Node entry (see ./Dockerfile).
       "image": "./Dockerfile",
+      // The Dockerfile COPYs repo-level paths (the container mirrors the
+      // one cross-tree protocol module it imports), so the build context is
+      // the repo root; the root .dockerignore keeps it to exactly those
+      // paths (the I5 backup-worker precedent).
+      "image_build_context": "../../",
       "class_name": "ExportWorkerContainer",
       "instance_type": "dev",
       "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
@@ -84,6 +89,7 @@
         {
           "name": "kiero-staging-export-container",
           "image": "./Dockerfile",
+          "image_build_context": "../../",
           "class_name": "ExportWorkerContainer",
           "instance_type": "dev",
           "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
@@ -111,6 +117,7 @@
         {
           "name": "kiero-alpha-export-container",
           "image": "./Dockerfile",
+          "image_build_context": "../../",
           "class_name": "ExportWorkerContainer",
           "instance_type": "basic",
           "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },

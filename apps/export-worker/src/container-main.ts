@@ -8,10 +8,11 @@
  * streams to a Web `Request` and writes the handler's `Response` back:
  * there is no second copy of the boundary to drift.
  *
- * Node >= 22.12 runs this file directly with type stripping
- * (`node --experimental-strip-types`), so the image needs no build step
- * and no added dependency; intra-app imports therefore carry explicit
- * `.ts` extensions.
+ * Node >= 22.12 runs this file directly with type stripping plus
+ * transformation (`node --experimental-transform-types`; strip-only mode
+ * cannot parse the parameter property in ./zip.ts), so the image needs no
+ * build step and no added dependency; intra-app imports therefore carry
+ * explicit `.ts` extensions.
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";

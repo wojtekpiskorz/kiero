@@ -334,11 +334,46 @@ export async function expireExportCore(
 }
 
 /**
+ * The ONE one-row invalidation transition: patch the row to `invalidated`,
+ * publish `operations.exportInvalidated`, and schedule the byte cleanup
+ * when the row has an object. Every path that invalidates an export runs
+ * through here (the eager core below and the lazy per-request download
+ * refusal in functions.ts `exportAccessFor`), so no invalidation ever
+ * strands archive bytes in R2. A terminal or missing row is a no-op.
+ */
+export async function invalidateExportCore(
+  tx: MutationCtx,
+  exportId: Id<"exports">,
+  reason: string,
+  nowMs: number,
+): Promise<boolean> {
+  const row = await tx.db.get(exportId);
+  if (row === null || !isPreTerminal(row.state)) {
+    return false;
+  }
+  await tx.db.patch(exportId, {
+    state: "invalidated",
+    invalidationReason: reason,
+    invalidatedAtMs: nowMs,
+  });
+  await publishEvent(tx, {
+    companyId: row.companyId,
+    eventName: "operations.exportInvalidated",
+    payload: { exportId },
+    dedupKey: `operations.exportInvalidated:${exportId}`,
+  });
+  if (row.objectKey !== undefined) {
+    await tx.scheduler.runAfter(0, internal.operations.exports.functions.cleanupExport, { exportId });
+  }
+  return true;
+}
+
+/**
  * The eager invalidation path (I4's purge executor and this lane's proof
- * call it): every pre-terminal export linked to the source is invalidated,
- * its event published and its cleanup scheduled. Returns the invalidated
- * export ids (the per-request download check is the immediate guard even
- * before this runs).
+ * call it): every pre-terminal export linked to the source runs through
+ * the one-row core above. Returns the invalidated export ids (the
+ * per-request download check is the immediate guard even before this
+ * runs).
  */
 export async function invalidateExportsForSourceCore(
   tx: MutationCtx,
@@ -349,25 +384,9 @@ export async function invalidateExportsForSourceCore(
   const links = await tx.db.query("exportSourceLinks").withIndex("by_source", (q) => q.eq("sourceId", sourceId)).collect();
   const invalidated: Id<"exports">[] = [];
   for (const link of links) {
-    const row = await tx.db.get(link.exportId);
-    if (row === null || !isPreTerminal(row.state)) {
-      continue;
+    if (await invalidateExportCore(tx, link.exportId, reason, nowMs)) {
+      invalidated.push(link.exportId);
     }
-    await tx.db.patch(link.exportId, {
-      state: "invalidated",
-      invalidationReason: reason,
-      invalidatedAtMs: nowMs,
-    });
-    await publishEvent(tx, {
-      companyId: row.companyId,
-      eventName: "operations.exportInvalidated",
-      payload: { exportId: link.exportId },
-      dedupKey: `operations.exportInvalidated:${link.exportId}`,
-    });
-    if (row.objectKey !== undefined) {
-      await tx.scheduler.runAfter(0, internal.operations.exports.functions.cleanupExport, { exportId: link.exportId });
-    }
-    invalidated.push(link.exportId);
   }
   return invalidated;
 }

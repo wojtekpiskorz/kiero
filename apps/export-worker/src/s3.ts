@@ -9,9 +9,11 @@
  * SIGNING TWIN: apps/media-worker/src/s3r2.ts (the D6 reader) carries its
  * own copy of the same SigV4 derivation chain (hex/hmac/sha256Hex, amzDate,
  * scope, key chain, authorization header). The container boundary keeps it
- * there: each image contains only its own src/ (no node_modules, build
- * context = the app directory), so a shared workspace module is not
- * importable at container runtime. A signing fix here MUST land there too.
+ * there: the image carries only its own src/ plus the one mirrored
+ * zero-dependency protocol module (see ./Dockerfile; node_modules never
+ * enters the allowlisted root build context), so a shared workspace module
+ * is not importable at container runtime. A signing fix here MUST land
+ * there too.
  * The one known divergence is requirement-driven: this client signs real
  * body hashes and a sorted canonical query (writes need both); the reader
  * signs the empty hash with no query (ranged reads only).

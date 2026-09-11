@@ -41,7 +41,7 @@ import {
   resolveAccessContextFromConvexAuth,
   resolveAccessContextWithProvisioning,
 } from "../../access/identity/resolution";
-import { requestExportCore, publishArchiveCore, failBuildCore, markCleanedCore, expireExportCore, invalidateExportsForSourceCore } from "./lifecycle";
+import { requestExportCore, publishArchiveCore, failBuildCore, markCleanedCore, expireExportCore, invalidateExportCore, invalidateExportsForSourceCore } from "./lifecycle";
 import { readCompanySnapshot, snapshotDb } from "./snapshot";
 import { resolveExportAccess, exportAccessDb } from "./access";
 import { EXPORT_STATE_LABELS } from "./protocol";
@@ -171,13 +171,11 @@ export const exportAccessFor = internalMutation({
     const context = await resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
     const outcome = await resolveExportAccess(exportAccessDb(ctx.db), context, args, Date.now());
     if (outcome.invalidateExportId !== undefined) {
-      // The linked-purge refusal: mark the row so the status list says why
-      // (the refusal itself already happened; the marking is best-effort).
-      await ctx.db.patch(outcome.invalidateExportId, {
-        state: "invalidated",
-        invalidationReason: "source_purged",
-        invalidatedAtMs: Date.now(),
-      });
+      // The linked-purge refusal: run the row through the ONE invalidation
+      // transition (patch + event + cleanup schedule), so this lazy path
+      // strands no archive bytes either (the refusal already happened; the
+      // marking is best-effort).
+      await invalidateExportCore(ctx, outcome.invalidateExportId, "source_purged", Date.now());
     }
     return outcome.result;
   },

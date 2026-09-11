@@ -86,6 +86,9 @@ function ExportsSurface(): ReactNode {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ readonly kind: "ok" | "error"; readonly text: string } | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
+  // The download gateway, derived ONCE: null when unconfigured (the missing
+  // note renders exactly then, and the button stays disabled).
+  const gatewayUrl = config.gateway.state === "configured" ? config.gateway.gatewayUrl : null;
 
   if (state.status === "error") {
     return createElement("div", { role: "alert" }, createElement("p", null, copy.sessionEnded));
@@ -113,14 +116,13 @@ function ExportsSurface(): ReactNode {
   }
 
   async function download(row: StatusRow): Promise<void> {
-    const gatewayUrl = config.gateway.state === "configured" ? config.gateway.gatewayUrl : null;
     if (token === null || gatewayUrl === null) {
       setNotice({ kind: "error", text: copy.gatewayMissing });
       return;
     }
     setDownloading(row.exportId);
     try {
-      const response = await fetch(`${config.gateway.state === "configured" ? config.gateway.gatewayUrl : null}/exports/${row.exportId}/download`, {
+      const response = await fetch(`${gatewayUrl}/exports/${row.exportId}/download`, {
         headers: { authorization: `Bearer ${token}` },
       });
       if (response.status !== 200 && response.status !== 206) {
@@ -195,7 +197,7 @@ function ExportsSurface(): ReactNode {
           "button",
           {
             type: "button",
-            disabled: row.stateRaw !== "available" || downloading !== null || config.gateway.state !== "configured",
+            disabled: row.stateRaw !== "available" || downloading !== null || gatewayUrl === null,
             onClick: () => void download(row),
           },
           downloading === row.exportId ? copy.downloading : copy.downloadButton,
@@ -209,7 +211,7 @@ function ExportsSurface(): ReactNode {
     });
     children.push(createElement("ul", null, ...items));
   }
-  if (config.gateway.state === "configured" ? config.gateway.gatewayUrl : null === null) {
+  if (gatewayUrl === null) {
     children.push(createElement("p", { role: "note" }, copy.gatewayMissing));
   }
   if (notice !== null) {

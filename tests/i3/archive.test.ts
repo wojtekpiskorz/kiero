@@ -299,8 +299,10 @@ describe("the rendered archive", () => {
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("Kaczmarek &lt;b&gt;");
     expect(html).toContain("&lt;/td&gt;");
-    // Media links point at the archive-relative, id-built path only.
-    expect(html).toMatch(/href="\.\.\/media\/s1\/r1\.jpg"/);
+    // Media links point at the archive-relative, id-built path only
+    // (index.html and media/ share the ZIP root; no ../ escape).
+    expect(html).toMatch(/href="media\/s1\/r1\.jpg"/);
+    expect(html).not.toMatch(/href="\.\.\//);
     expect(html).not.toContain("objectKey");
   });
 

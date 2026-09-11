@@ -1,0 +1,17 @@
+# Root build context allowlist: container Dockerfiles that COPY repo-level
+# paths (apps/export-worker/wrangler.jsonc sets image_build_context to the
+# repo root) build with the repo root as their context, so only the paths
+# their COPY lines name enter the context - the export worker's src tree
+# plus the one cross-tree module the image mirrors (see
+# apps/export-worker/Dockerfile). Everything else, including node_modules
+# and .git, stays out. Sibling container apps (backup-worker) extend this
+# allowlist with their own COPY paths; keep every entry paired with a
+# Dockerfile COPY line.
+*
+!apps
+!apps/export-worker
+!apps/export-worker/src
+!convex
+!convex/operations
+!convex/operations/exports
+!convex/operations/exports/protocol.ts

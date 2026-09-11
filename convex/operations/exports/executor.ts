@@ -41,8 +41,13 @@ const RETRY_BACKOFF_BASE_MS = 5_000;
 export const buildArchiveExecutor: JobExecutor = {
   jobKind: "exports.build_archive",
   execute: async (ctx: MutationCtx, job: DurableJobDoc): Promise<JobOutcome> => {
-    const exportId = JSON.parse(job.inputJson).exportId as string;
-    const begun = await beginBuildCore(ctx, exportId as any, Date.now());
+    const input = JSON.parse(job.inputJson) as { exportId: string };
+    const exportId = ctx.db.normalizeId("exports", input.exportId);
+    if (exportId === null) {
+      // A malformed job input (no valid export id): nothing to build.
+      return { outcome: "succeeded" };
+    }
+    const begun = await beginBuildCore(ctx, exportId, Date.now());
     if (begun === null) {
       // Terminal row (already available/expired/invalidated/failed): the
       // replay is a no-op, never a second archive.
@@ -216,7 +221,10 @@ export async function recordBuildOutcome(
       finishedAtMs: nowMs,
     });
     if (args.exportId !== "" && args.buildToken !== "") {
-      await failBuildCore(ctx, args.exportId as any, args.buildToken, args.errorKind, nowMs);
+      const exportId = ctx.db.normalizeId("exports", args.exportId);
+      if (exportId !== null) {
+        await failBuildCore(ctx, exportId, args.buildToken, args.errorKind, nowMs);
+      }
     }
   };
   if (args.outcome === "failed" && args.retryable && job.attempts < job.maxAttempts) {
