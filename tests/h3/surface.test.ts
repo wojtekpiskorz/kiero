@@ -217,6 +217,7 @@ describe("the dossier fixture decodes through the public read's schema", () => {
           state: "complete",
           audioDurationMs: 120_000,
           pipelineVersion: "d6/1",
+      attachmentId: "k0003ttttttttttttttttttttt",
           segmentCount: 2,
           segments: [
             { segmentIndex: 0, startMs: 0, endMs: 1_000, state: "succeeded", text: "Dowóz płytek w środę." },
@@ -278,6 +279,7 @@ describe("the dossier fixture decodes through the public read's schema", () => {
           orderId: VISION_ORDER_ID,
           state: "complete",
           pipelineVersion: "e4/1",
+      attachmentId: "k0003ttttttttttttttttttttt",
           representationId: REPRESENTATION_2,
           spaceWidth: 1024,
           spaceHeight: 768,

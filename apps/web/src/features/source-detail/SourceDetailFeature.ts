@@ -173,12 +173,15 @@ function SourceDetailBody({
     query: api.sources.read.views.sourceExposition,
     args: { sourceId: asConvexId("sources", sourceId) },
   });
-  const [evidencePageSize, setEvidencePageSize] = useState(EVIDENCE_PAGE_SIZE);
+  const [evidenceCursor, setEvidenceCursor] = useState<string | null>(null);
+  const [evidenceRows, setEvidenceRows] = useState<readonly SourceEvidenceRow[]>([]);
   const evidence = useQueryState({
     query: api.sources.read.views.sourceEvidence,
     args: {
       sourceId: asConvexId("sources", sourceId),
-      paginationOpts: { numItems: evidencePageSize, cursor: null },
+      // The tracked cursor pages forward: each click fetches ONE page past
+      // the last, never re-reading the whole prefix.
+      paginationOpts: { numItems: EVIDENCE_PAGE_SIZE, cursor: evidenceCursor },
     },
   });
   const markRead = useMutation(api.attention.read_state.commands.markSourceReadCommand);
@@ -226,6 +229,21 @@ function SourceDetailBody({
     evidence.status === "success" && evidence.data._tag === "ok"
       ? Schema.decodeUnknownSync(SourceEvidencePage)(evidence.data.value)
       : null;
+  // Pages accumulate: each fetch is ONE page past the cursor (the tracked
+  // continueCursor), so paging N pages costs N page reads, not the O(N^2)
+  // re-read of the whole prefix a growing numItems caused.
+  useEffect(() => {
+    if (evidencePage === null) {
+      return;
+    }
+    setEvidenceRows((previous) => {
+      const seen = new Set(previous.map((r) => `${r.findingId}:${r.citedRevisionId}:${r.fragmentId ?? "whole"}`));
+      const appended = evidencePage.page.filter(
+        (r) => !seen.has(`${r.findingId}:${r.citedRevisionId}:${r.fragmentId ?? "whole"}`),
+      );
+      return appended.length === 0 ? previous : [...previous, ...appended];
+    });
+  }, [evidencePage]);
 
   const canonicalUrl =
     typeof window === "undefined" ? null : `${window.location.origin}/?${SOURCE_PARAM}=${sourceId}`;
@@ -296,11 +314,11 @@ function SourceDetailBody({
     createElement(OcrSection, { row }),
     createElement(FragmentsSection, { row, highlightedFragmentId }),
     createElement(EvidenceSection, {
-      page: evidencePage,
+      rows: evidenceRows,
       loading: evidence.status !== "success" && evidence.status !== "error",
       sessionEnded: evidence.status === "error",
       isDone: evidencePage?.isDone ?? true,
-      loadMore: () => setEvidencePageSize((size) => size + EVIDENCE_PAGE_SIZE),
+      loadMore: () => setEvidenceCursor(evidencePage?.continueCursor ?? null),
       row,
     }),
   );
@@ -364,7 +382,7 @@ function WithdrawControl({ sourceId }: { readonly sourceId: string }): ReactNode
       setReason("");
       setOpen(false);
     } catch {
-      setNotice({ kind: "error", text: copy.tokenMissing });
+      setNotice({ kind: "error", text: copy.networkUnavailable });
     } finally {
       setSaving(false);
     }
@@ -652,8 +670,13 @@ function ImageAttachmentView({
   // The EXACT retained representation the OCR anchors are coordinates in
   // (D3's exact-version read); fall back to the attachment read when no
   // completed order pins one.
+  // Per-attachment correlation: an order reads ONE attachment; without the
+  // filter, every image view would load the first order's representation
+  // and draw its OCR boxes over whichever image is displayed.
   const anchoredOrder =
-    row.visionOrders.find((order) => order.state === "complete") ?? null;
+    row.visionOrders.find(
+      (order) => order.state === "complete" && order.attachmentId === attachmentId,
+    ) ?? null;
   const representationId =
     anchoredOrder?.representationId ??
     row.attachments
@@ -896,14 +919,14 @@ function FragmentsSection({
 // ---------------------------------------------------------------------------
 
 function EvidenceSection({
-  page,
+  rows,
   loading,
   sessionEnded,
   isDone,
   loadMore,
   row,
 }: {
-  readonly page: SourceEvidencePage | null;
+  readonly rows: readonly SourceEvidenceRow[];
   readonly loading: boolean;
   readonly sessionEnded: boolean;
   readonly isDone: boolean;
@@ -919,12 +942,12 @@ function EvidenceSection({
       ? createElement(SessionEnded)
       : loading
         ? createElement("p", { role: "status" }, copy.checkingSession)
-        : page === null || page.page.length === 0
+        : rows.length === 0
           ? createElement("p", null, copy.noEvidence)
           : createElement(
               "ul",
               null,
-              ...page.page.map((entry) =>
+              ...rows.map((entry) =>
                 createElement(
                   "li",
                   { key: `${entry.findingId}:${entry.citedRevisionId}:${entry.fragmentId ?? "whole"}` },
@@ -932,7 +955,7 @@ function EvidenceSection({
                 ),
               ),
             ),
-    page !== null && !isDone
+    !isDone
       ? createElement(
           "p",
           null,

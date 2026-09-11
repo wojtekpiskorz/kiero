@@ -129,6 +129,8 @@ const VisionOrderWireRow = Schema.Struct({
   orderId: Schema.String,
   state: Schema.Literals(["pending", "complete", "failed"]),
   pipelineVersion: Schema.String,
+  /** The image attachment this order read (per-attachment correlation). */
+  attachmentId: Schema.String,
   /** The EXACT representation whose pixels were read (coordinate space). */
   representationId: Schema.String,
   spaceWidth: Schema.NullOr(Schema.Number),
@@ -352,6 +354,7 @@ async function visionOrdersOf(
         orderId: order._id as string,
         state: order.state,
         pipelineVersion: order.pipelineVersion,
+        attachmentId: order.attachmentId as string,
         representationId: order.representationId as string,
         spaceWidth: representation?.width ?? null,
         spaceHeight: representation?.height ?? null,

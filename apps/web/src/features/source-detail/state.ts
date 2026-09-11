@@ -65,6 +65,7 @@ export const sourceDetailCopy = {
   reassignmentNote:
     "Przypisanie tej wiadomości do projektów zmienia się obecnie tylko przy wysyłce (podpowiedzi projektów). Osobna operacja przypisania źródła do projektów nie jest jeszcze udostępniona.",
   // Evidence chain
+  networkUnavailable: "Brak połączenia z serwerem. Spróbuj ponownie za chwilę.",
   evidenceHeading: "Ustalenia oparte na tym źródle",
   evidenceIntro:
     "Każdy dowód wskazuje fragment wiadomości i aktualny stan ustalenia, które z niego wynika.",
