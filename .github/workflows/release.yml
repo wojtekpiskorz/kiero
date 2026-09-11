@@ -4,8 +4,8 @@ name: Release
 #
 # 1. PRODUCTION IS EXPLICIT. The only trigger is workflow_dispatch with a
 #    chosen target; checks (checks.yml) and a successful staging deploy can
-#    never promote anything by themselves. The production job additionally
-#    runs inside the protected `alpha-production` GitHub environment, so a
+#    never promote anything by themselves. The production job also runs
+#    inside the protected `alpha-production` GitHub environment, so a
 #    human approval gate stands between staging evidence and production.
 # 2. SECRETS ARE ENVIRONMENT-SCOPED. The staging job may reference only
 #    STAGING_* secrets and the production job only PRODUCTION_*; the

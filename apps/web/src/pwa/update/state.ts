@@ -2,9 +2,10 @@
  * The PWA update surface's Polish copy (I7): the update prompt shown only
  * at a safe point, and the closed vocabulary the update flow reports.
  *
- * Product text follows CONTEXT.md exactly: the composer's local state is
- * the "szkic" (a draft that is local until the server confirms), and the
- * thing being updated is the Kiero application the boss is looking at.
+ * Product text: "szkic" is D4's established capture-surface word for
+ * the composer's local state (a draft that is local until the server
+ * confirms; it is not a CONTEXT.md glossary term), and the thing being
+ * updated is the Kiero application the boss is looking at.
  * The copy never claims more safety than the mechanism provides: what is
  * promised is that the szkic stays recoverable on this device, which is
  * exactly what the incremental draft store plus the pre-update

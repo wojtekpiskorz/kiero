@@ -15,7 +15,7 @@ import {
   convexSiteUrlFromCloudUrl,
   decideRuntimeHandshake,
 } from "../../apps/web/src/pwa/update/handshake";
-import { webUpdateEntry } from "../../apps/web/src/pwa/update/module";
+import { createWebUpdateEntry } from "../../apps/web/src/pwa/update/module";
 import {
   DRAFTS_DB_NAME,
   DRAFTS_STORE_NAME,
@@ -85,27 +85,29 @@ describe("drift guards against sibling-owned constants", () => {
   });
 
   it("the update module fills the composition slot and the host wiring attaches it", () => {
-    expect(webUpdateEntry.moduleId).toBe("update.pwa");
+    const updateEntry = createWebUpdateEntry(null);
+    expect(updateEntry.moduleId).toBe("update.pwa");
     const composition = composePwaEntries({
       serviceWorkerScript: "/sw.js",
-      update: webUpdateEntry,
+      update: updateEntry,
     });
     expect(composition.update?.moduleId).toBe("update.pwa");
     // The prepared seam still refuses modules without their worker.
-    expect(() => composePwaEntries({ update: webUpdateEntry })).toThrow(
+    expect(() => composePwaEntries({ update: updateEntry })).toThrow(
       /service worker script/,
     );
 
     const mainSource = readFileSync(path.join(webSrc, "main.tsx"), "utf8");
-    expect(mainSource).toMatch(/update:\s*webUpdateEntry/);
-    expect(mainSource).toMatch(/configureUpdateVersionSource\(versionSourceFromAppConfig\(config\)\)/);
+    expect(mainSource).toMatch(
+      /update:\s*createWebUpdateEntry\(versionSourceFromAppConfig\(config\)\)/,
+    );
     // The composition's register path now hands the registration to the
-    // module hooks (the flagged I7 append).
+    // module hooks as independent legs (the flagged I7 append).
     const compositionSource = readFileSync(
       path.join(webSrc, "app", "pwa", "composition.ts"),
       "utf8",
     );
     expect(compositionSource).toMatch(/promptAtSafePoint\(registration\)/);
-    expect(compositionSource).toMatch(/push\.register\(registration\)/);
+    expect(compositionSource).toMatch(/push\?\.register\(registration\)/);
   });
 });

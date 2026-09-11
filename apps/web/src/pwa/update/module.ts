@@ -194,7 +194,6 @@ function reportSummary(report: DraftMigrationReport): string {
 }
 
 /** Builds a synthetic pagehide event when this runtime has an Event. */
-/** Builds a synthetic pagehide event when this runtime has an Event. */
 function syntheticPageHide(): unknown {
   const eventConstructor = (globalThis as { Event?: new (type: string) => unknown }).Event;
   return eventConstructor === undefined ? null : new eventConstructor("pagehide");
@@ -316,24 +315,25 @@ export async function startUpdateFlow(
       : detected === "waiting-worker"
         ? "available"
         : null;
-    if (kind === null) {
+    // Every "not now" path: hide any shown prompt and record why, so the
+    // state stays honest about the moment the prompt went away.
+    const defer = (reason: UpdateFlowState["deferredReason"]): void => {
       presenter.hide();
       promptShown = false;
-      deferredReason = "";
+      deferredReason = reason;
+    };
+    if (kind === null) {
+      defer("");
       return;
     }
     const document = documentSurface();
     if (document !== undefined && document.visibilityState === "hidden") {
-      presenter.hide();
-      promptShown = false;
-      deferredReason = "not-visible";
+      defer("not-visible");
       return;
     }
     const reason = gate.deferralReason(now());
     if (reason !== "") {
-      presenter.hide();
-      promptShown = false;
-      deferredReason = reason;
+      defer(reason);
       return;
     }
     deferredReason = "";
@@ -408,20 +408,24 @@ export async function startUpdateFlow(
 }
 
 /**
- * The composition entry (A4's prepared slot): attaching it together with
- * the service worker script starts the safe-update flow for that
- * worker's scope. This module never registers a worker itself and never
- * modifies the shipped worker script (F3 owns /sw.js). The version
- * source it consults is the one the host configured before registration
- * (see configureUpdateVersionSource); unconfigured means no handshake
- * leg, which is honest for a backend-less host.
+ * Builds the composition entry (A4's prepared slot) around its version
+ * source: attaching it together with the service worker script starts
+ * the safe-update flow for that worker's scope. This module never
+ * registers a worker itself and never modifies the shipped worker
+ * script (F3 owns /sw.js). The source arrives here, at attach time
+ * (main.tsx passes the typed config seam's answer); a null source means
+ * no handshake leg, which is honest for a backend-less host.
  */
-export const webUpdateEntry: UpdateEntryModule = {
-  moduleId: "update.pwa",
-  promptAtSafePoint: async (registration) => {
-    await startUpdateFlow(registration, { versionSource: configuredVersionSource });
-  },
-};
+export function createWebUpdateEntry(
+  versionSource: VersionInfoSource | null,
+): UpdateEntryModule {
+  return {
+    moduleId: "update.pwa",
+    promptAtSafePoint: async (registration) => {
+      await startUpdateFlow(registration, { versionSource });
+    },
+  };
+}
 
 /**
  * Builds the production version source from the app's Convex websocket
@@ -433,9 +437,6 @@ export function versionSourceFromConvexUrl(convexUrl: string): VersionInfoSource
   return siteUrl === null ? null : fetchHealthVersionSource(siteUrl);
 }
 
-/** The configured source (null until the host wires one). */
-let configuredVersionSource: VersionInfoSource | null = null;
-
 /**
  * Derives the update version source from the typed app config: a
  * configured Convex URL yields the health-endpoint source; anything else
@@ -445,17 +446,4 @@ export function versionSourceFromAppConfig(config: AppConfig): VersionInfoSource
   return config.connection.state === "configured"
     ? versionSourceFromConvexUrl(config.connection.convexUrl)
     : null;
-}
-
-/**
- * Sets the version source the composition entry consults (main.tsx wires
- * it from the typed config seam before registration; one-shot by design).
- */
-export function configureUpdateVersionSource(source: VersionInfoSource | null): void {
-  configuredVersionSource = source;
-}
-
-/** Reads back the configured source (tests and diagnostics). */
-export function updateVersionSource(): VersionInfoSource | null {
-  return configuredVersionSource;
 }

@@ -98,7 +98,10 @@ function serviceWorkerContainer(): ServiceWorkerContainerLike | undefined {
  * composed module hooks, so push registration and the safe update flow
  * ride the ONE registration path this seam owns. F3's push hook stays
  * passive by its own contract; I7's update hook starts the safe-point
- * flow for the worker's scope.
+ * flow for the worker's scope. The two hooks run as independent legs:
+ * push registration must never wait on the update flow's first poll,
+ * which is network-bound (the backend health read) exactly on the
+ * mobile connections Kiero targets.
  */
 export async function registerPwa(composition: PwaComposition): Promise<void> {
   if (composition.serviceWorkerScript === null) {
@@ -109,10 +112,8 @@ export async function registerPwa(composition: PwaComposition): Promise<void> {
     return;
   }
   const registration = await container.register(composition.serviceWorkerScript);
-  if (composition.update !== null) {
-    await composition.update.promptAtSafePoint(registration);
-  }
-  if (composition.push !== null) {
-    await composition.push.register(registration);
-  }
+  await Promise.all([
+    composition.update?.promptAtSafePoint(registration) ?? Promise.resolve(),
+    composition.push?.register(registration) ?? Promise.resolve(),
+  ]);
 }

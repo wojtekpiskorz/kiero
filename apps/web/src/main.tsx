@@ -12,10 +12,10 @@ import { composePwaEntries, registerPwa } from "./app/pwa/composition";
 import { webPushEntry } from "./pwa/push";
 // I7's sanctioned composition attach (the same prepared rule): the safe
 // update module joins the same registration; its version source is the
-// typed config seam's Convex URL (the public health endpoint).
+// typed config seam's Convex URL (the public health endpoint), passed
+// at attach time.
 import {
-  webUpdateEntry,
-  configureUpdateVersionSource,
+  createWebUpdateEntry,
   versionSourceFromAppConfig,
 } from "./pwa/update/module";
 
@@ -56,11 +56,10 @@ createRoot(container).render(
 // apps/web/src/pwa/push.ts). I7 attaches the safe update module to the
 // same composition: its prompt defers work (recording/editing/upload),
 // migrates the local draft first and reloads only on the user's click.
-configureUpdateVersionSource(versionSourceFromAppConfig(config));
 void registerPwa(
   composePwaEntries({
     serviceWorkerScript: "/sw.js",
     push: webPushEntry,
-    update: webUpdateEntry,
+    update: createWebUpdateEntry(versionSourceFromAppConfig(config)),
   }),
 );

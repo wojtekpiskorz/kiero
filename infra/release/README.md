@@ -48,7 +48,7 @@ After a bad release, repair is code-level only
 
 - Trigger: `workflow_dispatch` with an explicit target choice only.
   Checks and staging success can never implicitly promote production; the
-  production job additionally sits behind the protected
+  production job also sits behind the protected
   `alpha-production` GitHub environment (human approval).
 - Concurrency: one release per target at a time; a concurrent attempt
   queues (never cancels) and still stops at the protected environment.
