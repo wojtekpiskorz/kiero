@@ -71,6 +71,8 @@ describe("the recoveryManifests fragment", () => {
       "mediaBytes",
       "completedAtMs",
       "manifestHash",
+      "classAOps",
+      "classBOps",
     ]) {
       expect(fields[column], `missing I5 column ${column}`).toBeDefined();
     }

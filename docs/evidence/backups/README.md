@@ -35,8 +35,14 @@ npx --yes convex@1.45.0 deployment select wojtek-piskorz-jr:kiero-dev-core:dev/i
 npx convex@1.45.0 dev --once          # push functions + crons, regenerate
 npx convex@1.45.0 env set KIERO_PROBE_ENABLED 1
 npx convex@1.45.0 env set KIERO_SERVICE_TOKEN <value>   # name only here
-KIERO_I5_CONVEX=<deployment-name> node --experimental-strip-types tests/i5/live-proof.mjs
+KIERO_I5_CONVEX=<deployment-name> node --experimental-transform-types tests/i5/live-proof.mjs
 ```
+
+The flag is `--experimental-transform-types` (strip-only mode cannot parse
+the TypeScript parameter properties in the imported executor modules), and
+the script derives the client URL from the deployment's answering origin
+(fresh leases answer at `https://<name>.convex.cloud`, not the regional
+template).
 
 A re-run of the create during this session confirmed the quota is still
 exhausted; no other team resource was touched (the shared dev/main
@@ -74,10 +80,13 @@ Measured without live runs so far: the dev backup bucket is empty (0 bytes,
 0 objects - free tier), the container build ran locally (no account
 charge), and the Convex zip export performed during codegen/probe work is
 within Free. Per-run measurement wiring is implemented: manifest rows carry
-databaseBytes/mediaBytes/mediaObjectCount; complete records cost entries
+databaseBytes/mediaBytes/mediaObjectCount plus the executor-measured S3
+Class A/B op counts (the pipeline counts its GET/HEAD/LIST and PUT/DELETE
+port calls); complete records cost entries
 (provider `backup`, categories export/storage/egress, observed amounts, 0
 minor while inside free allowances); the state read compares pooled bytes
-against the configured free allowance. R2 overage PLN conversion is an
+against the configured free allowance and rolls the month's Class A/B ops
+into the exceeded-allowances categories. R2 overage PLN conversion is an
 explicit PENDING owner decision (no invented FX rate). The 15-minute
 frequency is never silently reduced: a plan-limit breach is a loud typed
 failure plus owner decision (asserted by the cadence-agreement test).

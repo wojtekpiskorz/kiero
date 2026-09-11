@@ -29,7 +29,7 @@ dev proof state. Full configuration and owner actions:
 | `R2_BACKUP_SECRET_ACCESS_KEY` | Secret access key paired with the id above | same token | PENDING (owner) |
 | `R2_MEDIA_READ_ACCESS_KEY_ID` | Access key id of a READ-ONLY media-bucket token held ONLY by the backup worker (the copy source; distinct from the media worker's token) | dashboard-issued per-bucket token | PENDING (owner; I5 addition) |
 | `R2_MEDIA_READ_SECRET_ACCESS_KEY` | Secret access key paired with the id above | same token | PENDING (owner; I5 addition) |
-| `CONVEX_BACKUP_ADMIN_KEY` | Mechanism FINALIZED by I5: a Convex access token driving the pinned documented export (`npx --yes convex@1.45.0 export`) headless; the executor writes it to the CLI's runtime config, never to the repo | stored only in the backup runtime environment | PENDING (owner) |
+| `CONVEX_BACKUP_ADMIN_KEY` | Mechanism FINALIZED by I5: a Convex access token driving the pinned documented export (the image's globally pre-installed `convex@1.45.0` binary, invoked directly as `convex export`) headless; the executor writes it to the CLI's runtime config, never to the repo | stored only in the backup runtime environment | PENDING (owner) |
 | `KIERO_SERVICE_TOKEN` | Shared service bearer for the verified Convex protocol routes (`/operations/backups/*`) | Convex deployment variable + worker secret | set on dev/i5 by the I5 proof; PENDING for staging/alpha |
 | `AXIOM_API_TOKEN` | Redacted diagnostics ingestion | deploy flow | PENDING (I2) |
 

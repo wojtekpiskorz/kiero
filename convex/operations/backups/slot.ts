@@ -340,8 +340,9 @@ export const R2_FREE_PLAN_LIMITS: PlanLimits = {
 
 /**
  * Which free allowances the measured usage exceeds (closed categories). The
- * per-run usage carries the byte counts; the monthly accumulators come from
- * the cost accounting period.
+ * per-run usage carries the byte and op counts; the monthly op
+ * accumulators are the state read's sum of the calendar month's verified
+ * runs (functions.ts), against the plan-limits mirror.
  */
 export function exceededAllowances(
   storedBytesTotal: number,

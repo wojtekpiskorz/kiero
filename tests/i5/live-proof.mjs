@@ -8,11 +8,13 @@
  * these rows are NOT RUN. The script is the repeatable procedure: the moment
  * the owner frees a deployment slot (or raises the quota), run
  *
- *   KIERO_I5_CONVEX=<deployment-name> node --experimental-strip-types \
+ *   KIERO_I5_CONVEX=<deployment-name> node --experimental-transform-types \
  *     tests/i5/live-proof.mjs
  *
  * from the operator machine (wrangler OAuth + convex CLI auth required; the
- * operator-authenticated export is the pinned documented mechanism).
+ * operator-authenticated export is the pinned documented mechanism). The
+ * flag must be --experimental-transform-types: strip-only mode cannot parse
+ * the TypeScript parameter properties in the imported executor modules.
  *
  * Byte transport: until the per-bucket R2 S3 tokens exist (owner action,
  * dashboard-only), the wrangler CLI moves the bytes (get/put) and the
@@ -55,9 +57,32 @@ if (DEPLOYMENT === undefined || DEPLOYMENT === "") {
   console.error("[BLOCKED] KIERO_I5_CONVEX is not set: the dev/i5 lease is required (see file header).");
   process.exit(2);
 }
-const URL_ = `https://${DEPLOYMENT}.eu-west-1.convex.cloud`;
 const MEDIA_BUCKET = "kiero-dev-media";
 const BACKUP_BUCKET = "kiero-dev-backup";
+
+// The client URL comes from the deployment's REPORTED origin, not a guessed
+// regional template: fresh leases answer at https://<name>.convex.cloud
+// while older EU leases answer at <name>.eu-west-1.convex.cloud. Each
+// candidate is probed on the app's own public health route; the origin
+// that answers is the one every client below uses.
+const ORIGIN_CANDIDATES = [
+  `https://${DEPLOYMENT}.convex.cloud`,
+  `https://${DEPLOYMENT}.eu-west-1.convex.cloud`,
+];
+let URL_ = null;
+for (const candidate of ORIGIN_CANDIDATES) {
+  const answers = await fetch(`${candidate}/platform/telemetry/health`)
+    .then((response) => response.ok)
+    .catch(() => false);
+  if (answers) {
+    URL_ = candidate;
+    break;
+  }
+}
+if (URL_ === null) {
+  console.error(`[BLOCKED] no origin answered for ${DEPLOYMENT}: ${ORIGIN_CANDIDATES.join(", ")}`);
+  process.exit(2);
+}
 
 const results = [];
 function record(id, outcome, detail) {
@@ -122,18 +147,23 @@ function probeProtocol() {
 /** The wrangler-CLI backup store (dev-proof byte transport). */
 function wranglerStore(dir) {
   let counter = 0;
+  // What THIS process put (key -> hash metadata), so a takeover run's
+  // head-first resume skips objects the interrupted attempt stored.
   const objects = new Map();
   return {
     async head(key) {
-      return { present: objects.has(key) };
+      const hit = objects.get(key);
+      return hit === undefined
+        ? { ok: true, present: false }
+        : { ok: true, present: true, sha256Hex: hit.sha256Hex, bytes: hit.bytes.length };
     },
-    async put(key, bytes) {
+    async put(key, bytes, sha256Hex) {
       counter += 1;
       const file = join(dir, `put-${counter}`);
       await writeFile(file, bytes);
       await wranglerObjectPut(BACKUP_BUCKET, key, file);
-      objects.set(key, bytes);
-      return { ok: true, skipped: false };
+      objects.set(key, { bytes, sha256Hex });
+      return { ok: true };
     },
     async get(key) {
       const file = join(dir, `get-${counter++}`);
@@ -203,13 +233,14 @@ try {
   const protocol = probeProtocol();
   const deps = {
     protocol,
-    exporter: { export: async () => ({ ok: true, bytes: await exportDatabase(dir), sha256Hex: "" }) },
+    exporter: {
+      export: async () => {
+        const bytes = await exportDatabase(dir);
+        return { ok: true, bytes, sha256Hex: await sha256HexOf(bytes) };
+      },
+    },
     media: wranglerMedia(dir),
     store: wranglerStore(dir),
-  };
-  deps.exporter.export = async () => {
-    const bytes = await exportDatabase(dir);
-    return { ok: true, bytes, sha256Hex: await sha256HexOf(bytes) };
   };
 
   const l2 = await runBackup(deps);
@@ -246,11 +277,27 @@ try {
     record("L3-interrupt-resume", "NOT RUN", `slot not acquirable: ${JSON.stringify(l3begin).slice(0, 120)}`);
   }
 
-  // L4: corruption + freshness.
+  // L4: corruption + freshness. The tampered source is a FRESH fixture whose
+  // pool copy does not exist yet (the copy pass is what catches it; an
+  // already-stored byte-identical object would be a head-skip resume, by
+  // design): the media object stops matching its inventory row's byte count
+  // between seeding and the run, and the run must fail typed.
+  const corruptKey = `companies/i5-proof/uploads/corrupt-${Date.now()}/0-image`;
   const tampered = new TextEncoder().encode("tampered bytes");
   const tamperFile = join(dir, "tamper");
   await writeFile(tamperFile, tampered);
-  await wranglerObjectPut(MEDIA_BUCKET, seedKey, tamperFile);
+  const originalFile = join(dir, "corrupt-original");
+  const originalBytes = new TextEncoder().encode("original retained fixture bytes");
+  await writeFile(originalFile, originalBytes);
+  await wranglerObjectPut(MEDIA_BUCKET, corruptKey, originalFile);
+  await probe("probeSeedRetainedMedia", {
+    objectKey: corruptKey,
+    contentHash: `proof:${await sha256HexOf(originalBytes)}`,
+    bytes: originalBytes.length,
+    transformVersion: "i5.proof/1",
+  });
+  // Tamper the source AFTER the inventory row recorded it.
+  await wranglerObjectPut(MEDIA_BUCKET, corruptKey, tamperFile);
   // Next slot: wait or reuse after lease expiry is not practical live; the
   // corruption row uses the CURRENT pipeline against the tampered source.
   const l4begin = (await probe("probeBegin", {}))?.value;

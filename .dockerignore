@@ -1,0 +1,16 @@
+# Root build context allowlist: the backup Container's Dockerfile builds
+# with the repo root as its context (apps/backup-worker/wrangler.jsonc sets
+# image_build_context), so only the paths its COPY lines name enter the
+# context - the executor's src tree plus the two cross-tree modules the
+# image mirrors (see apps/backup-worker/Dockerfile). Everything else,
+# including node_modules and .git, stays out.
+*
+!apps
+!apps/backup-worker
+!apps/backup-worker/src
+!convex
+!convex/operations
+!convex/operations/backups
+!convex/operations/backups/slot.ts
+!convex/operations/telemetry
+!convex/operations/telemetry/serviceToken.ts

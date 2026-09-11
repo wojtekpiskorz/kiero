@@ -98,6 +98,8 @@ function completeInputFor(
     ledger: { sha256: fakeSha("ledger"), bytes: 90, count: begin.ledger?.length ?? 0 },
     manifestHash: fakeSha("manifest"),
     droppedPurged: [],
+    classAOps: 5,
+    classBOps: 7,
     ...overrides,
   };
 }
@@ -182,9 +184,13 @@ describe("complete: server-side closure verification", () => {
     expect(result.tier).toBe(tierOfSlot(begin.slotMs));
     expect(result.expiresAtMs).toBe(begin.slotMs + retentionMsOfTier(result.tier));
     expect(result.usage.mediaBytes).toBe(42);
+    // The executor-measured op counts are stored and echoed (P12).
+    expect(result.usage).toMatchObject({ classAOps: 5, classBOps: 7 });
     const row = (await ctx.db.query("recoveryManifests").collect())[0]!;
     expect(row.state).toBe("verified");
     expect(row.mediaObjectCount).toBe(2);
+    expect(row.classAOps).toBe(5);
+    expect(row.classBOps).toBe(7);
     expect(row.databaseManifestHash).toBe(fakeSha("database"));
     const audits = await ctx.db.query("auditRecords").collect();
     expect(audits.some((entry) => entry.operationName === "operations.backup.manifestPublished")).toBe(true);
@@ -266,6 +272,11 @@ describe("complete: server-side closure verification", () => {
     expect(await completeRunTx(asTx(ctx), badHash)).toMatchObject({
       ok: false,
       reason: "manifest_hash_invalid",
+    });
+    const badUsage = completeInputFor(begin, { classAOps: -1, classBOps: 7 });
+    expect(await completeRunTx(asTx(ctx), badUsage)).toMatchObject({
+      ok: false,
+      reason: "usage_invalid",
     });
   });
 

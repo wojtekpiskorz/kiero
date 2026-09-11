@@ -53,6 +53,8 @@ export const probeComplete = action({
     ledger: v.object({ sha256: v.string(), bytes: v.float64(), count: v.float64() }),
     manifestHash: v.string(),
     droppedPurged: v.array(v.object({ objectKey: v.string(), sourceId: v.string() })),
+    classAOps: v.float64(),
+    classBOps: v.float64(),
   },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
     if (!probeGuardEnabled()) {

@@ -63,6 +63,10 @@
       // I5: node:22-slim + the pinned Convex CLI, zero-build Node entry
       // (see ./Dockerfile).
       "image": "./Dockerfile",
+      // The Dockerfile COPYs repo-level paths (the executor mirrors the two
+      // cross-tree convex modules it imports), so the build context is the
+      // repo root; the root .dockerignore keeps it to exactly those paths.
+      "image_build_context": "../../",
       "class_name": "BackupWorkerContainer",
       "instance_type": "dev",
       "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
@@ -96,6 +100,7 @@
         {
           "name": "kiero-staging-backup-container",
           "image": "./Dockerfile",
+          "image_build_context": "../../",
           "class_name": "BackupWorkerContainer",
           "instance_type": "dev",
           "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
@@ -129,6 +134,7 @@
         {
           "name": "kiero-alpha-backup-container",
           "image": "./Dockerfile",
+          "image_build_context": "../../",
           "class_name": "BackupWorkerContainer",
           "instance_type": "basic",
           "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },

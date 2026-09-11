@@ -16,6 +16,7 @@
  */
 
 import type { BackupStore, MediaReader } from "./ports.ts";
+import { sha256BytesHex } from "./hash.ts";
 
 const encoder = new TextEncoder();
 
@@ -71,8 +72,7 @@ async function signedFetch(
   const now = new Date();
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
   const dateStamp = amzDate.slice(0, 8);
-  const payloadHash = init.bodySha256Hex ?? (init.body === undefined ? await sha256Hex("") : await sha256BytesHex(init.body));
-  const headers: Record<string, string> = {
+  const payloadHash = init.bodySha256Hex ?? (init.body === undefined ? await sha256Hex("") : await sha256BytesHex(init.body));  const headers: Record<string, string> = {
     host: url.host,
     "x-amz-content-sha256": payloadHash,
     "x-amz-date": amzDate,
@@ -114,11 +114,6 @@ async function signedFetch(
   });
 }
 
-async function sha256BytesHex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes as unknown as ArrayBuffer);
-  return hex(new Uint8Array(digest));
-}
-
 function parseConfig(
   env: Record<string, string | undefined>,
   prefix: "R2_BACKUP" | "R2_MEDIA_READ",
@@ -140,8 +135,8 @@ function parseConfig(
 
 /**
  * The backup-bucket store (the ONLY write path of the complete sets).
- * Object sha256 values ride as x-amz-meta-sha256 so head-first resume can
- * skip verified objects without re-reading them.
+ * Object sha256 values ride as x-amz-meta-sha256 so the pipeline's
+ * head-first resume can skip verified objects without re-reading them.
  */
 export function s3BackupStore(env: {
   R2_BACKUP_ENDPOINT?: string;
@@ -157,15 +152,14 @@ export function s3BackupStore(env: {
   return {
     head: async (key) => {
       const response = await signedFetch(config, key, { method: "HEAD" });
-      if (response.status === 404) {
-        return { present: false };
-      }
       if (response.status !== 200) {
-        return { present: false };
+        // Absent (404) and unusable statuses are both "not present"; the
+        // copy pass then takes the read-and-put path.
+        return { ok: true as const, present: false };
       }
       const meta = response.headers.get("x-amz-meta-sha256") ?? undefined;
       const length = Number(response.headers.get("content-length") ?? "0");
-      return { present: true, ...(meta === undefined ? {} : { sha256Hex: meta }), ...(Number.isFinite(length) ? { bytes: length } : {}) };
+      return { ok: true as const, present: true, ...(meta === undefined ? {} : { sha256Hex: meta }), ...(Number.isFinite(length) ? { bytes: length } : {}) };
     },
     put: async (key, bytes, sha256HexValue) => {
       try {
@@ -178,7 +172,7 @@ export function s3BackupStore(env: {
         if (response.status !== 200 && response.status !== 201) {
           return { ok: false, code: "store_write_failed" as const };
         }
-        return { ok: true as const, skipped: false };
+        return { ok: true as const };
       } catch {
         return { ok: false, code: "store_write_failed" as const };
       }

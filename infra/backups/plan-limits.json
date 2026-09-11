@@ -18,8 +18,8 @@
     "plan": "Containers runtime verified deployable on the current account (D6 observed 2026-09-10, no Workers-Paid blocker); dev instance type until alpha provisioning"
   },
   "measurement": {
-    "perRun": "databaseBytes/mediaBytes/mediaObjectCount on the manifest row; class A/B op counts counted by the executor",
-    "perMonth": "cost entries by period (YYYY-MM) in the 400/500 PLN accounting (I2 seam)",
-    "stateRead": "pooledBytes vs storageFreeBytes and withinStorageFreeAllowance in /operations/backups/state"
+    "perRun": "databaseBytes/mediaBytes/mediaObjectCount plus classAOps/classBOps on the manifest row; the executor counts its S3 port calls (Class A: PUTs/DELETEs; Class B: GETs/HEADs/LISTs)",
+    "perMonth": "cost entries by period (YYYY-MM) in the 400/500 PLN accounting (I2 seam); the state read sums the month's verified runs",
+    "stateRead": "pooledBytes vs storageFreeBytes, withinStorageFreeAllowance, monthlyClassAOps/monthlyClassBOps and the exceededAllowances categories in /operations/backups/state"
   }
 }

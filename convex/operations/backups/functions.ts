@@ -43,6 +43,7 @@ import {
   canonicalJson,
   deletedContentInvariantHolds,
   decideBegin,
+  exceededAllowances as exceededAllowanceCategories,
   freshnessOf,
   isSha256Hex,
   isValidFailureReason,
@@ -53,7 +54,9 @@ import {
   R2_FREE_PLAN_LIMITS,
   tierOfSlot,
   LEASE_MS,
+  type RunUsage,
 } from "./slot";
+import { periodOf } from "../telemetry/costs";
 import {
   deletionLedgerSnapshot,
   purgedDropsOf,
@@ -101,11 +104,8 @@ export interface CompleteOk {
   readonly tier: "frequent" | "daily";
   readonly expiresAtMs: number;
   readonly mediaManifestHash: string;
-  readonly usage: {
-    readonly databaseBytes: number;
-    readonly mediaBytes: number;
-    readonly mediaObjects: number;
-  };
+  /** The run's measured usage (P12): bytes, object count and S3 op counts. */
+  readonly usage: RunUsage;
 }
 
 export type CompleteFailureReason =
@@ -120,7 +120,8 @@ export type CompleteFailureReason =
   | "media_bytes_mismatch"
   | "database_hash_invalid"
   | "ledger_count_mismatch"
-  | "manifest_hash_invalid";
+  | "manifest_hash_invalid"
+  | "usage_invalid";
 
 export type CompleteResult = CompleteOk | { readonly ok: false; readonly reason: CompleteFailureReason };
 
@@ -138,6 +139,10 @@ export interface CompleteInput {
   readonly ledger: { readonly sha256: string; readonly bytes: number; readonly count: number };
   readonly manifestHash: string;
   readonly droppedPurged: readonly { objectKey: string; sourceId: string }[];
+  /** Executor-measured S3 Class A ops (PUTs/DELETEs) of this run (P12). */
+  readonly classAOps: number;
+  /** Executor-measured S3 Class B ops (GETs/HEADs/LISTs) of this run (P12). */
+  readonly classBOps: number;
 }
 
 // --- shared reads ----------------------------------------------------------------
@@ -228,17 +233,10 @@ export async function beginRunTx(ctx: MutationCtx, nowMs: number = Date.now()): 
     return { status: "refused", reason: "inventory_invalid" };
   }
   const ledger = await deletionLedgerSnapshot(ctx.db);
-  const isStart = decision.action === "start";
-  if (!isStart && existing === null) {
-    // Unreachable by construction (takeover/retry only come from an existing
-    // row); the guard keeps the narrowing explicit.
-    return refused("slot_passed");
-  }
   // Every acquire re-anchors the snapshot time: the inventory (and the
   // export that follows) reflects the CURRENT database state, and freshness
   // is measured from that snapshot, never from an attempt's start.
   const snapshotAtMs = nowMs;
-  const attempt = isStart ? 1 : (existing?.attempts ?? 1) + 1;
   const leaseExpiresAtMs = nowMs + LEASE_MS;
 
   const purgedDrops = purgedDropsOf(inventory, ledger, snapshotAtMs);
@@ -247,24 +245,32 @@ export async function beginRunTx(ctx: MutationCtx, nowMs: number = Date.now()): 
 
   const rowValues = {
     state: "building" as const,
-    attempts: attempt,
     snapshotAtMs,
     leaseExpiresAtMs,
     inventoryJson: JSON.stringify(inventory),
     ledgerCount: ledger.length,
   };
   let manifestId: string;
-  if (isStart || existing === null) {
-    // Unreachable together (the guard above returns); start keeps the insert.
+  let attempt: number;
+  if (decision.action === "start") {
+    attempt = 1;
     manifestId = (await ctx.db.insert("recoveryManifests", {
       ...rowValues,
+      attempts: attempt,
       databaseManifestHash: "",
       slotMs,
     })) as string;
   } else {
+    if (existing === null) {
+      // Unreachable by construction (takeover/retry only come from an
+      // existing row); ONE guard keeps the narrowing explicit.
+      return refused("slot_passed");
+    }
+    attempt = (existing.attempts ?? 1) + 1;
     manifestId = existing._id as string;
     await ctx.db.patch(existing._id, {
       ...rowValues,
+      attempts: attempt,
       failureReason: undefined,
       expiresAtMs: undefined,
     });
@@ -378,6 +384,9 @@ export async function completeRunTx(ctx: MutationCtx, input: CompleteInput): Pro
   if (!isSha256Hex(input.database.sha256) || input.database.bytes < 0) {
     return { ok: false, reason: "database_hash_invalid" };
   }
+  if (!Number.isFinite(input.classAOps) || input.classAOps < 0 || !Number.isFinite(input.classBOps) || input.classBOps < 0) {
+    return { ok: false, reason: "usage_invalid" };
+  }
   if (input.ledger.count !== (row.ledgerCount ?? 0)) {
     return { ok: false, reason: "ledger_count_mismatch" };
   }
@@ -394,6 +403,13 @@ export async function completeRunTx(ctx: MutationCtx, input: CompleteInput): Pro
         .map((entry) => ({ objectKey: entry.objectKey, sha256: entry.sha256, bytes: entry.bytes })),
     ),
   );
+  const usage: RunUsage = {
+    databaseBytes: input.database.bytes,
+    mediaBytes,
+    mediaObjects: input.media.length,
+    classAOps: input.classAOps,
+    classBOps: input.classBOps,
+  };
   await ctx.db.patch(id, {
     state: "verified",
     databaseManifestHash: input.database.sha256,
@@ -406,6 +422,8 @@ export async function completeRunTx(ctx: MutationCtx, input: CompleteInput): Pro
     databaseBytes: input.database.bytes,
     mediaBytes,
     manifestHash: input.manifestHash,
+    classAOps: input.classAOps,
+    classBOps: input.classBOps,
     purgedDroppedJson: canonicalJson(input.droppedPurged),
     failureReason: undefined,
   });
@@ -419,11 +437,7 @@ export async function completeRunTx(ctx: MutationCtx, input: CompleteInput): Pro
     tier,
     expiresAtMs,
     mediaManifestHash,
-    usage: {
-      databaseBytes: input.database.bytes,
-      mediaBytes,
-      mediaObjects: input.media.length,
-    },
+    usage,
   };
 }
 
@@ -436,6 +450,8 @@ export const completeRun = internalMutation({
     ledger: v.object({ sha256: v.string(), bytes: v.float64(), count: v.float64() }),
     manifestHash: v.string(),
     droppedPurged: v.array(v.object({ objectKey: v.string(), sourceId: v.string() })),
+    classAOps: v.float64(),
+    classBOps: v.float64(),
   },
   handler: async (ctx, args): Promise<CompleteResult> => completeRunTx(ctx, args),
 });
@@ -699,16 +715,36 @@ export const backupsState = internalQuery({
       }
     }
     const pooledBytes = [...pooledKeys.values()].reduce((total, bytes) => total + bytes, 0);
+    // P12 monthly ops rollup: the executor counts Class A/B ops per run
+    // (complete stores them); the state read sums the calendar month's
+    // verified runs and compares against the free allowances (slot.ts).
+    const currentPeriod = periodOf(Date.now());
+    let monthlyClassA = 0;
+    let monthlyClassB = 0;
+    const verifiedRows = await ctx.db
+      .query("recoveryManifests")
+      .withIndex("by_state", (q) => q.eq("state", "verified"))
+      .collect();
+    for (const row of verifiedRows) {
+      if (periodOf(row.snapshotAtMs) === currentPeriod) {
+        monthlyClassA += row.classAOps ?? 0;
+        monthlyClassB += row.classBOps ?? 0;
+      }
+    }
     return {
       atMs: Date.now(),
       freshness,
       deletedContentInvariantHolds: deletedContentInvariantHolds(),
       pooledObjectCount: pooledKeys.size,
       // P12 measurement: pooled bytes against the configured free allowance
-      // (R2_FREE_PLAN_LIMITS mirror in infra/backups/plan-limits.json).
+      // (R2_FREE_PLAN_LIMITS mirror in infra/backups/plan-limits.json), plus
+      // the month's measured Class A/B ops and which allowances they exceed.
       pooledBytes,
       storageFreeBytes: R2_FREE_PLAN_LIMITS.storageFreeBytes,
       withinStorageFreeAllowance: pooledBytes <= R2_FREE_PLAN_LIMITS.storageFreeBytes,
+      monthlyClassAOps: monthlyClassA,
+      monthlyClassBOps: monthlyClassB,
+      exceededAllowances: exceededAllowanceCategories(pooledBytes, monthlyClassA, monthlyClassB),
       manifests: rows.map((row) => ({
         manifestId: row._id as string,
         slotMs: row.slotMs ?? null,
@@ -723,6 +759,8 @@ export const backupsState = internalQuery({
         ...(row.databaseBytes === undefined ? {} : { databaseBytes: row.databaseBytes }),
         ...(row.mediaBytes === undefined ? {} : { mediaBytes: row.mediaBytes }),
         ...(row.mediaObjectCount === undefined ? {} : { mediaObjectCount: row.mediaObjectCount }),
+        ...(row.classAOps === undefined ? {} : { classAOps: row.classAOps }),
+        ...(row.classBOps === undefined ? {} : { classBOps: row.classBOps }),
         ...(row.manifestHash === undefined ? {} : { manifestHash: row.manifestHash }),
         ...(row.databaseManifestHash === undefined
           ? {}

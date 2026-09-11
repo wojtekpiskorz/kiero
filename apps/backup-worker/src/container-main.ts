@@ -6,10 +6,11 @@
  * (./backup-service.ts) with the REAL deps built from the container env
  * (./deps.ts). No second copy of the boundary exists to drift.
  *
- * Node >= 22.12 runs this file directly with type stripping
- * (`node --experimental-strip-types`), so the image needs no build step and
- * no added dependency; intra-app imports therefore carry explicit `.ts`
- * extensions.
+ * Node >= 22.12 runs this file directly with type transformation
+ * (`node --experimental-transform-types`; strip-only mode cannot parse the
+ * parameter properties in ports.ts/convex-export.ts), so the image needs
+ * no build step and no added dependency; intra-app imports therefore carry
+ * explicit `.ts` extensions.
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";

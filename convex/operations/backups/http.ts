@@ -93,9 +93,11 @@ export const backupsCompleteHandler = httpAction(async (ctx, request) => {
     await heartbeat(ctx, "degraded");
     return jsonResponse(200, okResult(complete));
   }
-  const environment = typeof body.environment === "string" && /^[a-z-]{2,31}$/.test(body.environment)
-    ? body.environment
-    : "dev";
+  // The deployment knows its own environment (KIERO_ENVIRONMENT, the same
+  // server-side read the telemetry cron uses); the container never sends
+  // the field, so a body-supplied value must not relabel cost entries.
+  const rawEnvironment = process.env.KIERO_ENVIRONMENT ?? "dev";
+  const environment = /^(dev|staging|alpha-production)$/.test(rawEnvironment) ? rawEnvironment : "dev";
   await recordCost(ctx, {
     category: "export",
     amountMinor: 0,

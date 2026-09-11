@@ -36,6 +36,7 @@ export interface MediaReader {
 }
 
 export interface HeadResult {
+  readonly ok: true;
   readonly present: boolean;
   readonly sha256Hex?: string;
   readonly bytes?: number;
@@ -43,7 +44,6 @@ export interface HeadResult {
 
 export interface PutResult {
   readonly ok: true;
-  readonly skipped: boolean;
 }
 
 /** The private EU backup bucket (the ONLY credential that writes sets). */
@@ -64,26 +64,51 @@ export interface ProtocolBeginMediaEntry {
   readonly sourceId: string | null;
 }
 
-export interface ProtocolBegin {
-  readonly status: "acquired" | "refused";
-  readonly manifestId?: string;
-  readonly attempt?: number;
-  readonly slotMs?: number;
-  readonly snapshotAtMs?: number;
-  readonly tier?: "frequent" | "daily";
-  readonly leaseExpiresAtMs?: number;
-  readonly media?: readonly ProtocolBeginMediaEntry[];
-  readonly purgedDrops?: readonly { objectKey: string; sourceId: string }[];
-  readonly ledger?: readonly {
-    recordId: string;
-    companyId: string;
-    kind: "source_purge" | "data_revocation";
-    targetSourceId: string | null;
-    scopeSummary: string;
-    createdAtMs: number;
-  }[];
-  readonly reason?: string;
+export interface ProtocolBeginLedgerEntry {
+  readonly recordId: string;
+  readonly companyId: string;
+  readonly kind: "source_purge" | "data_revocation";
+  readonly targetSourceId: string | null;
+  readonly scopeSummary: string;
+  readonly createdAtMs: number;
 }
+
+/**
+ * The acquired lease, the server's `BeginAcquired` shape: every field the
+ * pipeline consumes is REQUIRED (no assertions, no impossible fallbacks).
+ */
+export interface ProtocolBeginAcquired {
+  readonly status: "acquired";
+  readonly manifestId: string;
+  readonly attempt: number;
+  readonly slotMs: number;
+  readonly snapshotAtMs: number;
+  readonly tier: "frequent" | "daily";
+  readonly leaseExpiresAtMs: number;
+  /** The media objects this run must copy and verify (purge drops removed). */
+  readonly media: readonly ProtocolBeginMediaEntry[];
+  /** Purge-recorded drops already excluded from `media` (I4 seam). */
+  readonly purgedDrops: readonly { objectKey: string; sourceId: string }[];
+  /** The content-free deletion/revocation ledger to carry separately. */
+  readonly ledger: readonly ProtocolBeginLedgerEntry[];
+}
+
+/** The refused begin: closed reason vocabulary, row context when one exists. */
+export interface ProtocolBeginRefused {
+  readonly status: "refused";
+  readonly reason:
+    | "lease_held"
+    | "already_complete"
+    | "attempts_exhausted"
+    | "slot_passed"
+    | "inventory_invalid"
+    | "retention_invariant_broken";
+  readonly manifestId?: string;
+  readonly leaseExpiresAtMs?: number;
+}
+
+/** The begin result as the SAME discriminated union the server returns. */
+export type ProtocolBegin = ProtocolBeginAcquired | ProtocolBeginRefused;
 
 export interface ProtocolCompleteInput {
   readonly manifestId: string;
@@ -93,6 +118,10 @@ export interface ProtocolCompleteInput {
   readonly ledger: { readonly sha256: string; readonly bytes: number; readonly count: number };
   readonly manifestHash: string;
   readonly droppedPurged: readonly { objectKey: string; sourceId: string }[];
+  /** Executor-measured S3 Class A ops (PUTs/DELETEs) of this run (P12). */
+  readonly classAOps: number;
+  /** Executor-measured S3 Class B ops (GETs/HEADs/LISTs) of this run (P12). */
+  readonly classBOps: number;
 }
 
 export interface ProtocolSweepPlan {

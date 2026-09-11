@@ -15,6 +15,9 @@
 
 import { runBackup, type RunOptions, type RunSummary } from "./pipeline.ts";
 import type { BackupDeps } from "./ports.ts";
+// The ONE bearer rule (no third mirror here): serviceToken.ts is
+// deliberately free of Convex imports so any runtime can use it.
+import { verifyServiceBearerToken } from "../../../convex/operations/telemetry/serviceToken.ts";
 
 export interface BackupServiceEnv {
   readonly ENVIRONMENT?: string;
@@ -35,18 +38,6 @@ function jsonResponse(status: number, body: unknown): Response {
     status,
     headers: { "content-type": "application/json" },
   });
-}
-
-/** Constant-shape bearer compare (the D6 segment-service pattern). */
-function tokenMatches(expected: string, presented: string): boolean {
-  if (expected.length !== presented.length) {
-    return false;
-  }
-  let diff = 0;
-  for (let i = 0; i < expected.length; i += 1) {
-    diff |= expected.charCodeAt(i) ^ presented.charCodeAt(i);
-  }
-  return diff === 0;
 }
 
 /** Channel presence by NAME only (booleans; no values, no prefixes). */
@@ -76,9 +67,9 @@ export async function handleBackupProtocol(
     return jsonResponse(200, healthSummary(env));
   }
   if (request.method === "POST" && url.pathname === "/run") {
-    const expected = env.KIERO_SERVICE_TOKEN ?? "";
-    const presented = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-    if (expected === "" || !tokenMatches(expected, presented)) {
+    // Digest-compared bearer check (the shared helper; false covers a
+    // missing configuration, a missing header and any mismatch).
+    if (!(await verifyServiceBearerToken(request.headers.get("authorization"), env.KIERO_SERVICE_TOKEN))) {
       return jsonResponse(401, { ok: false, code: "service_credential_invalid" });
     }
     if (deps === undefined) {

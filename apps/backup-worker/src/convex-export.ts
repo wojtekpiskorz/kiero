@@ -1,6 +1,13 @@
 /**
- * The pinned documented export mechanism (I5): `npx --yes convex@1.45.0
- * export --path <zip> --deployment <ref>` driven headless.
+ * The pinned documented export mechanism (I5): the globally pre-installed
+ * `convex` CLI (the image pins convex@1.45.0 via `npm install -g`) driven
+ * headless as `convex export --path <zip> --deployment <ref>`.
+ *
+ * The global binary is invoked DIRECTLY, never through `npx convex@1.45.0`:
+ * npm exec resolves a versioned spec from the npx cache under HOME, this
+ * exporter runs with a fresh scratch HOME every time, so npx would hit the
+ * npm registry on every export. The global install needs no cache, which is
+ * what makes the export network-free at runtime.
  *
  * The CLI reads its access token from `<HOME>/.convex/config.json` and
  * needs an app-shaped directory (package.json with a convex dependency +
@@ -20,6 +27,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { DatabaseExporter } from "./ports.ts";
+import { sha256BytesHex } from "./hash.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -49,13 +57,6 @@ async function scratchContext(env: ExportEnv): Promise<string> {
   return home;
 }
 
-async function sha256BytesHex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes as unknown as ArrayBuffer);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 /** The exporter over the pinned CLI (headless via the injected key). */
 export class ConvexCliExporter implements DatabaseExporter {
   constructor(private readonly env: ExportEnv) {}
@@ -74,8 +75,8 @@ export class ConvexCliExporter implements DatabaseExporter {
       const outZip = join(home, "snapshot.zip");
       try {
         await execFileAsync(
-          "npx",
-          ["--yes", "convex@1.45.0", "export", "--path", outZip, "--deployment", deployment],
+          "convex",
+          ["export", "--path", outZip, "--deployment", deployment],
           {
             cwd: join(home, "app"),
             env: { ...process.env, HOME: home },

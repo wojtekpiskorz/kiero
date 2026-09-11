@@ -62,6 +62,11 @@ export const backupsTables = {
     mediaBytes: v.optional(v.float64()),
     completedAtMs: v.optional(shared.tsMs),
     manifestHash: v.optional(v.string()),
+    // P12 measurement: the executor-measured S3 Class A/B op counts of the
+    // run that verified this set (plan-limits.json; monthly rollup in the
+    // backups state read compares them against the free allowances).
+    classAOps: v.optional(shared.counter),
+    classBOps: v.optional(shared.counter),
   })
     .index("by_snapshot", ["snapshotAtMs"])
     .index("by_slot", ["slotMs"])

@@ -22,6 +22,8 @@ import type {
   DatabaseExporter,
   MediaReader,
   ProtocolBegin,
+  ProtocolBeginAcquired,
+  ProtocolBeginRefused,
   ProtocolCompleteInput,
   ProtocolSweepPlan,
 } from "../../apps/backup-worker/src/ports";
@@ -35,17 +37,20 @@ async function sha(bytes: Uint8Array): Promise<string> {
 /** In-memory object store with metadata and mtimes (the BackupStore port). */
 class MemoryStore implements BackupStore {
   readonly objects = new Map<string, { bytes: Uint8Array; sha256Hex: string; lastModifiedMs: number }>();
+  /** Instrumentation: PUT count per key (the head-skip proof reads it). */
+  readonly puts = new Map<string, number>();
   timeMs = Date.now();
 
   async head(key: string) {
     const hit = this.objects.get(key);
     return hit === undefined
-      ? { present: false }
-      : { present: true, sha256Hex: hit.sha256Hex, bytes: hit.bytes.length };
+      ? { ok: true as const, present: false }
+      : { ok: true as const, present: true, sha256Hex: hit.sha256Hex, bytes: hit.bytes.length };
   }
   async put(key: string, bytes: Uint8Array, sha256Hex: string) {
     this.objects.set(key, { bytes, sha256Hex, lastModifiedMs: this.timeMs });
-    return { ok: true as const, skipped: false };
+    this.puts.set(key, (this.puts.get(key) ?? 0) + 1);
+    return { ok: true as const };
   }
   async get(key: string) {
     const hit = this.objects.get(key);
@@ -67,6 +72,8 @@ type MediaGet = Awaited<ReturnType<MediaReader["get"]>>;
 class MemoryMedia implements MediaReader {
   /** Writable so corruption tests can swap reads between copy and verify. */
   read: (objectKey: string) => Promise<MediaGet>;
+  /** Instrumentation: total GET count (the no-second-read proof reads it). */
+  reads = 0;
   constructor(readonly objects: Map<string, Uint8Array>) {
     this.read = async (objectKey) => {
       const hit = this.objects.get(objectKey);
@@ -77,6 +84,7 @@ class MemoryMedia implements MediaReader {
     };
   }
   async get(objectKey: string): Promise<MediaGet> {
+    this.reads += 1;
     return this.read(objectKey);
   }
 }
@@ -111,9 +119,9 @@ class MemoryProtocol implements BackupProtocol {
       return {
         status: "refused",
         reason: "already_complete",
-        ...(this.beginResult.manifestId === undefined
-          ? {}
-          : { manifestId: this.beginResult.manifestId }),
+        ...(this.beginResult.status === "acquired"
+          ? { manifestId: this.beginResult.manifestId }
+          : {}),
       };
     }
     return this.beginResult;
@@ -126,8 +134,8 @@ class MemoryProtocol implements BackupProtocol {
     this.verifiedOnce = true;
     return {
       ok: true,
-      ...(this.beginResult.tier === undefined ? {} : { tier: this.beginResult.tier }),
-      expiresAtMs: (this.beginResult.slotMs ?? 0) + 48 * 60 * MIN,
+      ...(this.beginResult.status === "acquired" ? { tier: this.beginResult.tier } : {}),
+      expiresAtMs: (this.beginResult.status === "acquired" ? this.beginResult.slotMs : 0) + 48 * 60 * MIN,
     };
   }
   async fail(manifestId: string, attempt: number, reason: string) {
@@ -161,9 +169,14 @@ interface Fixture {
   exporter: FixedExporter;
 }
 
-function fixture(beginOverrides: Partial<ProtocolBegin> = {}, mediaMap = new Map<string, Uint8Array>([["pool/a", MEDIA_A], ["pool/b", MEDIA_B]])): Fixture {
+/** Fixture overrides: tweak the acquired shape, or flip to a refusal. */
+type BeginOverrides =
+  | (Partial<Omit<ProtocolBeginAcquired, "status">> & { status?: "acquired" })
+  | (Partial<Omit<ProtocolBeginRefused, "status">> & { status: "refused" });
+
+function fixture(beginOverrides: BeginOverrides = {}, mediaMap = new Map<string, Uint8Array>([["pool/a", MEDIA_A], ["pool/b", MEDIA_B]])): Fixture {
   const mediaKeys = [...mediaMap.keys()];
-  const protocol = new MemoryProtocol({
+  const acquired: ProtocolBeginAcquired = {
     status: "acquired",
     manifestId: "m1",
     attempt: 1,
@@ -174,8 +187,16 @@ function fixture(beginOverrides: Partial<ProtocolBegin> = {}, mediaMap = new Map
     media: mediaKeys.map((objectKey) => ({ objectKey, contentHash: "x", bytes: mediaMap.get(objectKey)!.length, sourceId: null })),
     purgedDrops: [],
     ledger: [],
-    ...beginOverrides,
-  });
+  };
+  const begin: ProtocolBegin =
+    beginOverrides.status === "refused"
+      ? {
+          status: "refused",
+          reason: beginOverrides.reason ?? "lease_held",
+          ...(beginOverrides.manifestId === undefined ? {} : { manifestId: beginOverrides.manifestId }),
+        }
+      : { ...acquired, ...beginOverrides };
+  const protocol = new MemoryProtocol(begin);
   // Server-like: the completed run's inventory stays referenced (survives
   // its own sweep); individual tests override for collection scenarios.
   protocol.referenced = [...mediaKeys];
@@ -284,30 +305,62 @@ describe("the interruption matrix (resumable, idempotent)", () => {
     expect(f.protocol.completed).toHaveLength(0);
   });
 
-  it("a corrupted source object fails verification (copy-time and read-back)", async () => {
+  it("a corrupted source object fails the copy pass (size cross-check)", async () => {
     // The source claims bytes it does not have: the size cross-check fails.
     const f = fixture({
       media: [{ objectKey: "pool/a", contentHash: "x", bytes: 999_999, sourceId: null }],
     }, new Map<string, Uint8Array>([["pool/a", MEDIA_A]]));
     const summary = await runBackup(f.deps);
     expect(summary).toMatchObject({ outcome: "failed", reason: "media_hash_mismatch" });
+  });
 
-    // Source corrupted between copy and the read-back verification pass:
-    // the store copy and the re-read source disagree -> typed failure.
-    const f2 = fixture({}, new Map<string, Uint8Array>([["pool/a", MEDIA_A]]));
-    const original = f2.media.read;
-    let reads = 0;
+  it("a corrupted STORE object fails the readback verification (copy-time hash)", async () => {
+    // The pool object mutated between the copy pass and the read-back
+    // verification: the readback hash no longer equals the copy-time hash
+    // the copy pass recorded -> typed failure, without a second source GET.
+    const f = fixture({}, new Map<string, Uint8Array>([["pool/a", MEDIA_A]]));
+    const originalGet = f.store.get.bind(f.store);
     const corruption = new Uint8Array([1, 2, 3]);
-    f2.media.read = async (key: string) => {
-      reads += 1;
-      const result = await original(key);
-      if (result.ok && reads === 2) {
-        return { ok: true as const, bytes: corruption, sha256Hex: await sha(corruption) };
+    let readbacks = 0;
+    f.store.get = async (key: string) => {
+      const result = await originalGet(key);
+      if (result.ok && key === mediaPoolKey("pool/a")) {
+        readbacks += 1;
+        return { ok: true as const, bytes: corruption };
       }
       return result;
     };
-    const summary2 = await runBackup(f2.deps);
-    expect(summary2).toMatchObject({ outcome: "failed", reason: "media_verify_failed" });
+    const summary = await runBackup(f.deps);
+    expect(summary).toMatchObject({ outcome: "failed", reason: "media_verify_failed" });
+    expect(readbacks).toBe(1);
+    // The source was read exactly once (the copy pass): verification no
+    // longer re-downloads every object.
+    expect(f.media.reads).toBe(1);
+  });
+
+  it("a takeover HEAD-skips objects a previous attempt already stored", async () => {
+    const f = fixture({}, new Map<string, Uint8Array>([["pool/a", MEDIA_A]]));
+    // The interrupted attempt copied pool/a into the pool but never completed.
+    await expect(runBackup(f.deps, { interruptAt: "after_media" })).rejects.toBeInstanceOf(PipelineInterrupt);
+    const sourceReadsBefore = f.media.reads;
+    const summary = await runBackup(f.deps);
+    expect(summary.outcome).toBe("verified");
+    // The resume re-read no source object and re-PUT no pool object.
+    expect(f.media.reads).toBe(sourceReadsBefore);
+    expect(f.store.puts.get(mediaPoolKey("pool/a"))).toBe(1);
+  });
+
+  it("counts Class A/B S3 ops and carries them to complete (P12)", async () => {
+    const f = fixture();
+    const summary = await runBackup(f.deps);
+    expect(summary.outcome).toBe("verified");
+    // Complete receives the run's own counts (before the sweep): 2 media
+    // PUTs + db/ledger/manifest PUTs = 5 Class A; 2 HEADs + 2 source GETs +
+    // 2 readbacks + the database readback = 7 Class B.
+    expect(f.protocol.completed[0]).toMatchObject({ classAOps: 5, classBOps: 7 });
+    // The summary adds the sweep: 1 Class B LIST, no deletes, no orphans
+    // (the inventory stays referenced).
+    expect(summary).toMatchObject({ classAOps: 5, classBOps: 8 });
   });
 
   it("a server closure rejection fails the run honestly", async () => {
