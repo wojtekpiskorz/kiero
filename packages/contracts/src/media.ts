@@ -48,12 +48,21 @@ export const PublicationState = Schema.Literals([
 ]);
 export type PublicationState = Schema.Schema.Type<typeof PublicationState>;
 
-/** Lifecycle of a firm export archive. */
+/**
+ * Lifecycle of a firm export archive.
+ *
+ * I3 amendment (issue #55, additive, flagged; the C5 `updating` precedent):
+ * `failed` names a build that could not produce an archive (bound
+ * exceeded, media drift, executor failure). A placeholder cannot claim
+ * business work, and a build that did not finish must say so instead of
+ * sitting in `building` forever or masquerading as `invalidated`.
+ */
 export const ExportState = Schema.Literals([
   "requested",
   "building",
   "available",
   "expired",
   "invalidated",
+  "failed",
 ]);
 export type ExportState = Schema.Schema.Type<typeof ExportState>;

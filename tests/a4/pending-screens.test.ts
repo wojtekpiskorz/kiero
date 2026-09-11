@@ -68,17 +68,17 @@ describe("pending feature screens render without fake data", () => {
     // H2 (issue #50) flipped /co-teraz to the real per-user screen: like
     // every mounted lane, its connection gate is the honest disconnected
     // state (no fake entries either way). H3's search and source detail
-    // sit at indices 2 and 3, shifting H2's mounts to 4-6.
-    const coTeraz = renderScreen(4);
+    // sit at indices 2 and 3; I3's exports at 4; H2's mounts shift to 5-7.
+    const coTeraz = renderScreen(5);
     expect(coTeraz).toContain("Co teraz");
     expect(coTeraz).toContain("Aplikacja nie jest połączona z backendem");
-    const work = renderScreen(5);
+    const work = renderScreen(6);
     expect(work).toContain("Praca");
     expect(work).toContain("Aplikacja nie jest połączona z backendem");
-    const extensions = renderScreen(6);
+    const extensions = renderScreen(7);
     expect(extensions).toContain("Dodatkowe informacje");
     expect(extensions).toContain("Aplikacja nie jest połączona z backendem");
-    const projects = renderScreen(7);
+    const projects = renderScreen(8);
     expect(projects).toContain("Projekty");
     expect(projects).toContain("W przygotowaniu.");
     expect(projects).toContain("projects.identifyProject");

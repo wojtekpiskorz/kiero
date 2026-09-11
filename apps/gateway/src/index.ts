@@ -106,7 +106,8 @@ export default {
         request.method === "OPTIONS" &&
         (url.pathname.startsWith("/uploads/") ||
           url.pathname.startsWith("/media/") ||
-          url.pathname.startsWith("/images/"))
+          url.pathname.startsWith("/images/") ||
+          url.pathname.startsWith("/exports/"))
       ) {
         // Preflight: answered without touching any route or Convex/R2.
         return withCors(new Response(null, { status: 204 }), cors);
@@ -115,7 +116,9 @@ export default {
         url.pathname.startsWith("/platform/") ||
         url.pathname.startsWith("/uploads/") ||
         url.pathname.startsWith("/images/") ||
-        url.pathname.startsWith("/media/")
+        url.pathname.startsWith("/media/") ||
+        // I3 append (flagged, the D3 precedent): the export download route.
+        url.pathname.startsWith("/exports/")
       ) {
         const route = matchRoute(request.method, url.pathname);
         if (route === undefined) {

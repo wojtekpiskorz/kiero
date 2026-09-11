@@ -5,6 +5,16 @@
  * dependency (the root manifest is a coordinated shared change; D6 does not
  * make one).
  *
+ * SIGNING TWIN: apps/export-worker/src/s3.ts (the I3 writer) carries its
+ * own copy of the same SigV4 derivation chain (hex/hmac/sha256Hex, amzDate,
+ * scope, key chain, authorization header). The container boundary keeps it
+ * there: each image contains only its own src/ (no node_modules, build
+ * context = the app directory), so a shared workspace module is not
+ * importable at container runtime. A signing fix here MUST land there too.
+ * The one known divergence is requirement-driven: this reader signs the
+ * empty hash with no query (ranged reads only); the writer signs real body
+ * hashes and a sorted canonical query (writes need both).
+ *
  * Credential rules (architecture "Deployment and ownership"):
  * - ONLY the media bucket token reaches this process
  *   (R2_MEDIA_ACCESS_KEY_ID / R2_MEDIA_SECRET_ACCESS_KEY / R2_MEDIA_ENDPOINT

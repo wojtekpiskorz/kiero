@@ -37,6 +37,9 @@ describe("convex executor composition", () => {
         // E3's sanctioned append (issue #37 owns the text-analysis lane:
         // the mechanical A3 analyze executor is replaced behind the same
         // seam by the real workflow, and the extract edge is implemented).
+        // I3's sanctioned append (issue #55 owns the firm-export archive
+        // build executor).
+        "exports.build_archive",
         "processing.extract_fragments",
 
         // C5's sanctioned append (issue #28 owns the recomputation lane).

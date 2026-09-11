@@ -40,6 +40,8 @@ import { notificationsFeatureEntry } from "../app/features/notifications/entry";
 import { gmProcessingFeatureEntry } from "../app/features/gm/processing-entry";
 import { searchFeatureEntry } from "../app/features/search/entry";
 import { sourceDetailFeatureEntry } from "../app/features/source-detail/entry";
+// I3's sanctioned append (flagged, issue #55): the firm-export surface.
+import { exportsFeatureEntry } from "../app/features/exports/entry";
 
 /** The mounted feature ids the complete core must compose, in order. */
 export const FULL_CORE_FEATURE_IDS: readonly string[] = [
@@ -47,6 +49,7 @@ export const FULL_CORE_FEATURE_IDS: readonly string[] = [
   "memory.project",
   "search.evidence",
   "source.detail",
+  "operations.exports",
   "attention.now",
   "work.records",
   "memory.extensions",
@@ -91,6 +94,7 @@ export function fullCoreAppFeatures(): readonly AppFeatureEntry[] {
     memoryFeatureEntry,
     searchFeatureEntry,
     sourceDetailFeatureEntry,
+    exportsFeatureEntry,
     coTerazFeatureEntry,
     workFeatureEntry,
     extensionsFeatureEntry,

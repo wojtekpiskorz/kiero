@@ -32,6 +32,10 @@ import { imagesRouteProvider } from "../images/routes";
 
 import { mediaRouteProvider } from "../media/routes";
 
+// I3 append (flagged shared-file change, the D3 sanctioned pattern): the
+// firm-export download provider (parameterized GET reads only).
+import { exportsRouteProvider } from "../exports/routes";
+
 import { calendarOAuthProvider } from "../calendar-oauth/routes";
 
 /** One lane's route provider. */
@@ -54,6 +58,8 @@ export const routeProviders: readonly RouteProvider[] = [
   imagesRouteProvider,
 
   mediaRouteProvider,
+
+  exportsRouteProvider,
 
   calendarOAuthProvider,
 ];

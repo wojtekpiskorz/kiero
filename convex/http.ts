@@ -32,6 +32,10 @@ import { uploadsBridgeHandler, uploadsStateHandler } from "./sources/uploads/htt
 import { imagesBridgeHandler } from "./processing/images/http";
 
 import { mediaAccessHandler } from "./sources/media_access/http";
+// I3 append (flagged shared-file change, the D3 sanctioned pattern): the
+// firm-export lane's HTTP boundaries - the per-user download channel and
+// the service-credentialed build channel the export Worker calls.
+import { exportAccessHandler, exportsBridgeHandler } from "./operations/exports/http";
 import {
   calendarStartHandler,
   calendarCallbackHandler,
@@ -79,6 +83,11 @@ http.route({ path: "/sources/uploads/state", method: "POST", handler: uploadsSta
 http.route({ path: "/processing/images/bridge", method: "POST", handler: imagesBridgeHandler });
 
 http.route({ path: "/sources/media/access", method: "POST", handler: mediaAccessHandler });
+
+// I3 append: the export download channel (per-user) and the build channel
+// (service-credentialed) on the same composition seam.
+http.route({ path: "/operations/exports/access", method: "POST", handler: exportAccessHandler });
+http.route({ path: "/operations/exports/bridge", method: "POST", handler: exportsBridgeHandler });
 
 http.route({ path: "/calendar/oauth/start", method: "POST", handler: calendarStartHandler });
 http.route({ path: "/calendar/oauth/callback", method: "GET", handler: calendarCallbackHandler });

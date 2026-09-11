@@ -248,6 +248,14 @@ export const attentionRemindersInput = Schema.Struct({
   findingId: Schema.NullOr(tableIdSchema("findings")),
 });
 
+// I3 amendment (issue #55, flagged coordinated change, the D5/F3
+// precedent): the firm-export archive build executor's input. One job per
+// export row; the export id is the whole identity (the snapshot itself is
+// read by the executor inside ONE transaction, never carried in the input).
+export const buildArchiveInput = Schema.Struct({
+  exportId: tableIdSchema("exports"),
+});
+
 function decodeFeatureId(value: string): Schema.Schema.Type<typeof FeatureId> {
   return Schema.decodeUnknownSync(FeatureId)(value);
 }
@@ -370,6 +378,16 @@ export const executors: readonly ExecutorEntry[] = [
     executorId: decodeFeatureId("attention.reminders"),
     jobKind: "attention.schedule_task_reminders",
     input: attentionRemindersInput,
+  }),
+  // I3 amendment (issue #55, flagged coordinated change): the firm-export
+  // archive build executor (`convex/operations/exports/executor.ts`
+  // implements it). Registered by the admin-only requestExport transaction;
+  // it consumes no event edge.
+  executorEntry({
+    kind: "executor",
+    executorId: decodeFeatureId("exports.build"),
+    jobKind: "exports.build_archive",
+    input: buildArchiveInput,
   }),
 ];
 

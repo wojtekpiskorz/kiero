@@ -129,7 +129,7 @@ describe("the shipped host features", () => {
     }
   });
 
-  it("registers every feature as pending with a note, except the mounted lanes (H1 conversation + memory, H3 search + source detail, B3 membership, B4 GM, G1 calendar, F3 notifications, H4 GM processing, H2 work/extensions/co-teraz); only the conversation carries its own placeholder screen", () => {
+  it("registers every feature as pending with a note, except the mounted lanes (H1 conversation + memory, H3 search + source detail, B3 membership, B4 GM, G1 calendar, F3 notifications, H4 GM processing, H2 work/extensions/co-teraz, I3 exports); only the conversation carries its own placeholder screen", () => {
     // B3 (issue #22) is the first lane to mount a real screen through this
     // registry: the sanctioned sign-in + membership host composition.
     // B4 (issue #23) mounts the audited GM operator surface the same way;
@@ -138,8 +138,9 @@ describe("the shipped host features", () => {
     // H1 (issue #49) replaced that mount with the full conversation UI and
     // added the memory route; F3 (issue #43) mounts the web push settings
     // screen; H4 (issue #52) mounts the audited GM processing inspector;
-    // D4 (issue #32) mounted the capture composer at /wpis; H3 (issue #51)
-    // mounts the evidence-search and source-history routes; H2 (issue #50)
+    // D4 (issue #32) mounted the capture composer at /wpis (retired by the
+    // J2 join); H3 (issue #51) mounts the evidence-search and
+    // source-history routes; H2 (issue #50)
     // mounts the work records (/praca), the typed extensions (/dodatkowe)
     // and flips the /co-teraz placeholder to the real per-user screen.
     // J2 (issue #61) RETIRED the /wpis capture entry: the composer joined
@@ -150,6 +151,7 @@ describe("the shipped host features", () => {
       "memory.project",
       "search.evidence",
       "source.detail",
+      "operations.exports",
       "attention.now",
       "work.records",
       "memory.extensions",
