@@ -219,10 +219,7 @@ export async function markReassignedScope(
   // --- the candidate walk (bounded, indexed; everything before writes) ----
   const candidates = await scopeCandidates(tx.db, args.companyId, args.sourceId);
 
-  interface MarkingPlan extends PlannedMarking {
-    /** The finding's scope project (the reason the marking names). */
-    readonly scopeProjectId: Id<"projects">;
-  }
+  type MarkingPlan = PlannedMarking;
   const markings: MarkingPlan[] = [];
   const seenFindings = new Set<Id<"findings">>();
   for (const candidate of candidates) {
@@ -271,7 +268,6 @@ export async function markReassignedScope(
         finding: candidate.finding,
         currentRevision: candidate.currentRevision,
         reason: scopeReassignedReason(candidate.finding.scopeProjectId as string),
-        scopeProjectId: candidate.finding.scopeProjectId as Id<"projects">,
       });
     }
   }

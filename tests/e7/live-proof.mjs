@@ -391,8 +391,8 @@ await publishOne(S_MOV, {
 
   // --- R7: tenant isolation (B reassigns its own placement) ---------------------
   const ownMove = await reassign(SOURCE_B, [], SESSION_B);
-  const stB = await readState(SESSION_B);
-  const ownRow = stB.sources.find((s) => s.sourceId === SOURCE_B);
+  const defaultCompanyProbe = await readState(SESSION_B);
+  const ownRow = defaultCompanyProbe.sources.find((s) => s.sourceId === SOURCE_B);
   const r7ok =
     ownMove._tag === "ok" &&
     ownMove.value.projectIds.length === 0 &&
@@ -478,7 +478,7 @@ await publishOne(S_MOV, {
 // --- final sweep ------------------------------------------------------------------
 {
   const st = await readState();
-  const stB = await readState(); // company A is the default session's company
+  const defaultCompanyProbe = await readState(); // company A is the default session's company
   const projectionConsistent = st.findings.every((f) => {
     const history = revisionsOf(st, f.findingId);
     return (
@@ -495,7 +495,7 @@ await publishOne(S_MOV, {
   record(
     "S final sweep: every projection equals its latest revision; every recomputation job terminal; placements bounded",
     projectionConsistent && jobsTerminal && linksSingleTruth ? "PASS" : "FAIL",
-    `consistent=${projectionConsistent} terminal=${jobsTerminal} links=${linksSingleTruth} sources=${stB.sources.length}`,
+    `consistent=${projectionConsistent} terminal=${jobsTerminal} links=${linksSingleTruth} sources=${defaultCompanyProbe.sources.length}`,
   );
 }
 
