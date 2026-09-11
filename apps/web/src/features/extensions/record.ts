@@ -159,8 +159,8 @@ export function ValueSection({
       // basis): the same one-key send loop the conversation rides. Once a
       // source is durable the receipt is REUSED on resubmit (the key was
       // consumed by the acceptance; a re-send would mint a SECOND source).
-      const reusuable = accepted !== null && accepted.statement === statement.trim();
-      const outcome = reusuable
+      const reusable = accepted !== null && accepted.statement === statement.trim();
+      const outcome = reusable
         ? ({ _tag: "sent", receipt: { sourceId: accepted.sourceId } } as const)
         : await source.send({
             authorText: statement.trim(),
