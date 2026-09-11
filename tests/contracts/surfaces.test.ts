@@ -56,9 +56,12 @@ describe("composed registry integrity", () => {
     // 73 since the H1 amendment added the two memory reads, F3 added
     // attention.revokePushSubscription and F4 added
     // attention.evaluateDueReminders; 74 since G5 (issue #107) landed the
-    // certified calendar.setSelection entry G2's report had flagged.
-    expect(operationNames).toHaveLength(74);
-    expect(eventNames).toHaveLength(41);
+    // certified calendar.setSelection entry G2's report had flagged;
+    // 75/42 since the E7 amendment (issue #115) added the certified
+    // sources.reassignSource operation and its sources.sourceReassigned
+    // event.
+    expect(operationNames).toHaveLength(75);
+    expect(eventNames).toHaveLength(42);
     for (const name of operationNames) {
       expect(operations[name]?.name).toBe(name);
       expect(name).toMatch(/^[a-z][a-z0-9_]*\.[a-z][a-zA-Z0-9_]*$/);

@@ -62,8 +62,19 @@ export const sourceDetailCopy = {
   withdrawSaving: "Wycofywanie…",
   withdrawDone:
     "Źródło wycofane. Treść i historia pozostają; zależne ustalenia są oznaczane do ponownego rozpatrzenia.",
-  reassignmentNote:
-    "Przypisanie tej wiadomości do projektów zmienia się obecnie tylko przy wysyłce (podpowiedzi projektów). Osobna operacja przypisania źródła do projektów nie jest jeszcze udostępniona.",
+  // Reassignment (E7): the control mounts now that the certified operation exists.
+  reassignmentHeading: "Przypisanie do projektów",
+  reassignmentIntro:
+    "Przenieś tę wiadomość między projektami albo do wiedzy ogólnej firmy. Wiadomość zachowuje jedność: rozmowy projektowe pokazują ten sam oryginał, a stan przeczytania pozostaje. Ustalenia oparte na tej wiadomości, które dotyczą zdjętego projektu, są ponownie rozpatrywane.",
+  reassignmentNoProjectsHint:
+    "Brak zaznaczonych projektów: wiadomość zostaje wiedzą ogólną firmy.",
+  reassignmentSubmit: "Zapisz przypisanie",
+  reassignmentSaving: "Zapisywanie…",
+  reassignmentDone:
+    "Przypisanie zapisane. Rozmowy projektowe pokazują już nowe rozmieszczenie; zależne ustalenia są ponownie rozpatrywane.",
+  reassignmentUnchanged: "To przypisanie jest już aktualne, nie ma czego zapisywać.",
+  withdrawnReassignmentNote:
+    "Źródło wycofane pozostaje w historii w miejscach, w których działało; przypisania do projektów zmienia się tylko dla źródeł aktualnych.",
   // Evidence chain
   networkUnavailable: "Brak połączenia z serwerem. Spróbuj ponownie za chwilę.",
   evidenceHeading: "Ustalenia oparte na tym źródle",
@@ -221,6 +232,8 @@ const failureHints: Partial<Record<string, string>> = {
   ...sessionFailureHints,
   source_not_in_company: sourceDetailCopy.notFound,
   source_withdrawn: sourceDetailCopy.withdrawnHeading,
+  source_links_unchanged: sourceDetailCopy.reassignmentUnchanged,
+  source_not_active: sourceDetailCopy.withdrawnHeading,
   media_reference_not_found: sourceDetailCopy.mediaDenied,
   client_credential_missing: sourceDetailCopy.tokenMissing,
 };

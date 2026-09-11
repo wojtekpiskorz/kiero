@@ -20,6 +20,11 @@
  *   the same sources dispatch the send path uses — with the explicit
  *   disclosure that withdrawal is NOT permanent deletion (CONTEXT.md
  *   "Źródło wycofane" keeps content and history);
+ * - the reassignment control (E7's mount, issue #115): the certified
+ *   `sources.reassignSource` over the same dispatch: the boss moves the
+ *   message between projects or to company-general knowledge by declaring
+ *   the complete new set; the links table stays the single source of truth
+ *   and dependent findings re-assess through C5's recomputation;
  * - media anchors: audio playback and image display load EXCLUSIVELY
  *   through D3's authorized channel (fresh authenticated request per
  *   load; image highlights render over the EXACT representation whose
@@ -68,6 +73,7 @@ import {
 } from "../company/CompanyGate";
 import { asConvexId } from "../company/convex-ids";
 import { PROJECT_PARAM, SOURCE_PARAM, searchParam } from "../company/route-params";
+import { ReassignControl } from "./reassign";
 import {
   attachmentMediaUrl,
   loadAuthorizedMedia,
@@ -310,8 +316,15 @@ function SourceDetailBody({
           reason: row.withdrawnReason,
         })
       : row.lifecycle === "active"
-        ? createElement(WithdrawControl, { sourceId })
+        ? createElement(ReassignControl, {
+            sourceId,
+            projectNames,
+            currentProjectIds: row.projectIds,
+          })
         : null,
+    row.lifecycle === "active"
+      ? createElement(WithdrawControl, { sourceId })
+      : null,
     createElement(MediaSection, { row }),
     createElement(TranscriptsSection, { row }),
     createElement(OcrSection, { row }),
@@ -348,7 +361,7 @@ function WithdrawnRecord({
     createElement("p", null, `${copy.withdrawnByLabel}: ${withdrawnBy ?? "?"}`),
     createElement("p", null, `${copy.withdrawnAtLabel}: ${withdrawnAtMs === null ? "?" : instantLabel(withdrawnAtMs)}`),
     createElement("p", null, `${copy.withdrawnReasonLabel}: ${reason ?? "?"}`),
-    createElement("p", null, copy.reassignmentNote),
+    createElement("p", null, copy.withdrawnReassignmentNote),
   );
 }
 
@@ -396,7 +409,6 @@ function WithdrawControl({ sourceId }: { readonly sourceId: string }): ReactNode
     { "aria-label": copy.withdrawHeading },
     createElement("h2", null, copy.withdrawHeading),
     createElement("p", null, copy.withdrawIntro),
-    createElement("p", null, copy.reassignmentNote),
     open
       ? createElement(
           "form",

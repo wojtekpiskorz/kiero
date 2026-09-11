@@ -34,6 +34,17 @@
  *   evidence). A non-known root is a no-op: the stale cascade above owns
  *   that direction.
  *
+ * - `sources.sourceReassigned` → cause `source_reassigned` (E7 amendment,
+ *   flagged): a project reassignment re-assesses DEPENDENT SCOPE. The
+ *   moved source stays active (its evidence still witnesses), so nothing
+ *   is marked unknown here; the findings whose project placement lost the
+ *   source's link, narrowed to unlinked scopes, sparing explicit
+ *   corrections, already-marked findings and findings with another active
+ *   linked witness, become `updating`-until-revalidated through the
+ *   reassignment lane's marking core, cascade to derivation dependents
+ *   through the same carrier, and re-analyze through E3's seam (the new
+ *   run reads the CURRENT project links).
+ *
  * AMPLIFICATION NOTE (for H3's incident scanning): the findingRevised edge
  * fires one durable walk per revision — including the cascade's own
  * markings, most of which no-op. Accepted for alpha volume; per-reaction
@@ -83,6 +94,9 @@ import type { JobExecutor } from "../../platform/executors";
 import type { MutationCtx } from "../../_generated/server";
 import type { Id, Doc } from "../../_generated/dataModel";
 import { markWithdrawnSupport } from "../findings/withdrawal";
+// E7 amendment (flagged): the reassignment lane's scope-marking core (the
+// same one-core pattern as the withdrawal marking above).
+import { markReassignedScope } from "../../sources/reassign/dependents";
 import { encodeKnowledgeState, knowledgeTagOf } from "../findings/semantics";
 import { RECOMPUTE_PIPELINE_VERSION } from "./withdrawal";
 
@@ -90,9 +104,19 @@ import { RECOMPUTE_PIPELINE_VERSION } from "./withdrawal";
 interface RecomputeInput {
   readonly rootFindingId: string | null;
   readonly sourceId: string | null;
-  readonly cause: "source_withdrawn" | "dependent_stale" | "reanalysis";
+  readonly cause:
+    | "source_withdrawn"
+    | "dependent_stale"
+    | "reanalysis"
+    | "source_reassigned";
   readonly reason: string | null;
   readonly withdrawnByUserId: string | null;
+  /**
+   * E7 amendment (flagged): the reassigning user of the
+   * `source_reassigned` cause (optional like the registry key; absent on
+   * every other cause).
+   */
+  readonly reassignedByUserId?: string | null;
 }
 
 /** Retry policy of the linked re-analysis registrations (E3's bound). */
@@ -559,6 +583,80 @@ export const recomputeDependentsExecutor: JobExecutor = {
           markingRevisionId: rootRow.currentRevisionId,
         });
       }
+      return { outcome: "succeeded" };
+    }
+
+    // E7 amendment (flagged, issue #115): the scope re-assessment reaction
+    // of one project reassignment. The marking is identity-independent like
+    // the withdrawal half (the reassigning user, fallback the source's
+    // author, recorded honestly as the marking's author), rechecks the
+    // source's CURRENT lifecycle and CURRENT links (marking follows the
+    // link change; only an active source's placement re-assesses), marks
+    // the narrowed scope findings through the reassignment lane's own core
+    // (../sources/reassign/dependents.ts), hands every marked root to the
+    // SAME cascade carrier as withdrawal, and registers the marked
+    // findings' linked re-analysis (an active source re-analyzes: the new
+    // run reads the CURRENT project links and re-derives placement).
+    if (decoded.cause === "source_reassigned") {
+      const sourceId = ctx.db.normalizeId("sources", decoded.sourceId ?? "");
+      if (sourceId === null) {
+        return { outcome: "failed", errorKind: "source_id_invalid", retryable: false };
+      }
+      const source = await ctx.db.get(sourceId);
+      if (source === null) {
+        return { outcome: "failed", errorKind: "source_missing", retryable: false };
+      }
+      if (source.companyId !== companyId) {
+        return { outcome: "failed", errorKind: "tenant_scope_mismatch", retryable: false };
+      }
+      // CURRENT lifecycle recheck: withdrawal/purge own the stronger
+      // reactions for their lifecycles; scope re-assessment never runs
+      // around them.
+      if (source.lifecycle !== "active") {
+        return { outcome: "failed", errorKind: "source_not_active", retryable: false };
+      }
+      const preferredActor = ctx.db.normalizeId("users", decoded.reassignedByUserId ?? "");
+      const actorUserId =
+        preferredActor === null
+          ? ctx.db.normalizeId("users", source.authorUserId)
+          : preferredActor;
+      if (actorUserId === null) {
+        return { outcome: "failed", errorKind: "actor_unresolved", retryable: false };
+      }
+      const links = await ctx.db
+        .query("sourceProjectLinks")
+        .withIndex("by_source", (q) => q.eq("sourceId", source._id))
+        .collect();
+      const marking = await markReassignedScope(ctx, {
+        companyId,
+        actorUserId,
+        sourceId: source._id,
+        currentProjectIds: links.map((link) => link.projectId),
+      });
+      if (marking._tag === "error") {
+        return {
+          outcome: "failed",
+          errorKind: `scope_marking_refused:${marking.error.code}`,
+          retryable: false,
+        };
+      }
+      const marked = marking.value as {
+        markedFindingIds: Id<"findings">[];
+        targets: RecomputeTarget[];
+      };
+      for (const root of marked.markedFindingIds) {
+        const rootRow = await ctx.db.get(root);
+        if (rootRow === null || rootRow.currentRevisionId === undefined) {
+          continue; // a root that lost its current revision carries nothing
+        }
+        await publishCascadeCarrier(ctx, {
+          companyId,
+          actorUserId,
+          rootFindingId: root,
+          markingRevisionId: rootRow.currentRevisionId,
+        });
+      }
+      await registerReanalysisGroups(ctx, companyId, marked.targets, triggerKey);
       return { outcome: "succeeded" };
     }
 

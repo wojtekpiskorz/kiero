@@ -160,8 +160,15 @@ export const memoryOperations = {
           revision: RevisionCounter,
           value: FindingValue,
           knowledgeState: KnowledgeState,
-          origin: Schema.Literals(["publication", "correction", "withdrawal_marking"]),
-          /** Why an explicit correction or withdrawal marking happened. */
+          origin: Schema.Literals([
+            "publication",
+            "correction",
+            "withdrawal_marking",
+            // E7 amendment (additive, flagged): a project reassignment's
+            // scope re-assessment marking.
+            "reassignment_marking",
+          ]),
+          /** Why an explicit correction or a marking revision happened. */
           reason: Schema.NullOr(Schema.String),
           recordedByUserId: tableIdSchema("users"),
           recordedAtMs: Schema.Number,

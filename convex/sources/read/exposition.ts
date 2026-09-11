@@ -187,7 +187,14 @@ export const SourceEvidenceRow = Schema.Struct({
   ]),
   citedRevisionId: Schema.String,
   citedRevision: Schema.Number,
-  citedOrigin: Schema.Literals(["publication", "correction", "withdrawal_marking"]),
+  // E7 amendment (additive, flagged): the reassignment scope marking joins
+  // the origin vocabulary on both the cited and the current revision.
+  citedOrigin: Schema.Literals([
+    "publication",
+    "correction",
+    "withdrawal_marking",
+    "reassignment_marking",
+  ]),
   citedRecordedAtMs: Schema.Number,
   fragmentId: Schema.NullOr(Schema.String),
   fragmentAnchor: Schema.NullOr(FragmentAnchor),
@@ -196,7 +203,14 @@ export const SourceEvidenceRow = Schema.Struct({
   currentRevision: Schema.NullOr(Schema.Number),
   currentKnowledgeState: Schema.NullOr(Schema.Unknown),
   currentValue: Schema.NullOr(Schema.Unknown),
-  currentOrigin: Schema.NullOr(Schema.Literals(["publication", "correction", "withdrawal_marking"])),
+  currentOrigin: Schema.NullOr(
+    Schema.Literals([
+      "publication",
+      "correction",
+      "withdrawal_marking",
+      "reassignment_marking",
+    ]),
+  ),
   currentReason: Schema.NullOr(Schema.String),
   currentRecordedAtMs: Schema.NullOr(Schema.Number),
   /** True when a newer revision replaced the one this source supported. */

@@ -201,6 +201,26 @@ function projectOneEdge(
         dedupKey: rowDedupKey,
       };
     }
+    // E7 registration (issue #115 owns this edge's projection): a project
+    // reassignment drains into the scope re-assessment cause. The publisher
+    // (the reassignment transaction) already registered the job itself with
+    // the real reassigning actor under the SAME dedup key, so this
+    // projection collapses onto that row.
+    if (eventName === "sources.sourceReassigned") {
+      return {
+        kind: "job",
+        jobKind,
+        input: {
+          rootFindingId: null,
+          sourceId: payload.sourceId,
+          cause: "source_reassigned",
+          reason: null,
+          withdrawnByUserId: null,
+          reassignedByUserId: null,
+        },
+        dedupKey: rowDedupKey,
+      };
+    }
     if (eventName === "memory.dependentsMarkedStale") {
       return {
         kind: "job",
