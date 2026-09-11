@@ -113,13 +113,14 @@ function ExportsSurface(): ReactNode {
   }
 
   async function download(row: StatusRow): Promise<void> {
-    if (token === null || config.gatewayUrl === null) {
+    const gatewayUrl = config.gateway.state === "configured" ? config.gateway.gatewayUrl : null;
+    if (token === null || gatewayUrl === null) {
       setNotice({ kind: "error", text: copy.gatewayMissing });
       return;
     }
     setDownloading(row.exportId);
     try {
-      const response = await fetch(`${config.gatewayUrl}/exports/${row.exportId}/download`, {
+      const response = await fetch(`${config.gateway.state === "configured" ? config.gateway.gatewayUrl : null}/exports/${row.exportId}/download`, {
         headers: { authorization: `Bearer ${token}` },
       });
       if (response.status !== 200 && response.status !== 206) {
@@ -194,7 +195,7 @@ function ExportsSurface(): ReactNode {
           "button",
           {
             type: "button",
-            disabled: row.stateRaw !== "available" || downloading !== null || config.gatewayUrl === null,
+            disabled: row.stateRaw !== "available" || downloading !== null || config.gateway.state !== "configured",
             onClick: () => void download(row),
           },
           downloading === row.exportId ? copy.downloading : copy.downloadButton,
@@ -208,7 +209,7 @@ function ExportsSurface(): ReactNode {
     });
     children.push(createElement("ul", null, ...items));
   }
-  if (config.gatewayUrl === null) {
+  if (config.gateway.state === "configured" ? config.gateway.gatewayUrl : null === null) {
     children.push(createElement("p", { role: "note" }, copy.gatewayMissing));
   }
   if (notice !== null) {

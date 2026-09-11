@@ -46,12 +46,14 @@ describe("the capture feature registration (D4's host mount)", () => {
 });
 
 describe("the gateway configuration append (optional, honest)", () => {
-  it("stays null when VITE_GATEWAY_URL is unset or blank", () => {
-    expect(loadAppConfig({ VITE_CONVEX_URL: "https://demo.convex.cloud" }).gatewayUrl).toBeNull();
+  it("stays unconfigured when VITE_GATEWAY_URL is unset or blank", () => {
+    expect(loadAppConfig({ VITE_CONVEX_URL: "https://demo.convex.cloud" }).gateway).toEqual({
+      state: "unconfigured",
+    });
     expect(
       loadAppConfig({ VITE_CONVEX_URL: "https://demo.convex.cloud", VITE_GATEWAY_URL: "   " })
-        .gatewayUrl,
-    ).toBeNull();
+        .gateway,
+    ).toEqual({ state: "unconfigured" });
   });
 
   it("normalizes a valid gateway URL", () => {
@@ -59,8 +61,8 @@ describe("the gateway configuration append (optional, honest)", () => {
       loadAppConfig({
         VITE_CONVEX_URL: "https://demo.convex.cloud",
         VITE_GATEWAY_URL: "https://kiero-dev-gateway-d4.workers.dev/",
-      }).gatewayUrl,
-    ).toBe("https://kiero-dev-gateway-d4.workers.dev");
+      }).gateway,
+    ).toEqual({ state: "configured", gatewayUrl: "https://kiero-dev-gateway-d4.workers.dev" });
   });
 
   it("treats an invalid gateway URL as null (degrades only the capture surface)", () => {
@@ -68,13 +70,13 @@ describe("the gateway configuration append (optional, honest)", () => {
       VITE_CONVEX_URL: "https://demo.convex.cloud",
       VITE_GATEWAY_URL: "not a url",
     });
-    expect(config.gatewayUrl).toBeNull();
+    expect(config.gateway).toEqual({ state: "unconfigured" });
     expect(config.connection.state).toBe("configured");
   });
 
   it("never lets the gateway value affect the unconfigured Convex state", () => {
     const config = loadAppConfig({ VITE_GATEWAY_URL: "https://gw.example" });
     expect(config.connection.state).toBe("unconfigured");
-    expect(config.gatewayUrl).toBe("https://gw.example");
+    expect(config.gateway).toEqual({ state: "configured", gatewayUrl: "https://gw.example" });
   });
 });
