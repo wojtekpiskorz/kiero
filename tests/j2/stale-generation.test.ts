@@ -25,6 +25,8 @@ interface Seeded {
 async function seedBuilding(job: {
   readonly state: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   readonly updatedAtMs: number;
+  /** The job's start time (the pass's total age, which the gate must NOT read). */
+  readonly createdAtMs?: number;
 }): Promise<Seeded> {
   const companyId = await ctx.db.insert("companies", {
     name: "j2-stale-generation",
@@ -48,7 +50,7 @@ async function seedBuilding(job: {
     dedupKey: `search.index_generation:build:${generationId}`,
     attempts: 1,
     maxAttempts: 3,
-    createdAtMs: 1,
+    createdAtMs: job.createdAtMs ?? 1,
     updatedAtMs: job.updatedAtMs,
   });
   void companyId;
@@ -100,6 +102,24 @@ describe("the interrupted-build reconciliation (the dev/j2 stuck lock)", () => {
 
   it("keeps the gate closed for a fresh running build", async () => {
     await seedBuilding({ state: "running", updatedAtMs: Date.now() });
+
+    const started = await start();
+
+    expect(started).toMatchObject({ _tag: "error" });
+    expect(ctx.db.rows("searchIndexGenerations")).toHaveLength(1);
+  });
+
+  it("keeps the gate closed for a long-running build whose pass heartbeats within the window", async () => {
+    // A whole-corpus embed pass legitimately outlasts the staleness
+    // window; runIndexPass heartbeats the job row per embedded batch, so
+    // the window must mean NO PROGRESS, not total age. This job STARTED
+    // 20 minutes ago (past the window) but its last heartbeat landed
+    // 5 minutes ago: the pass is alive and the gate stays closed.
+    await seedBuilding({
+      state: "running",
+      updatedAtMs: Date.now() - 5 * 60 * 1000,
+      createdAtMs: Date.now() - 20 * 60 * 1000,
+    });
 
     const started = await start();
 

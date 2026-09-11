@@ -38,10 +38,19 @@ const BUILD_RETRY_POLICY = { maxAttempts: 3, backoffBaseMs: 2_000 } as const;
  * leaves the generation building and the one-at-a-time gate refusing
  * every later generation forever - the exact uncertain-outcome class the
  * platform protocol reconciles. A building generation whose build job is
- * terminally dead (failed/cancelled/absent) or has not updated within the
- * staleness window retires here (it was never active, so serving is
- * untouched); a fresh or SUCCEEDED build keeps the gate closed (the
- * succeeded-awaiting-cutover coexistence is the designed state).
+ * terminally dead (failed/cancelled/absent) or has made NO PROGRESS
+ * within the staleness window retires here (it was never active, so
+ * serving is untouched); a fresh or SUCCEEDED build keeps the gate closed
+ * (the succeeded-awaiting-cutover coexistence is the designed state).
+ *
+ * The window observes the external pass, not the wall clock since the
+ * pass started: `runIndexPass` heartbeats the job row's `updatedAtMs`
+ * after every embedded batch (./executor.ts `heartbeatJob`), so a
+ * whole-corpus pass that legitimately outlasts the window keeps the gate
+ * closed while batches keep completing. Only 15 minutes WITHOUT a
+ * heartbeat or terminal record (a pass that died mid-flight) retires the
+ * build; the batch size is chosen so a live pass's worst inter-heartbeat
+ * gap stays under half that window.
  */
 const STALE_BUILD_JOB_MS = 15 * 60 * 1000;
 

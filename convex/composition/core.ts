@@ -103,41 +103,66 @@ export interface CoreComposition {
 }
 
 /**
- * Validates the complete core composition. Pure over the imported
- * registries: same inputs, same problems. An empty `problems` list is the
- * join's green light; anything else is drift that must fail loudly.
+ * The composed registries the validation consumes (structural on purpose,
+ * the gateway view's pattern): production validates the LIVE composed
+ * registries by default, while drift tests inject a view with real drift
+ * (a dropped executor, a missing seam) instead of re-validating the
+ * clean state.
  */
-export function validateCoreComposition(): CoreComposition {
+export interface CoreRegistryView {
+  /** The composed executor table (durable job kind -> implementation). */
+  readonly jobExecutors: Readonly<Record<string, unknown>>;
+  /** The composed contracts operations registry (operation name -> entry). */
+  readonly operations: Readonly<Record<string, unknown>>;
+  /** The composed contracts events registry (event name -> entry). */
+  readonly events: Readonly<Record<string, unknown>>;
+}
+
+/** The live composed registries (the validator's default view). */
+function liveRegistries(): CoreRegistryView {
+  return { jobExecutors, operations, events };
+}
+
+/**
+ * Validates the complete core composition. Pure: same registry view, same
+ * problems. An empty `problems` list is the join's green light; anything
+ * else is drift that must fail loudly.
+ */
+export function validateCoreComposition(
+  registries: CoreRegistryView = liveRegistries(),
+): CoreComposition {
   const problems: CoreCompositionProblem[] = [];
   const isClosedKind = Schema.is(DurableJobKind);
   for (const kind of CORE_JOB_KINDS) {
     if (!isClosedKind(kind)) {
       problems.push({ kind: "job_kind_outside_contracts", name: kind });
     }
-    if (!(kind in jobExecutors)) {
+    if (!(kind in registries.jobExecutors)) {
       problems.push({ kind: "executor_missing", name: kind });
     }
   }
   for (const operation of CORE_OPERATION_SEAMS) {
-    if (!(operation in operations)) {
+    if (!(operation in registries.operations)) {
       problems.push({ kind: "operation_missing", name: operation });
     }
   }
   for (const eventName of CORE_EVENT_SEAMS) {
-    if (!(eventName in events)) {
+    if (!(eventName in registries.events)) {
       problems.push({ kind: "event_missing", name: eventName });
     }
   }
   return {
     jobKinds: CORE_JOB_KINDS,
-    executorCount: Object.keys(jobExecutors).length,
+    executorCount: Object.keys(registries.jobExecutors).length,
     problems,
   };
 }
 
 /** Runs the validation and THROWS on any drift (the loud gate). */
-export function coreCompositionOrThrow(): CoreComposition {
-  const composition = validateCoreComposition();
+export function coreCompositionOrThrow(
+  registries: CoreRegistryView = liveRegistries(),
+): CoreComposition {
+  const composition = validateCoreComposition(registries);
   if (composition.problems.length > 0) {
     const listed = composition.problems
       .map((problem) => `${problem.kind}: ${problem.name}`)

@@ -13,18 +13,21 @@ import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { validateSourceMaterial, validateAuthorText, MAX_AUTHOR_TEXT_LENGTH } from "../../convex/sources/accept/acceptance";
+import { validateSourceMaterial, MAX_AUTHOR_TEXT_LENGTH } from "../../convex/sources/accept/acceptance";
 import { appFeatures } from "../../apps/web/src/app/app-features";
 import { resolveFeatureScreen } from "../../apps/web/src/app/feature-pending";
 import { AppServicesProvider } from "../../apps/web/src/app/providers";
 import { loadAppConfig } from "../../apps/web/src/app/config";
 import {
+  AnswerRefusalWire,
+  AnswerResultWire,
   AnswerRunWire,
   answerBasisLabel,
   answerOutcomeLabel,
   conversationCopy,
 } from "../../apps/web/src/features/conversation/state";
 import { captureCopy } from "../../apps/web/src/features/capture/state";
+import { nextPrefillApplication } from "../../apps/web/src/features/capture/CaptureFeature";
 
 // ---------------------------------------------------------------------------
 // The joined mount
@@ -103,18 +106,62 @@ describe("the source material rule (words OR retained media)", () => {
     });
   });
 
-  it("leaves D1's pinned pure decision untouched (tests/d1 authority)", () => {
-    expect(validateAuthorText("Dowóz płytek w czwartek")).toEqual({
+  it("keeps the text-only refusal identical through the one material rule (tests/d1 authority)", () => {
+    // `validateSourceMaterial(text, false)` IS the old text-only rule
+    // (D1's pinned decision, now the one author-text rule in production).
+    expect(validateSourceMaterial("Dowóz płytek w czwartek", false)).toEqual({
       ok: true,
       value: "Dowóz płytek w czwartek",
     });
-    expect(validateAuthorText("  ")).toEqual({ ok: false, code: "author_text_empty" });
+    expect(validateSourceMaterial("  ", false)).toEqual({ ok: false, code: "author_text_empty" });
   });
 
   it("renders the honest composer note: text is one channel, not a requirement", () => {
     expect(captureCopy.textOptionalNote).toContain("nagranie albo zdjęcia");
     // The old required-note is gone; the refusal copy stays load-bearing.
     expect(captureCopy.textOptionalNote).not.toContain("wymaga");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The correction prefill's once-per-REQUEST rule (the repeat click)
+// ---------------------------------------------------------------------------
+
+describe("the correction prefill decision (Korekta repeat on the same message)", () => {
+  it("applies the request once, then re-renders of the same prefill never rewrite", () => {
+    // First request: lands.
+    expect(nextPrefillApplication(null, "Poprawka do wiadomości…")).toEqual({
+      lastApplied: "Poprawka do wiadomości…",
+      apply: "Poprawka do wiadomości…",
+    });
+    // The parent drops the request to null (applied or cancelled): the
+    // memory clears, so the composer's text stays the boss's own.
+    expect(nextPrefillApplication("Poprawka do wiadomości…", null)).toEqual({
+      lastApplied: null,
+      apply: null,
+    });
+  });
+
+  it("lands a byte-identical repeat request (second Korekta click on the same message)", () => {
+    // The exact effect-run sequence of the repeat: request, drop to null
+    // (applied or cancelled), then the SAME regenerated prefill arrives
+    // again. A value-only dedup swallows it; the null reset makes it land.
+    let lastApplied: string | null = null;
+    const first = nextPrefillApplication(lastApplied, "Poprawka: ta sama treść");
+    lastApplied = first.lastApplied;
+    const dropped = nextPrefillApplication(lastApplied, null);
+    lastApplied = dropped.lastApplied;
+    const repeat = nextPrefillApplication(lastApplied, "Poprawka: ta sama treść");
+    expect(repeat.apply).toBe("Poprawka: ta sama treść");
+  });
+
+  it("never rewrites an applied prefill that is still outstanding", () => {
+    // The request has not been dropped yet (still non-null): identical
+    // re-renders must not rewrite text the boss may already have edited.
+    expect(nextPrefillApplication("Poprawka: ta sama treść", "Poprawka: ta sama treść")).toEqual({
+      lastApplied: "Poprawka: ta sama treść",
+      apply: null,
+    });
   });
 });
 
@@ -214,5 +261,19 @@ describe("the answer wire contract and its Polish labels", () => {
     expect(answerBasisLabel("inference")).toBe("wniosek agenta");
     expect(answerBasisLabel("direct")).toBe("bezpośrednio w źródle");
     expect(answerBasisLabel("corroboration")).toBe("potwierdzone niezależnie");
+  });
+
+  it("decodes the honest pre-loop refusals through the SAME boundary union", () => {
+    // askAgent's answer | refusal comes back as one shape family: the
+    // boundary decodes ONCE through AnswerResultWire and narrows by
+    // schema, never by a hand-rolled "outcome" in raw data.
+    const refusal = Schema.decodeUnknownSync(AnswerResultWire)({ outcome: "missing" });
+    expect(Schema.is(AnswerRefusalWire)(refusal)).toBe(true);
+    expect(refusal).toMatchObject({ outcome: "missing" });
+    const run = Schema.decodeUnknownSync(AnswerResultWire)(answeredRun);
+    expect(Schema.is(AnswerRefusalWire)(run)).toBe(false);
+    // Wire drift (an unknown outcome string) fails the decode instead of
+    // rendering a guess.
+    expect(() => Schema.decodeUnknownSync(AnswerResultWire)({ outcome: "guessed" })).toThrow();
   });
 });

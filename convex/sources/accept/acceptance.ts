@@ -108,17 +108,6 @@ export type Validated<T> = { readonly ok: true; readonly value: T } | {
   readonly code: string;
 };
 
-/** Author text must carry words: whitespace-only text is not a message. */
-export function validateAuthorText(text: string): Validated<string> {
-  if (text.trim().length === 0) {
-    return { ok: false, code: "author_text_empty" };
-  }
-  if (text.length > MAX_AUTHOR_TEXT_LENGTH) {
-    return { ok: false, code: "author_text_too_long" };
-  }
-  return { ok: true, value: text };
-}
-
 /**
  * The J2 voice-only ruling (issue #61): a wiadomość źródłowa "może łączyć
  * tekst, nagranie i zdjęcia" (CONTEXT.md) — the channels combine, none is
@@ -127,7 +116,9 @@ export function validateAuthorText(text: string): Validated<string> {
  * retained recording or photos is a valid voice-only/photo-only message
  * (its analysis runs through the E4 multimodal join); empty text with NO
  * attachment stays the honest `author_text_empty` refusal. The length
- * cap applies whenever text is present at all.
+ * cap applies whenever text is present at all. This is the ONE author
+ * text rule: the acceptance transaction runs it once, after the
+ * attachment gate (whose VERIFIED ids answer the has-attachments half).
  */
 export function validateSourceMaterial(
   text: string,
@@ -353,14 +344,10 @@ export async function performAcceptance(
   }
 
   // --- deeper input validation (the contract schema passed these shapes) ---
-  // The author-text MATERIAL rule (words OR verified attachments, the J2
-  // voice-only ruling through `validateSourceMaterial`) runs after the
-  // attachment gate below, because only the gate's VERIFIED attachment ids
-  // can honestly say the message carries retained media. The length cap
-  // needs no attachment knowledge and refuses early.
-  if (input.authorText.length > MAX_AUTHOR_TEXT_LENGTH) {
-    return errorResult(validationError("author_text_too_long"));
-  }
+  // The author-text rule runs ONCE, as `validateSourceMaterial` after the
+  // attachment gate below, because only the gate's VERIFIED attachment
+  // ids can honestly say the message carries retained media; there is no
+  // earlier inline length check to race it (one rule, one place).
   const sentAt = resolveSentAtMs(input.intendedSentAtIso, nowMs);
   if (!sentAt.ok) {
     return errorResult(validationError(sentAt.code));

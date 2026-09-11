@@ -79,6 +79,27 @@ export interface ComposerFormProps {
 // The composer form: renders the wiring's state through the views
 // ---------------------------------------------------------------------------
 
+/**
+ * One correction-prefill effect decision (pure so tests pin the repeat):
+ * `lastApplied` remembers the APPLIED request so re-renders never rewrite
+ * text the boss may already have edited, but a prefill that went back to
+ * null (applied or cancelled) CLEARS that memory - a second Korekta click
+ * on the same message regenerates a byte-identical prefill that must land
+ * again, not be swallowed by a value-only dedup.
+ */
+export function nextPrefillApplication(
+  lastApplied: string | null,
+  prefill: string | null,
+): { readonly lastApplied: string | null; readonly apply: string | null } {
+  if (prefill === null) {
+    return { lastApplied: null, apply: null };
+  }
+  if (lastApplied === prefill) {
+    return { lastApplied, apply: null };
+  }
+  return { lastApplied: prefill, apply: prefill };
+}
+
 export function ComposerForm({
   userId,
   prefill,
@@ -108,14 +129,16 @@ export function ComposerForm({
         }))
       : [];
 
-  // The correction prefill lands in the draft ONCE per request: the ref
-  // remembers which request was applied, so re-renders never rewrite text
-  // the boss may already have edited.
+  // The correction prefill lands in the draft ONCE per REQUEST (the pure
+  // decision above): the ref remembers which request was applied, so
+  // re-renders never rewrite text the boss may already have edited, and a
+  // request that went back to null clears it for the next one.
   const appliedPrefill = useRef<string | null>(null);
   useEffect(() => {
-    if (prefill !== null && appliedPrefill.current !== prefill) {
-      appliedPrefill.current = prefill;
-      composer.editText(prefill);
+    const decision = nextPrefillApplication(appliedPrefill.current, prefill);
+    appliedPrefill.current = decision.lastApplied;
+    if (decision.apply !== null) {
+      composer.editText(decision.apply);
       onPrefillApplied();
     }
   }, [prefill, composer, onPrefillApplied]);

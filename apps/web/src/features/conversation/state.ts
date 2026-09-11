@@ -37,11 +37,7 @@ export const conversationCopy = {
   scopeProjectLabel: "Widok: projekt",
   scopeSwitchHint:
     "Rozmowa projektowa to te same wiadomości — jeden oryginał, jeden autor, wszędzie.",
-  // Send form
-  sendHeading: "Wyślij wiadomość źródłową",
-  sendTextLabel: "Treść wiadomości",
-  sendTextPlaceholder: "np. Projekt Banan: dowóz płytek w środę rano, klient potwierdził odbiór.",
-  sendProjectsLabel: "Projekty, których dotyczy (podpowiedzi dla agenta)",
+  // Send form (the composer re-uses these state labels)
   sendButton: "Wyślij",
   sending: "Wysyłanie…",
   savedNotice: "Wiadomość zapisana. Agent przetwarza…",
@@ -52,8 +48,6 @@ export const conversationCopy = {
   partialNotice: "Część materiałów tej wiadomości czeka jeszcze na przetworzenie.",
   lostResponseNotice:
     "Odpowiedź zaginęła podczas wysyłania. Wiadomość mogła zostać zapisana — ponowne kliknięcie „Wyślij” nie utworzy duplikatu.",
-  correctionNote:
-    "Korekta ustalenia to jawne rozstrzygnięcie zmieniające informację w pamięci, z własnym autorem i czasem. Nie przepisuje wcześniejszej wiadomości źródłowej — napisz wyraźnie, co się zmienia, a agent zaktualizuje pamięć zachowując historię.",
   correctionButton: "Popraw tę wiadomość",
   correctionActiveNotice:
     " Piszesz korektę wcześniejszej wiadomości. Wyślij ją jako zwykłą wiadomość — poprzednia pozostaje w historii.",
@@ -259,6 +253,21 @@ export const AnswerRunWire = Schema.Struct({
   failure: Schema.optional(Schema.String),
 });
 export type AnswerRunWire = Schema.Schema.Type<typeof AnswerRunWire>;
+
+/**
+ * The refusal wire of `agent/loop:askAgent`'s pre-loop honest outcomes
+ * (`unauthenticated`, `forbidden`, `missing`): one field, the closed
+ * outcome vocabulary. Disjoint from {@link AnswerRunWire}'s outcome
+ * literals, so the union decodes unambiguously.
+ */
+export const AnswerRefusalWire = Schema.Struct({
+  outcome: Schema.Literals(["unauthenticated", "forbidden", "missing"]),
+});
+export type AnswerRefusalWire = Schema.Schema.Type<typeof AnswerRefusalWire>;
+
+/** Everything `agent/loop:askAgent` can honestly return, decoded once. */
+export const AnswerResultWire = Schema.Union([AnswerRunWire, AnswerRefusalWire]);
+export type AnswerResultWire = Schema.Schema.Type<typeof AnswerResultWire>;
 
 /** Copy for the agent-answer panel (J2; glossary terms exact). */
 export const answerCopy = {

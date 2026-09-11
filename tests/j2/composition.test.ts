@@ -12,12 +12,14 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { operations, events } from "@kiero/contracts";
 import {
   CORE_EVENT_SEAMS,
   CORE_JOB_KINDS,
   CORE_OPERATION_SEAMS,
   coreCompositionOrThrow,
   validateCoreComposition,
+  type CoreRegistryView,
 } from "../../convex/composition/core";
 import {
   FULL_CORE_FEATURE_IDS,
@@ -57,14 +59,38 @@ describe("the Convex core composition entry", () => {
   });
 
   it("bites: a job kind without an executor is reported, not shipped", () => {
-    // The pure validator reads the live registries; simulate drift by
-    // checking an executor-less kind lands in problems when injected into
-    // the same check the loud gate runs. The I-lane kinds (exports,
-    // backups, purge) are honestly OUTSIDE the core set: removing one from
-    // jobExecutors would not be caught here, by design.
-    const composition = validateCoreComposition();
-    expect(composition.problems).toEqual([]);
-    expect(CORE_JOB_KINDS).not.toContain("exports.build_archive");
+    // REAL drift through the validator's registry view (the gateway
+    // validator's pattern): drop one live executor from the composed view
+    // and the validator must name exactly that kind, and the loud gate
+    // must throw on it. The I-lane kinds (exports, backups, purge) are
+    // honestly OUTSIDE the core set, so the injected drift removes a CORE
+    // kind instead.
+    const drifted: CoreRegistryView = {
+      jobExecutors: Object.fromEntries(
+        Object.entries(jobExecutors).filter(([kind]) => kind !== "search.index_generation"),
+      ),
+      operations,
+      events,
+    };
+    const composition = validateCoreComposition(drifted);
+    expect(composition.problems).toEqual([
+      { kind: "executor_missing", name: "search.index_generation" },
+    ]);
+    expect(() => coreCompositionOrThrow(drifted)).toThrow(
+      /Core composition drift: executor_missing: search\.index_generation/,
+    );
+  });
+
+  it("bites: a seam missing from the contracts registries is reported", () => {
+    const drifted: CoreRegistryView = {
+      jobExecutors,
+      operations: {}, // every operation seam is now missing
+      events,
+    };
+    const composition = validateCoreComposition(drifted);
+    expect(
+      composition.problems.filter((problem) => problem.kind === "operation_missing"),
+    ).toHaveLength(CORE_OPERATION_SEAMS.length);
   });
 });
 

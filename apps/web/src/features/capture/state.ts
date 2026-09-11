@@ -24,8 +24,6 @@ export { processingStateLabels, sessionFailureHints, signInCopy };
 /** Copy for the capture surface (stable product text). */
 export const captureCopy = {
   title: "Nowy wpis",
-  intro:
-    "Wyślij jedną wiadomość źródłową: tekst, opcjonalnie jedno nagranie i zdjęcia. Szkic jest zachowywany na tym urządzeniu do potwierdzonego wysłania.",
   gatewayUnconfigured:
     "Aplikacja nie ma adresu bramy mediów (VITE_GATEWAY_URL nie jest ustawiony) — wysyłanie nagrań i zdjęć jest niedostępne.",
   draftLoading: "Odczytujemy szkic z tego urządzenia…",

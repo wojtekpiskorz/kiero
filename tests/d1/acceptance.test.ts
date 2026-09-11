@@ -18,23 +18,28 @@ import {
   dedupeProjectHints,
   registrationTargets,
   resolveSentAtMs,
-  validateAuthorText,
+  validateSourceMaterial,
   validateTimezoneSnapshot,
 } from "../../convex/sources/accept/acceptance";
 
 const NOW = Date.parse("2026-09-09T10:00:00.000Z");
 
 describe("author text validation (immutable message content)", () => {
+  // The text-only half of the ONE material rule (the J2 join folded the
+  // old standalone author-text validator into `validateSourceMaterial`).
   it("accepts real text", () => {
-    expect(validateAuthorText("Dowóz płytek na Buniewice w czwartek")).toEqual({
+    expect(validateSourceMaterial("Dowóz płytek na Buniewice w czwartek", false)).toEqual({
       ok: true,
       value: "Dowóz płytek na Buniewice w czwartek",
     });
   });
 
   it("rejects whitespace-only and over-long text", () => {
-    expect(validateAuthorText("   \n\t ")).toEqual({ ok: false, code: "author_text_empty" });
-    expect(validateAuthorText("a".repeat(MAX_AUTHOR_TEXT_LENGTH + 1))).toEqual({
+    expect(validateSourceMaterial("   \n\t ", false)).toEqual({
+      ok: false,
+      code: "author_text_empty",
+    });
+    expect(validateSourceMaterial("a".repeat(MAX_AUTHOR_TEXT_LENGTH + 1), false)).toEqual({
       ok: false,
       code: "author_text_too_long",
     });

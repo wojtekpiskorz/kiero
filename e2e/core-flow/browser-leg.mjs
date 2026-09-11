@@ -34,10 +34,10 @@
  * Everything printed is sanitized: no tokens, no secrets.)
  */
 
-import { ConvexHttpClient } from "convex/browser";
 import { randomUUID } from "node:crypto";
 import { chromium } from "playwright-core";
 import { homedir } from "node:os";
+import { envelope, fixtureCodeOf, signInWithFixtureCode } from "../helpers.mjs";
 
 const CONVEX_URL = process.env.KIERO_J2_CONVEX_URL ?? "https://zany-snail-540.convex.cloud";
 const GATEWAY = process.env.KIERO_J2_GATEWAY ?? "https://kiero-dev-gateway-j2.wojtek-524.workers.dev";
@@ -58,42 +58,20 @@ function record(id, outcome, detail) {
 const note = (line) => console.log(`NOTE | ${line}`);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const fixtureCodeOf = (seed) => {
-  let hash = 0;
-  for (const byte of Buffer.from(seed)) {
-    hash = (hash * 31 + byte) % 90_000_000;
-  }
-  return String(42_000_000 + hash);
-};
-
 // --- seed: a REAL signed-in boss with their own firm + one project + task ----
 
-const anon = () => new ConvexHttpClient(CONVEX_URL, { logger: false });
-const envelope = (operation, input, idempotencyKey) => ({
-  operation,
-  input,
-  expectedRevisions: [],
-  ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
-});
 const isOk = (result) => result?._tag === "ok";
 const value = (result) => (isOk(result) ? result.value : null);
 const errCode = (result) => (result?._tag === "error" ? result.error.code : "ok");
 const key = () => `idem_${randomUUID()}`;
 
-const code = fixtureCodeOf(EMAIL);
-await anon().action("auth:signIn", { provider: "email_code", params: { email: EMAIL } }).catch(() => undefined);
-const setCode = await anon().action("access/identity/probe:b1ProofSetCode", { email: EMAIL, code });
-if (!isOk(setCode)) throw new Error("fixture code install failed");
-const signedIn = await anon().action("auth:signIn", {
-  provider: "email_code",
-  params: { email: EMAIL, code },
-});
-const token = signedIn?.tokens?.token;
-const refreshToken = signedIn?.tokens?.refreshToken;
-if (typeof token !== "string" || typeof refreshToken !== "string") throw new Error("sign-in failed");
-const boss = new ConvexHttpClient(CONVEX_URL, { logger: false, auth: token });
-await boss.mutation("access/identity/functions:ensureSessionRegistry", {});
-const created = await boss.mutation("access/membership/functions:admitCommand", {
+// Real B1 sign-in with the deterministic fixture code (the shared helper);
+// the browser leg additionally needs the REFRESH token (it seeds the
+// app's localStorage auth keys before the first load).
+const boss = await signInWithFixtureCode(CONVEX_URL, EMAIL, fixtureCodeOf(EMAIL));
+if (typeof boss.refreshToken !== "string") throw new Error("sign-in returned no refresh token");
+const { token, refreshToken } = boss;
+const created = await boss.client.mutation("access/membership/functions:admitCommand", {
   envelope: envelope("access.createCompany", {
     name: `Budowa J2 Web ${RUN}`,
     timezone: "Europe/Warsaw",
@@ -101,7 +79,7 @@ const created = await boss.mutation("access/membership/functions:admitCommand", 
   }),
 });
 if (!isOk(created)) throw new Error("company creation failed");
-const project = await boss.mutation("projects/functions:dispatchProjects", {
+const project = await boss.client.mutation("projects/functions:dispatchProjects", {
   envelope: envelope("projects.identifyProject", {
     displayName: "Banan",
     initialStage: "in_progress",
@@ -112,7 +90,7 @@ const BANAN = value(project)?.projectId ?? null;
 if (BANAN === null) throw new Error("project creation failed");
 // One task with an open checklist point, so /co-teraz has real rows over
 // the repaired ordinary-token reads.
-const task = await boss.mutation("work/functions:dispatchWork", {
+const task = await boss.client.mutation("work/functions:dispatchWork", {
   envelope: envelope(
     "work.changeTask",
     {

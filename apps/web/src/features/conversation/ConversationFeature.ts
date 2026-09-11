@@ -77,7 +77,8 @@ import {
 import { ComposerForm } from "../capture/CaptureFeature";
 import {
   ReadStateProjection,
-  AnswerRunWire,
+  AnswerRefusalWire,
+  AnswerResultWire,
   answerCopy,
   answerOutcomeLabel,
   answerBasisLabel,
@@ -87,6 +88,7 @@ import {
   instantLabel,
   lifecycleLabels,
   processingStateLabels,
+  type AnswerRunWire,
 } from "./state";
 
 /** How many rows one page of the conversation view requests. */
@@ -243,30 +245,25 @@ function ConversationMain({
     }
     setAnswer({ sourceId, status: "asking" });
     try {
-      const result = await askAgent({ sourceId: asConvexId("sources", sourceId) });
-      // The refusal shape comes back as a bare outcome field; the run
-      // result decodes through the wire schema at this boundary.
-      if (
-        result !== null &&
-        typeof result === "object" &&
-        "outcome" in result &&
-        (result.outcome === "unauthenticated" ||
-          result.outcome === "forbidden" ||
-          result.outcome === "missing")
-      ) {
+      // ONE decode at the untrusted boundary: the run result or the honest
+      // pre-loop refusal (the three outcome strings), never a hand-rolled
+      // narrowing of raw data in front of the schema.
+      const result = Schema.decodeUnknownSync(AnswerResultWire)(
+        await askAgent({ sourceId: asConvexId("sources", sourceId) }),
+      );
+      if (Schema.is(AnswerRefusalWire)(result)) {
         setAnswer({
           sourceId,
           status: "refused",
           message:
-            result.outcome === "missing"
-              ? copy.answerMissingSource
-              : copy.answerRefused,
+            result.outcome === "missing" ? copy.answerMissingSource : copy.answerRefused,
         });
         return;
       }
-      const run = Schema.decodeUnknownSync(AnswerRunWire)(result);
-      setAnswer({ sourceId, status: "done", run });
+      setAnswer({ sourceId, status: "done", run: result });
     } catch {
+      // Transport failure (or wire drift throwing in the decode): the
+      // honest unavailable notice. Nothing was rendered from a guess.
       setAnswer({ sourceId, status: "refused", message: copy.answerUnavailable });
     }
   }

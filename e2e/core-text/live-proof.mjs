@@ -34,6 +34,7 @@
 
 import { ConvexHttpClient } from "convex/browser";
 import { randomUUID } from "node:crypto";
+import { envelope, signInWithFixtureCode } from "../helpers.mjs";
 
 const DEPLOYMENT = process.env.KIERO_J1_DEPLOYMENT;
 if (typeof DEPLOYMENT !== "string" || DEPLOYMENT.length === 0) {
@@ -82,36 +83,13 @@ const modelObservations = (state) =>
   }));
 
 const anon = () => new ConvexHttpClient(URL, { logger: false });
-const envelope = (operation, input, idempotencyKey) => ({
-  operation,
-  input,
-  expectedRevisions: [],
-  ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
-});
 const isOk = (result) => result?._tag === "ok";
 const value = (result) => (isOk(result) ? result.value : null);
 const errCode = (result) => (result?._tag === "error" ? result.error.code : "ok");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Real B1 sign-in with a fixture code (proof-domain address only). */
-async function signInFixture(email, code) {
-  const bootstrap = anon();
-  await bootstrap.action("auth:signIn", { provider: "email_code", params: { email } }).catch(() => {});
-  const set = await bootstrap.action("access/identity/probe:b1ProofSetCode", { email, code });
-  if (!isOk(set)) throw new Error(`fixture code install failed for ${email}`);
-  const result = await bootstrap.action("auth:signIn", {
-    provider: "email_code",
-    params: { email, code },
-  });
-  const token = result?.tokens?.token;
-  if (typeof token !== "string") throw new Error(`sign-in failed for ${email}`);
-  const client = new ConvexHttpClient(URL, { logger: false, auth: token });
-  const ensured = await client.mutation("access/identity/functions:ensureSessionRegistry", {});
-  if (ensured?.state !== "live") {
-    throw new Error(`session provisioning failed for ${email}: ${JSON.stringify(ensured)}`);
-  }
-  return { client, token, sessionId: ensured.sessionId, email };
-}
+/** Real B1 sign-in with a fixture code (the shared helper, proof-domain addresses only). */
+const signInFixture = (email, code) => signInWithFixtureCode(URL, email, code);
 
 // --- public surfaces (the mounted core-text feature's own calls) -----------
 

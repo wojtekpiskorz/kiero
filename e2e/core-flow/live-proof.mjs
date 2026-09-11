@@ -47,6 +47,7 @@
 import { ConvexHttpClient } from "convex/browser";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { envelope, fixtureCodeOf, signInWithFixtureCode } from "../helpers.mjs";
 
 const DEPLOYMENT = process.env.KIERO_J2_CONVEX ?? "zany-snail-540.convex.cloud";
 const URL = `https://${DEPLOYMENT}`;
@@ -73,43 +74,13 @@ const note = (line) => console.log(`NOTE | ${line}`);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const anon = () => new ConvexHttpClient(URL, { logger: false });
-const envelope = (operation, input, idempotencyKey) => ({
-  operation,
-  input,
-  expectedRevisions: [],
-  ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
-});
 const isOk = (result) => result?._tag === "ok";
 const value = (result) => (isOk(result) ? result.value : null);
 const errCode = (result) => (result?._tag === "error" ? result.error.code : "ok");
 const key = () => `idem_${randomUUID()}`;
 
-const fixtureCodeOf = (seed) => {
-  let hash = 0;
-  for (const byte of Buffer.from(seed)) {
-    hash = (hash * 31 + byte) % 90_000_000;
-  }
-  return String(42_000_000 + hash);
-};
-
-/** Real B1 sign-in with a fixture code (the C1/C4 lease workaround). */
-async function signInFixture(email) {
-  const code = fixtureCodeOf(email);
-  const bootstrap = anon();
-  await bootstrap.action("auth:signIn", { provider: "email_code", params: { email } }).catch(() => {});
-  const set = await bootstrap.action("access/identity/probe:b1ProofSetCode", { email, code });
-  if (!isOk(set)) throw new Error(`fixture code install failed for ${email}`);
-  const result = await bootstrap.action("auth:signIn", {
-    provider: "email_code",
-    params: { email, code },
-  });
-  const token = result?.tokens?.token;
-  if (typeof token !== "string") throw new Error(`sign-in failed for ${email}`);
-  const client = new ConvexHttpClient(URL, { logger: false, auth: token });
-  const ensured = await client.mutation("access/identity/functions:ensureSessionRegistry", {});
-  if (ensured?.state !== "live") throw new Error(`session provisioning failed for ${email}`);
-  return { client, token, sessionId: ensured.sessionId, email };
-}
+/** Real B1 sign-in with the deterministic fixture code (the shared helper). */
+const signInFixture = (email) => signInWithFixtureCode(URL, email, fixtureCodeOf(email));
 
 // --- public surfaces (the ones the joined app calls) -------------------------
 
@@ -706,30 +677,9 @@ const correction = await sendMessage(B, {
 });
 check("E/correction-source-accepted", correction.ok, correction.ok ? correction.sourceId : JSON.stringify(correction));
 if (correction.ok) {
-  let row = await waitForTerminal(A.client, correction.sourceId, 12 * 60_000, "correction");
-  // Honest failure windows get ONE bounded model-stage restart (the J1/E3
-  // sanctioned recovery; every window is recorded, never retried into
-  // fake success).
-  if (row !== null && row.processingState === "failed") {
-    note("[correction] HONEST FAILURE WINDOW: provider-failed run; one bounded model-stage restart");
-    const latest = await anon().action("processing/text/probe:probeLatestRunForSource", {
-      sourceId: correction.sourceId,
-    });
-    const runId = value(latest)?.runId ?? null;
-    const state = runId === null
-      ? null
-      : value(await anon().action("processing/text/probe:probeAnalysisState", { runId, sessionId: A.sessionId }));
-    const checkpoint = state === null ? {} : JSON.parse(state.run.checkpoint ?? "{}");
-    if (typeof checkpoint.workflowId === "string") {
-      const restarted = await anon().action("processing/text/probe:probeRestartAnalysis", {
-        workflowId: checkpoint.workflowId,
-        from: "model",
-        runId,
-      });
-      note(`[correction] restart: ${errCode(restarted)}`);
-      row = await waitForTerminal(A.client, correction.sourceId, 8 * 60_000, "correction-restart");
-    }
-  }
+  // terminalWithRestart owns the honest-failure-window recovery (one
+  // bounded model-stage restart), same as every other terminal wait here.
+  const row = await terminalWithRestart(A, correction.sourceId, "correction", 12 * 60_000);
   const findings = await currentFindings(A.client, {
     _tag: "project",
     projectId: BANAN,

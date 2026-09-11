@@ -74,9 +74,10 @@ function freshDraftId(): string {
 
 /**
  * The ONE fresh-draft seeding rule (review round 1): a new draft's scope
- * comes from the conversation route's ?projekt= param: plain /wpis
- * starts Auto (company-wide), a project view retains its project. After
- * this, the stored record is the single authority the pill renders.
+ * comes from the conversation route's ?projekt= param: the plain company
+ * view starts Auto (company-wide), a project view retains its project.
+ * After this, the stored record is the single authority the pill renders
+ * (the separate /wpis route retired with the J2 join).
  */
 export function scopedFreshDraft(userId: string, nowMs: number): DraftRecord {
   return {
@@ -608,9 +609,9 @@ export function useCaptureComposer(userId: string): CaptureComposer {
         const finished = draftRef.current ?? record;
         await store.clearDraft(finished).catch(() => undefined);
         // The next draft's scope is re-seeded from the ?projekt= param: on
-        // plain /wpis the pill honestly shows Auto again; a project view
-        // retains its project. The pill renders this record (one source of
-        // truth), so the reset is exactly what the boss sees.
+        // the plain company view the pill honestly shows Auto again; a
+        // project view retains its project. The pill renders this record
+        // (one source of truth), so the reset is exactly what the boss sees.
         const next = scopedFreshDraft(userId, Date.now());
         draftRef.current = next;
         setDraft(next);
