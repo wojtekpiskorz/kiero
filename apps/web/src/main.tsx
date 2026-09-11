@@ -10,6 +10,14 @@ import { composePwaEntries, registerPwa } from "./app/pwa/composition";
 // F3's sanctioned composition attach (the prepared seam's rule: the push
 // module joins together with the service worker script that owns it).
 import { webPushEntry } from "./pwa/push";
+// I7's sanctioned composition attach (the same prepared rule): the safe
+// update module joins the same registration; its version source is the
+// typed config seam's Convex URL (the public health endpoint).
+import {
+  webUpdateEntry,
+  configureUpdateVersionSource,
+  versionSourceFromAppConfig,
+} from "./pwa/update/module";
 
 /**
  * Bootstrap entry for the Kiero PWA host (A4).
@@ -19,7 +27,7 @@ import { webPushEntry } from "./pwa/push";
  * once, mounts the application host and prepares the PWA entry
  * composition. F3 attaches the push-owning service worker (`/sw.js`: push
  * presentation + click-through only, no fetch/cache - protected data stays
- * behind live authorized queries); I7 later adds the update module.
+ * behind live authorized queries); I7 attaches the safe update module.
  * Without a configured backend the app still runs and renders the
  * disconnected state without faking a connection.
  */
@@ -45,7 +53,14 @@ createRoot(container).render(
 
 // F3 attaches the push-owning service worker through the composition (the
 // only registration path); the push module's own hook stays passive (see
-// apps/web/src/pwa/push.ts).
+// apps/web/src/pwa/push.ts). I7 attaches the safe update module to the
+// same composition: its prompt defers work (recording/editing/upload),
+// migrates the local draft first and reloads only on the user's click.
+configureUpdateVersionSource(versionSourceFromAppConfig(config));
 void registerPwa(
-  composePwaEntries({ serviceWorkerScript: "/sw.js", push: webPushEntry }),
+  composePwaEntries({
+    serviceWorkerScript: "/sw.js",
+    push: webPushEntry,
+    update: webUpdateEntry,
+  }),
 );
