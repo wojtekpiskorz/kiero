@@ -13,12 +13,19 @@
  * Identity follows the canonical resolution (Convex Auth -> live session
  * -> user -> active membership); the resolved session id also marks
  * which subscription row belongs to THIS device.
+ *
+ * J2 identity repair (the attention-lane gap H2 recorded, F3 sibling of
+ * the context.ts fold-in): the public read resolves through B1's
+ * live-session chain because the platform-generic subject is not a
+ * sessions-registry id and ordinary user tokens failed
+ * `no_live_session_push` before it.
  */
 
 import { ConvexError } from "convex/values";
 import { v } from "convex/values";
 import { internalQuery, query } from "../../_generated/server";
-import { identityFromConvexAuth, resolveRequestContext } from "../../platform/context";
+import { resolveRequestContext } from "../../platform/context";
+import { resolveAccessContextFromConvexAuth } from "../../access/identity/resolution";
 import { unauthenticatedError } from "@kiero/runtime";
 import { subscriptionViewsOf } from "./operations";
 import { vapidConfig } from "./functions";
@@ -53,8 +60,7 @@ async function pushStateForContext(
 export const pushState = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await identityFromConvexAuth(ctx.auth, Date.now());
-    const context = await resolveRequestContext(ctx.db, identity);
+    const context = await resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
     if (context === null) {
       throw new ConvexError(unauthenticatedError("no_live_session_push"));
     }

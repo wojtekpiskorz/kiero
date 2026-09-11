@@ -211,14 +211,19 @@ describe("runSend: the happy path (text + recording + photo)", () => {
     ]);
   });
 
-  it("sends a text-only message (prepare with the empty declaration)", async () => {
+  it("sends a text-only message (prepare with the empty declaration; no finalize)", async () => {
     const fake = fakeGateway();
     const accept = fakeAccept();
     const outcome = await runSend(material(), fake.gateway, accept.port, hooksOf().hooks, retry3);
     expect(outcome.ok).toBe(true);
     expect(fake.calls.prepare).toEqual([{ draftId: "idem_stable_draft", parts: 1, mediaKinds: [] }]);
     expect(fake.calls.parts).toEqual([]);
-    expect(fake.calls.finalizes).toEqual(["up1"]);
+    // J2 join repair (flagged): a text-only upload has no attachment to
+    // complete or finalize — the real gateway's begin/finalize contracts
+    // require declared attachments, so the engine accepts the draft row
+    // directly (J1's text-only semantics through the same engine). The
+    // previous expectation pinned a finalize the REAL backend refused.
+    expect(fake.calls.finalizes).toEqual([]);
   });
 
   it("runs with only the progress hook (the session observer is optional; the record mirrors nothing)", async () => {
@@ -233,7 +238,8 @@ describe("runSend: the happy path (text + recording + photo)", () => {
       retry3,
     );
     expect(outcome.ok).toBe(true);
-    expect(progress).toEqual(["preparing", "finalizing", "accepting"]);
+    // Text-only: no upload/finalize phases, straight to acceptance.
+    expect(progress).toEqual(["preparing", "accepting"]);
   });
 });
 

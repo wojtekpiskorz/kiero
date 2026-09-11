@@ -1,7 +1,8 @@
 /**
- * The conversation feature (H1): the boss-facing surface of the one shared
- * conversation history — "Rozmowa firmy" (company) and "Rozmowa projektowa"
- * (project projection of the SAME entries, CONTEXT.md).
+ * The conversation feature (H1, joined by J2): the boss-facing surface of
+ * the one shared conversation history — "Rozmowa firmy" (company) and
+ * "Rozmowa projektowa" (project projection of the SAME entries,
+ * CONTEXT.md).
  *
  * JSX-free on purpose (createElement only), like the membership and sign-in
  * surfaces: the host feature registry chain stays importable by the node
@@ -26,14 +27,22 @@
  * - honest processing states (D1's derived vocabulary, incl. `partial` and
  *   `failed` — a failed analysis never loses the source);
  * - correction-as-new-source ("Korekta ustalenia", CONTEXT.md): the Korekta
- *   button prefills a NEW message that references the old one; the earlier
- *   message is never rewritten.
+ *   button prefills the composer with a NEW message that references the
+ *   old one; the earlier message is never rewritten.
  *
- * The send path is J1's proved loop, graduated into the shared
- * statement-to-source helper (`../company/statement-source`): one
- * idempotency key per logical message, held by the hook and rotated only
- * after a confirmed acceptance, so a lost response retried with the same
- * key cannot create a second source.
+ * The J2 join (issue #61) folds ALL capture modes into this surface: the
+ * embedded capture composer (text + one recording + photos, D4's
+ * recoverable-draft engine with voice-only sends allowed) replaces J1's
+ * text-only statement form, and the separate /wpis route retires. The
+ * composer's project pill keeps D4's semantics (the DRAFT's stored scope,
+ * seeded from this route's ?projekt= param); multi-project messages route
+ * through the agent's project identification, not the pill.
+ *
+ * The agent-answer flow (E6 joined): "Zapytaj agenta" on one message runs
+ * the real answer loop (`agent/loop:askAgent`, the question source's id)
+ * and renders the structured result inline — the answer with per-statement
+ * evidence bases, the raised Sprawa do wyjaśnienia, the executed task/event
+ * changes, or the honest gave-up/provider-failure notice. Never a guess.
  *
  * No styling, semantic controls only (the UX/UI track owns presentation).
  */
@@ -43,11 +52,10 @@ import {
   useEffect,
   useRef,
   useState,
-  type ChangeEvent,
   type ReactNode,
 } from "react";
 import { Schema } from "effect";
-import { useMutation, useQuery_experimental as useQueryState } from "convex/react";
+import { useAction, useMutation, useQuery_experimental as useQueryState } from "convex/react";
 import { parseTableId } from "@kiero/contracts";
 import { api } from "../../../../../convex/_generated/api";
 import type { MemberView } from "../../../../../convex/access/membership/functions";
@@ -58,24 +66,25 @@ import {
   SessionEnded,
   envelopeOf,
   type MemberOverview,
-  type Notice,
-  type SubmitEvent,
 } from "../company/CompanyGate";
 import { asConvexId } from "../company/convex-ids";
-import { useStatementSource } from "../company/statement-source";
 import {
   PROJECT_PARAM,
   SOURCE_PARAM,
   searchParam,
   writeScopeParam,
 } from "../company/route-params";
+import { ComposerForm } from "../capture/CaptureFeature";
 import {
   ReadStateProjection,
+  AnswerRunWire,
+  answerCopy,
+  answerOutcomeLabel,
+  answerBasisLabel,
   conversationCopy as copy,
   correctionPrefill,
   failureHint,
   instantLabel,
-  justSentNotice,
   lifecycleLabels,
   processingStateLabels,
 } from "./state";
@@ -85,6 +94,13 @@ const PAGE_SIZE = 30;
 
 /** The growth cap (four pages): the unread projection stays bounded. */
 const MAX_PAGE_SIZE = 120;
+
+/** One open agent-answer run: asking, decoded, or honestly refused. */
+type AnswerState =
+  | { readonly sourceId: string; readonly status: "asking" }
+  | { readonly sourceId: string; readonly status: "done"; readonly run: AnswerRunWire }
+  | { readonly sourceId: string; readonly status: "refused"; readonly message: string }
+  | null;
 
 // ---------------------------------------------------------------------------
 // Root: the shared company-feature gate around this surface
@@ -123,20 +139,15 @@ function ConversationMain({
   }, []);
 
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
-  const [text, setText] = useState("");
-  const [hintedProjects, setHintedProjects] = useState<readonly string[]>([]);
-  const [sending, setSending] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(null);
-  const [sentSourceId, setSentSourceId] = useState<string | null>(null);
+  // The correction prefill for the composer (H1's flow, now writing into
+  // the draft record through the composer's own seam): one outstanding
+  // prefill at a time, dropped once applied.
+  const [correctionPrefillText, setCorrectionPrefillText] = useState<string | null>(null);
   const [correcting, setCorrecting] = useState<SourceConversationRowType | null>(null);
-
-  // The shared statement-to-source send: the hook holds ONE idempotency
-  // key per logical message and rotates it only after a confirmed
-  // acceptance, so a lost-response retry converges on one source.
-  const source = useStatementSource();
-
-  const timezone =
-    typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "Europe/Warsaw";
+  // The agent-answer flow (J2): one open answer at a time — asking, done
+  // (decoded run) or refused (honest Polish failure).
+  const [answer, setAnswer] = useState<AnswerState>(null);
+  const askAgent = useAction(api.agent.loop.askAgent);
 
   const projectViews: readonly {
     projectId: string;
@@ -186,7 +197,6 @@ function ConversationMain({
       : null;
   const rows: readonly SourceConversationRowType[] = page?.page ?? [];
   const isDone = page?.isDone ?? true;
-  const sentRow = sentSourceId === null ? null : rows.find((row) => row.sourceId === sentSourceId) ?? null;
   // A deep-linked source below the loaded page stays invisible without this:
   // the notice names why "load older" matters (the canonical URL must open
   // the original, also when history grew past the first page).
@@ -212,51 +222,53 @@ function ConversationMain({
     }
   }
 
-  async function send(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
-    const authorText = text.trim();
-    if (authorText.length === 0 || sending) {
-      return;
-    }
-    setSending(true);
-    setNotice(null);
-    const outcome = await source.send({
-      authorText,
-      timezoneSnapshot: timezone,
-      projectHints: hintedProjects,
-    });
-    if (outcome._tag === "refused") {
-      setNotice({ kind: "error", text: failureHint(outcome.code, outcome.message) });
-    } else if (outcome._tag === "lost") {
-      // Unknown response (network lost): the SAME key retries the SAME
-      // logical source, never a duplicate.
-      setNotice({ kind: "error", text: copy.lostResponseNotice });
-    } else {
-      // Confirmed durable acceptance: the logical message is complete (the
-      // helper minted the next draft's key); the watch state takes over.
-      setSentSourceId(outcome.receipt.sourceId);
-      setNotice({ kind: "ok", text: copy.savedNotice });
-      setText("");
-      setHintedProjects([]);
-      setCorrecting(null);
-    }
-    setSending(false);
-  }
-
-  function toggleHint(projectId: string): void {
-    setHintedProjects((current) =>
-      current.includes(projectId)
-        ? current.filter((id) => id !== projectId)
-        : [...current, projectId],
-    );
-  }
-
   function startCorrection(row: SourceConversationRowType): void {
     // "Korekta ustalenia": a NEW message referencing the old source. The
-    // prefill quotes the original's own words; nothing is rewritten.
+    // prefill quotes the original's own words; nothing is rewritten. The
+    // composer applies it into the draft record (one outstanding prefill).
     setCorrecting(row);
-    setText(correctionPrefill(row.authorText, row.sentAtMs));
+    setCorrectionPrefillText(correctionPrefill(row.authorText, row.sentAtMs));
     window.scrollTo({ top: 0 });
+  }
+
+  function cancelCorrection(): void {
+    setCorrecting(null);
+    setCorrectionPrefillText(null);
+  }
+
+  /** Runs the real answer loop for one question source (J2's join). */
+  async function runAnswer(sourceId: string): Promise<void> {
+    if (answer !== null && answer.sourceId === sourceId && answer.status === "asking") {
+      return;
+    }
+    setAnswer({ sourceId, status: "asking" });
+    try {
+      const result = await askAgent({ sourceId: asConvexId("sources", sourceId) });
+      // The refusal shape comes back as a bare outcome field; the run
+      // result decodes through the wire schema at this boundary.
+      if (
+        result !== null &&
+        typeof result === "object" &&
+        "outcome" in result &&
+        (result.outcome === "unauthenticated" ||
+          result.outcome === "forbidden" ||
+          result.outcome === "missing")
+      ) {
+        setAnswer({
+          sourceId,
+          status: "refused",
+          message:
+            result.outcome === "missing"
+              ? copy.answerMissingSource
+              : copy.answerRefused,
+        });
+        return;
+      }
+      const run = Schema.decodeUnknownSync(AnswerRunWire)(result);
+      setAnswer({ sourceId, status: "done", run });
+    } catch {
+      setAnswer({ sourceId, status: "refused", message: copy.answerUnavailable });
+    }
   }
 
   function selectScope(projectId: string | null): void {
@@ -266,8 +278,8 @@ function ConversationMain({
   }
 
   const members = new Map(overview.members.map((member) => [member.userId, member]));
-  const selfLabel =
-    overview.members.find((member) => member.isSelf)?.email ?? overview.company.name;
+  const selfMember = overview.members.find((member) => member.isSelf);
+  const selfLabel = selfMember?.email ?? overview.company.name;
 
   return createElement(
     "section",
@@ -284,26 +296,24 @@ function ConversationMain({
       knownProject,
       selectScope,
     }),
-    createElement(SendForm, {
-      text,
-      setText: (value: string) => setText(value),
-      projectViews,
-      hintedProjects,
-      toggleHint,
-      sending,
-      send,
-      correcting: correcting !== null,
-      cancelCorrection: () => {
-        setCorrecting(null);
-        setText("");
-      },
+    correcting === null
+      ? null
+      : createElement(
+          "p",
+          { role: "status" },
+          copy.correctionActiveNotice,
+          " ",
+          createElement("button", { type: "button", onClick: cancelCorrection }, copy.cancel),
+        ),
+    // The joined composer: ALL capture modes (text, recording, photos) over
+    // D4's recoverable-draft engine; the correction prefill and the
+    // accepted callback are this surface's seams into it.
+    createElement(ComposerForm, {
+      userId: selfMember?.userId ?? "unknown-user",
+      prefill: correctionPrefillText,
+      onPrefillApplied: () => setCorrectionPrefillText(null),
+      onAccepted: () => setCorrecting(null),
     }),
-    notice === null
-      ? null
-      : createElement("p", { role: notice.kind === "error" ? "alert" : "status" }, notice.text),
-    sentRow === null
-      ? null
-      : createElement("p", { role: "status" }, justSentNotice(sentRow.processingState)),
     createElement("h2", null, knownProject === null ? copy.conversationHeading : copy.projectConversationHeading),
     conversation.status === "error"
       ? createElement(SessionEnded)
@@ -319,6 +329,8 @@ function ConversationMain({
               openSourceId,
               setOpenSourceId: (id: string | null) => setOpenSourceId(id),
               startCorrection,
+              answer,
+              runAnswer: (sourceId: string) => void runAnswer(sourceId),
             }),
     rows.length === 0 || isDone || pageSize >= MAX_PAGE_SIZE
       ? null
@@ -404,84 +416,8 @@ function ScopeSwitcher({
 }
 
 // ---------------------------------------------------------------------------
-// Send form (semantic, unstyled; J1's proved loop, graduated)
-// ---------------------------------------------------------------------------
-
-function SendForm({
-  text,
-  setText,
-  projectViews,
-  hintedProjects,
-  toggleHint,
-  sending,
-  send,
-  correcting,
-  cancelCorrection,
-}: {
-  readonly text: string;
-  readonly setText: (value: string) => void;
-  readonly projectViews: readonly { readonly projectId: string; readonly displayName: string }[];
-  readonly hintedProjects: readonly string[];
-  readonly toggleHint: (projectId: string) => void;
-  readonly sending: boolean;
-  readonly send: (event: SubmitEvent) => void;
-  readonly correcting: boolean;
-  readonly cancelCorrection: () => void;
-}): ReactNode {
-  return createElement(
-    "form",
-    { onSubmit: (event) => void send(event) },
-    createElement("h2", null, copy.sendHeading),
-    correcting
-      ? createElement("p", { role: "status" }, copy.correctionActiveNotice)
-      : null,
-    createElement("label", { htmlFor: "conversation-message" }, copy.sendTextLabel),
-    createElement("textarea", {
-      id: "conversation-message",
-      rows: 4,
-      placeholder: copy.sendTextPlaceholder,
-      value: text,
-      onChange: (event: ChangeEvent<HTMLTextAreaElement>) => setText(event.target.value),
-      required: true,
-    }),
-    createElement("p", null, copy.sendProjectsLabel),
-    projectViews.length === 0
-      ? null
-      : createElement(
-          "ul",
-          null,
-          ...projectViews.map((project) =>
-            createElement(
-              "li",
-              { key: project.projectId },
-              createElement(
-                "label",
-                null,
-                createElement("input", {
-                  type: "checkbox",
-                  checked: hintedProjects.includes(project.projectId),
-                  onChange: () => toggleHint(project.projectId),
-                }),
-                ` ${project.displayName}`,
-              ),
-            ),
-          ),
-        ),
-    createElement("button", { type: "submit", disabled: sending || text.trim().length === 0 },
-      sending ? copy.sending : copy.sendButton),
-    correcting
-      ? createElement(
-          "button",
-          { type: "button", onClick: cancelCorrection },
-          copy.cancel,
-        )
-      : null,
-    createElement("p", null, copy.correctionNote),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Message list: rows identical in both scopes, unread badges, detail, korekta
+// Message list: rows identical in both scopes, unread badges, detail,
+// korekta and the agent-answer panel
 // ---------------------------------------------------------------------------
 
 function MessageList({
@@ -492,6 +428,8 @@ function MessageList({
   openSourceId,
   setOpenSourceId,
   startCorrection,
+  answer,
+  runAnswer,
 }: {
   readonly rows: readonly SourceConversationRowType[];
   readonly members: ReadonlyMap<string, MemberView>;
@@ -500,6 +438,8 @@ function MessageList({
   readonly openSourceId: string | null;
   readonly setOpenSourceId: (id: string | null) => void;
   readonly startCorrection: (row: SourceConversationRowType) => void;
+  readonly answer: AnswerState;
+  readonly runAnswer: (sourceId: string) => void;
 }): ReactNode {
   if (rows.length === 0) {
     return createElement("p", null, copy.noMessages);
@@ -519,9 +459,14 @@ function MessageList({
           open: openSourceId === row.sourceId,
           setOpen: (open: boolean) => setOpenSourceId(open ? row.sourceId : null),
           startCorrection,
+          askDisabled: answer !== null && answer.status === "asking",
+          ask: () => runAnswer(row.sourceId),
         }),
         openSourceId === row.sourceId
           ? createElement(SourceDetailPanel, { sourceId: row.sourceId, members })
+          : null,
+        answer !== null && answer.sourceId === row.sourceId
+          ? createElement(AgentAnswerPanel, { answer })
           : null,
       ),
     ),
@@ -536,6 +481,8 @@ function SourceRow({
   open,
   setOpen,
   startCorrection,
+  askDisabled,
+  ask,
 }: {
   readonly row: SourceConversationRowType;
   readonly members: ReadonlyMap<string, MemberView>;
@@ -544,6 +491,8 @@ function SourceRow({
   readonly open: boolean;
   readonly setOpen: (open: boolean) => void;
   readonly startCorrection: (row: SourceConversationRowType) => void;
+  readonly askDisabled: boolean;
+  readonly ask: () => void;
 }): ReactNode {
   const author = members.get(row.authorUserId);
   const authorLabel = author === undefined ? copy.unknownAuthorLabel : `${author.displayName} (${author.email})`;
@@ -574,6 +523,123 @@ function SourceRow({
       createElement("button", { type: "button", onClick: () => setOpen(!open) }, copy.detailButton),
       " ",
       createElement("button", { type: "button", onClick: () => startCorrection(row) }, copy.correctionButton),
+      // A withdrawn/purged original cannot ground a question; only an
+      // active source may be asked about (the loop's own gate agrees).
+      row.lifecycle === "active"
+        ? createElement(
+            "button",
+            { type: "button", onClick: ask, disabled: askDisabled },
+            answerCopy.askButton,
+          )
+        : null,
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The agent answer panel: E6's structured result, glossary-exact labels
+// ---------------------------------------------------------------------------
+
+function AgentAnswerPanel({ answer }: { readonly answer: AnswerState }): ReactNode {
+  if (answer === null) {
+    return null;
+  }
+  if (answer.status === "asking") {
+    return createElement(
+      "section",
+      { "aria-label": answerCopy.heading, role: "status" },
+      createElement("p", null, answerCopy.asking),
+    );
+  }
+  if (answer.status === "refused") {
+    return createElement(
+      "section",
+      { "aria-label": answerCopy.heading },
+      createElement("p", { role: "alert" }, answer.message),
+    );
+  }
+  const { run } = answer;
+  const evidenceById = new Map(run.evidence.map((entry) => [entry.evidenceId, entry]));
+  return createElement(
+    "section",
+    { "aria-label": answerCopy.heading },
+    createElement("h3", null, answerOutcomeLabel(run)),
+    run.outcome === "clarified"
+      ? createElement(
+          "div",
+          null,
+          ...run.clarificationsRaised.map((raised) =>
+            createElement("p", { key: raised.clarificationId }, createElement("strong", null, raised.question)),
+          ),
+          createElement("p", null, answerCopy.clarifiedNote),
+        )
+      : null,
+    run.answer === null
+      ? null
+      : createElement(
+          "div",
+          null,
+          createElement("p", null, createElement("strong", null, run.answer.answerText)),
+          createElement(
+            "ul",
+            null,
+            ...run.answer.statements.map((statement, index) =>
+              createElement(
+                "li",
+                { key: `${index}-${statement.text.slice(0, 24)}` },
+                `${statement.text} (${answerBasisLabel(statement.basis)})`,
+                ...statement.evidenceIds.flatMap((handle) => {
+                  const evidence = evidenceById.get(handle);
+                  return evidence === undefined
+                    ? []
+                    : [
+                        createElement(
+                          "p",
+                          { key: `${handle}-${evidence.sourceId}` },
+                          `${answerCopy.evidenceQuoteLabel} ${evidence.quote}`,
+                        ),
+                      ];
+                }),
+              ),
+            ),
+          ),
+          run.answer.disclosures.updatingFindingIds.length === 0 &&
+            run.answer.disclosures.processingSourceIds.length === 0
+            ? null
+            : createElement(
+                "div",
+                null,
+                createElement("p", null, createElement("strong", null, answerCopy.disclosuresHeading)),
+                run.answer.disclosures.updatingFindingIds.length === 0
+                  ? null
+                  : createElement("p", null, answerCopy.disclosureUpdating(run.answer.disclosures.updatingFindingIds.length)),
+                run.answer.disclosures.processingSourceIds.length === 0
+                  ? null
+                  : createElement("p", null, answerCopy.disclosureProcessing(run.answer.disclosures.processingSourceIds.length)),
+              ),
+        ),
+    run.changes.length === 0
+      ? null
+      : createElement(
+          "div",
+          null,
+          createElement("p", null, createElement("strong", null, answerCopy.changesHeading)),
+          createElement(
+            "ul",
+            null,
+            ...run.changes.map((change) =>
+              createElement(
+                "li",
+                { key: `${change.operation}-${change.entityId}` },
+                `${answerCopy.changeLabels[change.kind]}: ${change.operation} (rewizja ${change.revision})`,
+              ),
+            ),
+          ),
+        ),
+    createElement(
+      "p",
+      null,
+      answerCopy.modelsLine(run.observedModels, run.turns, run.refreshes),
     ),
   );
 }

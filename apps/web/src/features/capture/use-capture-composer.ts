@@ -549,7 +549,13 @@ export function useCaptureComposer(userId: string): CaptureComposer {
       return;
     }
     const authorText = record.text.trim();
-    if (authorText.length === 0 || gateway === null) {
+    // The J2 material rule, client half: words of text OR at least one
+    // retained medium (a recording with chunks or any photo). The server
+    // re-decides against VERIFIED attachments; this gate only keeps the
+    // button honest about what can possibly be accepted.
+    const hasRetainedMedia =
+      (record.recording !== null && record.recording.chunkCount > 0) || record.photos.length > 0;
+    if ((authorText.length === 0 && !hasRetainedMedia) || gateway === null) {
       return;
     }
     sendingRef.current = true;
@@ -694,8 +700,17 @@ export function useCaptureComposer(userId: string): CaptureComposer {
     void persist({ ...record, scopeProjectId: projectId });
   }
 
+  // The honest submit state: words OR retained media, gateway ready, idle
+  // (the J2 material rule's client half; the server re-decides on verified
+  // attachments).
   const sendEnabled =
-    !sending && draft !== null && draft.text.trim().length > 0 && gateway !== null && !recordingActive;
+    !sending &&
+    draft !== null &&
+    gateway !== null &&
+    !recordingActive &&
+    (draft.text.trim().length > 0 ||
+      (draft.recording !== null && draft.recording.chunkCount > 0) ||
+      draft.photos.length > 0);
 
   return {
     draft,

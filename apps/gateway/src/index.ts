@@ -21,7 +21,12 @@
  * Worker the external heartbeat prober (`./telemetry/scheduled.ts`).
  */
 
-import { matchRoute } from "./composition/registry";
+import { matchRoute, routeProviders } from "./composition/registry";
+// J2 append (minimal, flagged to the coordinator): the full-flow join's
+// loud boot gate over the composed core HTTP surface (all five providers,
+// every fixed core route). A provider silently dropped from the registry
+// fails the deploy here instead of answering `unsupported` in production.
+import { fullCoreGatewayOrThrow } from "./composition/full";
 import { unsupportedRoute } from "./platform/routes";
 import { withGatewayTelemetry } from "./telemetry/emit";
 import { telemetryScheduled } from "./telemetry/scheduled";
@@ -30,6 +35,10 @@ import type { UploadsEnv } from "./uploads/r2";
 import type { MediaEnv } from "./media/r2";
 import type { TelemetryEnv } from "./telemetry/emit";
 import type { NormalizerEnv } from "./images/normalizer";
+
+// The join's boot gate: validates the REAL composed registry once at
+// module scope, before any request is routed.
+fullCoreGatewayOrThrow({ providers: routeProviders, match: matchRoute });
 
 /**
  * D4 append (minimal, flagged to the coordinator): browser CORS for the

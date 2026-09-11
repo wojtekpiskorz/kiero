@@ -37,8 +37,8 @@ export const captureCopy = {
   // Text
   textLabel: "Treść wiadomości",
   textPlaceholder: "np. Banan: dowóz płytek w środę rano, klient potwierdził odbiór.",
-  textRequiredNote:
-    "Obecnie wiadomość wymaga choć krótkiego tekstu — nagranie i zdjęcia go uzupełniają.",
+  textOptionalNote:
+    "Tekst jest jednym z kanałów wiadomości źródłowej: wystarczy sam, ale nagranie albo zdjęcia też wystarczą bez tekstu.",
   // Photos
   photosLabel: "Zdjęcia",
   photoRemoveButton: "Usuń",
@@ -132,7 +132,8 @@ const captureFailureHints: Partial<Record<string, string>> = {
     "Serwer zapisał inne dane dla jednej z części. Odrzuć szkic i zacznij wiadomość od nowa.",
   upload_stage_not_acceptable:
     "Materiały nie są jeszcze w całości na serwerze. Wznów wysyłkę.",
-  author_text_empty: captureCopy.textRequiredNote,
+  author_text_empty:
+    "Wiadomość musi mieć treść: napisz choć krótki tekst albo dodaj nagranie albo zdjęcia.",
   client_credential_missing: "Sesja wygasła. Zaloguj się ponownie i wznów wysyłkę.",
   part_manifest_empty: "Materiał nie dotarł w całości. Wznów wysyłkę.",
   attachment_bytes_mismatch: "Serwer zapisał inną liczbę bajtów. Wznów wysyłkę.",

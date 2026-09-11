@@ -80,6 +80,12 @@ export const conversationCopy = {
   detailState: "Stan przetwarzania",
   detailLinkLabel: "Bezpośredni odnośnik do tej wiadomości (działa w każdym widoku):",
   markReadFailure: "Nie udało się zapisać stanu przeczytania. Spróbuj ponownie.",
+  // Agent answer (J2: E6's loop joined into this surface)
+  answerRefused:
+    "Agent nie mógł rozpocząć odpowiedzi (brak uprawnień albo sesja wygasła). Zaloguj się ponownie i spróbuj jeszcze raz.",
+  answerMissingSource: "Ta wiadomość nie jest już dostępna — agent nie może o nią pytać.",
+  answerUnavailable:
+    "Nie udało się uzyskać odpowiedzi agenta. Pamięć nie została zmieniona — spróbuj ponownie.",
 } as const;
 
 /**
@@ -195,3 +201,110 @@ export function correctionPrefill(originalText: string, sentAtMs: number): strin
   const quoted = originalText.length > 160 ? `${originalText.slice(0, 160)}…` : originalText;
   return `Poprawka do wiadomości z ${instantLabel(sentAtMs)}: „${quoted}”. Co się zmienia: `;
 }
+
+// ---------------------------------------------------------------------------
+// The agent answer payload (J2: E6's askAgent result, decoded at the
+// untrusted boundary and rendered with glossary-exact labels)
+// ---------------------------------------------------------------------------
+
+/**
+ * The wire shape of `agent/loop:askAgent`'s AnswerRunResult this surface
+ * renders. The rendering subset only: versions and the full turn log stay
+ * with the GM processing inspector; what the boss reads is the outcome,
+ * the structured answer with its evidence, the raised Sprawy do wyjaśnienia,
+ * the domain changes and the honesty line about model work.
+ */
+export const AnswerRunWire = Schema.Struct({
+  outcome: Schema.Literals(["answered", "clarified", "gave_up", "provider_failed"]),
+  answer: Schema.NullOr(
+    Schema.Struct({
+      answerText: Schema.String,
+      statements: Schema.Array(
+        Schema.Struct({
+          text: Schema.String,
+          basis: Schema.Literals(["direct", "corroboration", "inference"]),
+          evidenceIds: Schema.Array(Schema.String),
+          derivedFromFindingIds: Schema.Array(Schema.String),
+        }),
+      ),
+      disclosures: Schema.Struct({
+        updatingFindingIds: Schema.Array(Schema.String),
+        processingSourceIds: Schema.Array(Schema.String),
+      }),
+    }),
+  ),
+  clarificationsRaised: Schema.Array(
+    Schema.Struct({ clarificationId: Schema.String, question: Schema.String }),
+  ),
+  changes: Schema.Array(
+    Schema.Struct({
+      kind: Schema.Literals(["task", "event"]),
+      operation: Schema.String,
+      entityId: Schema.String,
+      revision: Schema.Number,
+    }),
+  ),
+  evidence: Schema.Array(
+    Schema.Struct({
+      evidenceId: Schema.String,
+      sourceId: Schema.String,
+      quote: Schema.String,
+      groundsUpdating: Schema.Boolean,
+    }),
+  ),
+  turns: Schema.Number,
+  refreshes: Schema.Number,
+  observedModels: Schema.Array(Schema.String),
+  finalText: Schema.String,
+  failure: Schema.optional(Schema.String),
+});
+export type AnswerRunWire = Schema.Schema.Type<typeof AnswerRunWire>;
+
+/** Copy for the agent-answer panel (J2; glossary terms exact). */
+export const answerCopy = {
+  askButton: "Zapytaj agenta o tę wiadomość",
+  asking: "Agent szuka odpowiedzi w źródłach firmy…",
+  heading: "Odpowiedź agenta",
+  clarifiedHeading: "Sprawa do wyjaśnienia",
+  clarifiedNote:
+    "Agent nie mógł rozstrzygnąć pytania na podstawie źródeł. Sprawa jest wspólna dla szefów — rozstrzygnij ją w pamięci albo w Co teraz.",
+  basisLabels: {
+    direct: "bezpośrednio w źródle",
+    corroboration: "potwierdzone niezależnie",
+    inference: "wniosek agenta",
+  } as const,
+  disclosuresHeading: "Zastrzeżenia",
+  disclosureUpdating: (count: number) =>
+    `Dotyka ${count} ustaleń w trakcie zmiany — podanych informacji nie traktuj jako ustalonych.`,
+  disclosureProcessing: (count: number) =>
+    `${count} wiadomości źródłowych jest jeszcze w trakcie przetwarzania.`,
+  changesHeading: "Zmiany wykonane przez agenta",
+  changeLabels: { task: "zadanie", event: "zdarzenie" } as const,
+  gaveUp:
+    "Agent nie udzielił odpowiedzi. Wiadomości i pamięć nie zostały zniszczone — spróbuj zadać pytanie inaczej.",
+  providerFailed: (kind: string) =>
+    `Dostawca modelu nie odpowiedział (${kind}). Pytanie nie zmieniło pamięci — spróbuj ponownie.`,
+  modelsLine: (models: readonly string[], turns: number, refreshes: number) =>
+    `Modele: ${models.join(", ")}. Tur: ${turns}${refreshes > 0 ? `, odświeżeń kontekstu: ${refreshes}` : ""}.`,
+  evidenceQuoteLabel: "Źródło:",
+} as const;
+
+/** The honest outcome heading/notice for one answer run. */
+export function answerOutcomeLabel(run: AnswerRunWire): string {
+  switch (run.outcome) {
+    case "answered":
+      return answerCopy.heading;
+    case "clarified":
+      return answerCopy.clarifiedHeading;
+    case "gave_up":
+      return answerCopy.gaveUp;
+    case "provider_failed":
+      return answerCopy.providerFailed(run.failure ?? "nieznany");
+  }
+}
+
+/** One statement's basis label (glossary: Wniosek agenta stays marked). */
+export function answerBasisLabel(basis: "direct" | "corroboration" | "inference"): string {
+  return answerCopy.basisLabels[basis];
+}
+
