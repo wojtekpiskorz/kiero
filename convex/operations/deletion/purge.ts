@@ -72,7 +72,7 @@ export const PURGE_CONFIRMATION_PHRASE = "USUŃ TRWALE";
 export const PURGE_RETRY_POLICY = { maxAttempts: 6, backoffBaseMs: 5_000 } as const;
 
 /** The machine reason every finding marking of a purge records. */
-export const PURGED_SUPPORT_REASON = "source_purged: permanentne usunięcie wiadomości źródłowej";
+export const PURGED_SUPPORT_REASON = "source_purged: trwałe usunięcie wiadomości źródłowej";
 
 /**
  * A representative table id used only by the pre-insert decode templates
