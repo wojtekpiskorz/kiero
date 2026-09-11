@@ -5,13 +5,13 @@
  * is PR #102 review round 1; fixtures live in tests/f4/fixtures.ts).
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { okResult, parseTableId } from "@kiero/contracts";
 import { dispatchCommand, membershipPolicy } from "@kiero/runtime";
 import { valueOf } from "../d2/harness";
 import { projectEventToJobInputs } from "../../convex/platform/outbox";
 import { performChangeTask } from "../../convex/work/operations";
-import { taskRemindersExecutor } from "../../convex/attention/reminders/executor";
+import { reminderClock, taskRemindersExecutor } from "../../convex/attention/reminders/executor";
 import { remindersHandlers } from "../../convex/attention/reminders/dispatch";
 import {
   T0,
@@ -34,6 +34,13 @@ import {
 
 beforeEach(() => {
   useFakeContext();
+});
+
+beforeEach(() => {
+  reminderClock.nowMs = T0;
+});
+afterEach(() => {
+  reminderClock.nowMs = null;
 });
 
 describe("the outbox projections", () => {
