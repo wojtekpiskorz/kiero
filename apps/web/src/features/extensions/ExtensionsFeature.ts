@@ -39,8 +39,8 @@ import {
   failureHint,
   fieldKindLabels,
   extensionsCopy as copy,
-  instantLabel,
 } from "./state";
+import { instantLabel } from "../conversation/state";
 import { ValueSection, CorrectSection, type Candidate, type FindingsScopeArgs } from "./record";
 import type { FieldShape } from "./value-editor";
 
