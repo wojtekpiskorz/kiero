@@ -19,6 +19,8 @@ import type {
   BackupWorkerEnv,
   DatabaseExporter,
   MediaReader,
+  ProtocolBegin,
+  ProtocolSweepPlan,
 } from "./ports.ts";
 
 export type { BackupWorkerEnv };
