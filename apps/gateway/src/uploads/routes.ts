@@ -195,6 +195,17 @@ async function prepareRoute(request: Request, env: UploadsEnv): Promise<Response
   if (session.state.stage !== "draft" && session.state.stage !== "uploading") {
     return jsonResponse(200, okResult({ uploadId, stage: session.state.stage, attachments: [] }));
   }
+  // J2 join repair (flagged minimal amendment): a TEXT-ONLY declaration
+  // (mediaKinds: []) has no attachment to begin — the fused route used to
+  // call the begin step with an empty attachments array, which the begin
+  // contract honestly refuses (isMinLength(1)). The text-only upload row
+  // is already durable in draft stage, exactly what D1's text-only
+  // acceptance semantics consume; no R2 session and no begin step exist
+  // for it. (D2's proofs only drove media-bearing declarations; the
+  // joined composer is the first text-only consumer of THIS route.)
+  if (mediaKinds.length === 0) {
+    return jsonResponse(200, okResult({ uploadId, stage: session.state.stage, attachments: [] }));
+  }
   let sessions;
   try {
     sessions = await createMultipartSessions(

@@ -114,6 +114,7 @@ import type * as calendar_sync_operations from "../calendar/sync/operations.js";
 import type * as calendar_sync_proof from "../calendar/sync/proof.js";
 import type * as calendar_sync_proofHttp from "../calendar/sync/proofHttp.js";
 import type * as calendar_sync_protocol from "../calendar/sync/protocol.js";
+import type * as composition_core from "../composition/core.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as integrations_ai_dispatch from "../integrations/ai/dispatch.js";
@@ -356,6 +357,7 @@ declare const fullApi: ApiFromModules<{
   "calendar/sync/proof": typeof calendar_sync_proof;
   "calendar/sync/proofHttp": typeof calendar_sync_proofHttp;
   "calendar/sync/protocol": typeof calendar_sync_protocol;
+  "composition/core": typeof composition_core;
   crons: typeof crons;
   http: typeof http;
   "integrations/ai/dispatch": typeof integrations_ai_dispatch;

@@ -204,9 +204,14 @@ export async function runSend(
   }
   hooks.onSession?.({ uploadId: prepared.uploadId, attachments: prepared.attachments });
 
-  // A previously finalized upload (crash between finalize and accept) goes
-  // straight to acceptance on the SAME durable objects.
-  if (prepared.stage !== "finalized") {
+  // TEXT-ONLY material (J2 join repair, flagged): no attachment exists, so
+  // there is nothing to upload, complete or finalize: the draft-stage
+  // upload row IS the durable object D1's text-only acceptance consumes
+  // (J1's proved semantics, now through the same engine). Finalizing an
+  // attachment-less upload is impossible by contract (begin and finalize
+  // both require declared attachments), so the engine goes straight to
+  // acceptance.
+  if (attachments.length > 0 && prepared.stage !== "finalized") {
     // ONE declaration rule (the planner's declarationMatches, mirroring
     // the server's multiset kindsMatch): the session must carry exactly
     // the declared kinds, in any order.

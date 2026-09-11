@@ -235,6 +235,40 @@ export const failJob = internalMutation({
   },
 });
 
+/**
+ * The external pass's PROGRESS heartbeat: advances a running job's
+ * `updatedAtMs` so the staleness window in ./generations.ts means NO
+ * PROGRESS, not no news (a whole-corpus embed pass legitimately outlasts
+ * the window while alive). Only a `running` row is patched: a terminal
+ * outcome recorded by the pass itself (or a reconciliation) is never
+ * overwritten or resurrected.
+ */
+export const heartbeatJob = internalMutation({
+  args: { jobKey: v.string() },
+  handler: async (ctx, args) => {
+    const job = await ctx.db
+      .query("durableJobs")
+      .withIndex("by_jobKey", (q) => q.eq("jobKey", args.jobKey))
+      .first();
+    if (job === null || job.state !== "running") {
+      return;
+    }
+    await ctx.db.patch(job._id, { updatedAtMs: Date.now() });
+  },
+});
+
+/**
+ * Embedding batch size of the external pass: the pass heartbeats the job
+ * row (./heartbeatJob) after every batch, so a whole-corpus build that
+ * legitimately outlasts the staleness window keeps proving liveness while
+ * it makes progress. A batch's worst case (14 x the 30 s per-attempt
+ * embedding deadline, @kiero/providers routing) stays under half the
+ * 15-minute window (14 x 30s = 420s < 450s; the exact inequality is
+ * pinned in tests/j2/stale-generation.test.ts), so a live pass can
+ * never look stale between heartbeats.
+ */
+export const EMBED_HEARTBEAT_BATCH = 14;
+
 /** The external embedding pass and batch record (the scheduled action). */
 export const runIndexPass = internalAction({
   args: { jobKey: v.string() },
@@ -250,38 +284,47 @@ export const runIndexPass = internalAction({
     const credentials = openRouterCredentialsFromEnv();
     const embedded = new Set(loaded.work.alreadyEmbedded);
     const rows: IndexRowInput[] = [];
-    for (const draft of loaded.work.drafts) {
-      const row: IndexRowInput = {
-        generationId: draft.generationId,
-        companyId: draft.companyId,
-        ...(draft.sourceFragmentId === undefined ? {} : { sourceFragmentId: draft.sourceFragmentId }),
-        ...(draft.sourceId === undefined ? {} : { sourceId: draft.sourceId }),
-        ...(draft.findingId === undefined ? {} : { findingId: draft.findingId }),
-        ...(draft.findingRevisionId === undefined
-          ? {}
-          : { findingRevisionId: draft.findingRevisionId }),
-        preparedText: draft.preparedText,
-      };
-      if (credentials !== null && !embedded.has(draftKeyOf(draft))) {
-        const call = await runEmbedding(credentials, {
-          text: draft.preparedText,
-          inputKind: "search_document",
-        });
-        if (call.outcome.outcome === "succeeded") {
-          row.embedding = [...call.outcome.value.vector];
-        } else if (call.outcome.failure.kind === "output_rejected") {
-          // Incompatible provider output fails the index write: nothing
-          // commits for this pass and the job records the typed failure.
-          await ctx.runMutation(internal.search.executor.failJob, {
-            jobKey: args.jobKey,
-            errorKind: "embedding_output_rejected",
+    // The sequential provider calls run in batches, each closing with a
+    // progress heartbeat on the job row: only the final record below
+    // writes entries (recordEntries completes the job, so it must run
+    // once), while the heartbeats keep the staleness reconciliation
+    // informed DURING the pass.
+    for (let offset = 0; offset < loaded.work.drafts.length; offset += EMBED_HEARTBEAT_BATCH) {
+      const batch = loaded.work.drafts.slice(offset, offset + EMBED_HEARTBEAT_BATCH);
+      for (const draft of batch) {
+        const row: IndexRowInput = {
+          generationId: draft.generationId,
+          companyId: draft.companyId,
+          ...(draft.sourceFragmentId === undefined ? {} : { sourceFragmentId: draft.sourceFragmentId }),
+          ...(draft.sourceId === undefined ? {} : { sourceId: draft.sourceId }),
+          ...(draft.findingId === undefined ? {} : { findingId: draft.findingId }),
+          ...(draft.findingRevisionId === undefined
+            ? {}
+            : { findingRevisionId: draft.findingRevisionId }),
+          preparedText: draft.preparedText,
+        };
+        if (credentials !== null && !embedded.has(draftKeyOf(draft))) {
+          const call = await runEmbedding(credentials, {
+            text: draft.preparedText,
+            inputKind: "search_document",
           });
-          return;
+          if (call.outcome.outcome === "succeeded") {
+            row.embedding = [...call.outcome.value.vector];
+          } else if (call.outcome.failure.kind === "output_rejected") {
+            // Incompatible provider output fails the index write: nothing
+            // commits for this pass and the job records the typed failure.
+            await ctx.runMutation(internal.search.executor.failJob, {
+              jobKey: args.jobKey,
+              errorKind: "embedding_output_rejected",
+            });
+            return;
+          }
+          // Any other failure is an outage: the row stays text-only and the
+          // query-side coverage literal discloses the semantic gap.
         }
-        // Any other failure is an outage: the row stays text-only and the
-        // query-side coverage literal discloses the semantic gap.
+        rows.push(row);
       }
-      rows.push(row);
+      await ctx.runMutation(internal.search.executor.heartbeatJob, { jobKey: args.jobKey });
     }
     await ctx.runMutation(internal.search.records.recordEntries, {
       jobKey: args.jobKey,

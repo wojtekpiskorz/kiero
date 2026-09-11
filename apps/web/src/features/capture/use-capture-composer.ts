@@ -74,9 +74,10 @@ function freshDraftId(): string {
 
 /**
  * The ONE fresh-draft seeding rule (review round 1): a new draft's scope
- * comes from the conversation route's ?projekt= param: plain /wpis
- * starts Auto (company-wide), a project view retains its project. After
- * this, the stored record is the single authority the pill renders.
+ * comes from the conversation route's ?projekt= param: the plain company
+ * view starts Auto (company-wide), a project view retains its project.
+ * After this, the stored record is the single authority the pill renders
+ * (the separate /wpis route retired with the J2 join).
  */
 export function scopedFreshDraft(userId: string, nowMs: number): DraftRecord {
   return {
@@ -549,7 +550,13 @@ export function useCaptureComposer(userId: string): CaptureComposer {
       return;
     }
     const authorText = record.text.trim();
-    if (authorText.length === 0 || gateway === null) {
+    // The J2 material rule, client half: words of text OR at least one
+    // retained medium (a recording with chunks or any photo). The server
+    // re-decides against VERIFIED attachments; this gate only keeps the
+    // button honest about what can possibly be accepted.
+    const hasRetainedMedia =
+      (record.recording !== null && record.recording.chunkCount > 0) || record.photos.length > 0;
+    if ((authorText.length === 0 && !hasRetainedMedia) || gateway === null) {
       return;
     }
     sendingRef.current = true;
@@ -602,9 +609,9 @@ export function useCaptureComposer(userId: string): CaptureComposer {
         const finished = draftRef.current ?? record;
         await store.clearDraft(finished).catch(() => undefined);
         // The next draft's scope is re-seeded from the ?projekt= param: on
-        // plain /wpis the pill honestly shows Auto again; a project view
-        // retains its project. The pill renders this record (one source of
-        // truth), so the reset is exactly what the boss sees.
+        // the plain company view the pill honestly shows Auto again; a
+        // project view retains its project. The pill renders this record
+        // (one source of truth), so the reset is exactly what the boss sees.
         const next = scopedFreshDraft(userId, Date.now());
         draftRef.current = next;
         setDraft(next);
@@ -694,8 +701,17 @@ export function useCaptureComposer(userId: string): CaptureComposer {
     void persist({ ...record, scopeProjectId: projectId });
   }
 
+  // The honest submit state: words OR retained media, gateway ready, idle
+  // (the J2 material rule's client half; the server re-decides on verified
+  // attachments).
   const sendEnabled =
-    !sending && draft !== null && draft.text.trim().length > 0 && gateway !== null && !recordingActive;
+    !sending &&
+    draft !== null &&
+    gateway !== null &&
+    !recordingActive &&
+    (draft.text.trim().length > 0 ||
+      (draft.recording !== null && draft.recording.chunkCount > 0) ||
+      draft.photos.length > 0);
 
   return {
     draft,

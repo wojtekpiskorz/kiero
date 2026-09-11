@@ -40,6 +40,15 @@
  *
  * Pure decisions (fingerprint, replay/conflict, state derivation for reads)
  * live here so tests/d1 can prove them without a deployment.
+ *
+ * J2 amendment (issue #61, flagged): the voice-only ruling. A source's
+ * material rule is `validateSourceMaterial` — words of author text OR at
+ * least one VERIFIED attachment (the gate's ids, never the declaration).
+ * The text extraction row still seeds for every source (zero words are
+ * the author's own extraction: coverage and evidence anchoring stay
+ * coherent), but the `processing.extract_fragments` registration runs
+ * only when words exist; a voice-only source's analysis arrives through
+ * the `sources.sourceAccepted` event's E4 join projection.
  */
 
 import { Schema } from "effect";
@@ -99,9 +108,23 @@ export type Validated<T> = { readonly ok: true; readonly value: T } | {
   readonly code: string;
 };
 
-/** Author text must carry words: whitespace-only text is not a message. */
-export function validateAuthorText(text: string): Validated<string> {
-  if (text.trim().length === 0) {
+/**
+ * The J2 voice-only ruling (issue #61): a wiadomość źródłowa "może łączyć
+ * tekst, nagranie i zdjęcia" (CONTEXT.md) — the channels combine, none is
+ * mandatory. A source needs substance in AT LEAST ONE channel: words of
+ * author text OR at least one verified attachment. Empty text with a
+ * retained recording or photos is a valid voice-only/photo-only message
+ * (its analysis runs through the E4 multimodal join); empty text with NO
+ * attachment stays the honest `author_text_empty` refusal. The length
+ * cap applies whenever text is present at all. This is the ONE author
+ * text rule: the acceptance transaction runs it once, after the
+ * attachment gate (whose VERIFIED ids answer the has-attachments half).
+ */
+export function validateSourceMaterial(
+  text: string,
+  hasAttachments: boolean,
+): Validated<string> {
+  if (text.trim().length === 0 && !hasAttachments) {
     return { ok: false, code: "author_text_empty" };
   }
   if (text.length > MAX_AUTHOR_TEXT_LENGTH) {
@@ -321,10 +344,10 @@ export async function performAcceptance(
   }
 
   // --- deeper input validation (the contract schema passed these shapes) ---
-  const authorText = validateAuthorText(input.authorText);
-  if (!authorText.ok) {
-    return errorResult(validationError(authorText.code));
-  }
+  // The author-text rule runs ONCE, as `validateSourceMaterial` after the
+  // attachment gate below, because only the gate's VERIFIED attachment
+  // ids can honestly say the message carries retained media; there is no
+  // earlier inline length check to race it (one rule, one place).
   const sentAt = resolveSentAtMs(input.intendedSentAtIso, nowMs);
   if (!sentAt.ok) {
     return errorResult(validationError(sentAt.code));
@@ -401,6 +424,25 @@ export async function performAcceptance(
   if (!attachmentGate.ok) {
     return errorResult(attachmentGate.error);
   }
+
+  // --- the material rule (J2): words OR verified retained media -----------
+  // Runs here (after the gate) so the decision reads the VERIFIED attachment
+  // ids, never the untrusted declaration. A voice-only/photo-only message
+  // is a valid wiadomość źródłowa; an empty text with nothing retained is
+  // not a message at all and refuses honestly.
+  const material = validateSourceMaterial(
+    input.authorText,
+    attachmentGate.binding.attachmentIds.length > 0,
+  );
+  if (!material.ok) {
+    return errorResult(validationError(material.code));
+  }
+  // The author's words are their own text extraction (possibly zero words:
+  // the row still seeds, so coverage and evidence anchoring stay coherent;
+  // the E4 join owns a voice-only source's analysis). E3's extract/analyze
+  // jobs are registered only when words exist — analyzing an empty text
+  // would be a pointless model turn over nothing.
+  const hasAuthorWords = input.authorText.trim().length > 0;
 
   // --- project hint reference checks (context, never authority) ------------
   const linkedProjects: Id<"projects">[] = [];
@@ -496,14 +538,20 @@ export async function performAcceptance(
     payload: { sourceId, attachmentIds: attachmentGate.binding.attachmentIds },
     dedupKey,
   });
-  await registerDurableJob(tx, {
-    kind: "processing.extract_fragments",
-    input: { sourceId, extractionId },
-    companyId: context.actor.companyId,
-    sourceId,
-    processingRunId,
-    policy: PROCESSING_RETRY_POLICY,
-    dedupKey,
-  });
+  if (hasAuthorWords) {
+    // The text pipeline registration (extract -> analyze) runs only when
+    // the author wrote words. A voice-only source's analysis arrives
+    // through the sourceAccepted event's E4 join projection (the outbox
+    // edge), which resolves this same initial run.
+    await registerDurableJob(tx, {
+      kind: "processing.extract_fragments",
+      input: { sourceId, extractionId },
+      companyId: context.actor.companyId,
+      sourceId,
+      processingRunId,
+      policy: PROCESSING_RETRY_POLICY,
+      dedupKey,
+    });
+  }
   return okResult(receiptOf({ _id: sourceId, fullyAcceptedAtMs: nowMs }));
 }

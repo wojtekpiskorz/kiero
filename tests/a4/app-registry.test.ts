@@ -129,7 +129,7 @@ describe("the shipped host features", () => {
     }
   });
 
-  it("registers every feature as pending with a note, except the mounted lanes (H1 conversation + memory, H3 search + source detail, B3 membership, B4 GM, G1 calendar, F3 notifications, H4 GM processing, D4 capture, H2 work/extensions/co-teraz); only the conversation carries its own placeholder screen", () => {
+  it("registers every feature as pending with a note, except the mounted lanes (H1 conversation + memory, H3 search + source detail, B3 membership, B4 GM, G1 calendar, F3 notifications, H4 GM processing, H2 work/extensions/co-teraz); only the conversation carries its own placeholder screen", () => {
     // B3 (issue #22) is the first lane to mount a real screen through this
     // registry: the sanctioned sign-in + membership host composition.
     // B4 (issue #23) mounts the audited GM operator surface the same way;
@@ -138,10 +138,12 @@ describe("the shipped host features", () => {
     // H1 (issue #49) replaced that mount with the full conversation UI and
     // added the memory route; F3 (issue #43) mounts the web push settings
     // screen; H4 (issue #52) mounts the audited GM processing inspector;
-    // D4 (issue #32) mounts the capture composer at /wpis; H3 (issue #51)
+    // D4 (issue #32) mounted the capture composer at /wpis; H3 (issue #51)
     // mounts the evidence-search and source-history routes; H2 (issue #50)
     // mounts the work records (/praca), the typed extensions (/dodatkowe)
     // and flips the /co-teraz placeholder to the real per-user screen.
+    // J2 (issue #61) RETIRED the /wpis capture entry: the composer joined
+    // the conversation surface, so capture.composer no longer composes.
     const mounted = appFeatures.filter((entry) => entry.implementation === "mounted");
     expect(mounted.map((entry) => entry.featureId)).toEqual([
       "conversation.company",
@@ -156,7 +158,6 @@ describe("the shipped host features", () => {
       "operations.processing",
       "calendar.connection",
       "attention.push",
-      "capture.composer",
     ]);
     for (const mountedEntry of mounted) {
       expect(mountedEntry.screen).toBeTypeOf("function");
