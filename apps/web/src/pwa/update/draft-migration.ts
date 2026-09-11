@@ -58,9 +58,8 @@ export interface MigrationIdbDatabase {
     stores: string[],
     mode: "readonly" | "readwrite",
   ): MigrationIdbTransaction;
-  /** The probe surface (round 2): presence, version and teardown. */
+  /** The probe surface: presence and teardown. */
   readonly objectStoreNames?: { contains(name: string): boolean };
-  readonly version?: number;
   close?(): void;
 }
 

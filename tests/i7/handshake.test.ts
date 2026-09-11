@@ -62,6 +62,9 @@ describe("drift guards against sibling-owned constants", () => {
     const storeSource = readFileSync(path.join(webSrc, "storage", "drafts", "store.ts"), "utf8");
     expect(storeSource).toMatch(/const DB_NAME = "kiero-drafts"/);
     expect(storeSource).toMatch(/const STORE = "entries"/);
+    // D4's own version bump must fail HERE too, or the migration's
+    // versioned open answers VersionError on every profile (round 4).
+    expect(storeSource).toMatch(/const DB_VERSION = 1;/);
     expect(DRAFTS_DB_NAME).toBe("kiero-drafts");
     expect(DRAFTS_STORE_NAME).toBe("entries");
     expect(DRAFTS_DB_VERSION).toBe(1);
