@@ -5,6 +5,7 @@
  * duplicated), so the UI's "wpisz: ..." can never drift from the check.
  */
 
+import type { PurgeStageKind } from "../../../../../convex/operations/deletion/schema";
 import { PURGE_CONFIRMATION_PHRASE } from "../../../../../convex/operations/deletion/purge";
 
 export const deletionCopy = {
@@ -27,6 +28,8 @@ export const deletionCopy = {
   stagePending: "w toku",
   stagePurged: "wyczyszczone",
   stageFailed: "niepowodzenie",
+  // The schema's stage vocabulary, compiler-checked: a stage kind added
+  // to PURGE_STAGE_KINDS without a Polish label fails this map's type.
   stageLabels: {
     media_objects: "Pliki i reprezentacje",
     transcripts: "Transkrypcje, odczyty i fragmenty",
@@ -34,7 +37,7 @@ export const deletionCopy = {
     search_index: "Indeks wyszukiwania",
     notification_work: "Zawiadomienia",
     exports: "Eksporty",
-  } as const,
+  } as const satisfies Record<PurgeStageKind, string>,
   checking: "Sprawdzam stan usunięć...",
   sessionEnded: "Sesja wygasła. Zaloguj się ponownie.",
   unexpected: "Nie udało się wykonać operacji.",

@@ -283,8 +283,6 @@ export async function mediaObjectKeysOf(
   return [...keys].sort();
 }
 
-
-
 /** Persists the media stage's key list and re-opens it for this attempt. */
 async function prepareMediaStage(tx: MutationCtx, stage: StageRow): Promise<string[]> {
   const keys = await mediaObjectKeysOf(tx.db, stage.sourceId);
