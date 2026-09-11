@@ -64,11 +64,21 @@ describe("pending feature screens render without fake data", () => {
     expect(sourceDetail).toContain("Aplikacja nie jest połączona z backendem");
   });
 
-  it("renders Co teraz and projects context through the shared placeholder screen", () => {
+  it("renders Co teraz (H2's mount), the work/extensions records and the projects placeholder honestly", () => {
+    // H2 (issue #50) flipped /co-teraz to the real per-user screen: like
+    // every mounted lane, its connection gate is the honest disconnected
+    // state (no fake entries either way). H3's search and source detail
+    // sit at indices 2 and 3, shifting H2's mounts to 4-6.
     const coTeraz = renderScreen(4);
     expect(coTeraz).toContain("Co teraz");
-    expect(coTeraz).toContain("W przygotowaniu.");
-    const projects = renderScreen(5);
+    expect(coTeraz).toContain("Aplikacja nie jest połączona z backendem");
+    const work = renderScreen(5);
+    expect(work).toContain("Praca");
+    expect(work).toContain("Aplikacja nie jest połączona z backendem");
+    const extensions = renderScreen(6);
+    expect(extensions).toContain("Dodatkowe informacje");
+    expect(extensions).toContain("Aplikacja nie jest połączona z backendem");
+    const projects = renderScreen(7);
     expect(projects).toContain("Projekty");
     expect(projects).toContain("W przygotowaniu.");
     expect(projects).toContain("projects.identifyProject");

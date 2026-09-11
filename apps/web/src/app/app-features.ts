@@ -11,6 +11,10 @@ import { composeAppFeatures, type AppFeatureEntry } from "./registry";
 import { conversationFeatureEntry } from "./features/conversation/entry";
 import { memoryFeatureEntry } from "./features/memory/entry";
 import { coTerazFeatureEntry } from "./features/co-teraz/entry";
+// H2's sanctioned host mounts: the work record surface, the typed-extension
+// surface, and the real /co-teraz screen (the entry flip from pending).
+import { workFeatureEntry } from "./features/work/entry";
+import { extensionsFeatureEntry } from "./features/extensions/entry";
 import { projectsFeatureEntry } from "./features/projects/entry";
 import { membershipFeatureEntry } from "./features/membership/entry";
 import { calendarFeatureEntry } from "./features/calendar/entry";
@@ -37,6 +41,10 @@ export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
   // H3's sanctioned host mount: the full source-history surface.
   sourceDetailFeatureEntry,
   coTerazFeatureEntry,
+  // H2's sanctioned host mounts (issue #50): project work records at
+  // /praca and typed extensions at /dodatkowe.
+  workFeatureEntry,
+  extensionsFeatureEntry,
   projectsFeatureEntry,
   // B3's sanctioned host mount: the first mounted feature (sign-in gate +
   // membership surface); the entry file owns the shape, this line the wiring.
