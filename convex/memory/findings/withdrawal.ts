@@ -20,13 +20,16 @@
  *
  * TWO entries over ONE core (review round 2): `markWithdrawnSupport` is
  * the parameterized core (tenant + recording user as arguments, source id
- * already normalized) — the revision row, projection patch and event
- * payload exist exactly once here. `performWithdrawalMarking` stays the
- * RequestContext-backed entry (the guarded probe and any session-holding
- * caller); C5's durable `memory.recompute_dependents` executor calls the
- * core directly, because a deferred job cannot depend on a live session
- * existing — its actor is the withdrawal's actor (fallback: the source's
- * author), recorded honestly with the system-driven origin and reason.
+ * already normalized): the marking walk lives here once, and the commit
+ * loop (revision + projection patch + event) is the ONE shared
+ * marking-commit core (./marking.ts, extracted in E7 review round 1) this
+ * lane and the reassignment lane both call. `performWithdrawalMarking`
+ * stays the RequestContext-backed entry (the guarded probe and any
+ * session-holding caller); C5's durable `memory.recompute_dependents`
+ * executor calls the core directly, because a deferred job cannot depend
+ * on a live session existing; its actor is the withdrawal's actor
+ * (fallback: the source's author), recorded honestly with the
+ * system-driven origin and reason.
  *
  * Each marking revision carries `withdrawnSourceId` (C5 amendment, flagged
  * below in ./schema.ts): the exact withdrawal a marking belongs to, so
@@ -34,20 +37,14 @@
  * attribution (two withdrawals may share wording).
  */
 
-import { Schema } from "effect";
-import {
-  errorResult,
-  events,
-  okResult,
-  type ResultEnvelope,
-} from "@kiero/contracts";
+import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
 import { conflictError, notFoundError, validationError, type RequestContext } from "@kiero/runtime";
 import { decideWithdrawalMarking, explicitUnknown, sourceWithdrawnReason, type EvidenceSupportRef } from "@kiero/domain";
 import type { MutationCtx } from "../../_generated/server";
-import type { Id, Doc } from "../../_generated/dataModel";
-import { publishEvent } from "../../platform/publish";
+import type { Id } from "../../_generated/dataModel";
 import { normalizedCompany, normalizedActor } from "./references";
-import { TEMPLATE_ID, encodeKnowledgeState } from "./semantics";
+import { encodeKnowledgeState } from "./semantics";
+import { commitMarkings, type MarkingOutcome, type PlannedMarking } from "./marking";
 
 /** The marking core's parameters: everything the reaction needs, no session. */
 export interface WithdrawalMarkingArgs {
@@ -67,24 +64,24 @@ export interface WithdrawalMarkingArgs {
  * inside the caller's transaction: every marking (revision + projection
  * patch) and its `memory.findingRevised` event commit together with
  * everything else, or not at all. Everything that can refuse runs before
- * the first write.
+ * the first write. Returns the typed marking outcome (review round 1: the
+ * ok payload is typed, no envelope re-assertions at the callers).
  */
 export async function markWithdrawnSupport(
   tx: MutationCtx,
   args: WithdrawalMarkingArgs,
-): Promise<ResultEnvelope> {
+): Promise<MarkingOutcome> {
   const source = await tx.db.get(args.sourceId);
   if (source === null || source.companyId !== args.companyId) {
-    return errorResult(notFoundError("sources"));
+    return { _tag: "error", error: notFoundError("sources") };
   }
   // Marking follows withdrawal; it never runs ahead of the explicit
   // lifecycle transition (conflict detection alone is not withdrawal).
   if (source.lifecycle !== "withdrawn") {
-    return errorResult(conflictError("source_not_withdrawn", "sources", source._id));
-  }
-  const findingRevised = events["memory.findingRevised"];
-  if (findingRevised === undefined) {
-    return errorResult(validationError("memory_events_missing"));
+    return {
+      _tag: "error",
+      error: conflictError("source_not_withdrawn", "sources", source._id),
+    };
   }
 
   // Everything that can throw or refuse runs before the first write.
@@ -95,11 +92,7 @@ export async function markWithdrawnSupport(
   const affectedRevisions: Id<"findingRevisions">[] = [
     ...new Set(links.map((link) => link.findingRevisionId)),
   ];
-  interface MarkingPlan {
-    finding: Doc<"findings">;
-    currentRevision: Doc<"findingRevisions">;
-  }
-  const markings: MarkingPlan[] = [];
+  const markings: PlannedMarking[] = [];
   for (const revisionId of affectedRevisions) {
     const revision = await tx.db.get(revisionId);
     if (revision === null) {
@@ -127,53 +120,21 @@ export async function markWithdrawnSupport(
       withdrawnSourceId: args.sourceId,
     });
     if (decision.decision === "mark_unknown") {
-      markings.push({ finding, currentRevision: revision });
+      markings.push({ finding, currentRevision: revision, reason: args.reason });
     }
   }
-  Schema.decodeUnknownSync(findingRevised.payload)({
-    findingId: TEMPLATE_ID,
-    revisionId: TEMPLATE_ID,
-    supersedesRevisionId: null,
-  });
-
-  const nowMs = Date.now();
-  const markedFindingIds: Id<"findings">[] = [];
-  for (const marking of markings) {
-    const markedKnowledge = encodeKnowledgeState(
-      explicitUnknown(sourceWithdrawnReason(args.reason)),
-    );
-    const revisionId = await tx.db.insert("findingRevisions", {
-      findingId: marking.finding._id,
-      revision: marking.finding.revisionCounter + 1,
-      // The value is preserved verbatim; only its epistemic state changes.
-      value: marking.currentRevision.value,
-      knowledgeState: markedKnowledge,
-      supersedesRevisionId: marking.currentRevision._id,
+  return commitMarkings(tx, {
+    companyId: args.companyId,
+    actorUserId: args.actorUserId,
+    stamp: {
       origin: "withdrawal_marking",
-      reason: args.reason,
-      withdrawnSourceId: args.sourceId,
-      recordedByUserId: args.actorUserId,
-      recordedAtMs: nowMs,
-    });
-    await tx.db.patch(marking.finding._id, {
-      currentRevisionId: revisionId,
-      knowledgeState: markedKnowledge,
-      revisionCounter: marking.finding.revisionCounter + 1,
-      updatedAtMs: nowMs,
-    });
-    markedFindingIds.push(marking.finding._id);
-    await publishEvent(tx, {
-      companyId: args.companyId,
-      eventName: "memory.findingRevised",
-      payload: {
-        findingId: marking.finding._id,
-        revisionId,
-        supersedesRevisionId: marking.currentRevision._id,
-      },
-      dedupKey: `memory.findingRevised:${revisionId}`,
-    });
-  }
-  return okResult({ markedFindingIds });
+      knowledgeState: encodeKnowledgeState(
+        explicitUnknown(sourceWithdrawnReason(args.reason)),
+      ),
+      attribution: { kind: "withdrawnSourceId", sourceId: args.sourceId },
+    },
+    markings,
+  });
 }
 
 /**
@@ -200,10 +161,15 @@ export async function performWithdrawalMarking(
   if (actorUserId === null) {
     return errorResult(validationError("actor_user_unresolved"));
   }
-  return markWithdrawnSupport(tx, {
+  const marking = await markWithdrawnSupport(tx, {
     companyId,
     actorUserId,
     sourceId,
     reason,
   });
+  // The session-backed wire keeps its historical payload shape: the roots
+  // (targets stay with the durable executor, which owns re-analysis).
+  return marking._tag === "ok"
+    ? okResult({ markedFindingIds: marking.markedFindingIds })
+    : errorResult(marking.error);
 }

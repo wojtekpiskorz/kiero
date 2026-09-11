@@ -73,9 +73,11 @@ describe("sources handler registration (one write operation, nothing else)", () 
   it("registers acceptance as the only D1 sources lane write", () => {
     const handlers = sourcesHandlers();
     // C5's sanctioned append (issue #28 owns the withdrawal operation's
-    // implementation; D1 owns only acceptance here).
+    // implementation; D1 owns only acceptance here). E7's sanctioned append
+    // (issue #115) adds the project reassignment the same way.
     expect(Object.keys(handlers).sort()).toEqual([
       "sources.acceptSource",
+      "sources.reassignSource",
       "sources.withdrawSource",
     ]);
     expect(handlers["sources.acceptSource"]?.intent).toBe("write");

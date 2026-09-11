@@ -34,6 +34,18 @@
  *   evidence). A non-known root is a no-op: the stale cascade above owns
  *   that direction.
  *
+ * - `sources.sourceReassigned` → cause `source_reassigned` (E7 amendment,
+ *   flagged): a project reassignment re-assesses DEPENDENT SCOPE. The
+ *   moved source stays active (its evidence still witnesses), so nothing
+ *   is marked unknown here; the findings whose project placement lost the
+ *   source's link, narrowed to unlinked scopes, sparing explicit
+ *   corrections, already-marked findings and findings with another active
+ *   linked witness, become `updating`-until-revalidated through the memory
+ *   findings lane's reassignment marking core
+ *   (../findings/reassignment.ts), cascade to derivation dependents
+ *   through the same carrier, and re-analyze through E3's seam (the new
+ *   run reads the CURRENT project links).
+ *
  * AMPLIFICATION NOTE (for H3's incident scanning): the findingRevised edge
  * fires one durable walk per revision — including the cascade's own
  * markings, most of which no-op. Accepted for alpha volume; per-reaction
@@ -83,6 +95,12 @@ import type { JobExecutor } from "../../platform/executors";
 import type { MutationCtx } from "../../_generated/server";
 import type { Id, Doc } from "../../_generated/dataModel";
 import { markWithdrawnSupport } from "../findings/withdrawal";
+// E7 amendment (flagged): the reassignment scope-marking core lives in the
+// memory findings lane it writes (review round 1 moved it there from the
+// sources lane; its commit loop is the shared marking core,
+// ../findings/marking.ts).
+import { markReassignedScope } from "../findings/reassignment";
+import { commitMarkings } from "../findings/marking";
 import { encodeKnowledgeState, knowledgeTagOf } from "../findings/semantics";
 import { RECOMPUTE_PIPELINE_VERSION } from "./withdrawal";
 
@@ -90,9 +108,19 @@ import { RECOMPUTE_PIPELINE_VERSION } from "./withdrawal";
 interface RecomputeInput {
   readonly rootFindingId: string | null;
   readonly sourceId: string | null;
-  readonly cause: "source_withdrawn" | "dependent_stale" | "reanalysis";
+  readonly cause:
+    | "source_withdrawn"
+    | "dependent_stale"
+    | "reanalysis"
+    | "source_reassigned";
   readonly reason: string | null;
   readonly withdrawnByUserId: string | null;
+  /**
+   * E7 amendment (flagged): the reassigning user of the
+   * `source_reassigned` cause (optional like the registry key; absent on
+   * every other cause).
+   */
+  readonly reassignedByUserId?: string | null;
 }
 
 /** Retry policy of the linked re-analysis registrations (E3's bound). */
@@ -380,61 +408,40 @@ async function markStaleDependents(
     throw new Error("recompute: memory.findingRevised missing from the registry");
   }
 
-  // --- the commit loop: only pre-validated writes from here ----------------
-  const nowMs = Date.now();
-  const targets: RecomputeTarget[] = [];
-  for (const marked of decisions) {
-    const markedKnowledge = encodeKnowledgeState(
-      explicitUpdating(updatingUntilRevalidatedReason(args.rootFindingId)),
-    );
-    const revisionId = await tx.db.insert("findingRevisions", {
-      findingId: marked.finding._id,
-      revision: marked.finding.revisionCounter + 1,
+  // --- the commit: the ONE shared marking core, then the carriers ---------
+  // No source attribution on this level: the cascade marks by ROOT FINDING
+  // (the carrier's revision-unique dedup is its checkpoint), never by source.
+  const committed = await commitMarkings(tx, {
+    companyId,
+    actorUserId,
+    stamp: {
+      origin: "withdrawal_marking",
+      knowledgeState: encodeKnowledgeState(
+        explicitUpdating(updatingUntilRevalidatedReason(args.rootFindingId)),
+      ),
+    },
+    markings: decisions.map((dependent) => ({
+      finding: dependent.finding,
+      currentRevision: dependent.currentRevision,
       // The inferred value is preserved verbatim; only its epistemic state
       // moves to updating-until-revalidated (never discarded).
-      value: marked.currentRevision.value,
-      knowledgeState: markedKnowledge,
-      supersedesRevisionId: marked.currentRevision._id,
-      origin: "withdrawal_marking",
       reason: dependentUpdatingReason(args.rootFindingId, args.cause),
-      recordedByUserId: actorUserId,
-      recordedAtMs: nowMs,
-    });
-    await tx.db.patch(marked.finding._id, {
-      currentRevisionId: revisionId,
-      knowledgeState: markedKnowledge,
-      revisionCounter: marked.finding.revisionCounter + 1,
-      updatedAtMs: nowMs,
-    });
-    await publishEvent(tx, {
-      companyId: args.companyId,
-      eventName: "memory.findingRevised",
-      payload: {
-        findingId: marked.finding._id,
-        revisionId,
-        supersedesRevisionId: marked.currentRevision._id,
-      },
-      dedupKey: `memory.findingRevised:${revisionId}`,
-    });
-    if (marked.currentRevision.provenance !== undefined) {
-      const provenanceSource = await tx.db.get(marked.currentRevision.provenance.sourceId);
-      targets.push({
-        findingId: marked.finding._id,
-        provenanceSourceId: marked.currentRevision.provenance.sourceId,
-        provenanceSourceActive:
-          provenanceSource !== null && provenanceSource.lifecycle === "active",
-      });
-    }
-    // The cascade carrier: this marking is the durable checkpoint; the next
-    // bounded level is a durable job, not a loop in this transaction.
+    })),
+  });
+  if (committed._tag === "error") {
+    throw new Error(`recompute: marking commit refused (${committed.error.code})`);
+  }
+  // The cascade carrier: each committed marking is the durable checkpoint;
+  // the next bounded level is a durable job, not a loop in this transaction.
+  for (const revision of committed.revisions) {
     await publishCascadeCarrier(tx, {
       companyId,
       actorUserId,
-      rootFindingId: marked.finding._id,
-      markingRevisionId: revisionId,
+      rootFindingId: revision.findingId,
+      markingRevisionId: revision.revisionId,
     });
   }
-  await registerReanalysisGroups(tx, companyId, targets, args.triggerKey);
+  await registerReanalysisGroups(tx, companyId, committed.targets, args.triggerKey);
 }
 
 // ---------------------------------------------------------------------------
@@ -475,6 +482,95 @@ async function revalidateUpdatingDependents(
 }
 
 // ---------------------------------------------------------------------------
+// The shared opening and closing of the source-caused reactions.
+// ---------------------------------------------------------------------------
+
+/** The resolved source-cause reaction inputs, or the closed refusal kind. */
+type SourceCauseResolution =
+  | {
+      /** The tenant-checked source row in its expected lifecycle. */
+      readonly source: Doc<"sources">;
+      /** The reaction's recording user (preferred actor, fallback author). */
+      readonly actorUserId: Id<"users">;
+    }
+  | { readonly errorKind: string };
+
+/**
+ * The ONE shared preamble of the source-caused reactions (`source_withdrawn`
+ * and `source_reassigned`): normalize the source id, read and tenant-check
+ * the row, recheck its CURRENT lifecycle (marking follows the explicit
+ * transition, never ahead of it) and resolve the identity-independent
+ * recording user (the cause's actor, fallback: the source's author).
+ * Extracted in E7 review round 1, when the second cause transcribed the
+ * first guard for guard.
+ */
+async function resolveSourceCause(
+  ctx: MutationCtx,
+  args: {
+    readonly companyId: Id<"companies">;
+    readonly sourceRef: string | null;
+    /** The lifecycle this reaction owns ("withdrawn" / "active"). */
+    readonly expectedLifecycle: "withdrawn" | "active";
+    /** The cause's declared actor (the withdrawal's or reassignment's user). */
+    readonly preferredUserId: string | null;
+  },
+): Promise<SourceCauseResolution> {
+  const sourceId = ctx.db.normalizeId("sources", args.sourceRef ?? "");
+  if (sourceId === null) {
+    return { errorKind: "source_id_invalid" };
+  }
+  const source = await ctx.db.get(sourceId);
+  if (source === null) {
+    return { errorKind: "source_missing" };
+  }
+  if (source.companyId !== args.companyId) {
+    return { errorKind: "tenant_scope_mismatch" };
+  }
+  // CURRENT lifecycle recheck: withdrawal/purge own the stronger
+  // reactions for their lifecycles; a reaction never runs around them.
+  if (source.lifecycle !== args.expectedLifecycle) {
+    return { errorKind: `source_not_${args.expectedLifecycle}` };
+  }
+  const preferredActor = ctx.db.normalizeId("users", args.preferredUserId ?? "");
+  const actorUserId =
+    preferredActor === null
+      ? ctx.db.normalizeId("users", source.authorUserId)
+      : preferredActor;
+  if (actorUserId === null) {
+    return { errorKind: "actor_unresolved" };
+  }
+  return { source, actorUserId };
+}
+
+/**
+ * Hands every root finding to the cascade: one revision-unique
+ * `memory.dependentsMarkedStale` carrier per root (the withdrawal and
+ * reassignment reactions share this closing loop; a root that lost its
+ * current revision carries nothing).
+ */
+async function cascadeRootFindings(
+  ctx: MutationCtx,
+  args: {
+    readonly companyId: Id<"companies">;
+    readonly actorUserId: Id<"users">;
+    readonly roots: readonly Id<"findings">[];
+  },
+): Promise<void> {
+  for (const root of args.roots) {
+    const rootRow = await ctx.db.get(root);
+    if (rootRow === null || rootRow.currentRevisionId === undefined) {
+      continue; // a root that lost its current revision carries nothing
+    }
+    await publishCascadeCarrier(ctx, {
+      companyId: args.companyId,
+      actorUserId: args.actorUserId,
+      rootFindingId: root,
+      markingRevisionId: rootRow.currentRevisionId,
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // The executor.
 // ---------------------------------------------------------------------------
 
@@ -499,39 +595,24 @@ export const recomputeDependentsExecutor: JobExecutor = {
     const triggerKey = job.dedupKey ?? job.jobKey;
 
     if (decoded.cause === "source_withdrawn") {
-      const sourceId = ctx.db.normalizeId("sources", decoded.sourceId ?? "");
-      if (sourceId === null) {
-        return { outcome: "failed", errorKind: "source_id_invalid", retryable: false };
+      const resolved = await resolveSourceCause(ctx, {
+        companyId,
+        sourceRef: decoded.sourceId,
+        expectedLifecycle: "withdrawn",
+        preferredUserId: decoded.withdrawnByUserId,
+      });
+      if ("errorKind" in resolved) {
+        return { outcome: "failed", errorKind: resolved.errorKind, retryable: false };
       }
-      const source = await ctx.db.get(sourceId);
-      if (source === null) {
-        return { outcome: "failed", errorKind: "source_missing", retryable: false };
-      }
-      if (source.companyId !== companyId) {
-        return { outcome: "failed", errorKind: "tenant_scope_mismatch", retryable: false };
-      }
-      // CURRENT lifecycle recheck: marking follows the explicit transition
-      // (C2's rule) and stale work can never restore removed support.
-      if (source.lifecycle !== "withdrawn") {
-        return { outcome: "failed", errorKind: "source_not_withdrawn", retryable: false };
-      }
-      const reason = decoded.reason ?? source.withdrawnReason ?? "source withdrawn";
-      const preferredActor = ctx.db.normalizeId("users", decoded.withdrawnByUserId ?? "");
-      const actorUserId =
-        preferredActor === null
-          ? ctx.db.normalizeId("users", source.authorUserId)
-          : preferredActor;
-      if (actorUserId === null) {
-        return { outcome: "failed", errorKind: "actor_unresolved", retryable: false };
-      }
+      const reason = decoded.reason ?? resolved.source.withdrawnReason ?? "source withdrawn";
       // The marking is identity-independent (see the header): the shared
       // core takes tenant + recording user directly, so the reaction never
       // waits for a live session and cannot die on identity availability
       // after a withdrawal already committed.
       const marking = await markWithdrawnSupport(ctx, {
         companyId,
-        actorUserId,
-        sourceId: source._id,
+        actorUserId: resolved.actorUserId,
+        sourceId: resolved.source._id,
         reason,
       });
       if (marking._tag === "error") {
@@ -541,24 +622,69 @@ export const recomputeDependentsExecutor: JobExecutor = {
           retryable: false,
         };
       }
-      const roots = await withdrawnRootFindings(ctx.db, companyId, source._id);
       // Hand EVERY root (freshly marked here, or marked by an earlier
       // attempt of this same withdrawal — the carrier's revision-unique
       // dedup collapses the replay) to the cascade: the carrier jobs own
       // level 1 exactly like every deeper level — one bounded transaction
-      // each, no fat first level inside this job.
-      for (const root of roots) {
-        const rootRow = await ctx.db.get(root);
-        if (rootRow === null || rootRow.currentRevisionId === undefined) {
-          continue; // a root that lost its current revision carries nothing
-        }
-        await publishCascadeCarrier(ctx, {
-          companyId,
-          actorUserId,
-          rootFindingId: root,
-          markingRevisionId: rootRow.currentRevisionId,
-        });
+      // each, no fat first level inside this job. The roots are re-derived
+      // from committed state (not the marking result) so a replayed job
+      // adopts the same root set.
+      await cascadeRootFindings(ctx, {
+        companyId,
+        actorUserId: resolved.actorUserId,
+        roots: await withdrawnRootFindings(ctx.db, companyId, resolved.source._id),
+      });
+      return { outcome: "succeeded" };
+    }
+
+    // E7 amendment (flagged, issue #115): the scope re-assessment reaction
+    // of one project reassignment. The shared source-cause preamble covers
+    // the identity-independent resolution (the reassigning user, fallback
+    // the source's author, recorded honestly as the marking's author) and
+    // the CURRENT lifecycle recheck (only an active source's placement
+    // re-assesses); the reaction then reads the source's CURRENT links,
+    // marks the narrowed scope findings through the memory findings lane's
+    // reassignment core (../findings/reassignment.ts), hands every marked
+    // root to the SAME cascade carrier as withdrawal, and registers the
+    // marked findings' linked re-analysis (an active source re-analyzes:
+    // the new run reads the CURRENT project links and re-derives
+    // placement).
+    if (decoded.cause === "source_reassigned") {
+      const resolved = await resolveSourceCause(ctx, {
+        companyId,
+        sourceRef: decoded.sourceId,
+        expectedLifecycle: "active",
+        preferredUserId: decoded.reassignedByUserId ?? null,
+      });
+      if ("errorKind" in resolved) {
+        return { outcome: "failed", errorKind: resolved.errorKind, retryable: false };
       }
+      const links = await ctx.db
+        .query("sourceProjectLinks")
+        .withIndex("by_source", (q) => q.eq("sourceId", resolved.source._id))
+        .collect();
+      const marking = await markReassignedScope(ctx, {
+        companyId,
+        actorUserId: resolved.actorUserId,
+        sourceId: resolved.source._id,
+        currentProjectIds: links.map((link) => link.projectId),
+      });
+      if (marking._tag === "error") {
+        return {
+          outcome: "failed",
+          errorKind: `scope_marking_refused:${marking.error.code}`,
+          retryable: false,
+        };
+      }
+      // The typed marking outcome carries the marked roots directly (no
+      // envelope re-assertion); the roots feed the same cascade carrier
+      // the withdrawal reaction uses.
+      await cascadeRootFindings(ctx, {
+        companyId,
+        actorUserId: resolved.actorUserId,
+        roots: marking.markedFindingIds,
+      });
+      await registerReanalysisGroups(ctx, companyId, marking.targets, triggerKey);
       return { outcome: "succeeded" };
     }
 

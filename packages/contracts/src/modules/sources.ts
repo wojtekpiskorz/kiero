@@ -64,6 +64,32 @@ export const sourcesOperations = {
     result: Schema.Struct({ withdrawnAtMs: Schema.Number }),
     errorKinds: ["forbidden", "not_found", "conflict"],
   }),
+  /**
+   * E7 amendment (additive, flagged; issue #115): the per-source project
+   * reassignment write H3's dossier named as its missing prerequisite. The
+   * boss moves one "Wiadomość źródłowa" between projects or to/from
+   * company-general by declaring the COMPLETE new project set (an empty
+   * array means company-general). The source keeps its identity: read state,
+   * evidence and the immutable original stay; only `sourceProjectLinks`
+   * move, and dependent findings re-assess through the C5 recomputation
+   * seam. A set equal to the current links is a typed conflict (nothing to
+   * change), so client retries can never double-fire the reaction.
+   */
+  "sources.reassignSource": operationEntry({
+    kind: "operation",
+    name: "sources.reassignSource",
+    input: Schema.Struct({
+      sourceId: tableIdSchema("sources"),
+      /** The complete new project set; empty means company-general knowledge. */
+      projectIds: Schema.Array(tableIdSchema("projects")),
+    }),
+    result: Schema.Struct({
+      reassignedAtMs: Schema.Number,
+      /** The committed link set (deduplicated, input order preserved). */
+      projectIds: Schema.Array(tableIdSchema("projects")),
+    }),
+    errorKinds: ["forbidden", "not_found", "conflict", "validation"],
+  }),
   "sources.purgeSource": operationEntry({
     kind: "operation",
     name: "sources.purgeSource",
@@ -96,6 +122,23 @@ export const sourcesEvents = {
     payload: Schema.Struct({
       sourceId: tableIdSchema("sources"),
       reason: Schema.NonEmptyString,
+    }),
+  }),
+  /**
+   * E7 amendment (additive, flagged; issue #115): the canonical publication
+   * record of one project reassignment. The payload carries the COMMITTED
+   * link set so downstream consumers (audit, search refresh, J joins) see
+   * the placement after the move without re-deriving it. Drains into the
+   * C5 recomputation edge; the reassignment transaction registers that job
+   * itself under the same dedup identity, so the drain projection collapses
+   * onto the publisher's row (the D1/withdrawal discipline).
+   */
+  "sources.sourceReassigned": eventEntry({
+    kind: "event",
+    name: "sources.sourceReassigned",
+    payload: Schema.Struct({
+      sourceId: tableIdSchema("sources"),
+      projectIds: Schema.Array(tableIdSchema("projects")),
     }),
   }),
   "sources.sourcePurged": eventEntry({

@@ -116,13 +116,25 @@ export const revokedAccessCleanupInput = Schema.Struct({
  * the drain can project event payloads that do not carry them, while the
  * withdrawal transaction registers the job with the real values - the
  * marking revisions record the withdrawal's reason and actor.
+ *
+ * E7 amendment (issue #115, flagged on the same precedent): the
+ * `source_reassigned` cause carries the scope re-assessment reaction of a
+ * project reassignment, and its optional nullable actor
+ * `reassignedByUserId` rides alongside `withdrawnByUserId` (one actor
+ * field per cause; every other cause leaves it null).
  */
 export const recomputeDependentsInput = Schema.Struct({
   rootFindingId: Schema.NullOr(tableIdSchema("findings")),
   sourceId: Schema.NullOr(tableIdSchema("sources")),
-  cause: Schema.Literals(["source_withdrawn", "dependent_stale", "reanalysis"]),
+  cause: Schema.Literals([
+    "source_withdrawn",
+    "dependent_stale",
+    "reanalysis",
+    "source_reassigned",
+  ]),
   reason: Schema.NullOr(Schema.NonEmptyString),
   withdrawnByUserId: Schema.NullOr(tableIdSchema("users")),
+  reassignedByUserId: Schema.optionalKey(Schema.NullOr(tableIdSchema("users"))),
 });
 
 export const purgeSourceInput = Schema.Struct({
@@ -411,6 +423,12 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("access.sessionRevoked", "access.cleanup_revocation"),
   // Withdrawal/purge re-evaluates dependent findings; history retained.
   consumer("sources.sourceWithdrawn", "memory.recompute_dependents"),
+  // E7 amendment (issue #115, flagged): a project reassignment re-assesses
+  // the dependent scope of findings resting on the moved source (findings
+  // keep history; the link change narrows what is marked). The reassignment
+  // transaction registers this job itself under the event's dedup identity,
+  // so the drain projection collapses onto the publisher's row.
+  consumer("sources.sourceReassigned", "memory.recompute_dependents"),
   consumer("memory.dependentsMarkedStale", "memory.recompute_dependents"),
   // C5 registration (issue #28 owns the revalidation half of this edge):
   // every revised finding drains into one bounded dependent walk - a basis

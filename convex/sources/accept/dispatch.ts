@@ -42,6 +42,10 @@ import {
   withdrawSourceEntry,
   type WithdrawSourceInput,
 } from "../../memory/recompute/withdrawal";
+import {
+  performReassignment,
+  reassignSourceEntry,
+} from "../reassign/reassignment";
 
 /**
  * Handler table for sources mutation-transaction dispatches (exported for tests).
@@ -52,6 +56,12 @@ import {
  * lifecycle transition, the canonical event and the durable recompute
  * registration commit atomically there; this table only wires the checked
  * path to it.
+ *
+ * E7 registration (additive, flagged, same precedent): the project
+ * reassignment `sources.reassignSource` implements its declared entry from
+ * the reassignment lane's own module (../reassign/reassignment): the link
+ * set change, its canonical event and the durable scope re-assessment
+ * registration commit atomically there.
  */
 export function sourcesHandlers(): HandlerRegistry<MutationCtx> {
   return {
@@ -67,6 +77,13 @@ export function sourcesHandlers(): HandlerRegistry<MutationCtx> {
       run: (tx, context, input) => {
         const decoded = Schema.decodeUnknownSync(withdrawSourceEntry.input)(input);
         return performWithdrawSource(tx, context, decoded as WithdrawSourceInput);
+      },
+    },
+    "sources.reassignSource": {
+      intent: "write",
+      run: async (tx, context, input, meta) => {
+        const decoded = Schema.decodeUnknownSync(reassignSourceEntry.input)(input);
+        return performReassignment(tx, context, decoded, meta.idempotencyKey);
       },
     },
   };

@@ -66,6 +66,9 @@ export const memoryCopy = {
     publication: "publikacja z wiadomości",
     correction: "korekta",
     withdrawal_marking: "oznaczenie po wycofaniu źródła",
+    // E7 amendment (additive, flagged): a project reassignment's scope
+    // re-assessment marking, rendered honestly (never as a withdrawal).
+    reassignment_marking: "oznaczenie po przypisaniu źródła do innych projektów",
   } as const,
   revisionAuthorLabel: "zapisał",
   revisionReasonLabel: "powód",

@@ -111,7 +111,15 @@ export interface EvidenceSupportRef {
 }
 
 /** The knowledge-state origin of a revision, as withdrawal sees it. */
-export type RevisionOrigin = "publication" | "correction" | "withdrawal_marking";
+export type RevisionOrigin =
+  | "publication"
+  | "correction"
+  | "withdrawal_marking"
+  // E7 amendment (additive, flagged): the scope re-assessment marking of a
+  // project reassignment; withdrawal treats it by its witness rules below
+  // (not as an already-marked state, so a later withdrawal of the sole
+  // witness still marks unknown).
+  | "reassignment_marking";
 
 /**
  * The withdrawal-marking decision (the pure half of "Źródło wycofane"):

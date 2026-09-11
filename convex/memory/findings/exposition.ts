@@ -37,7 +37,13 @@ export interface RevisionWireRow {
   readonly revision: number;
   readonly value: unknown;
   readonly knowledgeState: unknown;
-  readonly origin: "publication" | "correction" | "withdrawal_marking";
+  // E7 amendment (additive, flagged): reassignment_marking joins the origin
+  // vocabulary (the contracts wire above is the decode authority).
+  readonly origin:
+    | "publication"
+    | "correction"
+    | "withdrawal_marking"
+    | "reassignment_marking";
   readonly reason: string | null;
   readonly recordedByUserId: string;
   readonly recordedAtMs: number;

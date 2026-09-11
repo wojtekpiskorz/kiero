@@ -58,6 +58,10 @@ const revisionOrigin = v.union(
   v.literal("publication"),
   v.literal("correction"),
   v.literal("withdrawal_marking"),
+  // E7 amendment (additive, flagged): the scope re-assessment marking of a
+  // project reassignment: value preserved verbatim, knowledge state
+  // updating-until-revalidated, never a withdrawal.
+  v.literal("reassignment_marking"),
 );
 
 /** Witness kinds a PLAN may claim (derivation/supersession are not witnesses). */
@@ -128,6 +132,13 @@ export const findingsTables = {
      * adopts only the roots of its own withdrawal.
      */
     withdrawnSourceId: v.optional(shared.sourceId),
+    /**
+     * E7 amendment (additive, flagged): the source whose project
+     * reassignment a `reassignment_marking` revision belongs to (the same
+     * by-SOURCE-ID attribution rule; a withdrawal marking never carries
+     * one).
+     */
+    reassignedSourceId: v.optional(shared.sourceId),
     recordedByUserId: shared.userId,
     recordedAtMs: shared.tsMs,
   }).index("by_finding_revision", ["findingId", "revision"]),
