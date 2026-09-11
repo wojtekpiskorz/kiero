@@ -261,7 +261,7 @@ export const heartbeatJob = internalMutation({
  * Embedding batch size of the external pass: the pass heartbeats the job
  * row (./heartbeatJob) after every batch, so a whole-corpus build that
  * legitimately outlasts the staleness window keeps proving liveness while
- * it makes progress. A batch's worst case (16 x the 30 s per-attempt
+ * it makes progress. A batch's worst case (14 x the 30 s per-attempt
  * embedding deadline, @kiero/providers routing) stays under half the
  * 15-minute window (14 x 30s = 420s < 450s; the exact inequality is
  * pinned in tests/j2/stale-generation.test.ts), so a live pass can

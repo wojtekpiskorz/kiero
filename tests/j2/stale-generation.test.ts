@@ -12,6 +12,8 @@ import { performStartIndexGeneration, STALE_BUILD_JOB_MS } from "../../convex/se
 import { EMBED_HEARTBEAT_BATCH } from "../../convex/search/executor";
 import { EMBEDDING_ATTEMPT_DEADLINE_MS } from "@kiero/providers";
 
+import { asTx, fakeCtx } from "../d2/harness";
+
 describe("the liveness arithmetic (heartbeat vs staleness window)", () => {
   it("keeps a heartbeating pass inside the window even at the worst per-attempt deadline", () => {
     // The liveness guarantee is this inequality: two full batches at the
@@ -20,7 +22,7 @@ describe("the liveness arithmetic (heartbeat vs staleness window)", () => {
     expect(EMBED_HEARTBEAT_BATCH * EMBEDDING_ATTEMPT_DEADLINE_MS * 2).toBeLessThan(STALE_BUILD_JOB_MS);
   });
 });
-import { asTx, fakeCtx } from "../d2/harness";
+
 
 let ctx: ReturnType<typeof fakeCtx>;
 

@@ -1,6 +1,6 @@
 # J2 core-flow live evidence (issue #61)
 
-The full-flow join's focused verification against the REAL leased dev deployment. Deterministic coverage lives in `tests/j2` (26 tests) plus the amended `tests/a4`, `tests/d4` and the full root suite; this directory records the LIVE evidence.
+The full-flow join's focused verification against the REAL leased dev deployment. Deterministic coverage lives in `tests/j2` (37 tests at 6ebcb06) plus the amended `tests/a4`, `tests/d4` and the full root suite; this directory records the LIVE evidence.
 
 ## Environment
 
@@ -15,7 +15,7 @@ The full-flow join's focused verification against the REAL leased dev deployment
 
 - Node proof: `node e2e/core-flow/live-proof.mjs` (per-run nonce identities; re-runnable without resetting data).
 - Browser legs: with `npm run dev` (web) running, `node e2e/core-flow/browser-leg.mjs` (needs `npm install --no-save playwright-core`).
-- Deterministic: `npx vitest run tests/j2`; full gate: `npm run typecheck && npm test` (observed 136 files / 1831 passed / 5 skipped).
+- Deterministic: `npx vitest run tests/j2`; full gate: `npm run typecheck && npm test` (observed 137 files / 1842 passed / 5 skipped at 6ebcb06).
 
 ## Verdicts (focused verification of issue #61)
 
