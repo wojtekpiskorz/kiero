@@ -224,6 +224,7 @@ import type * as sources_media_access_http from "../sources/media_access/http.js
 import type * as sources_media_access_probe from "../sources/media_access/probe.js";
 import type * as sources_media_access_protocol from "../sources/media_access/protocol.js";
 import type * as sources_probe_shared from "../sources/probe_shared.js";
+import type * as sources_read_exposition from "../sources/read/exposition.js";
 import type * as sources_read_probe from "../sources/read/probe.js";
 import type * as sources_read_rows from "../sources/read/rows.js";
 import type * as sources_read_views from "../sources/read/views.js";
@@ -465,6 +466,7 @@ declare const fullApi: ApiFromModules<{
   "sources/media_access/probe": typeof sources_media_access_probe;
   "sources/media_access/protocol": typeof sources_media_access_protocol;
   "sources/probe_shared": typeof sources_probe_shared;
+  "sources/read/exposition": typeof sources_read_exposition;
   "sources/read/probe": typeof sources_read_probe;
   "sources/read/rows": typeof sources_read_rows;
   "sources/read/views": typeof sources_read_views;
