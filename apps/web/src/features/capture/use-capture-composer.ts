@@ -114,7 +114,7 @@ export interface CaptureComposer {
 /** The composer's full wiring over the signed-in person's user id. */
 export function useCaptureComposer(userId: string): CaptureComposer {
   const { config } = useAppServices();
-  const gatewayUrl = config.gatewayUrl;
+  const gatewayUrl = config.gateway.state === "configured" ? config.gateway.gatewayUrl : null;
   const token = useAuthToken();
 
   const [draft, setDraft] = useState<DraftRecord | null>(null);

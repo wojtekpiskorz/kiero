@@ -21,6 +21,10 @@ import { notificationsFeatureEntry } from "./features/notifications/entry";
 import { gmProcessingFeatureEntry } from "./features/gm/processing-entry";
 // D4's sanctioned host mount: the capture composer at /wpis.
 import { captureFeatureEntry } from "./features/capture/entry";
+// H3's sanctioned host mounts: the evidence-search route and the full
+// source-history route (media anchors, corrections, withdrawal impact).
+import { searchFeatureEntry } from "./features/search/entry";
+import { sourceDetailFeatureEntry } from "./features/source-detail/entry";
 
 /** Every registered host feature, in navigation order. The first entry ("/") is the default route. */
 export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
@@ -28,6 +32,10 @@ export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
   // H1's sanctioned host mount: the boss-facing memory views (findings,
   // history/provenance, clarifications, direct correction).
   memoryFeatureEntry,
+  // H3's sanctioned host mount: evidence search over E5 retrieval.
+  searchFeatureEntry,
+  // H3's sanctioned host mount: the full source-history surface.
+  sourceDetailFeatureEntry,
   coTerazFeatureEntry,
   projectsFeatureEntry,
   // B3's sanctioned host mount: the first mounted feature (sign-in gate +

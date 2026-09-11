@@ -2,8 +2,9 @@
  * Typed client configuration seam (A4).
  *
  * The client has NO secrets by construction (AGENTS.md): only `VITE_*`
- * names ever reach the bundle, and the only one defined today is
- * `VITE_CONVEX_URL` (see the root `.env.example`). This module is the one
+ * names ever reach the bundle. The names defined today are
+ * `VITE_CONVEX_URL` and — for the media surfaces — the optional
+ * `VITE_GATEWAY_URL` (see the root `.env.example`). This module is the one
  * place that reads the environment, so every component downstream gets a
  * validated connection state instead of probing `import.meta.env`
  * on its own.
@@ -23,16 +24,27 @@ export type ConnectionConfig =
       readonly problem: string;
     };
 
+/**
+ * The media-gateway connection (H3 append, flagged on the same seam): how
+ * the client reaches the Cloudflare Worker that serves authorized media
+ * reads (D3's `/media/*` routes). Optional by design — a backend without
+ * a gateway keeps every non-media surface working, and media surfaces say
+ * so honestly instead of guessing a URL.
+ */
+export type GatewayConfig =
+  | { readonly state: "configured"; readonly gatewayUrl: string }
+  | { readonly state: "unconfigured" };
+
 /** The whole client-side application configuration. */
 export interface AppConfig {
   readonly connection: ConnectionConfig;
   /**
-   * D4 append (minimal, flagged): the media gateway Worker's base URL
-   * (VITE_GATEWAY_URL), or null when unset/invalid. The gateway is only
-   * the capture surface's dependency, so an invalid value degrades that
-   * one surface honestly instead of the whole connection state.
+   * The media gateway Worker's base URL (VITE_GATEWAY_URL) behind the
+   * discriminated union (D4's capture uploads and H3's authorized media
+   * reads share it): unconfigured degrades exactly those surfaces
+   * honestly, never the whole connection state.
    */
-  readonly gatewayUrl: string | null;
+  readonly gateway: GatewayConfig;
 }
 
 /**
@@ -42,7 +54,7 @@ export interface AppConfig {
 export interface AppEnvSource {
   readonly [key: string]: unknown;
   readonly VITE_CONVEX_URL?: unknown;
-  /** D4 append: public media-gateway base URL (no secret ever). */
+  /** Public media-gateway base URL (no secret ever; D4/H3 share it). */
   readonly VITE_GATEWAY_URL?: unknown;
 }
 
@@ -65,13 +77,18 @@ function parseBackendUrl(raw: string): string | null {
 
 /** Reads the environment once and produces the typed application config. */
 export function loadAppConfig(env: AppEnvSource): AppConfig {
-  const raw = typeof env.VITE_CONVEX_URL === "string" ? env.VITE_CONVEX_URL.trim() : "";
-  // D4 append: the gateway URL stays optional (null when unset/invalid);
-  // only the capture surface consumes it and renders its own honest note.
   const gatewayRaw = typeof env.VITE_GATEWAY_URL === "string" ? env.VITE_GATEWAY_URL.trim() : "";
   const gatewayUrl = gatewayRaw === "" ? null : parseBackendUrl(gatewayRaw);
+  const gateway: GatewayConfig =
+    gatewayUrl === null
+      ? { state: "unconfigured" }
+      : { state: "configured", gatewayUrl };
+  // The gateway URL stays optional (unconfigured when unset/invalid);
+  // only the capture and media surfaces consume it and render their own
+  // honest notes.
+  const raw = typeof env.VITE_CONVEX_URL === "string" ? env.VITE_CONVEX_URL.trim() : "";
   if (raw === "") {
-    return { connection: { state: "unconfigured" }, gatewayUrl };
+    return { connection: { state: "unconfigured" }, gateway };
   }
   const convexUrl = parseBackendUrl(raw);
   if (convexUrl === null) {
@@ -80,8 +97,8 @@ export function loadAppConfig(env: AppEnvSource): AppConfig {
         state: "misconfigured",
         problem: "nieprawidłowy adres backendu (VITE_CONVEX_URL)",
       },
-      gatewayUrl,
+      gateway,
     };
   }
-  return { connection: { state: "configured", convexUrl }, gatewayUrl };
+  return { connection: { state: "configured", convexUrl }, gateway };
 }

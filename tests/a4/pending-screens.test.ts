@@ -53,11 +53,22 @@ describe("pending feature screens render without fake data", () => {
     expect(html).not.toContain("<li>");
   });
 
+  it("renders the H3 search and source-detail screens with the same honest gate", () => {
+    // H3's mounts (indices 2 and 3) gate exactly like the conversation and
+    // memory surfaces; the entries after them shift down one place.
+    const search = renderScreen(2);
+    expect(search).toContain("Szukaj");
+    expect(search).toContain("Aplikacja nie jest połączona z backendem");
+    const sourceDetail = renderScreen(3);
+    expect(sourceDetail).toContain("Źródło");
+    expect(sourceDetail).toContain("Aplikacja nie jest połączona z backendem");
+  });
+
   it("renders Co teraz and projects context through the shared placeholder screen", () => {
-    const coTeraz = renderScreen(2);
+    const coTeraz = renderScreen(4);
     expect(coTeraz).toContain("Co teraz");
     expect(coTeraz).toContain("W przygotowaniu.");
-    const projects = renderScreen(3);
+    const projects = renderScreen(5);
     expect(projects).toContain("Projekty");
     expect(projects).toContain("W przygotowaniu.");
     expect(projects).toContain("projects.identifyProject");
