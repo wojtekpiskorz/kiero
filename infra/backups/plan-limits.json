@@ -1,0 +1,25 @@
+{
+  "description": "Provider hard limits and observed-cost measurement for complete backups (I5, P12). The backup run MEASURES its usage (database export bytes, pooled media bytes, S3 class A/B operation counts) and records it: per-manifest byte columns on recoveryManifests, per-run cost entries (provider 'backup', categories export/storage/egress) in the 400/500 PLN accounting, and the pooled-bytes-vs-allowance comparison in the backups state read. Amounts are 0 minor (observed) while inside free allowances; an overage is NEVER silently absorbed and NEVER silently reduces the 15-minute frequency - it is a loud typed failure plus an owner decision. R2 overage pricing is USD-denominated; PLN conversion for the budget accounting is an owner decision recorded here as PENDING, not an invented rate.",
+  "r2": {
+    "plan": "free",
+    "storageFreeBytes": 10000000000,
+    "classAFreePerMonth": 1000000,
+    "classBFreePerMonth": 10000000,
+    "overageUsdPerGbMonth": 0.015,
+    "plnConversion": "PENDING owner decision (no invented FX rate; overage costs surface as typed limit failures and measured usage first)"
+  },
+  "convex": {
+    "plan": "free (dev lease dev/i5 under kiero-dev-core)",
+    "exportCommand": "npx --yes convex@1.45.0 export --path <zip> --deployment <ref>",
+    "exportCharges": "PENDING observation on the actual plan: exports on Convex Free carry no published per-export price; each run records category 'export' with the observed amount (0 minor so far) and the measured zip bytes",
+    "snapshotSlotCleanup": "the zip export creates no persistent snapshot slots (a fresh zip per run); native snapshot-based exports, when later adopted, must measure slot creation/cleanup against the plan (P10 row in docs/evidence/backups/README.md)"
+  },
+  "containers": {
+    "plan": "Containers runtime verified deployable on the current account (D6 observed 2026-09-10, no Workers-Paid blocker); dev instance type until alpha provisioning"
+  },
+  "measurement": {
+    "perRun": "databaseBytes/mediaBytes/mediaObjectCount on the manifest row; class A/B op counts counted by the executor",
+    "perMonth": "cost entries by period (YYYY-MM) in the 400/500 PLN accounting (I2 seam)",
+    "stateRead": "pooledBytes vs storageFreeBytes and withinStorageFreeAllowance in /operations/backups/state"
+  }
+}

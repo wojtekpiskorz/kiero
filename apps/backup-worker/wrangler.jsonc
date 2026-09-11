@@ -1,63 +1,82 @@
-// apps/backup-worker/wrangler.jsonc: non-secret skeleton (issue I1 #53).
+// apps/backup-worker/wrangler.jsonc: the EU backup Container executor
+// (I1 skeleton; completed by I5, issue #57).
 //
-// Separate EU backup Container (every-15-minute scheduled backup job; complete
-// snapshot + referenced retained media into a private eu-jurisdiction backup
-// bucket with SEPARATE credentials from media/export). The TOP-LEVEL block
-// targets LOCAL DEV names only; staging/alpha are named environments
-// (`--env staging` / `--env alpha-production`).
+// The TOP-LEVEL block targets LOCAL DEV names only; staging/alpha are named
+// environments (`--env staging` / `--env alpha-production`) and can never be
+// hit by a bare `wrangler deploy`.
 //
-// EU placement notes:
-// - Container EU jurisdiction needs wrangler >= 4.130.0; the
-//   `constraints.jurisdiction = "eu"` field stays COMMENTED OUT until that
-//   pin lands (owner A3, root manifest; see the PENDING table in
-//   docs/evidence/environment/preflight-2026-09.md). I5 activates and
-//   verifies it.
-// - The backup bucket (kiero-<env>-backup) is created with
-//   `wrangler r2 bucket create kiero-<env>-backup --jurisdiction eu --location weur`
-//   and is accessed ONLY through its own per-bucket R2 API token
-//   (infra/bindings/backup-worker.md), never through the media credentials.
-// - No account_id committed; the account comes from `wrangler whoami`.
+// EU placement (I5): wrangler 4.130.0 is the pinned root devDependency
+// (A3), so the container EU jurisdiction constraints are SET in every scope
+// (discharging the I5 row of the PENDING table in
+// docs/evidence/environment/preflight-2026-09.md - that table stays the
+// single ownership source; D6 set the same fields for the media container).
 //
-// NOTE (wrangler schema): `containers` is NOT inherited into named
-// environments: every env block repeats it when containers deploy.
-// Re-verified after the A1 merge (db1d6a5) with wrangler 4.27.0:
-// `wrangler deploy --dry-run` parses this file and reports ONLY the
-// expected missing ./Dockerfile (the src/index.ts skeleton now exists).
+// Scheduled trigger: every 15 minutes (the accepted cadence; the Convex-side
+// schedule authority is convex/crons.ts backup-schedule-tick, whose safety
+// net pings this worker's /run when a slot has no row). Frequency is never
+// silently reduced to fit a plan (infra/backups/retention.json).
+//
+// The backup bucket (kiero-dev-backup) was created by the I5 proof with
+// `wrangler r2 bucket create kiero-dev-backup --jurisdiction eu --location
+// weur` and is addressed ONLY through its own per-bucket S3 API token
+// (R2_BACKUP_*), never through media credentials
+// (infra/bindings/backup-worker.md).
+// No account_id committed; the account comes from `wrangler whoami`.
+//
+// NOTE (wrangler schema): `containers` and `durable_objects` are NOT
+// inherited into named environments: every env block repeats them.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kiero-dev-backup-worker",
-  // Worker entry wrapping the container's Durable Object (skeleton from A1;
-  // container wiring from I5).
+  // Worker entry wrapping the container's Durable Object (class exported by
+  // src/index.ts; proxies /run to the EU container instance).
   "main": "src/index.ts",
-  // Raise together with the wrangler >= 4.130 pin: owner A3, root manifest;
+  // Raised together with the wrangler >= 4.130 pin (owner A3, root manifest);
   // see the PENDING table in docs/evidence/environment/preflight-2026-09.md.
   "compatibility_date": "2026-09-01",
   "observability": {
     "enabled": true
   },
-  // Scheduled backup trigger (accepted cadence: every 15 minutes).
-  // I5 owns activation; dev may run it sparsely while proving the pipeline.
+  // The every-15-minutes scheduled backup trigger (the accepted cadence).
   "triggers": {
     "crons": ["*/15 * * * *"]
   },
+  // The container's Durable Object must be declared as a binding of this
+  // same script (wrangler requirement for Containers; the D6 pattern).
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "BACKUP_WORKER",
+        "class_name": "BackupWorkerContainer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["BackupWorkerContainer"]
+    }
+  ],
   "containers": [
     {
       "name": "kiero-dev-backup-container",
-      // Dockerfile lands with I5; path relative to this config.
+      // I5: node:22-slim + the pinned Convex CLI, zero-build Node entry
+      // (see ./Dockerfile).
       "image": "./Dockerfile",
-      // Placeholder DO class; I5 aligns it with the workspace app skeleton.
       "class_name": "BackupWorkerContainer",
-      "instance_type": "dev"
-      // Once wrangler >= 4.130.0 is pinned, set:
-      // "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
-      // "scheduling_policy": "regional",
+      "instance_type": "dev",
+      "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
+      "scheduling_policy": "default"
     }
   ],
   "vars": {
     "ENVIRONMENT": "dev",
     "R2_BACKUP_BUCKET": "kiero-dev-backup",
     "R2_BACKUP_ENDPOINT": "",
-    "CONVEX_SITE_URL": ""
+    "R2_MEDIA_BUCKET": "kiero-dev-media",
+    "R2_MEDIA_ENDPOINT": "",
+    "CONVEX_SITE_URL": "",
+    "CONVEX_EXPORT_DEPLOYMENT": ""
   },
   "env": {
     "staging": {
@@ -65,19 +84,32 @@
       "triggers": {
         "crons": ["*/15 * * * *"]
       },
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "BACKUP_WORKER",
+            "class_name": "BackupWorkerContainer"
+          }
+        ]
+      },
       "containers": [
         {
           "name": "kiero-staging-backup-container",
           "image": "./Dockerfile",
           "class_name": "BackupWorkerContainer",
-          "instance_type": "dev"
+          "instance_type": "dev",
+          "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
+          "scheduling_policy": "default"
         }
       ],
       "vars": {
         "ENVIRONMENT": "staging",
         "R2_BACKUP_BUCKET": "kiero-staging-backup",
         "R2_BACKUP_ENDPOINT": "",
-        "CONVEX_SITE_URL": ""
+        "R2_MEDIA_BUCKET": "kiero-staging-media",
+        "R2_MEDIA_ENDPOINT": "",
+        "CONVEX_SITE_URL": "",
+        "CONVEX_EXPORT_DEPLOYMENT": ""
       }
     },
     "alpha-production": {
@@ -85,19 +117,32 @@
       "triggers": {
         "crons": ["*/15 * * * *"]
       },
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "BACKUP_WORKER",
+            "class_name": "BackupWorkerContainer"
+          }
+        ]
+      },
       "containers": [
         {
           "name": "kiero-alpha-backup-container",
           "image": "./Dockerfile",
           "class_name": "BackupWorkerContainer",
-          "instance_type": "basic"
+          "instance_type": "basic",
+          "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
+          "scheduling_policy": "default"
         }
       ],
       "vars": {
         "ENVIRONMENT": "alpha-production",
         "R2_BACKUP_BUCKET": "kiero-alpha-backup",
         "R2_BACKUP_ENDPOINT": "",
-        "CONVEX_SITE_URL": ""
+        "R2_MEDIA_BUCKET": "kiero-alpha-media",
+        "R2_MEDIA_ENDPOINT": "",
+        "CONVEX_SITE_URL": "",
+        "CONVEX_EXPORT_DEPLOYMENT": ""
       }
     }
   }

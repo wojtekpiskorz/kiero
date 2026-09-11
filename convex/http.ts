@@ -4,7 +4,8 @@
  * sources media-access route by D3, under its deployable module path
  * `sources/media_access` - Convex rejects hyphenated module path
  * components, so the issue's literal `sources/media-access/**` namespace
- * ships as `sources/media_access/**`; the lane's exclusivity is unchanged).
+ * ships as `sources/media_access/**`; the lane's exclusivity is unchanged;
+ * the EU backup Container protocol routes by I5).
  *
  * Convex serves the default export of the `http` module as the deployment's
  * HTTP router. Route handlers live in their owning lane files; this entry
@@ -64,6 +65,17 @@ import {
   proofPushServiceHandler,
   proofStateHandler as pushProofStateHandler,
 } from "./attention/push/proofService";
+// I5 append (issue #57, flagged shared-file change - the telemetry-boundary
+// precedent): the EU backup Container's verified protocol entry (lease,
+// complete/fail, retention sweep, state).
+import {
+  backupsCompleteHandler,
+  backupsFailHandler,
+  backupsRunHandler,
+  backupsStateHandler,
+  backupsSweepCompleteHandler,
+  backupsSweepHandler,
+} from "./operations/backups/http";
 
 const http = httpRouter();
 
@@ -150,5 +162,17 @@ http.route({
   handler: proofPushServiceHandler,
 });
 http.route({ path: "/attention/push/proof/state", method: "POST", handler: pushProofStateHandler });
+
+// I5 append: the EU backup Container protocol (service-token verified).
+http.route({ path: "/operations/backups/run", method: "POST", handler: backupsRunHandler });
+http.route({ path: "/operations/backups/complete", method: "POST", handler: backupsCompleteHandler });
+http.route({ path: "/operations/backups/fail", method: "POST", handler: backupsFailHandler });
+http.route({ path: "/operations/backups/sweep", method: "POST", handler: backupsSweepHandler });
+http.route({
+  path: "/operations/backups/sweep/complete",
+  method: "POST",
+  handler: backupsSweepCompleteHandler,
+});
+http.route({ path: "/operations/backups/state", method: "GET", handler: backupsStateHandler });
 
 export default http;

@@ -44,6 +44,11 @@ export const DIAGNOSTIC_EVENT_KINDS = [
   // Monitor group 2: recovery/health (incl. backend-silence detection)
   "ops.health.heartbeat",
   "ops.health.silence_detected",
+  // I5 append (issue #57, flagged shared-file change - the sibling pattern):
+  // complete-backup freshness. Emitted by the backups freshness check when
+  // the newest VERIFIED manifest's SNAPSHOT age exceeds one hour (or runs
+  // exist but none ever verified); deduped per staleness episode.
+  "ops.backup.stale",
   // Monitor group 3: costs/limits
   "ops.cost.entry",
   "ops.cost.threshold_warning",
@@ -121,6 +126,7 @@ export const KIND_METADATA_ALLOWLIST: Record<DiagnosticEventKind, readonly Metad
   "ops.outbox.delivery_failed": ["eventId", "eventName", "errorKind", "attempts"],
   "ops.health.heartbeat": ["serviceName", "status"],
   "ops.health.silence_detected": ["serviceName", "ageMs", "count"],
+  "ops.backup.stale": ["serviceName", "ageMs", "state", "count"],
   "ops.cost.entry": ["provider", "category", "costMinor", "period", "basis"],
   "ops.cost.threshold_warning": ["period", "totalMinor", "thresholdMinor", "level"],
   "ops.cost.threshold_alert": ["period", "totalMinor", "thresholdMinor", "level"],
