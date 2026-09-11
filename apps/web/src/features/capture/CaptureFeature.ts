@@ -9,7 +9,7 @@
  * (one hook this form consumes), the five presentational views in views.ts.
  *
  * J2 join (issue #61): the composer MOUNTS INSIDE the conversation surface
- * ("Rozmowa firmy"), replacing both earlier send forms (J1's text-only
+ * ("Rozmowa firmy"), replacing both earlier send forms: J1's text-only
  * statement form and D4's separate /wpis route. The /wpis route and its
  * nav entry retire with this join; this module exports the embedded
  * ComposerForm (plus its wiring seam props: a correction prefill and an

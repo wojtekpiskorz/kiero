@@ -17,8 +17,8 @@
  * J2 identity repair (the gap H2 recorded on its public reads): the user
  * path no longer resolves through the platform-generic
  * `identityFromConvexAuth`, because a real Convex Auth token's subject is
- * `<userId>|<authSessions id>` (not a sessions-registry id), so
- * which made every ordinary user token fail `unauthenticated` here. The user path
+ * `<userId>|<authSessions id>` (not a sessions-registry id), which made
+ * every ordinary user token fail `unauthenticated` here. The user path
  * now maps the auth-session subject through B1's live-session chain
  * (`resolveAccessContextFromConvexAuth` on reads,
  * `resolveAccessContextWithProvisioning` on dispatch: the same fold-in
