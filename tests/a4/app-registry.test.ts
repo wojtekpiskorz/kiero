@@ -149,6 +149,8 @@ describe("the shipped host features", () => {
       "calendar.connection",
       "attention.push",
       "capture.composer",
+      // I3 (issue #55) mounts the firm-export status/download screen.
+      "operations.exports",
     ]);
     for (const mountedEntry of mounted) {
       expect(mountedEntry.screen).toBeTypeOf("function");

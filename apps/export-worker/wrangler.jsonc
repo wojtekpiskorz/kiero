@@ -1,49 +1,66 @@
-// apps/export-worker/wrangler.jsonc: non-secret skeleton (issue I1 #53).
+// apps/export-worker/wrangler.jsonc: the EU export Container executor
+// (I1 skeleton; initialized by I3 for the bounded firm-export archives).
 //
-// EU export Container (background firm-export archives: HTML index, versioned
-// JSON, history, retained media). The TOP-LEVEL block targets LOCAL DEV names
-// only; staging/alpha are named environments (`--env staging` /
-// `--env alpha-production`).
+// The TOP-LEVEL block targets LOCAL DEV names only; staging/alpha are named
+// environments (`--env staging` / `--env alpha-production`) and can never be
+// hit by a bare `wrangler deploy`.
 //
-// EU placement notes:
-// - Same container-jurisdiction caveat as media-worker: the
-//   `constraints.jurisdiction = "eu"` field needs wrangler >= 4.130.0 and
-//   stays COMMENTED OUT until that pin lands (owner A3, root manifest; see
-//   the PENDING table in docs/evidence/environment/preflight-2026-09.md).
-//   D5 activates and verifies it.
-// - Exports read the eu-jurisdiction media R2 bucket via S3 credentials
-//   (infra/bindings/media-export-workers.md) and hold NO backup-bucket
-//   credentials.
-// - No account_id committed; the account comes from `wrangler whoami`.
+// EU placement (the D6 media-worker finding, applied here): wrangler 4.130.0
+// is the pinned root devDependency, so the container EU jurisdiction
+// constraints are SET in every scope (docs/evidence/environment/
+// preflight-2026-09.md stays the single ownership source).
+//
+// Environment contract (I1, infra/bindings/media-export-workers.md): this
+// worker binds NO R2 bucket and holds NO backup credentials. The EU media
+// bucket is addressed via the media S3 token
+// (R2_MEDIA_ENDPOINT / R2_MEDIA_BUCKET / R2_MEDIA_ACCESS_KEY_ID /
+// R2_MEDIA_SECRET_ACCESS_KEY); the S3 keys are Worker SECRETS injected with
+// `wrangler secret put` and forwarded into the container env by NAME.
+//
+// The pending owner actions for live operation (both recorded by I3,
+// 2026-09-11): the R2 media S3 credentials (as in D6) and a free Convex dev
+// deployment slot for the dev/i3 lease (the team quota was full when I3
+// ran: `DeploymentQuotaReached`, 40/40).
+//
+// No account_id committed; the account comes from `wrangler whoami`.
 //
 // NOTE (wrangler schema): `containers` is NOT inherited into named
-// environments: every env block repeats it when containers deploy.
-// Re-verified after the A1 merge (db1d6a5) with wrangler 4.27.0:
-// `wrangler deploy --dry-run` parses this file and reports ONLY the
-// expected missing ./Dockerfile (the src/index.ts skeleton now exists).
+// environments: every env block repeats it.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kiero-dev-export-worker",
-  // Worker entry wrapping the container's Durable Object (skeleton from A1;
-  // container wiring from D5).
+  // Worker entry wrapping the container's Durable Object (class exported by
+  // src/index.ts; serves the same protocol with or without the container).
   "main": "src/index.ts",
-  // Raise together with the wrangler >= 4.130 pin: owner A3, root manifest;
-  // see the PENDING table in docs/evidence/environment/preflight-2026-09.md.
   "compatibility_date": "2026-09-01",
   "observability": {
     "enabled": true
   },
+  // The container's Durable Object must be declared as a binding of this
+  // same script (wrangler requirement for Containers; the D6 finding).
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "EXPORT_WORKER",
+        "class_name": "ExportWorkerContainer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ExportWorkerContainer"]
+    }
+  ],
   "containers": [
     {
       "name": "kiero-dev-export-container",
-      // Dockerfile lands with D5; path relative to this config.
+      // I3: node:22-slim, zero-build Node entry (see ./Dockerfile).
       "image": "./Dockerfile",
-      // Placeholder DO class; D5 aligns it with the workspace app skeleton.
       "class_name": "ExportWorkerContainer",
-      "instance_type": "dev"
-      // Once wrangler >= 4.130.0 is pinned, set:
-      // "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
-      // "scheduling_policy": "regional",
+      "instance_type": "dev",
+      "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
+      "scheduling_policy": "default"
     }
   ],
   "vars": {
@@ -55,12 +72,22 @@
   "env": {
     "staging": {
       "name": "kiero-staging-export-worker",
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "EXPORT_WORKER",
+            "class_name": "ExportWorkerContainer"
+          }
+        ]
+      },
       "containers": [
         {
           "name": "kiero-staging-export-container",
           "image": "./Dockerfile",
           "class_name": "ExportWorkerContainer",
-          "instance_type": "dev"
+          "instance_type": "dev",
+          "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
+          "scheduling_policy": "default"
         }
       ],
       "vars": {
@@ -72,12 +99,22 @@
     },
     "alpha-production": {
       "name": "kiero-alpha-export-worker",
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "EXPORT_WORKER",
+            "class_name": "ExportWorkerContainer"
+          }
+        ]
+      },
       "containers": [
         {
           "name": "kiero-alpha-export-container",
           "image": "./Dockerfile",
           "class_name": "ExportWorkerContainer",
-          "instance_type": "basic"
+          "instance_type": "basic",
+          "constraints": { "jurisdiction": "eu", "regions": ["EEUR", "WEUR"] },
+          "scheduling_policy": "default"
         }
       ],
       "vars": {

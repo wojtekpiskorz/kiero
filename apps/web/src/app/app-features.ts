@@ -21,6 +21,8 @@ import { notificationsFeatureEntry } from "./features/notifications/entry";
 import { gmProcessingFeatureEntry } from "./features/gm/processing-entry";
 // D4's sanctioned host mount: the capture composer at /wpis.
 import { captureFeatureEntry } from "./features/capture/entry";
+// I3's sanctioned host mount: the firm-export status/download screen.
+import { exportsFeatureEntry } from "./features/exports/entry";
 
 /** Every registered host feature, in navigation order. The first entry ("/") is the default route. */
 export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
@@ -47,4 +49,7 @@ export const appFeatures: readonly AppFeatureEntry[] = composeAppFeatures([
   notificationsFeatureEntry,
   // D4's sanctioned host mount: the capture composer ("Nowy wpis").
   captureFeatureEntry,
+  // I3's sanctioned host mount: the firm-export status/download screen
+  // (admin-gated server-side; downloads carry the user's own credential).
+  exportsFeatureEntry,
 ]);

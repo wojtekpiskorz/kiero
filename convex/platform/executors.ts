@@ -91,6 +91,12 @@ import { pushDeliveryExecutor } from "../attention/push/executor";
 // path; this registry entry is its composition point.
 import { reconcileOutcomeExecutor } from "../calendar/sync/executor";
 
+// I3 append (flagged shared-file change, the G3 precedent): the firm-export
+// archive build executor implementation lives in I3's owned path
+// (convex/operations/exports/executor.ts); this registry entry is its
+// composition point.
+import { buildArchiveExecutor } from "../operations/exports/executor";
+
 // E5 append (flagged shared-file change, the G3 precedent): the
 // search.index_generation executor implementation lives in E5's owned path
 // (convex/search/executor.ts); this registry entry is its composition point.
@@ -145,4 +151,7 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [searchIndexExecutor.jobKind]: searchIndexExecutor,
   [pushDeliveryExecutor.jobKind]: pushDeliveryExecutor,
   [taskRemindersExecutor.jobKind]: taskRemindersExecutor,
+
+  // I3 append (flagged shared-file change): the firm-export archive build.
+  [buildArchiveExecutor.jobKind]: buildArchiveExecutor,
 };
