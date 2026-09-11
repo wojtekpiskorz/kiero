@@ -18,6 +18,7 @@ import {
 import { createWebUpdateEntry } from "../../apps/web/src/pwa/update/module";
 import {
   DRAFTS_DB_NAME,
+  DRAFTS_DB_VERSION,
   DRAFTS_STORE_NAME,
 } from "../../apps/web/src/pwa/update/draft-migration";
 import { composePwaEntries } from "../../apps/web/src/app/pwa/composition";
@@ -63,6 +64,7 @@ describe("drift guards against sibling-owned constants", () => {
     expect(storeSource).toMatch(/const STORE = "entries"/);
     expect(DRAFTS_DB_NAME).toBe("kiero-drafts");
     expect(DRAFTS_STORE_NAME).toBe("entries");
+    expect(DRAFTS_DB_VERSION).toBe(1);
     // The draft metadata key suffix D4 builds user keys with.
     expect(storeSource).toMatch(/`\$\{userId\}#draft`/);
   });

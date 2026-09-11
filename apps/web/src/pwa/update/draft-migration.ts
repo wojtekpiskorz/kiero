@@ -54,7 +54,10 @@ export interface MigrationIdbTransaction {
 }
 
 export interface MigrationIdbDatabase {
-  transaction(stores: string[], mode: "readonly" | "readwrite"): MigrationIdbTransaction;
+  transaction(
+    stores: string[],
+    mode: "readonly" | "readwrite",
+  ): MigrationIdbTransaction;
   /** The probe surface (round 2): presence, version and teardown. */
   readonly objectStoreNames?: { contains(name: string): boolean };
   readonly version?: number;
@@ -63,6 +66,9 @@ export interface MigrationIdbDatabase {
 
 export interface MigrationIdbFactory {
   open(name: string, version?: number): MigrationIdbRequest;
+  /** The side-effect-free existence check (round 3): absent on old engines. */
+  databases?(): Promise<{ name?: string }[]>;
+  deleteDatabase?(name: string): { queue?(): void };
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +79,9 @@ export interface MigrationIdbFactory {
 export interface DraftMigrationStep {
   readonly fromVersion: number;
   readonly toVersion: number;
-  readonly migrate: (record: Record<string, unknown>) => Record<string, unknown> | null;
+  readonly migrate: (
+    record: Record<string, unknown>,
+  ) => Record<string, unknown> | null;
 }
 
 /** The field this module stamps; readers: the step registry itself. */
@@ -142,7 +150,9 @@ export interface DraftMigrationReport {
 /** Runs the pending steps over one record (idempotent, pure). */
 export function migrateDraftRecordValue(
   raw: unknown,
-): { ok: true; record: unknown; changed: boolean } | { ok: false; problem: string } {
+):
+  | { ok: true; record: unknown; changed: boolean }
+  | { ok: false; problem: string } {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return { ok: false, problem: "record is not an object" };
   }
@@ -152,19 +162,30 @@ export function migrateDraftRecordValue(
     return { ok: true, record, changed: false };
   }
   if (version !== undefined && typeof version !== "number") {
-    return { ok: false, problem: `${DRAFT_RECORD_VERSION_FIELD} is not a number` };
+    return {
+      ok: false,
+      problem: `${DRAFT_RECORD_VERSION_FIELD} is not a number`,
+    };
   }
   let current = record;
   let fromVersion = typeof version === "number" ? version : 0;
   let changed = false;
   while (fromVersion < CURRENT_DRAFT_RECORD_VERSION) {
-    const step = draftMigrationSteps.find((candidate) => candidate.fromVersion === fromVersion);
+    const step = draftMigrationSteps.find(
+      (candidate) => candidate.fromVersion === fromVersion,
+    );
     if (step === undefined) {
-      return { ok: false, problem: `no migration step from version ${fromVersion}` };
+      return {
+        ok: false,
+        problem: `no migration step from version ${fromVersion}`,
+      };
     }
     const migrated = step.migrate(current);
     if (migrated === null) {
-      return { ok: false, problem: `step ${step.fromVersion}->${step.toVersion} rejected the record` };
+      return {
+        ok: false,
+        problem: `step ${step.fromVersion}->${step.toVersion} rejected the record`,
+      };
     }
     current = migrated;
     fromVersion = step.toVersion;
@@ -199,88 +220,105 @@ export async function migrateBrowserDraftStore(
     };
   }
   return new Promise<DraftMigrationReport>((resolve) => {
-    // Probe first (round 2): opening a nonexistent database at version 1
-    // would CREATE it empty (without the store), making the transaction
-    // below throw inside onsuccess with the promise forever unsettled -
-    // and poisoning the profile for D4's own open (its onupgradeneeded
-    // never fires on the now-existing version-1 database). A database
-    // that does not exist simply has no drafts to migrate.
-    const probeRequest = idb.open(DRAFTS_DB_NAME);
-    probeRequest.onerror = () => {
-      resolve({
-        status: "store-unavailable",
-        draftRecords: 0,
-        migrated: 0,
-        alreadyCurrent: 0,
-        leftIntact: 0,
-        problems: ["indexeddb open failed"],
-      });
-    };
-    probeRequest.onsuccess = () => {
-      const probed = probeRequest.result as MigrationIdbDatabase & { version?: number };
-      const storeMissing =
-        probed.objectStoreNames === undefined ||
-        !probed.objectStoreNames.contains(DRAFTS_STORE_NAME);
-      probed.close?.();
-      if (storeMissing || (probed.version ?? 0) < DRAFTS_DB_VERSION) {
-        resolve({
-          status: "store-unavailable",
-          draftRecords: 0,
-          migrated: 0,
-          alreadyCurrent: 0,
-          leftIntact: 0,
-          problems: ["drafts database not present"],
-        });
-        return;
-      }
+    // Probe first, with NO side effect (round 3): even a versionless
+    // open CREATES a nonexistent database, which would poison the profile
+    // for D4's own open (its onupgradeneeded never fires on the
+    // now-existing version-1 database). indexedDB.databases() answers
+    // existence without opening; where it is unavailable, the fallback
+    // probe opens and DELETES what it just created. A database that does
+    // not exist simply has no drafts to migrate.
+    const absent = (): DraftMigrationReport => ({
+      status: "store-unavailable",
+      draftRecords: 0,
+      migrated: 0,
+      alreadyCurrent: 0,
+      leftIntact: 0,
+      problems: ["drafts database not present"],
+    });
+    const openFailed = (): DraftMigrationReport => ({
+      status: "store-unavailable",
+      draftRecords: 0,
+      migrated: 0,
+      alreadyCurrent: 0,
+      leftIntact: 0,
+      problems: ["indexeddb open failed"],
+    });
+    const proceed = () => {
       const openRequest = idb.open(DRAFTS_DB_NAME, DRAFTS_DB_VERSION);
       openRequest.onerror = () => {
-        resolve({
-          status: "store-unavailable",
-          draftRecords: 0,
-          migrated: 0,
-          alreadyCurrent: 0,
-          leftIntact: 0,
-          problems: ["indexeddb open failed"],
-        });
+        resolve(openFailed());
         return;
       };
       openRequest.onsuccess = () => {
         const database = openRequest.result as MigrationIdbDatabase;
         try {
           const readTx = database.transaction([DRAFTS_STORE_NAME], "readonly");
-      const keysRequest = readTx.objectStore(DRAFTS_STORE_NAME).getAllKeys();
-      readTx.onerror = () => {
+          const keysRequest = readTx
+            .objectStore(DRAFTS_STORE_NAME)
+            .getAllKeys();
+          readTx.onerror = () => {
+            resolve({
+              status: "store-unavailable",
+              draftRecords: 0,
+              migrated: 0,
+              alreadyCurrent: 0,
+              leftIntact: 0,
+              problems: ["read transaction failed"],
+            });
+          };
+          keysRequest.onsuccess = () => {
+            const keys = Array.isArray(keysRequest.result)
+              ? keysRequest.result
+              : [];
+            const draftKeys = keys.filter(
+              (key): key is string =>
+                typeof key === "string" && key.endsWith(DRAFT_KEY_SUFFIX),
+            );
+            void migrateKeys(database, draftKeys).then(resolve);
+          };
+        } catch {
+          // A structural surprise resolves honestly instead of hanging the
+          // cached prepare promise.
           resolve({
             status: "store-unavailable",
             draftRecords: 0,
             migrated: 0,
             alreadyCurrent: 0,
             leftIntact: 0,
-            problems: ["read transaction failed"],
+            problems: ["drafts store unreadable"],
           });
-        };
-        keysRequest.onsuccess = () => {
-          const keys = Array.isArray(keysRequest.result) ? keysRequest.result : [];
-          const draftKeys = keys.filter(
-            (key): key is string => typeof key === "string" && key.endsWith(DRAFT_KEY_SUFFIX),
-          );
-          void migrateKeys(database, draftKeys).then(resolve);
-        };
-      } catch {
-        // A structural surprise (e.g. the store vanished between the probe
-        // and the open) resolves honestly instead of hanging the cached
-        // prepare promise (round 2).
-        resolve({
-          status: "store-unavailable",
-          draftRecords: 0,
-          migrated: 0,
-          alreadyCurrent: 0,
-          leftIntact: 0,
-          problems: ["drafts store unreadable"],
-        });
-      }
+        }
       };
+    };
+    if (typeof idb.databases === "function") {
+      idb
+        .databases()
+        .then((names) => {
+          if (!names.some((entry) => entry.name === DRAFTS_DB_NAME)) {
+            resolve(absent());
+            return;
+          }
+          proceed();
+        })
+        .catch(() => resolve(openFailed()));
+      return;
+    }
+    // Legacy engines without databases(): probe-open, then delete what the
+    // probe created so the profile is left exactly as it was found.
+    const probeRequest = idb.open(DRAFTS_DB_NAME);
+    probeRequest.onerror = () => resolve(openFailed());
+    probeRequest.onsuccess = () => {
+      const probed = probeRequest.result as MigrationIdbDatabase;
+      const existed =
+        probed.objectStoreNames !== undefined &&
+        probed.objectStoreNames.contains(DRAFTS_STORE_NAME);
+      probed.close?.();
+      if (!existed) {
+        idb.deleteDatabase?.(DRAFTS_DB_NAME);
+        resolve(absent());
+        return;
+      }
+      proceed();
     };
   });
 }
@@ -322,7 +360,10 @@ async function migrateKeys(
   };
 }
 
-function readRecord(database: MigrationIdbDatabase, key: string): Promise<unknown> {
+function readRecord(
+  database: MigrationIdbDatabase,
+  key: string,
+): Promise<unknown> {
   return new Promise((resolve) => {
     const tx = database.transaction([DRAFTS_STORE_NAME], "readonly");
     const request = tx.objectStore(DRAFTS_STORE_NAME).get(key);
@@ -331,7 +372,11 @@ function readRecord(database: MigrationIdbDatabase, key: string): Promise<unknow
   });
 }
 
-function writeRecord(database: MigrationIdbDatabase, key: string, value: unknown): Promise<void> {
+function writeRecord(
+  database: MigrationIdbDatabase,
+  key: string,
+  value: unknown,
+): Promise<void> {
   return new Promise((resolve) => {
     const tx = database.transaction([DRAFTS_STORE_NAME], "readwrite");
     tx.objectStore(DRAFTS_STORE_NAME).put(value, key);
