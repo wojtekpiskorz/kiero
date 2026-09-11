@@ -14,16 +14,19 @@
  *   feature uses (`dispatchExports`) as the caller, so the admin/member
  *   refusal matrix lives on the real deployment.
  * - `probeInvalidateForPurgedSource`: the eager invalidation seam I4 will
- *   call, as a guarded internal action for the immediacy evidence.
+ *   call, as a guarded internal action for the immediacy evidence; the
+ *   wrapper first checks the source against the caller's own company
+ *   (`probeSourceOfCallerInternal`, the sibling membership pattern).
  * - `probeSweepExpiry`: forces the expiry sweep's decision for one export.
  */
 
 import { v } from "convex/values";
-import { action, internalMutation } from "../../_generated/server";
+import { action, internalMutation, internalQuery } from "../../_generated/server";
 import { api, internal } from "../../_generated/api";
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
-import { validationError } from "@kiero/runtime";
+import { unauthenticatedError, unsupportedError, validationError } from "@kiero/runtime";
 import { probeDisabled, probeGuardEnabled } from "../../sources/probe_shared";
+import { resolveAccessContextFromConvexAuth } from "../../access/identity/resolution";
 import { expireExportCore, invalidateExportsForSourceCore } from "./lifecycle";
 
 
@@ -96,6 +99,35 @@ export const probeSweepExpiryAction = action({
   },
 });
 
+/**
+ * Resolves whether one source belongs to the CALLER'S company (the
+ * probeStateInternal pattern): the caller is resolved from that caller's own
+ * verified credential and the source row's company must equal it, so the
+ * guarded invalidation wrapper cannot reach another company's exports
+ * through the links.
+ */
+export const probeSourceOfCallerInternal = internalQuery({
+  args: { sourceId: v.id("sources") },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    if (!probeGuardEnabled()) {
+      return errorResult(unsupportedError("operations.exports.probe", "probe_guard_disabled"));
+    }
+    const context = await resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
+    if (context === null) {
+      return errorResult(unauthenticatedError());
+    }
+    const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
+    if (companyId === null) {
+      return errorResult(validationError("company_scope_unresolved"));
+    }
+    const source = await ctx.db.get(args.sourceId);
+    if (source === null || source.companyId !== companyId) {
+      return errorResult(validationError("source_not_found"));
+    }
+    return okResult({ sourceId: args.sourceId });
+  },
+});
+
 /** A thin action wrapper so proofs can drive the eager invalidation seam. */
 export const probeInvalidateForSourceAction = action({
   args: { sourceId: v.id("sources") },
@@ -103,10 +135,15 @@ export const probeInvalidateForSourceAction = action({
     if (!probeGuardEnabled()) {
       return probeDisabled();
     }
-    // The eager seam is company-scoped by construction (links come from
-    // this company's exports); the guarded guard still applies.
-    if (!probeGuardEnabled()) {
-      return probeDisabled();
+    // Company scoping before the seam runs (the sibling wrappers' membership
+    // pattern): the guarded query resolves the caller's own company and the
+    // source's company must equal it.
+    const check = await ctx.runQuery(
+      internal.operations["exports"].probe.probeSourceOfCallerInternal,
+      { sourceId: args.sourceId },
+    );
+    if (check._tag !== "ok") {
+      return check;
     }
     return okResult(
       await ctx.runMutation(internal.operations["exports"].probe.probeInvalidateForPurgedSource, {

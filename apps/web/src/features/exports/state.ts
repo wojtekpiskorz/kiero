@@ -27,5 +27,4 @@ export const exportsCopy = {
   checking: "Sprawdzam stan eksportów...",
   sessionEnded: "Sesja wygasła. Zaloguj się ponownie.",
   unexpected: "Nie udało się wykonać operacji.",
-  refreshButton: "Odśwież",
 } as const;

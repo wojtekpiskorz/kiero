@@ -60,7 +60,11 @@ const DEPLOYMENT = process.env.KIERO_I3_CONVEX;
 if (DEPLOYMENT === undefined) {
   throw new Error("KIERO_I3_CONVEX (dev/i3 instance name) is required");
 }
-const CLIENT_URL = `https://${DEPLOYMENT}.eu-west-1.convex.cloud`;
+// The env var carries the deployment NAME only; the client URL is the
+// regionless canonical origin (<name>.convex.cloud). The fresh lease
+// answers ONLY there: a regional template like
+// <name>.eu-west-1.convex.cloud 404s (live-proof run finding).
+const CLIENT_URL = `https://${DEPLOYMENT}.convex.cloud`;
 const GATEWAY = process.env.KIERO_I3_GATEWAY;
 if (GATEWAY === undefined) {
   throw new Error("KIERO_I3_GATEWAY (deployed gateway Worker URL) is required");

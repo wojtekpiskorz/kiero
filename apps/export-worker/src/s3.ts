@@ -6,6 +6,16 @@
  * DeleteObject. Hand-rolled on WebCrypto so neither the Worker nor the
  * container image needs an added dependency.
  *
+ * SIGNING TWIN: apps/media-worker/src/s3r2.ts (the D6 reader) carries its
+ * own copy of the same SigV4 derivation chain (hex/hmac/sha256Hex, amzDate,
+ * scope, key chain, authorization header). The container boundary keeps it
+ * there: each image contains only its own src/ (no node_modules, build
+ * context = the app directory), so a shared workspace module is not
+ * importable at container runtime. A signing fix here MUST land there too.
+ * The one known divergence is requirement-driven: this client signs real
+ * body hashes and a sorted canonical query (writes need both); the reader
+ * signs the empty hash with no query (ranged reads only).
+ *
  * Credential rules (the D6 ruling, unchanged): ONLY the media bucket token
  * reaches this process (R2_MEDIA_ENDPOINT / R2_MEDIA_BUCKET /
  * R2_MEDIA_ACCESS_KEY_ID / R2_MEDIA_SECRET_ACCESS_KEY); backup credentials
