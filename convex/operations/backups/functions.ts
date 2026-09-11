@@ -9,7 +9,7 @@
  *    content-free deletion ledger (I4 seam) atomically, and stores the
  *    inventory on the building row as the closure authority.
  * 2. The executor exports the database snapshot with the pinned documented
- *    mechanism (`npx convex@1.45.0 export`), copies every inventory object
+ *    mechanism (the pre-installed `convex export` binary), copies every inventory object
  *    into the private EU backup bucket's shared media pool (idempotent,
  *    content-verified), writes the deletion ledger as its own hashed file,
  *    and publishes the immutable manifest object LAST.

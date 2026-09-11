@@ -17,6 +17,7 @@ import { runBackup, type RunOptions, type RunSummary } from "./pipeline.ts";
 import type { BackupDeps } from "./ports.ts";
 // The ONE bearer rule (no third mirror here): serviceToken.ts is
 // deliberately free of Convex imports so any runtime can use it.
+import { PipelineInterrupt } from "./ports.ts";
 import { verifyServiceBearerToken } from "../../../convex/operations/telemetry/serviceToken.ts";
 
 export interface BackupServiceEnv {
@@ -26,9 +27,11 @@ export interface BackupServiceEnv {
   readonly R2_BACKUP_ENDPOINT?: string;
   readonly R2_BACKUP_BUCKET?: string;
   readonly R2_BACKUP_ACCESS_KEY_ID?: string;
+  readonly R2_BACKUP_SECRET_ACCESS_KEY?: string;
   readonly R2_MEDIA_ENDPOINT?: string;
   readonly R2_MEDIA_BUCKET?: string;
   readonly R2_MEDIA_READ_ACCESS_KEY_ID?: string;
+  readonly R2_MEDIA_READ_SECRET_ACCESS_KEY?: string;
   readonly CONVEX_EXPORT_DEPLOYMENT?: string;
   readonly CONVEX_BACKUP_ADMIN_KEY?: string;
 }
@@ -48,8 +51,8 @@ export function healthSummary(env: BackupServiceEnv): Record<string, unknown> {
     channels: {
       convexProtocol: env.CONVEX_SITE_URL !== undefined && env.CONVEX_SITE_URL !== "" && env.KIERO_SERVICE_TOKEN !== undefined && env.KIERO_SERVICE_TOKEN !== "",
       databaseExport: env.CONVEX_EXPORT_DEPLOYMENT !== undefined && env.CONVEX_EXPORT_DEPLOYMENT !== "" && env.CONVEX_BACKUP_ADMIN_KEY !== undefined && env.CONVEX_BACKUP_ADMIN_KEY !== "",
-      backupStore: env.R2_BACKUP_ENDPOINT !== undefined && env.R2_BACKUP_ENDPOINT !== "" && env.R2_BACKUP_BUCKET !== undefined && env.R2_BACKUP_BUCKET !== "" && env.R2_BACKUP_ACCESS_KEY_ID !== undefined && env.R2_BACKUP_ACCESS_KEY_ID !== "",
-      mediaReader: env.R2_MEDIA_ENDPOINT !== undefined && env.R2_MEDIA_ENDPOINT !== "" && env.R2_MEDIA_BUCKET !== undefined && env.R2_MEDIA_BUCKET !== "" && env.R2_MEDIA_READ_ACCESS_KEY_ID !== undefined && env.R2_MEDIA_READ_ACCESS_KEY_ID !== "",
+      backupStore: [env.R2_BACKUP_ENDPOINT, env.R2_BACKUP_BUCKET, env.R2_BACKUP_ACCESS_KEY_ID, env.R2_BACKUP_SECRET_ACCESS_KEY].every((value) => value !== undefined && value !== ""),
+      mediaReader: [env.R2_MEDIA_ENDPOINT, env.R2_MEDIA_BUCKET, env.R2_MEDIA_READ_ACCESS_KEY_ID, env.R2_MEDIA_READ_SECRET_ACCESS_KEY].every((value) => value !== undefined && value !== ""),
     },
     note: "channels false = typed not_configured refusals; owner actions in infra/backups/README.md",
   };
@@ -80,9 +83,9 @@ export async function handleBackupProtocol(
       const summary: RunSummary = await runBackup(deps, options);
       return jsonResponse(200, summary);
     } catch (error) {
-      if (error instanceof Error && error.message.startsWith("pipeline interrupted at ")) {
+      if (error instanceof PipelineInterrupt) {
         // Proof interrupts are deliberate: report them as such.
-        return jsonResponse(500, { ok: false, code: "interrupted", at: error.message });
+        return jsonResponse(500, { ok: false, code: "interrupted", at: error.at });
       }
       return jsonResponse(500, { ok: false, code: "internal" });
     }

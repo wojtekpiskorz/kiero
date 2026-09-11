@@ -52,21 +52,31 @@ class NotConfiguredMedia implements MediaReader {
   }
 }
 
+/**
+ * The typed not-configured refusal set (review round 2 finding 4): every
+ * method answers its channel's closed refusal instead of throwing an
+ * untyped error that surfaces as 500 internal.
+ */
 class NotConfiguredProtocol implements BackupProtocol {
-  async begin(): Promise<never> {
-    throw new Error("convex_protocol_not_configured");
+  async begin(): Promise<ProtocolBegin> {
+    return { status: "refused", reason: "convex_protocol_not_configured" };
   }
-  async complete(): Promise<never> {
-    throw new Error("convex_protocol_not_configured");
+  async complete(): Promise<{ ok: false; reason: string }> {
+    return { ok: false, reason: "convex_protocol_not_configured" };
   }
-  async fail(): Promise<never> {
-    throw new Error("convex_protocol_not_configured");
+  async fail(): Promise<{ ok: false; reason: string }> {
+    return { ok: false, reason: "convex_protocol_not_configured" };
   }
-  async sweep(): Promise<never> {
-    throw new Error("convex_protocol_not_configured");
+  async sweep(): Promise<ProtocolSweepPlan> {
+    // An empty plan with zero deletable keys: the sweep is a no-op until
+    // the protocol exists, which is the honest typed answer.
+    return {
+      plan: { expiredSets: [], survivingReferences: [], deletableObjectKeys: [] },
+      referencedByAnyManifest: [],
+    };
   }
-  async sweepComplete(): Promise<never> {
-    throw new Error("convex_protocol_not_configured");
+  async sweepComplete(): Promise<{ collected: number; replayed: number; prunedFailed: number; skipped: number }> {
+    return { collected: 0, replayed: 0, prunedFailed: 0, skipped: 0 };
   }
 }
 

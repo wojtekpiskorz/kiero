@@ -19,7 +19,7 @@ export interface ExportResult {
   readonly sha256Hex: string;
 }
 
-/** The pinned documented export mechanism (npx convex@1.45.0 export). */
+/** The pinned documented export mechanism (the pre-installed convex export). */
 export interface DatabaseExporter {
   export(): Promise<ExportResult | { readonly ok: false; readonly code: "export_not_configured" | "export_failed"; readonly exitCode?: number }>;
 }
@@ -102,7 +102,8 @@ export interface ProtocolBeginRefused {
     | "attempts_exhausted"
     | "slot_passed"
     | "inventory_invalid"
-    | "retention_invariant_broken";
+    | "retention_invariant_broken"
+    | "convex_protocol_not_configured";
   readonly manifestId?: string;
   readonly leaseExpiresAtMs?: number;
 }
