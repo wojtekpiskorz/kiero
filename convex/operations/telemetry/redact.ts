@@ -52,7 +52,7 @@ export const DIAGNOSTIC_EVENT_KINDS = [
   // I4 append (issue #56, flagged shared-file change - the I5 precedent):
   // permanent-deletion 24-hour tracking. Emitted by the deletion purge tick
   // when a derivative family's stage is still un-purged past its deadline;
-  // deduped per stage per day.
+  // deduped per stage per hour (the tick's deadline slides hourly).
   "ops.deletion.overdue",
   // Monitor group 3: costs/limits
   "ops.cost.entry",

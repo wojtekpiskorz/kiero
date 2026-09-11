@@ -52,7 +52,7 @@ import {
   validationError,
   type RequestContext,
 } from "@kiero/runtime";
-import type { MutationCtx } from "../../_generated/server";
+import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { publishEvent, registerDurableJob } from "../../platform/publish";
 import { normalizedActor, normalizedCompany, requireSource } from "../../memory/findings/references";
@@ -119,7 +119,7 @@ function registrationTargets(): { ok: true } | { ok: false; error: ReturnType<ty
 
 /** The source's content-free `source_purge` ledger row, when one exists. */
 export async function sourcePurgeRecordOf(
-  db: MutationCtx["db"],
+  db: MutationCtx["db"] | QueryCtx["db"],
   sourceId: Id<"sources">,
 ): Promise<Id<"deletionRecords"> | null> {
   const rows = await db

@@ -44,12 +44,13 @@ import { Schema } from "effect";
 import { executors, purgeSourceInput, ResultEnvelope } from "@kiero/contracts";
 import { internalAction, internalMutation, internalQuery } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import type { MutationCtx, QueryCtx } from "../../_generated/server";
+import type { MutationCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { DurableJobDoc, JobExecutor, JobOutcome } from "../../platform/executors";
 import { deleteSourceEntries } from "../../search/records";
 import { markPurgedSupport } from "./marking";
-import type { PurgeStageKind } from "./schema";
+import { sourcePurgeRecordOf } from "./purge";
+import { PURGE_STAGE_KINDS, type PurgeStageKind } from "./schema";
 
 /** The decoded input of one purge job (the registry schema authority). */
 export interface PurgeJobInput {
@@ -282,18 +283,7 @@ export async function mediaObjectKeysOf(
   return [...keys].sort();
 }
 
-/** The source's ledger row id (the null-record resolution, in-company). */
-async function resolveRecordId(
-  db: MutationCtx["db"] | QueryCtx["db"],
-  sourceId: Id<"sources">,
-): Promise<Id<"deletionRecords"> | null> {
-  const rows = await db
-    .query("deletionRecords")
-    .withIndex("by_target_source", (q) => q.eq("targetSourceId", sourceId))
-    .collect();
-  const record = rows.find((row) => row.kind === "source_purge");
-  return record === undefined ? null : record._id;
-}
+
 
 /** Persists the media stage's key list and re-opens it for this attempt. */
 async function prepareMediaStage(tx: MutationCtx, stage: StageRow): Promise<string[]> {
@@ -331,7 +321,7 @@ export const purgeSourceExecutor: JobExecutor = {
     }
     const recordId =
       decoded.deletionRecordId === null
-        ? await resolveRecordId(ctx.db, sourceId)
+        ? await sourcePurgeRecordOf(ctx.db, sourceId)
         : ctx.db.normalizeId("deletionRecords", String(decoded.deletionRecordId));
     if (recordId === null) {
       return { outcome: "failed", errorKind: "deletion_record_missing", retryable: false };
@@ -343,13 +333,12 @@ export const purgeSourceExecutor: JobExecutor = {
     // The in-transaction stages, each idempotent and independently visible.
     // A stage that refuses records its visible failure on its own row and
     // fails the job retryably (bounded by maxAttempts; the tick re-kicks).
-    const inTransaction: readonly PurgeStageKind[] = [
-      "findings_marking",
-      "transcripts",
-      "search_index",
-      "notification_work",
-      "exports",
-    ];
+    // Derived from the schema's vocabulary minus the one external stage, so
+    // a stage kind added to the schema can never be silently absent here
+    // (the compiler forces its body via InTransactionStage).
+    const inTransaction: readonly InTransactionStage[] = PURGE_STAGE_KINDS.filter(
+      (kind): kind is InTransactionStage => kind !== "media_objects",
+    );
     for (const kind of inTransaction) {
       const failure = await runStage(ctx, stages, kind, STAGE_BODIES[kind]);
       if (failure !== null) {
@@ -375,9 +364,13 @@ export const purgeSourceExecutor: JobExecutor = {
   },
 };
 
+/** The one kind the gateway action owns (the bytes leave the transaction). */
+type ExternalStage = "media_objects";
+/** Every stage the executor runs inside its transaction, by construction total. */
+type InTransactionStage = Exclude<PurgeStageKind, ExternalStage>;
+
 /** The in-transaction stage bodies, keyed by stage kind (total by construction). */
-const STAGE_BODIES: Readonly<Record<PurgeStageKind, (tx: MutationCtx, stage: StageRow) => Promise<void>>> = {
-  media_objects: (_tx, _stage) => Promise.resolve(),
+const STAGE_BODIES: Readonly<Record<InTransactionStage, (tx: MutationCtx, stage: StageRow) => Promise<void>>> = {
   findings_marking: purgeFindingsMarking,
   transcripts: purgeTranscripts,
   search_index: purgeSearchIndex,
@@ -450,7 +443,7 @@ export const mediaPurgeWorkFor = internalQuery({
     }
     const recordId =
       input.deletionRecordId === null
-        ? await resolveRecordId(ctx.db, sourceId)
+        ? await sourcePurgeRecordOf(ctx.db, sourceId)
         : ctx.db.normalizeId("deletionRecords", String(input.deletionRecordId));
     if (recordId === null) {
       return null;
