@@ -20,7 +20,7 @@ credential values. The decision model lives once in
   closure verification so a partial set can never be labelled complete.
 - The EU backup Container executor (`apps/backup-worker`): Worker cron
   trigger + Durable Object + container, the pinned documented export
-  mechanism (`npx --yes convex@1.45.0 export`), pooled media copy with
+  mechanism (the pre-installed `convex export` binary; see convex-export.ts), pooled media copy with
   sha256 verification, deletion-ledger carriage and manifest-last publish.
 - Health/cost events through the I2 machinery: `backup.job` heartbeats per
   attempt, measured `backup` provider cost entries (export/storage/egress)
@@ -43,7 +43,7 @@ credential values. The decision model lives once in
    Until injected, every byte operation answers the typed `not_configured`
    refusal - honest pending, never a fabricated copy.
 3. **Convex export credential** - `CONVEX_BACKUP_ADMIN_KEY`: the mechanism
-   I5 finalized is the pinned CLI export (`npx --yes convex@1.45.0 export`)
+   I5 finalized is the pinned CLI export (the pre-installed `convex export` binary)
    driven headless by injecting a Convex access token; the executor writes
    it to the CLI's config file inside the container at runtime. Until the
    key exists, the export step answers `export_not_configured`.

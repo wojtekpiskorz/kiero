@@ -108,7 +108,11 @@ export interface ProtocolBeginRefused {
   readonly leaseExpiresAtMs?: number;
 }
 
-/** The begin result as the SAME discriminated union the server returns. */
+/**
+ * The begin result: the server's discriminated union plus the executor-side
+ * `convex_protocol_not_configured` refusal (the not-configured stub answers
+ * it without a server round-trip).
+ */
 export type ProtocolBegin = ProtocolBeginAcquired | ProtocolBeginRefused;
 
 export interface ProtocolCompleteInput {
