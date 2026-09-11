@@ -76,6 +76,37 @@ async function remindersInState(
 }
 
 /**
+ * The wire row shapes of `myTaskReminders`' ok value (H2 append, flagged
+ * additive export: the personal projection imports the server's own types
+ * instead of hand-declaring a twin).
+ */
+export interface ReminderIntentWireRow {
+  readonly intentId: string;
+  readonly companyId: string;
+  readonly recipientUserId: string;
+  readonly taskId: string | null;
+  readonly semanticKind: string;
+  readonly dedupKey: string;
+  readonly state: string;
+  readonly dueAtMs: number;
+  readonly suppressedReason: string | null;
+  readonly delivery: unknown;
+  readonly deliveredAtMs: number | null;
+  readonly createdAtMs: number;
+}
+
+export interface ReminderSnoozeWireRow {
+  readonly taskId: string;
+  readonly untilMs: number;
+  readonly updatedAtMs: number;
+}
+
+export interface MyTaskRemindersWire {
+  readonly intents: readonly ReminderIntentWireRow[];
+  readonly snoozes: readonly ReminderSnoozeWireRow[];
+}
+
+/**
  * The public client path: the caller's OWN reminder intents and active
  * snoozes (the H2 personal projection; read-only).
  */

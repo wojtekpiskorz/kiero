@@ -27,7 +27,7 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
-import { forbiddenError, unauthenticatedError } from "@kiero/runtime";
+import { forbiddenError, unauthenticatedError, type RequestContext } from "@kiero/runtime";
 import { internalQuery, query } from "../../_generated/server";
 import type { QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
@@ -44,6 +44,8 @@ import {
   deriveProcessingState,
   type ConversationPage as ConversationPageType,
 } from "./rows";
+// H3 exposition cores (additive, flagged): the dossier + evidence reads.
+import { readSourceExpositionRows, readSourceEvidenceRows } from "./exposition";
 
 type PaginationOpts = { cursor: string | null; numItems: number };
 type RawPage<T> = { page: T[]; isDone: boolean; continueCursor: string };
@@ -277,5 +279,97 @@ export const sourceDetailFor = internalQuery({
       return errorResult(forbiddenError("source_not_in_company", "sources"));
     }
     return sourceDetailRow(ctx.db, resolved.companyId, sourceId);
+  },
+});
+
+// --- H3 exposition reads (additive, flagged on the H1 memory-exposition
+// precedent): the source dossier and the paginated evidence chain. Cores
+// live in ./exposition.ts; rows carry their wire shapes and decode through
+// the Effect schemas defined there. Unlike the helpers above (which narrow
+// to the company id), these two keep the full RequestContext the cores'
+// tenant checks read.
+
+/** The client-path context (full) for the H3 exposition cores. */
+async function expositionContextOrFail(ctx: QueryCtx): Promise<RequestContext | null> {
+  return resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
+}
+
+/** The bridge-path context (full) for the H3 exposition cores. */
+async function expositionServiceContextOrFail(
+  ctx: QueryCtx,
+  serviceSessionId: string,
+): Promise<RequestContext | null> {
+  return resolveRequestContext(ctx.db, bridgeIdentity(serviceSessionId, Date.now()));
+}
+
+/** The full dossier of one source (client path). */
+export const sourceExposition = query({
+  args: { sourceId: v.id("sources") },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    const context = await expositionContextOrFail(ctx);
+    if (context === null) {
+      return errorResult(unauthenticatedError());
+    }
+    const sourceId = ctx.db.normalizeId("sources", args.sourceId);
+    if (sourceId === null) {
+      return errorResult(forbiddenError("source_not_in_company", "sources"));
+    }
+    const row = await readSourceExpositionRows(ctx.db, context, sourceId);
+    return row.ok ? okResult(row.row) : errorResult(row.error);
+  },
+});
+
+/** The paginated evidence chain of one source (client path). */
+export const sourceEvidence = query({
+  args: { sourceId: v.id("sources"), paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    const context = await expositionContextOrFail(ctx);
+    if (context === null) {
+      return errorResult(unauthenticatedError());
+    }
+    const sourceId = ctx.db.normalizeId("sources", args.sourceId);
+    if (sourceId === null) {
+      return errorResult(forbiddenError("source_not_in_company", "sources"));
+    }
+    const page = await readSourceEvidenceRows(ctx.db, context, sourceId, args.paginationOpts);
+    return page.ok ? okResult(page.page) : errorResult(page.error);
+  },
+});
+
+/** The source dossier for the verified service session. */
+export const sourceExpositionFor = internalQuery({
+  args: { serviceSessionId: v.string(), sourceId: v.id("sources") },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    const context = await expositionServiceContextOrFail(ctx, args.serviceSessionId);
+    if (context === null) {
+      return errorResult(unauthenticatedError());
+    }
+    const sourceId = ctx.db.normalizeId("sources", args.sourceId);
+    if (sourceId === null) {
+      return errorResult(forbiddenError("source_not_in_company", "sources"));
+    }
+    const row = await readSourceExpositionRows(ctx.db, context, sourceId);
+    return row.ok ? okResult(row.row) : errorResult(row.error);
+  },
+});
+
+/** The paginated evidence chain for the verified service session. */
+export const sourceEvidenceFor = internalQuery({
+  args: {
+    serviceSessionId: v.string(),
+    sourceId: v.id("sources"),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args): Promise<ResultEnvelope> => {
+    const context = await expositionServiceContextOrFail(ctx, args.serviceSessionId);
+    if (context === null) {
+      return errorResult(unauthenticatedError());
+    }
+    const sourceId = ctx.db.normalizeId("sources", args.sourceId);
+    if (sourceId === null) {
+      return errorResult(forbiddenError("source_not_in_company", "sources"));
+    }
+    const page = await readSourceEvidenceRows(ctx.db, context, sourceId, args.paginationOpts);
+    return page.ok ? okResult(page.page) : errorResult(page.error);
   },
 });

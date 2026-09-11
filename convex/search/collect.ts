@@ -11,10 +11,14 @@
  * - transcript: every completed D6 order's per-segment audio-interval
  *   fragments, each with its verbatim segment text (and a whole-source STT
  *   fragment, when one exists, over the concatenated transcript);
- * - OCR: vision-kind extraction fragments are collected only when a text
- *   source exists for them; none exists yet (E4 owns that join), so today
- *   they are counted and skipped in `stats.visionFragmentsSkipped`, an
- *   honestly disclosed gap rather than a silent omission.
+ * - OCR: vision-kind extraction fragments are indexed from E4's completed
+ *   order record (`observationsJson`, the verbatim observation texts; H3
+ *   completion of the gap this collector first disclosed): each
+ *   image_region fragment whose exact region matches one observation is
+ *   indexed anchored to that fragment. Fragments without a matching
+ *   observation text are counted and skipped in
+ *   `stats.visionFragmentsSkipped`, an honestly disclosed gap rather than
+ *   a silent omission.
  *
  * Only lifecycle-active sources are indexed; withdrawn/purged evidence never
  * enters a fresh pass (hydration re-checks anyway: the index is derived).
@@ -62,6 +66,49 @@ function segmentTextFor(
     return null;
   }
   return segment.text;
+}
+
+/**
+ * The verbatim OCR observations of one completed vision order (H3 append):
+ * E4's durable `observationsJson` record, bounded and fail-soft — a missing
+ * or malformed record lists empty, so those fragments stay counted and
+ * skipped instead of blocking the pass.
+ */
+function observationsOfOrder(
+  order: Doc<"visionOrders"> | undefined,
+): { text: string; region: { x: number; y: number; width: number; height: number } }[] {
+  if (order === undefined || order.state !== "complete" || order.observationsJson === undefined) {
+    return [];
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(order.observationsJson);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  const observations: { text: string; region: { x: number; y: number; width: number; height: number } }[] = [];
+  for (const entry of parsed.slice(0, 64)) {
+    if (typeof entry !== "object" || entry === null) {
+      continue;
+    }
+    const text = (entry as { text?: unknown }).text;
+    const region = (entry as { region?: unknown }).region;
+    if (typeof text !== "string" || typeof region !== "object" || region === null) {
+      continue;
+    }
+    const { x, y, width, height } = region as Record<string, unknown>;
+    if (
+      typeof x !== "number" || typeof y !== "number" ||
+      typeof width !== "number" || typeof height !== "number"
+    ) {
+      continue;
+    }
+    observations.push({ text, region: { x, y, width, height } });
+  }
+  return observations;
 }
 
 /**
@@ -156,9 +203,46 @@ export async function collectGenerationWork(
         }
         continue;
       }
-      // Vision (OCR) fragments: no canonical text exists yet (E4 owns the
-      // join); counted and skipped, never silently pretended indexed.
-      stats.visionFragmentsSkipped += fragments.length;
+      // Vision (OCR) fragments: H3 completion (flagged append on E5's
+      // collector). E4's completed vision orders now carry the canonical
+      // observation texts (observationsJson, the verbatim record the joined
+      // analysis reads), so each image_region fragment whose EXACT region
+      // matches one observation is indexed anchored to that fragment — the
+      // same shape transcript segments use. Fragments without a matching
+      // observation text stay counted and skipped, never silently
+      // pretended indexed.
+      const visionOrders = await db
+        .query("visionOrders")
+        .withIndex("by_source", (q) => q.eq("sourceId", source._id))
+        .collect();
+      const order = visionOrders.find((row) => row.extractionId === extraction._id);
+      const observations = observationsOfOrder(order);
+      for (const fragment of fragments) {
+        const anchor = fragment.anchor;
+        if (anchor._tag !== "image_region") {
+          stats.visionFragmentsSkipped += 1;
+          continue;
+        }
+        const observation = observations.find(
+          (candidate) =>
+            candidate.region.x === anchor.x &&
+            candidate.region.y === anchor.y &&
+            candidate.region.width === anchor.width &&
+            candidate.region.height === anchor.height &&
+            candidate.text.trim() !== "",
+        );
+        if (observation === undefined) {
+          stats.visionFragmentsSkipped += 1;
+          continue;
+        }
+        drafts.push({
+          generationId,
+          companyId: source.companyId,
+          sourceFragmentId: fragment._id,
+          sourceId: source._id,
+          preparedText: prepareDocumentText(observation.text),
+        });
+      }
     }
   }
   const findings = await db.query("findings").collect();
