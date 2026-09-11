@@ -6,6 +6,11 @@
  * control uses. Split from SourceDetailFeature.ts to keep that file under
  * the size budget (the media.ts precedent).
  *
+ * The dispatch entry is the accept lane's public command, exactly like the
+ * WithdrawControl on the same dossier page: ONE operation-agnostic
+ * dispatch table serves every sources write, and the envelope carries the
+ * operation (review round 1 deleted this lane's duplicate entry pair).
+ *
  * Barebones by scope: one checkbox per company project (the source's
  * current links preselected), zero checked means company-general
  * ("wiedza ogólna firmy"), the committed receipt is authority for the
@@ -31,7 +36,7 @@ export function ReassignControl({
   readonly projectNames: ReadonlyMap<string, string>;
   readonly currentProjectIds: readonly string[];
 }): ReactNode {
-  const reassign = useMutation(api.sources.reassign.commands.reassignSourceCommand);
+  const reassign = useMutation(api.sources.accept.commands.acceptSourceCommand);
   const [selected, setSelected] = useState<ReadonlySet<string>>(
     () => new Set(currentProjectIds),
   );

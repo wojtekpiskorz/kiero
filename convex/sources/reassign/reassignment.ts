@@ -31,8 +31,9 @@
  * ("Niezmienny po wysłaniu wpis użytkownika"; reassignment keeps read
  * state, CONTEXT.md's own note on the links table). The dependent
  * findings' re-assessment does NOT run inline: the registered C5 executor
- * (./dependents.ts, called from convex/memory/recompute/executor.ts)
- * performs the scope marking in its own transaction.
+ * (the memory findings lane's marking core,
+ * convex/memory/findings/reassignment.ts) performs the scope marking in
+ * its own transaction.
  *
  * Pure decisions (set comparison, the new-set validation) live here so
  * tests/e7 can prove them without a deployment.

@@ -1,9 +1,11 @@
 /**
  * The scope re-assessment marking of one project reassignment (E7, issue
  * #115): the memory-side reaction C5's durable executor invokes for the
- * `source_reassigned` cause, the reassignment twin of
- * `markWithdrawnSupport` (convex/memory/findings/withdrawal.ts), over the
- * SAME one-core-two-entries discipline.
+ * `source_reassigned` cause; the reassignment twin of
+ * `markWithdrawnSupport` (./withdrawal.ts), living in the memory lane it
+ * writes (review round 1 moved it from the sources lane: it touches only
+ * findings, findingRevisions and `memory.findingRevised`, and its commit
+ * loop is the ONE shared marking-commit core, ./marking.ts).
  *
  * A reassignment moves the source's PLACEMENT, not its support: the source
  * stays `active`, its evidence still witnesses what it witnessed. What the
@@ -38,26 +40,130 @@
  * root to the existing `memory.dependentsMarkedStale` cascade, which owns
  * every level in its own bounded transaction.
  *
- * Pure decisions live in @kiero/domain so tests prove them without a
- * deployment (the C5 precedent); this module is the transactional core.
+ * The pure decision ({@link decideScopeReassessment}) lives here beside
+ * the core so tests prove it without a deployment (the C5 precedent);
+ * review round 1 folded the WHOLE narrowing rule into it (scope kind,
+ * scope project and the source's current links are its inputs), so the
+ * branch that runs in production is exactly the branch the unit tests
+ * prove. This module is the transactional core.
  */
 
-import { Schema } from "effect";
-import { events, errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
-import { notFoundError, validationError } from "@kiero/runtime";
+import {
+  notFoundError,
+  validationError,
+} from "@kiero/runtime";
 import {
   explicitUpdating,
   updatingUntilRevalidatedReason,
-  type RecomputeTarget,
 } from "@kiero/domain";
 import type { MutationCtx } from "../../_generated/server";
 import type { Id, Doc } from "../../_generated/dataModel";
-import { publishEvent } from "../../platform/publish";
-import { encodeKnowledgeState, knowledgeTagOf, TEMPLATE_ID } from "../../memory/findings/semantics";
-import {
-  decideScopeReassessment,
-  type ScopeWitnessRef,
-} from "./scope";
+import { encodeKnowledgeState, knowledgeTagOf } from "./semantics";
+import { commitMarkings, type MarkingOutcome, type PlannedMarking } from "./marking";
+
+// ---------------------------------------------------------------------------
+// The pure decision (unit-tested in tests/e7).
+// ---------------------------------------------------------------------------
+
+/** One witness reference of a candidate's current revision, placement-known. */
+export interface ScopeWitnessRef {
+  readonly sourceId: string;
+  /** Whether that source's lifecycle still lets it witness anything. */
+  readonly sourceActive: boolean;
+  /** Whether that source is currently linked to the candidate's scope project. */
+  readonly linkedToScope: boolean;
+}
+
+/** What the scope re-assessment decision needs about one candidate finding. */
+export interface ScopeReassessmentInput {
+  /** The knowledge-state tag of the candidate's CURRENT revision. */
+  readonly currentKnowledgeTag: string | null;
+  /** The origin of that revision (or null when absent). */
+  readonly currentRevisionOrigin: string | null;
+  /** The candidate's scope kind (company memory is never narrowed away). */
+  readonly scopeKind: "company" | "project";
+  /** The project the candidate is scoped to (null on company scope). */
+  readonly scopeProjectId: string | null;
+  /** The moved source's CURRENT project links (the link set that changed). */
+  readonly currentProjectIds: readonly string[];
+  /** The id of the source that moved. */
+  readonly movedSourceId: string;
+  /** Whether the current revision rests on the moved source: cites it as a
+   * witness or was published from it (provenance). */
+  readonly restsOnMovedSource: boolean;
+  /** The witness links of that revision with placement knowledge. */
+  readonly currentWitnesses: readonly ScopeWitnessRef[];
+}
+
+/**
+ * What the re-assessment does to one candidate finding.
+ *
+ * - `mark_updating`: the finding's placement lost the moved source's
+ *   support and has no surviving placement witness, it becomes
+ *   updating-until-revalidated (value preserved, excluded from automation);
+ * - `retain`: the finding keeps standing: company memory, a scope the
+ *   source still links, an already-marked finding, an explicit correction,
+ *   a finding not resting on the moved source, or another active linked
+ *   witness surviving.
+ */
+export type ScopeReassessmentDecision =
+  | { readonly decision: "mark_updating" }
+  | {
+      readonly decision: "retain";
+      readonly basis:
+        | "company_scope"
+        | "scope_still_linked"
+        | "already_marked"
+        | "explicit_correction"
+        | "not_resting_on_moved_source"
+        | "independent_placement_witness";
+    };
+
+/**
+ * The WHOLE narrowing rule in one place (review round 1: the caller's
+ * pre-filter and the decision's `scope_still_linked` branch were two
+ * halves of one rule, the second unreachable in production).
+ */
+export function decideScopeReassessment(
+  input: ScopeReassessmentInput,
+): ScopeReassessmentDecision {
+  if (input.scopeKind !== "project" || input.scopeProjectId === null) {
+    // The narrowing rule's floor: company memory always holds the source.
+    return { decision: "retain", basis: "company_scope" };
+  }
+  if (input.currentProjectIds.includes(input.scopeProjectId)) {
+    // The link change did not touch this finding's scope.
+    return { decision: "retain", basis: "scope_still_linked" };
+  }
+  if (input.currentKnowledgeTag !== "known") {
+    // Unknown or updating already: visibly non-current; idempotent.
+    return { decision: "retain", basis: "already_marked" };
+  }
+  if (input.currentRevisionOrigin === "correction") {
+    // An explicit correction is its own resolution ("Korekta ustalenia").
+    return { decision: "retain", basis: "explicit_correction" };
+  }
+  if (!input.restsOnMovedSource) {
+    // A candidate that neither cites the moved source on its current
+    // revision nor was published from it is not affected by this move.
+    return { decision: "retain", basis: "not_resting_on_moved_source" };
+  }
+  const survivingWitness = input.currentWitnesses.some(
+    (witness) =>
+      witness.sourceId !== input.movedSourceId &&
+      witness.sourceActive &&
+      witness.linkedToScope,
+  );
+  if (survivingWitness) {
+    // Independent placement evidence survives.
+    return { decision: "retain", basis: "independent_placement_witness" };
+  }
+  return { decision: "mark_updating" };
+}
+
+// ---------------------------------------------------------------------------
+// The transactional core.
+// ---------------------------------------------------------------------------
 
 /** The marking core's parameters: everything the reaction needs, no session. */
 export interface ReassignmentMarkingArgs {
@@ -69,14 +175,6 @@ export interface ReassignmentMarkingArgs {
   readonly sourceId: Id<"sources">;
   /** The source's CURRENT project links, read by the executor at reaction time. */
   readonly currentProjectIds: readonly Id<"projects">[];
-}
-
-/** The marking core's result: the marked roots and their re-analysis targets. */
-export interface ReassignmentMarking {
-  /** The findings this marking moved to updating (the cascade's roots). */
-  readonly markedFindingIds: Id<"findings">[];
-  /** The marked findings' provenance sources (E3 re-analysis groups). */
-  readonly targets: readonly RecomputeTarget[];
 }
 
 /** The machine reason recorded on each marking revision (per finding scope). */
@@ -95,37 +193,35 @@ export function scopeUpdatingReason(sourceId: Id<"sources">): string {
  * transaction: every marking (revision + projection patch) and its
  * `memory.findingRevised` event commit together with everything else, or
  * not at all. Everything that can refuse runs before the first write.
+ * Returns the typed marking outcome (review round 1: the ok payload is
+ * typed, the executor re-asserts nothing).
  */
 export async function markReassignedScope(
   tx: MutationCtx,
   args: ReassignmentMarkingArgs,
-): Promise<ResultEnvelope> {
+): Promise<MarkingOutcome> {
   const source = await tx.db.get(args.sourceId);
   if (source === null || source.companyId !== args.companyId) {
-    return errorResult(notFoundError("sources"));
+    return { _tag: "error", error: notFoundError("sources") };
   }
   // Marking follows the link change and never runs ahead of it: only an
   // ACTIVE source's placement re-assessment runs here (withdrawal/purge own
   // the stronger reactions for their lifecycles).
   if (source.lifecycle !== "active") {
-    return errorResult(
-      validationError(source.lifecycle === "withdrawn" ? "source_withdrawn" : "source_not_active"),
-    );
-  }
-  const findingRevised = events["memory.findingRevised"];
-  if (findingRevised === undefined) {
-    return errorResult(validationError("memory_events_missing"));
+    return {
+      _tag: "error",
+      error: validationError(
+        source.lifecycle === "withdrawn" ? "source_withdrawn" : "source_not_active",
+      ),
+    };
   }
 
   // --- the candidate walk (bounded, indexed; everything before writes) ----
   const candidates = await scopeCandidates(tx.db, args.companyId, args.sourceId);
-  const currentProjectSet = new Set<string>(args.currentProjectIds.map((id) => id as string));
 
-  interface MarkingPlan {
-    finding: Doc<"findings">;
-    currentRevision: Doc<"findingRevisions">;
+  interface MarkingPlan extends PlannedMarking {
     /** The finding's scope project (the reason the marking names). */
-    scopeProjectId: Id<"projects">;
+    readonly scopeProjectId: Id<"projects">;
   }
   const markings: MarkingPlan[] = [];
   const seenFindings = new Set<Id<"findings">>();
@@ -134,15 +230,7 @@ export async function markReassignedScope(
       continue;
     }
     seenFindings.add(candidate.finding._id);
-    // The narrowed scope test: only a project the source no longer links.
-    if (
-      candidate.finding.scopeKind !== "project" ||
-      candidate.finding.scopeProjectId === undefined ||
-      currentProjectSet.has(candidate.finding.scopeProjectId as string)
-    ) {
-      continue;
-    }
-    // The surviving-placement test: another active source cited by the
+    // The surviving-placement reads: another active source cited by the
     // current revision that is itself still linked to the finding's scope.
     const currentLinks = await tx.db
       .query("evidenceLinks")
@@ -171,7 +259,9 @@ export async function markReassignedScope(
     const decision = decideScopeReassessment({
       currentKnowledgeTag: knowledgeTagOf(candidate.currentRevision.knowledgeState),
       currentRevisionOrigin: candidate.currentRevision.origin,
-      scopeProjectLinked: false,
+      scopeKind: candidate.finding.scopeKind,
+      scopeProjectId: candidate.finding.scopeProjectId ?? null,
+      currentProjectIds: args.currentProjectIds.map((id) => id as string),
       movedSourceId: args.sourceId,
       restsOnMovedSource: candidate.restsOnMovedSource,
       currentWitnesses: witnesses,
@@ -180,65 +270,23 @@ export async function markReassignedScope(
       markings.push({
         finding: candidate.finding,
         currentRevision: candidate.currentRevision,
-        scopeProjectId: candidate.finding.scopeProjectId,
+        reason: scopeReassignedReason(candidate.finding.scopeProjectId as string),
+        scopeProjectId: candidate.finding.scopeProjectId as Id<"projects">,
       });
     }
   }
-  Schema.decodeUnknownSync(findingRevised.payload)({
-    findingId: TEMPLATE_ID,
-    revisionId: TEMPLATE_ID,
-    supersedesRevisionId: null,
-  });
-
-  // --- the commit loop: only pre-validated writes from here ----------------
-  const nowMs = Date.now();
-  const markedKnowledge = encodeKnowledgeState(
-    explicitUpdating(scopeUpdatingReason(args.sourceId)),
-  );
-  const markedFindingIds: Id<"findings">[] = [];
-  const targets: RecomputeTarget[] = [];
-  for (const marking of markings) {
-    const revisionId = await tx.db.insert("findingRevisions", {
-      findingId: marking.finding._id,
-      revision: marking.finding.revisionCounter + 1,
-      // The value is preserved verbatim; only its epistemic state moves.
-      value: marking.currentRevision.value,
-      knowledgeState: markedKnowledge,
-      supersedesRevisionId: marking.currentRevision._id,
+  return commitMarkings(tx, {
+    companyId: args.companyId,
+    actorUserId: args.actorUserId,
+    stamp: {
       origin: "reassignment_marking",
-      reason: scopeReassignedReason(marking.scopeProjectId),
-      reassignedSourceId: args.sourceId,
-      recordedByUserId: args.actorUserId,
-      recordedAtMs: nowMs,
-    });
-    await tx.db.patch(marking.finding._id, {
-      currentRevisionId: revisionId,
-      knowledgeState: markedKnowledge,
-      revisionCounter: marking.finding.revisionCounter + 1,
-      updatedAtMs: nowMs,
-    });
-    markedFindingIds.push(marking.finding._id);
-    await publishEvent(tx, {
-      companyId: args.companyId,
-      eventName: "memory.findingRevised",
-      payload: {
-        findingId: marking.finding._id,
-        revisionId,
-        supersedesRevisionId: marking.currentRevision._id,
-      },
-      dedupKey: `memory.findingRevised:${revisionId}`,
-    });
-    if (marking.currentRevision.provenance !== undefined) {
-      const provenanceSource = await tx.db.get(marking.currentRevision.provenance.sourceId);
-      targets.push({
-        findingId: marking.finding._id,
-        provenanceSourceId: marking.currentRevision.provenance.sourceId,
-        provenanceSourceActive:
-          provenanceSource !== null && provenanceSource.lifecycle === "active",
-      });
-    }
-  }
-  return okResult({ markedFindingIds, targets });
+      knowledgeState: encodeKnowledgeState(
+        explicitUpdating(scopeUpdatingReason(args.sourceId)),
+      ),
+      attribution: { kind: "reassignedSourceId", sourceId: args.sourceId },
+    },
+    markings,
+  });
 }
 
 /** One candidate finding the reassignment may re-assess, with its current revision. */

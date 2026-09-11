@@ -1,7 +1,10 @@
 /**
  * E7 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, exactly like the sibling sources probes; shared plumbing lives
- * in convex/sources/probe_shared.ts).
+ * variable, exactly like the sibling sources probes). Shared plumbing
+ * lives in convex/sources/probe_shared.ts, whose fixture and inspection
+ * bodies this lane's deltas ride: review round 1 replaced a verbatim
+ * transcription of C5's probe with those shared pieces, keeping only the
+ * lane-specific fixtures and wire-row mapping below.
  *
  * No business work happens here; these entries exist so the E7 evidence can
  * run against the REAL dev deployment without a development-auth shortcut:
@@ -19,140 +22,63 @@
  *   tenant-isolation proof can reassign B's own placement and refuse A's
  *   foreign attempt.
  * - `probeReassignSource`: the REAL `sources.reassignSource` dispatch
- *   through the checked sources path (the operation under proof).
+ *   through the checked sources path (the operation under proof), riding
+ *   the accept lane's transaction entry exactly like the withdrawal proof
+ *   and the dossier's WithdrawControl (ONE dispatch table; the envelope
+ *   carries the operation).
  * - `probeReassignState`: the tenant-scoped inspection read the evidence
  *   script asserts on (sources with their CURRENT links, findings with
  *   every revision's origin and attribution, durable recomputation and
- *   re-analysis jobs, reanalysis runs, and the reassignment events).
+ *   re-analysis jobs, reanalysis runs, and the reassignment events) over
+ *   the shared walks.
  */
 
 import { v } from "convex/values";
 import { okResult, type ResultEnvelope } from "@kiero/contracts";
 import { action, internalMutation, internalQuery } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { bridgeIdentity, resolveRequestContext } from "../../platform/context";
 import { knowledgeTagOf } from "../../memory/findings/semantics";
-import { dispatchSourcesCommand } from "../accept/dispatch";
 import {
   SERVICE_EMAIL,
   bridgeContextForEmail,
+  companyFindingRevisions,
+  companyMemoryJobs,
+  companyOutboxEvents,
+  companyReanalysisRuns,
+  companySourcesWithLinks,
+  ensureIsolationIdentity,
+  ensureProject,
+  ensureWitnessedSource,
   probeDisabled,
   probeGuardEnabled,
   resolveProbeSession,
   serviceIdentityUnavailable,
 } from "../probe_shared";
 
-const PROOF_TZ = "Europe/Warsaw";
-const PROOF_SENT_AT_MS = Date.parse("2026-09-10T09:00:00.000Z");
-const PROOF_PIPELINE_VERSION = "e7.proof/1";
+/** The E7 proof stamp every fixture row carries. */
+const PROOF_STAMP = {
+  timezone: "Europe/Warsaw",
+  sentAtMs: Date.parse("2026-09-10T09:00:00.000Z"),
+  pipelineVersion: "e7.proof/1",
+  fingerprintPrefix: "e7-proof:",
+} as const;
 
 /** The E7 isolation fixture identity (its own company, never company A). */
-const ISOLATION_EMAIL = "e7-isolation@kiero.invalid";
-const ISOLATION_COMPANY = "Kiero Dev Proof E (E7 isolation)";
+const ISOLATION = {
+  email: "e7-isolation@kiero.invalid",
+  companyName: "Kiero Dev Proof E (E7 isolation)",
+  displayName: "E7 isolation proof",
+  deviceLabel: "e7-isolation-bridge",
+} as const;
+
+/** The tag characters a run tag keeps (the sibling probes' sanitizer). */
+function sanitizedTag(runTag: string): string {
+  return runTag.replace(/[^a-z0-9-]/gi, "");
+}
 
 // --- fixtures -------------------------------------------------------------------
-
-interface SeededSource {
-  readonly sourceId: string;
-  readonly fragmentId: string;
-}
-
-/** Ensures one witnessed source, linked to the given projects (guarded). */
-async function ensureWitnessedLinkedSource(
-  db: MutationCtx["db"],
-  companyId: Id<"companies">,
-  userId: Id<"users">,
-  acceptanceKey: string,
-  authorText: string,
-  projectIds: readonly Id<"projects">[],
-): Promise<SeededSource> {
-  const existing = await db
-    .query("sources")
-    .withIndex("by_company_acceptance_key", (q) =>
-      q.eq("companyId", companyId).eq("acceptanceKey", acceptanceKey),
-    )
-    .first();
-  if (existing !== null) {
-    const fragment = await db
-      .query("sourceFragments")
-      .withIndex("by_source", (q) => q.eq("sourceId", existing._id))
-      .first();
-    return { sourceId: existing._id, fragmentId: fragment?._id ?? "" };
-  }
-  const nowMs = Date.now();
-  const sourceId = await db.insert("sources", {
-    companyId,
-    authorUserId: userId,
-    authorText,
-    sentAtMs: PROOF_SENT_AT_MS,
-    sentAtTimezone: PROOF_TZ,
-    fullyAcceptedAtMs: nowMs,
-    lifecycle: "active",
-    acceptanceKey,
-    acceptanceFingerprint: `e7-proof:${acceptanceKey}`,
-  });
-  const runId = await db.insert("processingRuns", {
-    companyId,
-    sourceId,
-    kind: "initial_analysis",
-    pipelineVersion: PROOF_PIPELINE_VERSION,
-    promptVersion: "none",
-    schemaVersion: "none",
-    modelConfigurationVersion: "none",
-    state: "succeeded",
-    startedAtMs: nowMs,
-  });
-  const extractionId = await db.insert("extractions", {
-    sourceId,
-    kind: "text",
-    pipelineVersion: PROOF_PIPELINE_VERSION,
-    model: "author-text",
-    provider: "kiero",
-    processingRunId: runId,
-    createdAtMs: nowMs,
-  });
-  const fragmentId = await db.insert("sourceFragments", {
-    extractionId,
-    sourceId,
-    anchor: { _tag: "whole_source" },
-    createdAtMs: nowMs,
-  });
-  for (const projectId of projectIds) {
-    await db.insert("sourceProjectLinks", {
-      sourceId,
-      projectId,
-      assignedByUserId: userId,
-      assignedAtMs: nowMs,
-      sentAtMs: PROOF_SENT_AT_MS,
-    });
-  }
-  return { sourceId, fragmentId };
-}
-
-/** Ensures one project in the service company (guarded; idempotent by name). */
-async function ensureProject(
-  db: MutationCtx["db"],
-  companyId: Id<"companies">,
-  displayName: string,
-): Promise<Id<"projects">> {
-  const existing = await db
-    .query("projects")
-    .withIndex("by_company_stage", (q) => q.eq("companyId", companyId))
-    .filter((q) => q.eq(q.field("displayName"), displayName))
-    .first();
-  if (existing !== null) {
-    return existing._id;
-  }
-  return db.insert("projects", {
-    companyId,
-    displayName,
-    stage: "inquiry",
-    stageRevision: 1,
-    createdAtMs: Date.now(),
-  });
-}
 
 /** Seeds the service company's E7 proof fixtures (guarded). */
 export const seedReassignFixtures = internalMutation({
@@ -167,40 +93,31 @@ export const seedReassignFixtures = internalMutation({
     if (companyId === null || userId === null) {
       return serviceIdentityUnavailable();
     }
-    const tag = args.runTag.replace(/[^a-z0-9-]/gi, "");
+    const tag = sanitizedTag(args.runTag);
     const projectA = await ensureProject(ctx.db, companyId, `Projekt E7 A ${tag}`);
     const projectB = await ensureProject(ctx.db, companyId, `Projekt E7 B ${tag}`);
     // The moved source (its findings live in project A), the independent
     // placement witness (stays linked to A), the company-general source and
     // the derivation's own provenance source.
-    const moved = await ensureWitnessedLinkedSource(
-      ctx.db,
-      companyId,
-      userId,
-      `e7-proof-${tag}-moved`,
-      "Termin dostawy na Budowlanej, piątek.",
-      [projectA],
-    );
-    const independent = await ensureWitnessedLinkedSource(
-      ctx.db,
-      companyId,
-      userId,
+    const source = (acceptanceKey: string, authorText: string, projectIds: readonly Id<"projects">[]) =>
+      ensureWitnessedSource(ctx.db, {
+        companyId,
+        userId,
+        acceptanceKey,
+        authorText,
+        stamp: PROOF_STAMP,
+        projectIds,
+      });
+    const moved = await source(`e7-proof-${tag}-moved`, "Termin dostawy na Budowlanej, piątek.", [
+      projectA,
+    ]);
+    const independent = await source(
       `e7-proof-${tag}-indep`,
       "Klient potwierdza dostawę w piątek na Budowlanej.",
       [projectA],
     );
-    const general = await ensureWitnessedLinkedSource(
-      ctx.db,
-      companyId,
-      userId,
-      `e7-proof-${tag}-general`,
-      "Zmieniamy dane do faktur na nowe.",
-      [],
-    );
-    const derivation = await ensureWitnessedLinkedSource(
-      ctx.db,
-      companyId,
-      userId,
+    const general = await source(`e7-proof-${tag}-general`, "Zmieniamy dane do faktur na nowe.", []);
+    const derivation = await source(
       `e7-proof-${tag}-derive`,
       "Skoro termin płatności wiadomo, przygotuj przelew.",
       [],
@@ -233,66 +150,20 @@ export const probeSeedReassignFixtures = action({
 export const seedReassignIsolation = internalMutation({
   args: { runTag: v.string() },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const existingUser = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", ISOLATION_EMAIL))
-      .first();
-    const userId =
-      existingUser?._id ??
-      (await ctx.db.insert("users", {
-        email: ISOLATION_EMAIL,
-        displayName: "E7 isolation proof",
-        createdAtMs: Date.now(),
-      }));
-    const existingCompany = await ctx.db
-      .query("companies")
-      .filter((q) => q.eq(q.field("name"), ISOLATION_COMPANY))
-      .first();
-    const companyId =
-      existingCompany?._id ??
-      (await ctx.db.insert("companies", {
-        name: ISOLATION_COMPANY,
-        timezone: "Europe/Warsaw",
-        defaultCurrency: "PLN",
-        createdAtMs: Date.now(),
-      }));
-    const existingMembership = await ctx.db
-      .query("memberships")
-      .withIndex("by_company_user", (q) => q.eq("companyId", companyId).eq("userId", userId))
-      .first();
-    if (existingMembership === null) {
-      await ctx.db.insert("memberships", {
-        companyId,
-        userId,
-        role: "admin",
-        state: "active",
-        createdAtMs: Date.now(),
-      });
-    }
-    const existingSession = await ctx.db
-      .query("sessions")
-      .withIndex("by_user_started", (q) => q.eq("userId", userId))
-      .order("desc")
-      .filter((q) => q.eq(q.field("revokedAtMs"), undefined))
-      .first();
-    const sessionId =
-      existingSession?._id ??
-      (await ctx.db.insert("sessions", {
-        userId,
-        startedAtMs: Date.now(),
-        lastSeenAtMs: Date.now(),
-        deviceLabel: "e7-isolation-bridge",
-      }));
-    const tag = args.runTag.replace(/[^a-z0-9-]/gi, "");
-    const project = await ensureProject(ctx.db, companyId, `Projekt E7 izolacja ${tag}`);
-    const source = await ensureWitnessedLinkedSource(
+    const { userId, companyId, sessionId } = await ensureIsolationIdentity(
       ctx.db,
+      ISOLATION,
+    );
+    const tag = sanitizedTag(args.runTag);
+    const project = await ensureProject(ctx.db, companyId, `Projekt E7 izolacja ${tag}`);
+    const source = await ensureWitnessedSource(ctx.db, {
       companyId,
       userId,
-      `e7-proof-${tag}-isolation`,
-      "Wiadomość drugiej firmy (dowód izolacji E7).",
-      [project],
-    );
+      acceptanceKey: `e7-proof-${tag}-isolation`,
+      authorText: "Wiadomość drugiej firmy (dowód izolacji E7).",
+      stamp: PROOF_STAMP,
+      projectIds: [project],
+    });
     return okResult({ companyId, userId, sessionId, project, ...source });
   },
 });
@@ -311,13 +182,12 @@ export const probeSeedReassignIsolation = action({
 
 // --- the operation under proof ---------------------------------------------------
 
-/** Dispatches `sources.reassignSource` through the REAL sources dispatch. */
-export const reassignTransaction = internalMutation({
-  args: { envelope: v.any(), serviceSessionId: v.string() },
-  handler: async (ctx, args): Promise<ResultEnvelope> =>
-    dispatchSourcesCommand(ctx, args.envelope, args.serviceSessionId),
-});
-
+/**
+ * Dispatches `sources.reassignSource` through the REAL sources dispatch,
+ * riding the accept lane's transaction entry (the withdrawal-proof
+ * precedent: one operation-agnostic dispatch table, the envelope carries
+ * the operation; review round 1 deleted this lane's duplicate pair).
+ */
 export const probeReassignSource = action({
   args: { envelope: v.any(), sessionId: v.optional(v.string()) },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
@@ -328,7 +198,7 @@ export const probeReassignSource = action({
     if (sessionId === null) {
       return serviceIdentityUnavailable();
     }
-    return ctx.runMutation(internal.sources.reassign.probe.reassignTransaction, {
+    return ctx.runMutation(internal.sources.accept.commands.acceptSourceTransaction, {
       envelope: args.envelope,
       serviceSessionId: sessionId,
     });
@@ -352,73 +222,38 @@ export const reassignState = internalQuery({
     if (companyId === null) {
       return serviceIdentityUnavailable();
     }
-    const sources = await ctx.db
-      .query("sources")
-      .withIndex("by_company_order", (q) => q.eq("companyId", companyId))
-      .collect();
-    const sourceRows = [];
-    for (const source of sources) {
-      const links = await ctx.db
-        .query("sourceProjectLinks")
-        .withIndex("by_source", (q) => q.eq("sourceId", source._id))
-        .collect();
-      sourceRows.push({
+    // The shared tenant-scoped walks; this lane maps its own wire rows.
+    const sourceRows = (await companySourcesWithLinks(ctx.db, companyId)).map(
+      ({ source, links }) => ({
         sourceId: source._id,
         lifecycle: source.lifecycle,
         withdrawnReason: source.withdrawnReason ?? null,
         projectIds: links.map((link) => link.projectId),
-      });
-    }
-    const findings = await ctx.db
-      .query("findings")
-      .withIndex("by_company_scope_key", (q) => q.eq("companyId", companyId))
-      .collect();
-    const revisionRows = [];
-    for (const finding of findings) {
-      const revisions = await ctx.db
-        .query("findingRevisions")
-        .withIndex("by_finding_revision", (q) => q.eq("findingId", finding._id))
-        .order("asc")
-        .collect();
-      for (const revision of revisions) {
-        revisionRows.push({
-          findingId: finding._id,
-          revisionId: revision._id,
-          revision: revision.revision,
-          semanticKey: finding.semanticKey,
-          value: revision.value,
-          knowledgeTag: knowledgeTagOf(revision.knowledgeState),
-          knowledgeState: revision.knowledgeState,
-          origin: revision.origin,
-          reason: revision.reason ?? null,
-          reassignedSourceId: revision.reassignedSourceId ?? null,
-          withdrawnSourceId: revision.withdrawnSourceId ?? null,
-          supersedesRevisionId: revision.supersedesRevisionId ?? null,
-        });
-      }
-    }
-    const jobs = await ctx.db
-      .query("durableJobs")
-      .withIndex("by_company", (q) => q.eq("companyId", companyId))
-      .filter((q) =>
-        q.or(
-          q.eq(q.field("kind"), "memory.recompute_dependents"),
-          q.eq(q.field("kind"), "processing.analyze_change_plan"),
-        ),
-      )
-      .collect();
-    const reanalysisRuns = await ctx.db
-      .query("processingRuns")
-      .withIndex("by_company_state", (q) => q.eq("companyId", companyId))
-      .filter((q) => q.eq(q.field("kind"), "reanalysis"))
-      .collect();
-    const events = await ctx.db
-      .query("outboxEvents")
-      .withIndex("by_company", (q) => q.eq("companyId", companyId))
-      .collect();
+      }),
+    );
+    const findingRows = await companyFindingRevisions(ctx.db, companyId);
+    const revisionRows = findingRows.flatMap(({ finding, revisions }) =>
+      revisions.map((revision) => ({
+        findingId: finding._id,
+        revisionId: revision._id,
+        revision: revision.revision,
+        semanticKey: finding.semanticKey,
+        value: revision.value,
+        knowledgeTag: knowledgeTagOf(revision.knowledgeState),
+        knowledgeState: revision.knowledgeState,
+        origin: revision.origin,
+        reason: revision.reason ?? null,
+        reassignedSourceId: revision.reassignedSourceId ?? null,
+        withdrawnSourceId: revision.withdrawnSourceId ?? null,
+        supersedesRevisionId: revision.supersedesRevisionId ?? null,
+      })),
+    );
+    const jobs = await companyMemoryJobs(ctx.db, companyId);
+    const reanalysisRuns = await companyReanalysisRuns(ctx.db, companyId);
+    const events = await companyOutboxEvents(ctx.db, companyId);
     return okResult({
       sources: sourceRows,
-      findings: findings.map((finding) => ({
+      findings: findingRows.map(({ finding }) => ({
         findingId: finding._id,
         semanticKey: finding.semanticKey,
         scopeKind: finding.scopeKind,

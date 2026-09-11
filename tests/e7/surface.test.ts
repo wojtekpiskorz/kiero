@@ -8,8 +8,10 @@
  *   checked sources dispatch exactly like the sibling write commands;
  * - the pure decisions: the declared-set de-duplication, the
  *   nothing-to-change set comparison, and the C5 scope re-assessment
- *   decision (narrowing, correction authority, idempotence, surviving
- *   placement witness);
+ *   decision proving the WHOLE narrowing rule in one place (company
+ *   memory, still-linked scopes, correction authority, idempotence,
+ *   surviving placement witness), exactly the branch the marking core
+ *   runs;
  * - the declared consumer edge: `sources.sourceReassigned` projects onto
  *   the recomputation cause and the amended executor input still decodes
  *   every existing registration shape (no required key was added);
@@ -41,7 +43,7 @@ import {
   reassignSourceEntry,
   sameLinkSet,
 } from "../../convex/sources/reassign/reassignment";
-import { decideScopeReassessment } from "../../convex/sources/reassign/scope";
+import { decideScopeReassessment } from "../../convex/memory/findings/reassignment";
 import { recomputeDependentsExecutor } from "../../convex/memory/recompute/executor";
 import { SourceEvidenceRow } from "../../convex/sources/read/exposition";
 import { memoryCopy } from "../../apps/web/src/features/memory/state";
@@ -142,7 +144,11 @@ describe("the C5 scope re-assessment decision (pure)", () => {
   const base = {
     currentKnowledgeTag: "known",
     currentRevisionOrigin: "publication",
-    scopeProjectLinked: false,
+    scopeKind: "project" as const,
+    scopeProjectId: projectId,
+    // The scope project is NOT in the moved source's current links (the
+    // link set that changed); a still-linked scope names it here.
+    currentProjectIds: [otherProjectId],
     movedSourceId: sourceId,
     restsOnMovedSource: true,
     currentWitnesses: [] as ReturnType<typeof witness>[],
@@ -152,9 +158,15 @@ describe("the C5 scope re-assessment decision (pure)", () => {
     expect(decideScopeReassessment(base)).toEqual({ decision: "mark_updating" });
   });
 
-  it("narrows: a still-linked scope and company memory are never marked", () => {
+  it("narrows: company memory is never marked (the rule's floor)", () => {
     expect(
-      decideScopeReassessment({ ...base, scopeProjectLinked: true }),
+      decideScopeReassessment({ ...base, scopeKind: "company", scopeProjectId: null }),
+    ).toEqual({ decision: "retain", basis: "company_scope" });
+  });
+
+  it("narrows: a scope the source still links keeps standing", () => {
+    expect(
+      decideScopeReassessment({ ...base, currentProjectIds: [projectId, otherProjectId] }),
     ).toEqual({ decision: "retain", basis: "scope_still_linked" });
   });
 
