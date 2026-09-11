@@ -143,7 +143,10 @@ function SourceDetailMain({
       createElement("p", null, createElement("a", { href: "/" }, copy.noSourceLink)),
     );
   }
+  // key: a source switch (deep link, back, an evidence link) remounts the
+  // body so the accumulated evidence pages and cursor reset with the row.
   return createElement(SourceDetailBody, {
+    key: sourceId,
     sourceId,
     highlightedFragmentId: fragmentId,
     projectNames,
