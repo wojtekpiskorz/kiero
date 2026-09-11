@@ -39,11 +39,13 @@ export interface RevisionWireRow {
   readonly knowledgeState: unknown;
   // E7 amendment (additive, flagged): reassignment_marking joins the origin
   // vocabulary (the contracts wire above is the decode authority).
+  // I4 amendment (additive, flagged, the E7 precedent): purge_marking.
   readonly origin:
     | "publication"
     | "correction"
     | "withdrawal_marking"
-    | "reassignment_marking";
+    | "reassignment_marking"
+    | "purge_marking";
   readonly reason: string | null;
   readonly recordedByUserId: string;
   readonly recordedAtMs: number;

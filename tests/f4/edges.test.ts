@@ -5,7 +5,7 @@
  * is PR #102 review round 1; fixtures live in tests/f4/fixtures.ts).
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { okResult, parseTableId } from "@kiero/contracts";
 import { dispatchCommand, membershipPolicy } from "@kiero/runtime";
 import { valueOf } from "../d2/harness";
@@ -34,6 +34,17 @@ import {
 
 beforeEach(() => {
   useFakeContext();
+});
+
+// The repo's one deliberate answer for clock-dependent suites (round 2):
+// pin Date itself to the fixtures' T0 anchor, so the executor's Date.now()
+// reads the authored relationship (T0 < the seeded deadline) with zero
+// production seams. Only Date is faked; timers and microtasks stay real.
+beforeEach(() => {
+  vi.useFakeTimers({ now: T0, toFake: ["Date"] });
+});
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("the outbox projections", () => {

@@ -46,6 +46,18 @@ import {
   performReassignment,
   reassignSourceEntry,
 } from "../reassign/reassignment";
+// I4 registration (flagged, the C5/E7 precedent): the permanent-deletion
+// operation `sources.purgeSource` implements its declared contract entry
+// from the deletion lane's own module (../../operations/deletion/purge.ts):
+// the tombstone, the content-free ledger, the purge stages, the canonical
+// events and the durable purge registration commit atomically there; this
+// table only wires the checked path to it (administer intent: only a
+// CURRENT administrator can permanently delete).
+import {
+  performPurgeSource,
+  purgeSourceEntry,
+  type PurgeSourceInput,
+} from "../../operations/deletion/purge";
 
 /**
  * Handler table for sources mutation-transaction dispatches (exported for tests).
@@ -84,6 +96,16 @@ export function sourcesHandlers(): HandlerRegistry<MutationCtx> {
       run: async (tx, context, input, meta) => {
         const decoded = Schema.decodeUnknownSync(reassignSourceEntry.input)(input);
         return performReassignment(tx, context, decoded, meta.idempotencyKey);
+      },
+    },
+    // I4 registration (flagged, the C5 precedent): permanent deletion is an
+    // administer-intent operation - the membership policy decides from the
+    // CURRENT resolved role on every request.
+    "sources.purgeSource": {
+      intent: "administer",
+      run: (tx, context, input) => {
+        const decoded = Schema.decodeUnknownSync(purgeSourceEntry.input)(input);
+        return performPurgeSource(tx, context, decoded as PurgeSourceInput);
       },
     },
   };

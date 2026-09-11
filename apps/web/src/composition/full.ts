@@ -42,6 +42,9 @@ import { searchFeatureEntry } from "../app/features/search/entry";
 import { sourceDetailFeatureEntry } from "../app/features/source-detail/entry";
 // I3's sanctioned append (flagged, issue #55): the firm-export surface.
 import { exportsFeatureEntry } from "../app/features/exports/entry";
+// I4's sanctioned append (flagged, issue #56, the I3 precedent): the
+// permanent-deletion surface (impact preview, confirmation, cleanup status).
+import { dataDeletionFeatureEntry } from "../app/features/data-deletion/entry";
 
 /** The mounted feature ids the complete core must compose, in order. */
 export const FULL_CORE_FEATURE_IDS: readonly string[] = [
@@ -58,6 +61,8 @@ export const FULL_CORE_FEATURE_IDS: readonly string[] = [
   "operations.processing",
   "calendar.connection",
   "attention.push",
+  // I4's sanctioned append (flagged, issue #56): the deletion surface.
+  "operations.deletion",
 ];
 
 /** Routes the core retired at this join (the separate capture screen). */
@@ -104,6 +109,7 @@ export function fullCoreAppFeatures(): readonly AppFeatureEntry[] {
     gmProcessingFeatureEntry,
     calendarFeatureEntry,
     notificationsFeatureEntry,
+    dataDeletionFeatureEntry,
   ]);
   const problems = fullCoreProblems(composed);
   if (problems.length > 0) {

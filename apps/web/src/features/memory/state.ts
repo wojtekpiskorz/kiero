@@ -69,6 +69,9 @@ export const memoryCopy = {
     // E7 amendment (additive, flagged): a project reassignment's scope
     // re-assessment marking, rendered honestly (never as a withdrawal).
     reassignment_marking: "oznaczenie po przypisaniu źródła do innych projektów",
+    // I4 amendment (additive, flagged, the E7 precedent): a permanent
+    // deletion's support-removal marking.
+    purge_marking: "oznaczenie po trwałym usunięciu źródła",
   } as const,
   revisionAuthorLabel: "zapisał",
   revisionReasonLabel: "powód",

@@ -137,9 +137,19 @@ export const recomputeDependentsInput = Schema.Struct({
   reassignedByUserId: Schema.optionalKey(Schema.NullOr(tableIdSchema("users"))),
 });
 
+/**
+ * I4 amendment (issue #56, the E3 `extractFragmentsInput` precedent for
+ * input-shape amendments made by the edge-owning lane): the drain projects
+ * `sources.sourcePurged` onto this input, but the certified payload carries
+ * only the source id (the purge transaction registers the job itself with
+ * the real record id, under the SAME dedup key, so the projection collapses
+ * onto the publisher's row). `deletionRecordId` is therefore nullable:
+ * `null` means "resolve the source's content-free `source_purge` ledger
+ * record in-company" (exactly one exists per purged source).
+ */
 export const purgeSourceInput = Schema.Struct({
   sourceId: tableIdSchema("sources"),
-  deletionRecordId: tableIdSchema("deletionRecords"),
+  deletionRecordId: Schema.NullOr(tableIdSchema("deletionRecords")),
 });
 
 export const reconcileOutcomeInput = Schema.Struct({

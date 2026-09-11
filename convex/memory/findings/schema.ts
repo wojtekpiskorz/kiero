@@ -62,6 +62,11 @@ const revisionOrigin = v.union(
   // project reassignment: value preserved verbatim, knowledge state
   // updating-until-revalidated, never a withdrawal.
   v.literal("reassignment_marking"),
+  // I4 amendment (additive, flagged, the E7 precedent): the support-removal
+  // marking of a permanent source deletion (issue #56): a purged source can
+  // witness nothing, so findings it alone supported become unknown with a
+  // machine reason, attributed by SOURCE ID.
+  v.literal("purge_marking"),
 );
 
 /** Witness kinds a PLAN may claim (derivation/supersession are not witnesses). */
@@ -139,6 +144,12 @@ export const findingsTables = {
      * one).
      */
     reassignedSourceId: v.optional(shared.sourceId),
+    /**
+     * I4 amendment (additive, flagged, the E7 attribution precedent): the
+     * source whose permanent deletion a `purge_marking` revision belongs
+     * to (by SOURCE ID, never by reason text).
+     */
+    purgedSourceId: v.optional(shared.sourceId),
     recordedByUserId: shared.userId,
     recordedAtMs: shared.tsMs,
   }).index("by_finding_revision", ["findingId", "revision"]),

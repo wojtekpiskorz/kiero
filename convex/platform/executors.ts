@@ -102,6 +102,12 @@ import { buildArchiveExecutor } from "../operations/exports/executor";
 // (convex/search/executor.ts); this registry entry is its composition point.
 import { searchIndexExecutor } from "../search/executor";
 
+// I4 append (flagged shared-file change, the G3/E5 precedent): the
+// deletion.purge_source executor implementation lives in I4's owned path
+// (convex/operations/deletion/executor.ts); this registry entry is its
+// composition point.
+import { purgeSourceExecutor } from "../operations/deletion/executor";
+
 /** One durable job row (the executable counterpart of an outbox event). */
 export type DurableJobDoc = Doc<"durableJobs">;
 
@@ -154,4 +160,7 @@ export const jobExecutors: Record<string, JobExecutor> = {
 
   // I3 append (flagged shared-file change): the firm-export archive build.
   [buildArchiveExecutor.jobKind]: buildArchiveExecutor,
+
+  // I4 append (flagged shared-file change): the permanent-deletion purge.
+  [purgeSourceExecutor.jobKind]: purgeSourceExecutor,
 };

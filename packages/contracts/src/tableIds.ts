@@ -134,6 +134,12 @@ export const TABLE_ID_NAMES = [
   "exportSourceLinks",
   // operations/deletion
   "deletionRecords",
+  // I4 amendment (issue #56, flagged in the issue report; the F3/G3
+  // closed-inventory precedent): the per-stage purge tracking rows of one
+  // permanent deletion (media bytes, transcripts, findings marking, search
+  // index, notification work, exports) - pending/purged/failed state with
+  // the 24-hour deadline the administrator's status screen reports.
+  "deletionPurgeStages",
   // operations/backups
   "recoveryManifests",
   // operations/telemetry

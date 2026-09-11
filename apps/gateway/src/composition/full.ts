@@ -31,7 +31,14 @@ export const FULL_CORE_PROVIDER_IDS: readonly string[] = [
   "uploads",
   "images",
   "media",
+  // I4 append (issue #56, flagged): (a) the REPAIR of a pre-existing
+  // main-branch drift - I3's exports provider was appended to the registry
+  // between media and calendar-oauth but never named here, so the boot
+  // gate threw on every load of the Worker entry; (b) the deletion purge
+  // provider (the service-credentialed media-byte deletion route).
+  "exports",
   "calendar-oauth",
+  "purge",
 ];
 
 /** The fixed route paths the joined core flow depends on. */

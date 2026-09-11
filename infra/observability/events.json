@@ -15,6 +15,7 @@
     "ops.health.heartbeat",
     "ops.health.silence_detected",
     "ops.backup.stale",
+    "ops.deletion.overdue",
     "ops.cost.entry",
     "ops.cost.threshold_warning",
     "ops.cost.threshold_alert",
@@ -55,7 +56,8 @@
     "serviceName": "^[a-z][a-z0-9_.-]{2,63}$",
     "environment": "^(dev|staging|alpha-production)$",
     "route": "^\\/[a-z0-9/_-]{1,120}$",
-    "httpStatus": "^\\d{3}$"
+    "httpStatus": "^\\d{3}$",
+    "stageKind": "^[a-z][a-z0-9_]{1,31}$"
   },
   "allowlist": {
     "ops.processing.completed": [
@@ -112,6 +114,13 @@
       "ageMs",
       "state",
       "count"
+    ],
+    "ops.deletion.overdue": [
+      "sourceId",
+      "stageKind",
+      "state",
+      "attempts",
+      "ageMs"
     ],
     "ops.cost.entry": [
       "provider",

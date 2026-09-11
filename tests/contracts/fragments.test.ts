@@ -95,7 +95,7 @@ function memberLiterals(validator: GenericValidator, table: string): string[] {
 }
 
 describe("schema composition", () => {
-  it("composes exactly the closed table inventory (72 tables)", () => {
+  it("composes exactly the closed table inventory (76 tables)", () => {
     const composed = Object.keys(tables).sort();
     const inventory = [...TABLE_ID_NAMES].sort();
     expect(composed).toEqual(inventory);
@@ -110,8 +110,10 @@ describe("schema composition", () => {
     // calendarSyncAttempts and calendarProofEvents (the sync attempt
     // ledger and the proof-only fake-Google event store); 73 since the F3
     // amendment added pushDeliveries and the proof-only pushProofDevices;
-    // 75 since the F4 amendment added reminderSchedules and reminderSnoozes.
-    expect(composed).toHaveLength(75);
+    // 75 since the F4 amendment added reminderSchedules and reminderSnoozes;
+    // 76 since the I4 amendment added deletionPurgeStages (the per-stage
+    // purge tracking of one permanent deletion).
+    expect(composed).toHaveLength(76);
   });
 
   it("gives the domain event envelope a durable outbox home", () => {
