@@ -29,13 +29,18 @@
  * a foreign company's source, and one source purged through the real
  * public command before the browser phase.
  *
- * Run (repo root; the dev server must serve the app, see KIERO_R5_APP):
- *   KIERO_R5_CONVEX=nautical-loris-352.convex.cloud \
- *   KIERO_R5_GATEWAY=https://kiero-dev-gateway-i4.wojtek-524.workers.dev \
- *   VITE_CONVEX_URL=https://nautical-loris-352.convex.cloud \
- *   VITE_GATEWAY_URL=https://kiero-dev-gateway-i4.wojtek-524.workers.dev \
- *   npm --prefix apps/web run dev -- --port 5173
- * then: node e2e/core-flow/r5-live-legs.mjs
+ * Run (repo root). Two processes, two env sets:
+ *  1. the web dev server (serves the app the browser drives; VITE_* vars):
+ *       VITE_CONVEX_URL=https://nautical-loris-352.convex.cloud \
+ *       VITE_GATEWAY_URL=https://kiero-dev-gateway-i4.wojtek-524.workers.dev \
+ *       npm --prefix apps/web run dev -- --port 5173
+ *  2. this harness (its own node process; KIERO_R5_* vars, all optional):
+ *       node e2e/core-flow/r5-live-legs.mjs
+ *     KIERO_R5_CONVEX_URL / KIERO_R5_GATEWAY_URL (API endpoints this
+ *     script calls), KIERO_R5_APP (the dev-server origin above) and
+ *     KIERO_R5_CHROMIUM default to the dev/i4 lease, localhost:5173 and
+ *     the cached Playwright Chromium; KIERO_R5_FILLERS overrides the
+ *     121-message count for dry runs (the official run keeps 121).
  * (Not a vitest file: live evidence, transcribed onto #130. Everything
  * printed is sanitized: ids, states and Polish product text only; no
  * tokens, no secrets.)
@@ -44,7 +49,13 @@
 import { randomUUID } from "node:crypto";
 import { chromium } from "playwright-core";
 import { homedir } from "node:os";
-import { envelope, fixtureCodeOf, signInWithFixtureCode } from "../helpers.mjs";
+import {
+  envelope,
+  fixtureCodeOf,
+  openAuthenticatedBrowser,
+  recorder,
+  signInWithFixtureCode,
+} from "../helpers.mjs";
 
 const CONVEX_URL = process.env.KIERO_R5_CONVEX_URL ?? "https://nautical-loris-352.convex.cloud";
 const GATEWAY = process.env.KIERO_R5_GATEWAY ?? "https://kiero-dev-gateway-i4.wojtek-524.workers.dev";
@@ -64,15 +75,11 @@ const PURGED_MARKER = `DO-USUNIECIA-TRWALE-${RUN}`;
 const FOREIGN_MARKER = `SEKRET-OBCEJ-FIRMY-${RUN}`;
 
 const REFUSAL = "Takie źródło nie istnieje albo nie należy do Twojej firmy.";
-const LEGACY_MALFORMED = "Odnośnik do źródła jest nieprawidłowy — nie otworzono żadnej wiadomości.";
+const LEGACY_MALFORMED = "Odnośnik do źródła jest nieprawidłowy — nie otwarto żadnej wiadomości.";
 
-const results = [];
-function record(id, outcome, detail) {
-  results.push({ id, outcome });
-  console.log(`[${outcome}] ${id}${detail === undefined ? "" : ` :: ${detail}`}`);
-  return outcome === "PASS";
-}
-const note = (line) => console.log(`NOTE | ${line}`);
+const tally = recorder();
+const record = tally.record;
+const note = tally.note;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const isOk = (result) => result?._tag === "ok";
@@ -229,19 +236,15 @@ record(
   `state=${oldState}`,
 );
 
-// --- the browser -----------------------------------------------------------
+// --- the browser (the shared authenticated bootstrap) -----------------------
 
-const browser = await chromium.launch({ executablePath: CHROMIUM, headless: true });
-const context = await browser.newContext({ locale: "pl-PL" });
-await context.addInitScript(
-  ({ convexUrl, t, r }) => {
-    const ns = convexUrl.replace(/[^a-zA-Z0-9]/g, "");
-    localStorage.setItem(`__convexAuthJWT_${ns}`, t);
-    localStorage.setItem(`__convexAuthRefreshToken_${ns}`, r);
-  },
-  { convexUrl: CONVEX_URL, t: token, r: refreshToken },
-);
-const page = await context.newPage();
+const { browser, page } = await openAuthenticatedBrowser({
+  chromium,
+  executablePath: CHROMIUM,
+  convexUrl: CONVEX_URL,
+  token,
+  refreshToken,
+});
 page.on("pageerror", (error) => console.log(`  [page-error] ${error.message}`));
 
 const canonical = (id, fragment = null) =>
@@ -401,11 +404,8 @@ record(
 
 await browser.close();
 
-const counts = results.reduce(
-  (acc, r) => ({ ...acc, [r.outcome]: (acc[r.outcome] ?? 0) + 1 }),
-  {},
-);
-console.log(`\nSummary: ${JSON.stringify(counts)} of ${results.length} checks`);
+const counts = tally.counts();
+console.log(`\nSummary: ${JSON.stringify(counts)} of ${tally.results.length} checks`);
 const runIds = { RUN, OLD_ID, PURGED_ID, FOREIGN_ID, fillers: FILLERS, fragmentId };
 console.log(`Run ids: ${JSON.stringify(runIds)}`);
-process.exit(results.every((r) => r.outcome === "PASS") ? 0 : 1);
+process.exit(tally.allPassed() ? 0 : 1);
