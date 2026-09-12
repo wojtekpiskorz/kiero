@@ -74,6 +74,18 @@ export const sourcesOperations = {
    * move, and dependent findings re-assess through the C5 recomputation
    * seam. A set equal to the current links is a typed conflict (nothing to
    * change), so client retries can never double-fire the reaction.
+   *
+   * R4 repair (issue #129): the complete replacement carries an
+   * observed-placement precondition. `expectedProjectIds` is the COMPLETE
+   * project set the editor saw on the read that populated the form, captured
+   * from the same snapshot as the dossier's `projectIds`. The transaction
+   * compares it with the current committed set BEFORE any write: a mismatch
+   * refuses as the typed `source_placement_stale` conflict, so a stale
+   * editor form can never silently overwrite another boss's newer
+   * reassignment. The key is REQUIRED on purpose: a pre-repair client that
+   * omits it fails the input decode (a typed validation refusal) instead of
+   * bypassing concurrency protection — an optional or defaulted
+   * precondition is exactly the hole R4 closes.
    */
   "sources.reassignSource": operationEntry({
     kind: "operation",
@@ -82,6 +94,14 @@ export const sourcesOperations = {
       sourceId: tableIdSchema("sources"),
       /** The complete new project set; empty means company-general knowledge. */
       projectIds: Schema.Array(tableIdSchema("projects")),
+      /**
+       * R4 precondition (REQUIRED, issue #129): the complete project set the
+       * editor observed when the form was loaded. Comparison ignores
+       * ordering and duplicates; a mismatch from the current committed set
+       * refuses `source_placement_stale` before any write, event or
+       * recomputation job.
+       */
+      expectedProjectIds: Schema.Array(tableIdSchema("projects")),
     }),
     result: Schema.Struct({
       reassignedAtMs: Schema.Number,

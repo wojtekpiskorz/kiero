@@ -73,6 +73,10 @@ export const sourceDetailCopy = {
   reassignmentDone:
     "Przypisanie zapisane. Rozmowy projektowe pokazują już nowe rozmieszczenie; zależne ustalenia są ponownie rozpatrywane.",
   reassignmentUnchanged: "To przypisanie jest już aktualne, nie ma czego zapisywać.",
+  // R4 (issue #129): another boss reassigned this source after this form
+  // loaded; the selection above has been reset to the current server choice.
+  reassignmentStale:
+    "Przypisanie źródła zmieniło się. Odświeżyliśmy aktualny wybór. Sprawdź go i zapisz ponownie.",
   withdrawnReassignmentNote:
     "Źródło wycofane pozostaje w historii w miejscach, w których działało; przypisania do projektów zmienia się tylko dla źródeł aktualnych.",
   // Evidence chain
@@ -233,6 +237,7 @@ const failureHints: Partial<Record<string, string>> = {
   source_not_in_company: sourceDetailCopy.notFound,
   source_withdrawn: sourceDetailCopy.withdrawnHeading,
   source_links_unchanged: sourceDetailCopy.reassignmentUnchanged,
+  source_placement_stale: sourceDetailCopy.reassignmentStale,
   source_not_active: sourceDetailCopy.withdrawnHeading,
   media_reference_not_found: sourceDetailCopy.mediaDenied,
   client_credential_missing: sourceDetailCopy.tokenMissing,
