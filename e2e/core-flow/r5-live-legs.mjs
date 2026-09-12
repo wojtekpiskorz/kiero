@@ -332,10 +332,14 @@ for (let click = 0; click < 4; click += 1) {
 const cappedCount = await plateauCount();
 const buttonGone = (await loadMore.count()) === 0;
 feedText = (await page.textContent("main")) ?? "";
+// With the official 121 fillers the button can only disappear through
+// MAX_PAGE_SIZE (isDone needs numItems >= 122 > 120), so the strict
+// article count applies; a FILLERS dry run may legitimately end on isDone.
+const strictCapCount = FILLERS >= 121;
 record(
   "L1/old-source-beyond-the-120-cap",
-  buttonGone && !feedText.includes(OLD_MARKER) ? "PASS" : "FAIL",
-  `articles=${cappedCount}; load-older hidden=${buttonGone}; marker present=${feedText.includes(OLD_MARKER)}`,
+  buttonGone && !feedText.includes(OLD_MARKER) && (!strictCapCount || cappedCount >= 120) ? "PASS" : "FAIL",
+  `articles=${cappedCount}; load-older hidden=${buttonGone}; marker present=${feedText.includes(OLD_MARKER)}; strict=${strictCapCount}`,
 );
 
 // The direct canonical open: the dossier fetches by id, feed-independent.

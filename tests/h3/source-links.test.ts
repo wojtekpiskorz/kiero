@@ -262,13 +262,18 @@ describe("the dossier's hooks never sit below an early return", () => {
         }
       }
       // An arrow body or a declared function body opens a function frame;
-      // every other brace (object literals, if/else blocks) is a block.
-      const lineOpensFunction =
-        /=>\s*\{\s*$/.test(line.trim()) || /\bfunction\b[^{]*\{\s*$/.test(line.trim());
+      // every other brace (object literals, if/else blocks) is a block. On
+      // multi-brace lines (single-line typed signatures, destructured
+      // params) only the FINAL `{` is the body brace.
+      const opensFunctionBody =
+        /=>\s*\{\s*$/.test(line.trim()) || (/\bfunction\b/.test(line) && /\{\s*$/.test(line.trim()));
       for (const brace of line.match(/\{/g) ?? []) {
         void brace;
-        frames.push(lineOpensFunction ? "fn" : "block");
+        frames.push("block");
         depth += 1;
+      }
+      if (opensFunctionBody && frames.length > 0) {
+        frames[frames.length - 1] = "fn";
       }
       for (const brace of line.match(/\}/g) ?? []) {
         void brace;
