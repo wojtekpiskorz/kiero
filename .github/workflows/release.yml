@@ -96,6 +96,10 @@ jobs:
       RELEASE_NOTES: ${{ github.event.inputs.notes }}
       VITE_CONVEX_URL: ${{ vars.STAGING_CONVEX_URL }}
       CONVEX_DEPLOYMENT: ${{ secrets.STAGING_CONVEX_DEPLOYMENT }}
+      # The deployment-scoped key is the authoritative CI target; without
+      # it `convex deploy` fails 401 MissingAccessToken even with a valid
+      # CONVEX_DEPLOYMENT reference (I8 probe P7; runbook R4).
+      CONVEX_DEPLOY_KEY: ${{ secrets.STAGING_CONVEX_DEPLOY_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
     steps:
