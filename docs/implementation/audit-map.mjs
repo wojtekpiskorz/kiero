@@ -91,6 +91,130 @@ for (const entry of entries) {
   if (entry.key !== 'M0') require(inventory.includes(reference), `${entry.key}: missing from inventory`);
 }
 require(graph.includes(`There are ${edges} core edges`), 'graph edge count differs from manifest');
+
+// Derived table content: the manifest is the authority, table cells are derivatives.
+// Every manifest-derivable cell below must match issues.json exactly.
+const openKeys = new Set(remaining.map(entry => entry.key));
+const cellTokens = (cell, context) => {
+  const tokens = [...cell.matchAll(/\[([A-Za-z]\w+) #(\d+)\]\(/g)].map(match => ({ label: match[1], number: Number(match[2]) }));
+  for (const token of tokens) {
+    const referenced = byKey.get(token.label);
+    if (referenced !== undefined) {
+      require(token.number === referenced.issueNumber, `${context} reference [${token.label} #${token.number}] does not match cached issue number ${referenced.issueNumber}`);
+    }
+  }
+  return tokens;
+};
+
+const graphRowMatches = [...graph.matchAll(/^\| \[([A-Z]\w+) #(\d+)\]\([^|)]*\) \| (OPEN|CLOSED) \| ([^|]*) \|/gm)];
+const graphRows = new Map(graphRowMatches.map(match => [match[1], { state: match[3], blockers: match[4] }]));
+require(graphRows.size === graphRowMatches.length, 'graph table contains duplicate entry rows');
+require(graphRows.size === entries.length, 'graph table row count differs from manifest entries');
+for (const entry of entries) {
+  const row = graphRows.get(entry.key);
+  require(row !== undefined, `${entry.key}: graph table row missing`);
+  if (!row) continue;
+  require(row.state === entry.state, `${entry.key}: graph table state ${row.state} differs from cached ${entry.state}`);
+  const tokens = cellTokens(row.blockers, `${entry.key}: graph table`);
+  const core = tokens.filter(token => byKey.has(token.label)).map(token => token.label);
+  const external = tokens.filter(token => !byKey.has(token.label)).map(token => token.number);
+  require(core.join(',') === entry.blockedBy.join(','), `${entry.key}: graph table blockers differ from manifest blockedBy`);
+  require(external.join(',') === (entry.externalBlockedBy ?? []).join(','), `${entry.key}: graph table external blockers differ from manifest`);
+  if (entry.blockedBy.length === 0 && (entry.externalBlockedBy ?? []).length === 0) {
+    require(row.blockers.trim() === 'None', `${entry.key}: graph table blockers must read None`);
+  }
+}
+
+const mermaidBlocks = [...graph.matchAll(/```mermaid\n([\s\S]*?)```/g)];
+require(mermaidBlocks.length === 1, 'graph must contain exactly one mermaid remaining-work block');
+const mermaid = mermaidBlocks[0];
+if (mermaid) {
+  const mermaidNodes = [...mermaid[1].matchAll(/^\s*([A-Z]\w+)\["/gm)].map(match => match[1]);
+  const mermaidEdges = [...mermaid[1].matchAll(/^\s*([A-Z]\w+) --> ([A-Z]\w+)\s*$/gm)].map(match => `${match[1]}-->${match[2]}`);
+  const derivedEdges = [];
+  for (const entry of remaining) {
+    for (const blocker of entry.blockedBy) if (openKeys.has(blocker)) derivedEdges.push(`${blocker}-->${entry.key}`);
+  }
+  require(mermaidNodes.join(',') === remaining.map(entry => entry.key).join(','), 'mermaid remaining-work nodes differ from manifest open entries');
+  require(mermaidEdges.join(',') === derivedEdges.join(','), 'mermaid remaining-work edges differ from manifest-derived remaining subgraph');
+}
+
+const remainingTable = inventory.split('## Remaining execution')[1]?.split('## Integrated implementation')[0] ?? '';
+const remainingRowMatches = [...remainingTable.matchAll(/^\| \[([A-Z]\w+) #(\d+)\]\([^|)]*\) \| [^|]* \| ([^|]*) \|/gm)];
+const remainingRows = new Map(remainingRowMatches.map(match => [match[1], match[3]]));
+require(remainingRows.size === remainingRowMatches.length, 'inventory remaining-execution table contains duplicate rows');
+require([...remainingRows.keys()].join(',') === remaining.map(entry => entry.key).join(','), 'inventory remaining-execution rows differ from manifest open entries');
+for (const entry of remaining) {
+  const cell = remainingRows.get(entry.key);
+  if (cell === undefined) continue;
+  const tokens = cellTokens(cell, `${entry.key}: inventory remaining`);
+  for (const token of tokens) require(byKey.has(token.label), `${entry.key}: inventory remaining reference [${token.label}] is not a manifest key`);
+  const core = tokens.filter(token => byKey.has(token.label)).map(token => token.label);
+  require(core.join(',') === entry.blockedBy.join(','), `${entry.key}: inventory remaining blockers differ from manifest blockedBy`);
+}
+
+const integratedTable = inventory.split('## Integrated implementation')[1]?.split('## Evidence qualifications')[0] ?? '';
+const integratedRowMatches = [...integratedTable.matchAll(/^\| \[([A-Z]\w+) #(\d+)\]\([^|)]*\) \| [^|]* \| [^|]* \| ([^|]*) \|/gm)];
+const integratedRows = new Map(integratedRowMatches.map(match => [match[1], match[3]]));
+require(integratedRows.size === integratedRowMatches.length, 'inventory integrated table contains duplicate rows');
+const expectedIntegrated = entries.filter(entry => entry.state === 'CLOSED' && entry.key !== 'M0').map(entry => entry.key);
+require(sameSet([...integratedRows.keys()], expectedIntegrated), 'inventory integrated rows differ from manifest closed entries');
+for (const [key, cell] of integratedRows) {
+  for (const token of cellTokens(cell, `${key}: inventory remaining owners`)) {
+    require(byKey.has(token.label) && openKeys.has(token.label), `${key}: inventory remaining owner ${token.label} is not an open manifest entry`);
+  }
+}
+
+const proofRowCells = new Map();
+for (const match of proofDoc.matchAll(/^\| (P\d\d) [^|]* \| [^|]* \| [^|]* \| ([^|]*) \|/gm)) {
+  proofRowCells.set(match[1], match[2]);
+}
+for (const proof of expectedProofs) {
+  const cell = proofRowCells.get(proof);
+  require(cell !== undefined, `${proof}: proof register row missing`);
+  if (cell === undefined) continue;
+  const owners = cellTokens(cell, `${proof}: proof owners`).map(token => token.label);
+  const expected = remaining.filter(entry => entry.proofs.includes(proof)).map(entry => entry.key);
+  require(sameSet(owners, expected), `${proof}: required owners differ from manifest open proof owners`);
+}
+
+const uxRemainingReferences = new Set();
+for (const match of ux.matchAll(/^\| (UX-[A-Z]+-\d+) \| [^|]* \| ([^|]*) \|/gm)) {
+  const identifier = match[1];
+  const note = match[2];
+  const marker = 'Remaining repair/proof owners: ';
+  const at = note.indexOf(marker);
+  require(at >= 0, `${identifier}: missing remaining-owner references`);
+  if (at < 0) continue;
+  for (const token of cellTokens(note.slice(at), `${identifier}: remaining owners`)) {
+    require(byKey.has(token.label) && openKeys.has(token.label), `${identifier}: remaining owner ${token.label} is not an open manifest entry`);
+    uxRemainingReferences.add(token.label);
+  }
+}
+for (const entry of remaining) {
+  const productFacing = entry.ownedPaths.some(path => path.startsWith('apps/web/'));
+  require(!productFacing || uxRemainingReferences.has(entry.key), `UX coverage never references open product-path owner ${entry.key}`);
+}
+
+// Cached map body (#15): string equality with the live body is checked in --remote mode;
+// offline we still reject the count-restating drift class and stale execution-order rows.
+require(typeof manifest.mapBody === 'string' && manifest.mapBody.length > 0, 'cached map body missing');
+if (typeof manifest.mapBody === 'string') {
+  for (const [pattern, message] of [
+    [/\d+ native children/, 'mapBody restates the native-children count'],
+    [/\d+ core dependency edges/, 'mapBody restates the core-edge count'],
+    [/(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)(?: [a-z-]+){0,3} remain\b/i, 'mapBody restates a remaining-work count'],
+  ]) {
+    require(!pattern.test(manifest.mapBody), message);
+  }
+  const mapBodyJ5Row = manifest.mapBody.match(/^\| \[J5 #64\]\([^)]*\) \| [^|]* \| ([^|]*) \|/m);
+  require(mapBodyJ5Row !== null, 'mapBody execution-order row for J5 missing');
+  if (mapBodyJ5Row) {
+    const mapBodyJ5Blockers = cellTokens(mapBodyJ5Row[1], 'mapBody J5 execution order').filter(token => byKey.has(token.label)).map(token => token.label);
+    require(mapBodyJ5Blockers.join(',') === byKey.get('J5').blockedBy.join(','), 'mapBody J5 execution-order blockers differ from manifest blockedBy');
+  }
+}
+
 for (const [name, content] of [['graph', graph], ['inventory', inventory], ['proofs', proofDoc], ['UX', ux]]) {
   require(!/#pending|number assigned during reconciliation|#None/.test(content), `${name}: unresolved generated reference`);
 }
@@ -116,9 +240,7 @@ if (process.argv.includes('--remote') && errors.length === 0) {
       if (!remote) continue;
       require(hash(remote.body ?? '') === entry.bodySha256, `${entry.key}: GitHub body differs from cache`);
       require(remote.title === entry.title, `${entry.key}: GitHub title differs from cache`);
-      // M0's PR closes its own administrative issue after publishing this snapshot.
-      const administrationCompleted = entry.key === 'M0' && entry.state === 'OPEN' && remote.state === 'closed';
-      require(remote.state.toUpperCase() === entry.state || administrationCompleted, `${entry.key}: GitHub state differs from cached state`);
+      require(remote.state.toUpperCase() === entry.state, `${entry.key}: GitHub state differs from cached state`);
       const blockers = await api(`${prefix}/${entry.issueNumber}/dependencies/blocked_by?per_page=100`);
       const expected = entry.blockedBy.map(key => byKey.get(key).issueNumber).concat(entry.externalBlockedBy ?? []);
       require(sameSet(blockers.map(blocker => blocker.number), expected), `${entry.key}: native blockers differ from cache`);
@@ -131,7 +253,7 @@ if (process.argv.includes('--remote') && errors.length === 0) {
   live = {
     closed: children.length - open.length, open: open.length,
     unassignedWithNoOpenNativeBlockers: ready.map(child => `${byNumber.get(child.number)?.key} #${child.number}`),
-    note: 'Native readiness still requires resource and active path ownership checks. Only M0 OPEN-to-CLOSED is allowed after its own documentation PR; update every other cached state when it changes.'
+    note: 'Native readiness still requires resource and active path ownership checks. Cached states change only through bounded administration PRs that rerun this audit and keep every derived table consistent with the manifest.'
   };
 }
 console.log(JSON.stringify({ result: errors.length ? 'FAIL' : 'PASS', entries: entries.length, coreEdges: edges, uxRows: uxKeys.length, live, errors }, null, 2));

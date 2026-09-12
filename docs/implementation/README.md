@@ -1,6 +1,6 @@
 # Kiero core implementation package
 
-The application is implemented across 48 integrated historical issues. The 2026-09-12 review identified repairs and missing real-service qualification. The map now tracks 67 native children: 52 prior implementation issues, 14 new repair/proof issues and the M0 reconciliation task. Eighteen implementation and qualification issues remain after M0.
+The application is implemented across 48 integrated historical issues. The 2026-09-12 review identified repairs and missing real-service qualification. The map's native children are the prior implementation issues, the registered repair and proof issues, and the map administration tasks; the audit derives current counts and remaining work from the manifest. The inventory's remaining-execution table lists every issue that still owes implementation or qualification work.
 
 The target remains a complete accepted core behind an unstyled Polish PWA. Final design integration, production activation and the four-week live alpha remain separate work.
 
@@ -19,7 +19,7 @@ Start with the [live implementation map](https://github.com/wojtekpiskorz/kiero/
 
 ## Next implementation work
 
-After M0 closes, R1, R4, R6 and R7 have no open native blockers. Claim only an unassigned issue after a fresh dependency and ownership audit. Root order is a scheduling opportunity, not a promise of available accounts or cloud capacity.
+With M0 closed, R1, R4, R6, R7 and the M1 map administration task have no open native blockers. Claim only an unassigned issue after a fresh dependency and ownership audit. Root order is a scheduling opportunity, not a promise of available accounts or cloud capacity.
 
 R1-R3 repair clarification provenance, purge and push delivery. R4 protects source reassignment against stale editors. R5 fixes old-source links. R6 replaces the broken/placeholder release path with executable tooling. R7 removes the known Calendar test timing flake while preserving timeout assertions.
 
