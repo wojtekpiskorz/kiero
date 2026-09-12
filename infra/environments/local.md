@@ -33,12 +33,17 @@ created by their owning tickets on first need. Evidence:
 | Name | Consumed by | Status |
 | --- | --- | --- |
 | `OPENROUTER_API_KEY` | Convex server actions (AI calls) | name present in local `.env` and as GitHub repo secret; Convex env injection PENDING (E2) |
-| `AUTH_RESEND_KEY` | Convex Auth custom Email provider | PENDING (B1) |
+| `RESEND_API_KEY`, `RESEND_FROM` | Convex email integration (`convex/integrations/email/resend.ts`) | PENDING (B5 owner provisioning); replaces the dead `AUTH_RESEND_KEY` name |
 | `AXIOM_API_TOKEN` | gateway/media/export/backup workers + Convex app events | PENDING (I2) |
 | `R2_MEDIA_ACCESS_KEY_ID`, `R2_MEDIA_SECRET_ACCESS_KEY` | media/export containers (S3 API) | PENDING (D5/D6) |
 | `R2_BACKUP_ACCESS_KEY_ID`, `R2_BACKUP_SECRET_ACCESS_KEY` | backup container (S3 API, separate per-bucket token) | PENDING (I5) |
 | `CONVEX_BACKUP_ADMIN_KEY` | backup container export step (candidate name, finalized by I5) | PENDING (I5) |
-| Web Push VAPID key pair, Google OAuth client secret | gateway / Convex Auth | PENDING (G1/B1); names assigned by their tickets |
+| `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`, `WEB_PUSH_VAPID_PUBLIC_KEY`/`_PRIVATE_KEY`/`_SUBJECT` | Convex access + calendar connection; Convex push delivery | PENDING (B1/G4 owner provisioning) |
+
+The per-runtime consumer table for every name (including service tokens and
+executor URLs) is [infra/bindings/](../bindings/README.md), the single
+namespace authority reconciled with the runtime reads by I8; rows here are
+the dev-environment subset only.
 
 ## Resource naming convention
 
@@ -62,14 +67,23 @@ created by their owning tickets on first need. Evidence:
 
 Default commands in this repository target `dev` ONLY:
 
-- `npx convex dev` uses root `convex.json` (`kiero-dev-core`); can never
-  touch staging/alpha because they are different projects.
+- `npx convex dev` uses root `convex.json` (`kiero-dev-core`) and resolves to
+  the project's default dev deployment; it can never touch staging, because
+  staging is a named deployment created without `--default`
+  (`wojtek-piskorz-jr:kiero-dev-core:staging`) inside the same project,
+  reachable only through that explicit reference (I8 reconciliation with the
+  owner's no-new-projects instruction). A bare `npx convex deploy` likewise
+  resolves to the project's default production deployment if one exists, a
+  dev-scope resource, never the `staging` reference and never alpha.
 - `wrangler deploy` inside `apps/*` uses the top-level env block of each
   `wrangler.jsonc`, whose names all start with `kiero-dev-`.
 - Any staging/alpha operation must spell the environment:
-  `--env staging` / `--env alpha-production` for wrangler, and explicit
-  `team:project:ref` (`wojtek-piskorz-jr:kiero-staging-core:...`) for Convex.
-  There is no shared default that resolves to production.
+  `--env staging` / `--env alpha-production` for wrangler, and for Convex the
+  explicit reference `wojtek-piskorz-jr:kiero-dev-core:staging` (staging) or
+  the separate-project `team:project:ref` / `--prod` addressing that alpha
+  provisioning will decide (see the owner-decision note in
+  [alpha-production.md](alpha-production.md)).
+  There is no shared default that resolves to staging or production.
 
 Repository and CI command aliases must preserve this shape (for example
 `dev:*`, `deploy:staging:*`, `deploy:alpha:*` with no un-suffixed deploy

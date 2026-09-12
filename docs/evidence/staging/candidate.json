@@ -1,0 +1,149 @@
+{
+  "candidateId": "kiero-staging-2026-09-12",
+  "kind": "synthetic-qualification-candidate",
+  "issue": 133,
+  "descriptorId": "infra/release/targets/staging@2026-09-12",
+  "basedOnRevision": "1ffb4dbc3966024270987da22893fb24f02b4df3",
+  "releaseCandidateRevision": "PENDING: the merge commit of the I8 pull request; the release workflow itself enforces exact-SHA deterministic-Checks success before any transport runs",
+  "provenance": {
+    "ownerResourceInstruction": "https://github.com/wojtekpiskorz/kiero/issues/15#issuecomment-5618841487",
+    "rule": "no new Convex projects, ever; all proof refs stay under the existing kiero-dev-core project",
+    "topologyDecision": "named prod-type deployment 'staging' inside kiero-dev-core replaces the superseded kiero-staging-core project"
+  },
+  "environment": {
+    "label": "staging",
+    "githubEnvironment": "staging",
+    "runtimeLabels": ["ENVIRONMENT=staging", "KIERO_ENVIRONMENT=staging"],
+    "webOrigin": "https://kiero-staging-web.pages.dev"
+  },
+  "convex": {
+    "team": "wojtek-piskorz-jr",
+    "project": "kiero-dev-core",
+    "projectCreated": false,
+    "projectCreationProhibited": true,
+    "deploymentReference": "wojtek-piskorz-jr:kiero-dev-core:staging",
+    "deploymentType": "prod",
+    "region": "eu",
+    "isDefault": false,
+    "deploymentSlug": "PENDING creation (record here when provisioned)",
+    "deploymentUrl": "PENDING (<slug>.eu-west-1.convex.cloud)"
+  },
+  "cloudflare": {
+    "accountSameAsDev": true,
+    "pagesProject": "kiero-staging-web",
+    "workers": [
+      "kiero-staging-gateway",
+      "kiero-staging-media-worker",
+      "kiero-staging-export-worker",
+      "kiero-staging-backup-worker"
+    ],
+    "r2Buckets": [
+      { "name": "kiero-staging-media", "jurisdiction": "eu", "location": "weur" },
+      { "name": "kiero-staging-backup", "jurisdiction": "eu", "location": "weur" }
+    ],
+    "corsAllowListOrigins": ["https://kiero-staging-web.pages.dev"]
+  },
+  "githubConfiguration": {
+    "environmentVariables": [
+      { "name": "STAGING_CONVEX_URL", "context": "vars", "consumer": "VITE_CONVEX_URL build input" }
+    ],
+    "environmentSecrets": [
+      { "name": "STAGING_CONVEX_DEPLOYMENT", "consumer": "CONVEX_DEPLOYMENT (deployment reference)" },
+      { "name": "STAGING_CONVEX_DEPLOY_KEY", "consumer": "CONVEX_DEPLOY_KEY (deployment-scoped deploy key; see evidence runbook R4 for the workflow mapping status)" },
+      { "name": "STAGING_CLOUDFLARE_API_TOKEN", "consumer": "CLOUDFLARE_API_TOKEN (wrangler)" },
+      { "name": "STAGING_CLOUDFLARE_ACCOUNT_ID", "consumer": "CLOUDFLARE_ACCOUNT_ID (wrangler)" },
+      { "name": "STAGING_OPENROUTER_API_KEY", "consumer": "Convex env OPENROUTER_API_KEY" },
+      { "name": "STAGING_RESEND_API_KEY", "consumer": "Convex env RESEND_API_KEY" },
+      { "name": "STAGING_RESEND_FROM", "consumer": "Convex env RESEND_FROM" },
+      { "name": "STAGING_AUTH_GOOGLE_ID", "consumer": "Convex env AUTH_GOOGLE_ID" },
+      { "name": "STAGING_AUTH_GOOGLE_SECRET", "consumer": "Convex env AUTH_GOOGLE_SECRET" },
+      { "name": "STAGING_WEB_PUSH_VAPID_PUBLIC_KEY", "consumer": "Convex env WEB_PUSH_VAPID_PUBLIC_KEY" },
+      { "name": "STAGING_WEB_PUSH_VAPID_PRIVATE_KEY", "consumer": "Convex env WEB_PUSH_VAPID_PRIVATE_KEY" },
+      { "name": "STAGING_WEB_PUSH_VAPID_SUBJECT", "consumer": "Convex env WEB_PUSH_VAPID_SUBJECT" },
+      { "name": "STAGING_AXIOM_API_TOKEN", "consumer": "Convex env + worker secret AXIOM_API_TOKEN" },
+      { "name": "STAGING_R2_MEDIA_ACCESS_KEY_ID", "consumer": "media/export container env R2_MEDIA_ACCESS_KEY_ID" },
+      { "name": "STAGING_R2_MEDIA_SECRET_ACCESS_KEY", "consumer": "media/export container env R2_MEDIA_SECRET_ACCESS_KEY" },
+      { "name": "STAGING_R2_BACKUP_ACCESS_KEY_ID", "consumer": "backup container env R2_BACKUP_ACCESS_KEY_ID" },
+      { "name": "STAGING_R2_BACKUP_SECRET_ACCESS_KEY", "consumer": "backup container env R2_BACKUP_SECRET_ACCESS_KEY" },
+      { "name": "STAGING_R2_MEDIA_READ_ACCESS_KEY_ID", "consumer": "backup container env R2_MEDIA_READ_ACCESS_KEY_ID (read-only media token)" },
+      { "name": "STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY", "consumer": "backup container env R2_MEDIA_READ_SECRET_ACCESS_KEY" },
+      { "name": "STAGING_KIERO_SERVICE_TOKEN", "consumer": "Convex env + worker secrets KIERO_SERVICE_TOKEN" },
+      { "name": "STAGING_KIERO_MEDIA_WORKER_TOKEN", "consumer": "Convex env KIERO_MEDIA_WORKER_TOKEN / worker secret MEDIA_SEGMENT_TOKEN" },
+      { "name": "STAGING_KIERO_CALENDAR_TOKEN_KEY", "consumer": "Convex env KIERO_CALENDAR_TOKEN_KEY" },
+      { "name": "STAGING_CONVEX_BACKUP_ADMIN_KEY", "consumer": "backup container env CONVEX_BACKUP_ADMIN_KEY" }
+    ]
+  },
+  "oauthPins": {
+    "googleWebOrigin": "https://kiero-staging-web.pages.dev",
+    "calendarRedirectUri": "PENDING owner Google OAuth client; must be registered for the staging origin only, distinct from any dev client",
+    "note": "separate staging Google OAuth client (or separate redirect URIs); staging credentials are never reused from dev"
+  },
+  "isolation": {
+    "mechanism": "named Convex deployment inside kiero-dev-core (per-deployment data, credentials, scheduler, storage) + kiero-staging-* Cloudflare resources + STAGING_-prefixed GitHub secrets",
+    "perDeploymentBoundaries": ["database", "environment-variables-and-auth-keys", "scheduler", "file-storage"],
+    "sharedWithDev": ["Convex project plan usage quota (accepted by the owner instruction; not a defect; no workarounds permitted)"],
+    "fixtureAuthorizationOnQualificationPath": "must remain unset on the staging deployment: KIERO_B1_PROOF_ENABLED, KIERO_B2_PROOF_ENABLED, KIERO_B3_PROOF_ENABLED, KIERO_B4_PROOF_ENABLED, KIERO_C1_PROOF_ENABLED, KIERO_C4_PROOF_ENABLED, KIERO_E5_PROOF_ENABLED, KIERO_F3_PROOF_ENABLED, KIERO_G1_PROOF_ENABLED, KIERO_G2_PROOF_ENABLED, KIERO_G3_PROOF_ENABLED, KIERO_H3_PROOF_ENABLED, KIERO_H4_PROOF_ENABLED, KIERO_PROBE_ENABLED, KIERO_ECHO_TARGET, KIERO_CALENDAR_GOOGLE_API_BASE_OVERRIDE, KIERO_CALENDAR_TOKEN_ENDPOINT_OVERRIDE"
+  },
+  "localProbes": [
+    {
+      "id": "shape-check",
+      "command": "node infra/environments/shape-check.mjs",
+      "expected": "exit 0, all descriptor/binding/wrangler shapes valid",
+      "observed": "exit 0, shape check passed",
+      "status": "PASS"
+    },
+    {
+      "id": "verify-target-correct-label",
+      "command": "KIERO_ENVIRONMENT=staging node infra/release/verify-target.mjs --target staging --workflow .github/workflows/release.yml --descriptor infra/release/targets/staging.json --checks-workflow .github/workflows/checks.yml",
+      "expected": "exit 0 (guards pass, no secret values read)",
+      "observed": "exit 0, release target verified: staging",
+      "status": "PASS"
+    },
+    {
+      "id": "verify-target-wrong-label",
+      "command": "KIERO_ENVIRONMENT=production node infra/release/verify-target.mjs --target staging --workflow .github/workflows/release.yml --descriptor infra/release/targets/staging.json --checks-workflow .github/workflows/checks.yml",
+      "expected": "exit 1 with the label violation naming the observed label",
+      "observed": "exit 1: runtime environment label is \"production\" but the target is \"staging\"",
+      "status": "PASS"
+    },
+    {
+      "id": "deploy-adapter-missing-binding",
+      "command": "env -i PATH=$PATH KIERO_ENVIRONMENT=staging node infra/release/deploy-component.mjs --descriptor infra/release/targets/staging.json --revision <HEAD> --checks-report <passing fixture report> --outcomes deploy-outcomes.json",
+      "expected": "every component blocked missing-configuration with the exact absent names; exit 1; no transport invoked",
+      "observed": "6x blocked missing-configuration (web: VITE_CONVEX_URL, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID; convex-functions: CONVEX_DEPLOYMENT; workers: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID); exit 1",
+      "status": "PASS"
+    },
+    {
+      "id": "deploy-adapter-wrong-environment",
+      "command": "env -i PATH=$PATH KIERO_ENVIRONMENT=dev node infra/release/deploy-component.mjs --descriptor infra/release/targets/staging.json --revision <HEAD> --checks-report <passing fixture report>",
+      "expected": "every component blocked unauthorized-environment; exit 1; no transport invoked",
+      "observed": "6x blocked unauthorized-environment; exit 1",
+      "status": "PASS"
+    },
+    {
+      "id": "checks-gate-wrong-sha",
+      "command": "node infra/release/verify-checks.mjs --descriptor infra/release/targets/staging.json --sha <HEAD> --fixture <success observation pinned to HEAD~1> --out report.json",
+      "expected": "refuse with the head-SHA mismatch named; exit 1",
+      "observed": "exit 1: observed on head SHA 141dd0d4486a..., requested 1ffb4dbc3966...",
+      "status": "PASS"
+    },
+    {
+      "id": "convex-deploy-ci-credential-surface",
+      "command": "env -i PATH=$PATH HOME=<isolated empty home> CONVEX_DEPLOYMENT=wojtek-piskorz-jr:kiero-dev-core:staging npx --yes convex@1.45.0 deploy",
+      "expected": "reference accepted; unauthenticated run fails before any mutation",
+      "observed": "GET deployment/staging/team_and_project answered 401 Unauthorized: MissingAccessToken (reference resolution reached; CI needs CONVEX_DEPLOY_KEY in addition to CONVEX_DEPLOYMENT)",
+      "status": "PASS"
+    }
+  ],
+  "pendingOwnerActions": [
+    "verify kiero-dev-core deployment inventory, plan headroom for a second prod-type deployment and month-quota state (dashboard)",
+    "create deployment wojtek-piskorz-jr:kiero-dev-core:staging --type prod --region eu (never --default) and record slug/URL here",
+    "generate a deployment-scoped Convex deploy key for staging and store it as GitHub environment secret STAGING_CONVEX_DEPLOY_KEY",
+    "execute evidence runbook R4: the release.yml + staging.json CONVEX_DEPLOY_KEY mapping follow-up (R6-owned files; note only, not edited by I8)",
+    "create R2 buckets kiero-staging-media / kiero-staging-backup (--jurisdiction eu --location weur) and their scoped tokens",
+    "create Pages project kiero-staging-web",
+    "create the GitHub staging environment + vars/secrets; configure alpha-production protection with a single gh api -X PUT repos/wojtekpiskorz/kiero/environments/alpha-production --input call whose body carries {\"deployment_branch_policy\":{\"restricted\":true},\"reviewers\":[{\"type\":\"User\",\"id\":<owner-user-id>}]} (no separate reviewers endpoint exists)",
+    "set runtime env vars on the staging Convex deployment per-deployment only (names only, per the runbook); never via convex env default, and the prod-type default list must stay empty",
+    "dispatch the first real staging Release run and attach run id + deployment identifiers here; verify the reported Convex deployment slug/URL matches this manifest's deploymentReference"
+  ]
+}
