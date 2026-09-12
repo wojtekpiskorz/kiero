@@ -58,7 +58,7 @@ import {
 } from "../helpers.mjs";
 
 const CONVEX_URL = process.env.KIERO_R5_CONVEX_URL ?? "https://nautical-loris-352.convex.cloud";
-const GATEWAY = process.env.KIERO_R5_GATEWAY ?? "https://kiero-dev-gateway-i4.wojtek-524.workers.dev";
+const GATEWAY = process.env.KIERO_R5_GATEWAY_URL ?? "https://kiero-dev-gateway-i4.wojtek-524.workers.dev";
 const APP_URL = process.env.KIERO_R5_APP ?? "http://localhost:5173";
 const CHROMIUM =
   process.env.KIERO_R5_CHROMIUM ??
