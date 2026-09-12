@@ -41,7 +41,7 @@ import {
   type SubmitEvent,
 } from "../company/CompanyGate";
 import { useCheckedDispatch, NoticeArea } from "../company/dispatch";
-import { SOURCE_PARAM } from "../company/route-params";
+import { serializeSourceReference } from "../source-detail/source-route";
 import { instantLabel } from "../conversation/state";
 import { failureHint as memoryFailureHint } from "../memory/state";
 import {
@@ -639,6 +639,48 @@ function ScopeQuestions({
   );
 }
 
+/** One conflicting-evidence witness of an open question (the wire element). */
+type ConflictingWitness = ClarificationWireRow["conflictingEvidence"][number];
+
+/**
+ * The conflicting-evidence list of one open question (R5): each witness
+ * links through the one canonical serializer into the dossier. Exported
+ * for the deterministic surface test (renderToString), like the work
+ * surface's exported rows.
+ */
+export function OpenQuestionEvidence({
+  witnesses,
+}: {
+  readonly witnesses: readonly ConflictingWitness[];
+}): ReactNode {
+  if (witnesses.length === 0) {
+    return null;
+  }
+  return createElement(
+    "p", null,
+    copy.questionsEvidenceLabel,
+    createElement(
+      "ul", null,
+      ...witnesses.map((witness) =>
+        createElement(
+          "li", { key: witness.fragmentId },
+          createElement(
+            "a",
+            {
+              href: serializeSourceReference({
+                sourceId: witness.sourceId,
+                fragmentId: witness.fragmentId,
+                projectId: null,
+              }),
+            },
+            copy.questionsSourceLink,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 function OpenQuestionRow({ row }: { readonly row: ClarificationWireRow }): ReactNode {
   // The memory command's own hint map: clarification refusals must never
   // be mapped through the work surface's codes.
@@ -669,21 +711,7 @@ function OpenQuestionRow({ row }: { readonly row: ClarificationWireRow }): React
   return createElement(
     "li", null,
     createElement("p", null, createElement("strong", null, row.question)),
-    row.conflictingEvidence.length === 0
-      ? null
-      : createElement(
-          "p", null,
-          copy.questionsEvidenceLabel,
-          createElement(
-            "ul", null,
-            ...row.conflictingEvidence.map((witness) =>
-              createElement(
-                "li", { key: witness.fragmentId },
-                createElement("a", { href: `/?${SOURCE_PARAM}=${encodeURIComponent(witness.sourceId)}` }, copy.questionsSourceLink),
-              ),
-            ),
-          ),
-        ),
+    createElement(OpenQuestionEvidence, { witnesses: row.conflictingEvidence }),
     createElement(
       "form", { onSubmit: (event) => void submit(event) },
       createElement("label", { htmlFor: `now-answer-${row.clarificationId}` }, copy.answerLabel),

@@ -73,6 +73,7 @@ import {
   unassignedOpenTasks,
 } from "../../apps/web/src/features/now/state";
 import { NoticeArea } from "../../apps/web/src/features/company/dispatch";
+import { OpenQuestionEvidence } from "../../apps/web/src/features/now/NowFeature";
 import {
   freshStatementKey,
   nextStatementKey,
@@ -101,6 +102,10 @@ const PROJECT_CLOSED = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2q";
 const EVENT_1 = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2e";
 const ME = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2m";
 const OTHER = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2n";
+/** R5: representative source/fragment ids (the wire pattern the reads carry). */
+const SOURCE_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f";
+const FIRM_SOURCE_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2s";
+const FRAGMENT_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2g";
 
 /** A minimal task view fixture (the same plain-string override rule). */
 function taskOf(
@@ -271,6 +276,26 @@ describe("the /co-teraz deep-link contract", () => {
   it("links Co teraz rows to the authoritative /praca records with the same keys", () => {
     expect(taskRecordLink(TASK_1)).toBe(`/praca?${TASK_PARAM}=${TASK_1}`);
     expect(eventRecordLink(EVENT_1)).toBe(`/praca?${EVENT_PARAM}=${EVENT_1}`);
+  });
+
+  it("links open-question evidence through R5's canonical source route (Co teraz)", () => {
+    // R5 (issue #130): "Co teraz" conflicting-evidence links ride the one
+    // shared serializer into the dossier route (with the fragment), never
+    // the legacy conversation-route deep link.
+    const html = renderToString(
+      createElement(OpenQuestionEvidence, {
+        witnesses: [
+          { sourceId: SOURCE_ID, fragmentId: FRAGMENT_ID },
+          { sourceId: FIRM_SOURCE_ID, fragmentId: FRAGMENT_ID },
+        ],
+      }),
+    );
+    expect(html).toContain("Sprzeczne źródła:");
+    expect(html).toContain(`/zrodlo?zrodlo=${SOURCE_ID}&amp;fragment=${FRAGMENT_ID}`);
+    expect(html).toContain(`/zrodlo?zrodlo=${FIRM_SOURCE_ID}`);
+    expect(html).not.toContain("/?zrodlo=");
+    // No witnesses, no list — the honest empty render.
+    expect(renderToString(createElement(OpenQuestionEvidence, { witnesses: [] }))).toBe("");
   });
 });
 

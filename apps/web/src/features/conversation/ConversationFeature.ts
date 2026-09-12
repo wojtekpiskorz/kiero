@@ -16,9 +16,12 @@
  *   `SourceConversationRow`, so source id, author, send snapshot, lifecycle
  *   and processing state are identical in either scope. No editable copy
  *   exists anywhere: the project filter only narrows which originals show;
- * - one source detail: `sources.read.views.sourceDetail` — the single
- *   canonical URL `/?zrodlo=<id>` works in every view (the deep link F3/G2
- *   and future UX work can target);
+ * - one source detail: `sources.read.views.sourceDetail` — the canonical
+ *   source route is the dossier `/zrodlo` with its encoded `zrodlo` param
+ *   (R5's shared serializer, ../source-detail/source-route); the legacy
+ *   conversation-route deep link carrying the same param redirects there,
+ *   because the inline detail renders only inside the feed's loaded rows
+ *   and the feed's growth is capped;
  * - unread badges: `attention.read_state.queries.readStateForSources` (F1)
  *   over the page's canonical source ids — absence of a row means unread;
  *   opening the ORIGINAL (the detail view) marks it read everywhere for
@@ -68,12 +71,11 @@ import {
   type MemberOverview,
 } from "../company/CompanyGate";
 import { asConvexId } from "../company/convex-ids";
+import { PROJECT_PARAM, searchParam, writeScopeParam } from "../company/route-params";
 import {
-  PROJECT_PARAM,
-  SOURCE_PARAM,
-  searchParam,
-  writeScopeParam,
-} from "../company/route-params";
+  inspectSourceSearch,
+  serializeSourceReference,
+} from "../source-detail/source-route";
 import { ComposerForm } from "../capture/CaptureFeature";
 import {
   ReadStateProjection,
@@ -104,6 +106,16 @@ type AnswerState =
   | { readonly sourceId: string; readonly status: "refused"; readonly message: string }
   | null;
 
+/**
+ * R5 (issue #130): the truthful refusal for a legacy source deep link
+ * whose value cannot denote a source. Local to this file because the
+ * shared conversation copy module is outside this issue's owned paths (the
+ * R1 label precedent in MemoryFeature); a copy consolidation can move it
+ * unchanged.
+ */
+const legacyDeepLinkMalformed =
+  "Odnośnik do źródła jest nieprawidłowy — nie otwarto żadnej wiadomości.";
+
 // ---------------------------------------------------------------------------
 // Root: the shared company-feature gate around this surface
 // ---------------------------------------------------------------------------
@@ -127,14 +139,27 @@ function ConversationMain({
 }): ReactNode {
   const projects = useQueryState({ query: api.projects.functions.projectsOverview, args: {} });
 
-  // Deep links: ?projekt=<id> selects the project projection; ?zrodlo=<id>
-  // opens one source's detail (the canonical URL of that source).
+  // Deep links: ?projekt=<id> selects the project projection. The legacy
+  // ?zrodlo=<id> no longer opens the inline detail (it renders only inside
+  // the capped feed): R5 redirects it to the canonical dossier, whose read
+  // is independent of this feed's pagination.
   const [scopeProjectId, setScopeProjectId] = useState<string | null>(() => searchParam(PROJECT_PARAM));
-  const [openSourceId, setOpenSourceId] = useState<string | null>(() => searchParam(SOURCE_PARAM));
+  const [openSourceId, setOpenSourceId] = useState<string | null>(null);
+  const [legacyNotice, setLegacyNotice] = useState<string | null>(null);
   useEffect(() => {
+    /** Redirects a legacy source deep link, or reports it honestly. */
+    const followLegacySourceLink = (): void => {
+      const inspection = inspectSourceSearch(window.location.search);
+      if (inspection.kind === "reference") {
+        window.location.replace(serializeSourceReference(inspection.reference));
+        return;
+      }
+      setLegacyNotice(inspection.kind === "malformed" ? legacyDeepLinkMalformed : null);
+    };
+    followLegacySourceLink();
     const onPop = () => {
       setScopeProjectId(searchParam(PROJECT_PARAM));
-      setOpenSourceId(searchParam(SOURCE_PARAM));
+      followLegacySourceLink();
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -199,11 +224,6 @@ function ConversationMain({
       : null;
   const rows: readonly SourceConversationRowType[] = page?.page ?? [];
   const isDone = page?.isDone ?? true;
-  // A deep-linked source below the loaded page stays invisible without this:
-  // the notice names why "load older" matters (the canonical URL must open
-  // the original, also when history grew past the first page).
-  const deepLinkedBelowPage =
-    openSourceId !== null && !rows.some((row) => row.sourceId === openSourceId);
 
   // The unread projection (F1) over this page's canonical source ids:
   // absence of a row means unread; one row per person + logical source, so
@@ -311,6 +331,7 @@ function ConversationMain({
       onPrefillApplied: () => setCorrectionPrefillText(null),
       onAccepted: () => setCorrecting(null),
     }),
+    legacyNotice === null ? null : createElement("p", { role: "alert" }, legacyNotice),
     createElement("h2", null, knownProject === null ? copy.conversationHeading : copy.projectConversationHeading),
     conversation.status === "error"
       ? createElement(SessionEnded)
@@ -340,9 +361,6 @@ function ConversationMain({
             copy.loadOlder,
           ),
         ),
-    deepLinkedBelowPage && !isDone && pageSize < MAX_PAGE_SIZE
-      ? createElement("p", { role: "status" }, copy.deepLinkNotOnPage)
-      : null,
     createElement(
       "p",
       null,
@@ -537,7 +555,12 @@ function SourceRow({
 // The agent answer panel: E6's structured result, glossary-exact labels
 // ---------------------------------------------------------------------------
 
-function AgentAnswerPanel({ answer }: { readonly answer: AnswerState }): ReactNode {
+/**
+ * The agent-answer panel: E6's structured result, glossary-exact labels.
+ * Exported for the deterministic surface tests (renderToString) — it owns
+ * no subscriptions, like the memory surface's exported R1 basis view.
+ */
+export function AgentAnswerPanel({ answer }: { readonly answer: AnswerState }): ReactNode {
   if (answer === null) {
     return null;
   }
@@ -593,7 +616,22 @@ function AgentAnswerPanel({ answer }: { readonly answer: AnswerState }): ReactNo
                         createElement(
                           "p",
                           { key: `${handle}-${evidence.sourceId}` },
-                          `${answerCopy.evidenceQuoteLabel} ${evidence.quote}`,
+                          // R5: the quote itself is the anchor into the
+                          // canonical dossier route — the answer's basis
+                          // stays one click from the original (the wire
+                          // pins no fragment, so the whole source serves).
+                          `${answerCopy.evidenceQuoteLabel} `,
+                          createElement(
+                            "a",
+                            {
+                              href: serializeSourceReference({
+                                sourceId: evidence.sourceId,
+                                fragmentId: null,
+                                projectId: null,
+                              }),
+                            },
+                            evidence.quote,
+                          ),
                         ),
                       ];
                 }),
@@ -687,8 +725,12 @@ function SourceDetailPanel({
       });
   }, [sourceId, markRead]);
 
+  // R5: the canonical link this inline panel can offer is the dossier
+  // route, serialized by the one shared authority.
   const canonicalUrl =
-    typeof window === "undefined" ? null : `${window.location.origin}/?${SOURCE_PARAM}=${sourceId}`;
+    typeof window === "undefined"
+      ? null
+      : `${window.location.origin}${serializeSourceReference({ sourceId, fragmentId: null, projectId: null })}`;
 
   if (detail.status === "error") {
     return createElement(SessionEnded);
@@ -723,6 +765,14 @@ function SourceDetailPanel({
       }`,
     ),
     createElement("p", null, createElement("strong", null, copy.detailLinkLabel)),
-    createElement("p", null, createElement("code", null, canonicalUrl ?? `/?${SOURCE_PARAM}=${sourceId}`)),
+    createElement(
+      "p",
+      null,
+      createElement(
+        "code",
+        null,
+        canonicalUrl ?? serializeSourceReference({ sourceId, fragmentId: null, projectId: null }),
+      ),
+    ),
   );
 }

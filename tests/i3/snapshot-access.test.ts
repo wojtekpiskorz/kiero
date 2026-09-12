@@ -17,7 +17,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { readCompanySnapshot, snapshotDb as _unused, type SnapshotDb } from "../../convex/operations/exports/snapshot";
+import {
+  readCompanySnapshot,
+  snapshotDb as _unused,
+  sourceArchiveTarget,
+  type SnapshotDb,
+} from "../../convex/operations/exports/snapshot";
+import { serializeSourceReference } from "../../apps/web/src/features/source-detail/source-route";
 import { resolveExportAccess, type ExportAccessDb } from "../../convex/operations/exports/access";
 import { resolveMediaAccess, mediaAccessDb as _unused2, type MediaAccessDb } from "../../convex/sources/media_access/access";
 import { EXPORT_BOUNDS } from "../../convex/operations/exports/protocol";
@@ -249,6 +255,55 @@ describe("the tenant-scoped snapshot reader", () => {
         // The archive copies exactly the representation the read seam serves.
         expect((granted.value as { representationId: string }).representationId).toBe(item.representationId);
       }
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // R5 (issue #130): the archive's source records carry the canonical
+  // RELATIVE target — the same wire form the app's shared serializer
+  // produces, without a host.
+  // -------------------------------------------------------------------------
+
+  it("stamps every archived source record with its canonical relative target", async () => {
+    const result = await readCompanySnapshot(fakeSnapshotDb(baseWorld()), companyA._id, "exp1", 1);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const targets = new Map<string, string | undefined>(
+      result.snapshot.sources.map((row) => [String(row.id), row.canonicalTarget as string | undefined]),
+    );
+    expect(targets.get("s1")).toBe("/zrodlo?zrodlo=s1");
+    // Withdrawn history stays and carries its target like any record.
+    expect(targets.get("s2")).toBe("/zrodlo?zrodlo=s2");
+    // Purged content is excluded, so it never carries a target.
+    expect(targets.has("s3")).toBe(false);
+    for (const target of targets.values()) {
+      if (target === undefined) {
+        continue;
+      }
+      // Relative only: a leading slash, no scheme, no host, no fragment.
+      expect(target.startsWith("/")).toBe(true);
+      expect(target.startsWith("//")).toBe(false);
+      expect(target).not.toContain("http");
+      expect(target).not.toContain("#");
+    }
+  });
+
+  it("pins the backend twin to the app serializer's wire contract", () => {
+    // The Convex half must not import browser feature code, so it carries a
+    // runtime-neutral twin; this corpus pins the two outputs equal — the
+    // tested wire contract R5's acceptance names.
+    const corpus = [
+      "s1",
+      "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f",
+      "K57D4A8EQ2X9W7C1VBN8HJ6T0A5Q3Z2F",
+      "with-dash_and_underscore",
+    ];
+    for (const id of corpus) {
+      expect(sourceArchiveTarget(id)).toBe(
+        serializeSourceReference({ sourceId: id, fragmentId: null, projectId: null }),
+      );
     }
   });
 });

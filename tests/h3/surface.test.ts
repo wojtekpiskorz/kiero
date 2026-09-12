@@ -65,6 +65,10 @@ import {
   isDegradedCoverage,
   searchCopy,
 } from "../../apps/web/src/features/search/state";
+import {
+  SOURCE_ROUTE_PATH,
+  serializeSourceReference,
+} from "../../apps/web/src/features/source-detail/source-route";
 
 /** Representative table ids (the wire pattern the reads carry). */
 const SOURCE_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f";
@@ -503,6 +507,50 @@ describe("coverage disclosure renders verbatim with the semantic-gap honesty", (
     expect(dayToMs("  ")).toBeNull();
     expect(dayToMs("not-a-day")).toBeNull();
     expect(dayToEndMs("2026-09-01")).toBe(from! + 86_399_999);
+  });
+
+  it("serializes source-hit targets through R5's canonical route (fragment pinned or whole source)", () => {
+    // The exact construction SearchFeature.SourceHit performs on a
+    // hydrated hit: the entry's source id with its optional matched
+    // fragment, through the one shared serializer.
+    expect(
+      serializeSourceReference({ sourceId: SOURCE_ID, fragmentId: FRAGMENT_TEXT, projectId: null }),
+    ).toBe(`/zrodlo?zrodlo=${SOURCE_ID}&fragment=${FRAGMENT_TEXT}`);
+    expect(
+      serializeSourceReference({ sourceId: SOURCE_ID, fragmentId: null, projectId: null }),
+    ).toBe(`/zrodlo?zrodlo=${SOURCE_ID}`);
+  });
+
+  it("keeps a decoded search entry's fragment flowing into the target unchanged", () => {
+    const decoded = Schema.decodeUnknownSync(entry.result)({
+      entries: [
+        {
+          searchEntryId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2x",
+          kind: "source_fragment",
+          sourceId: SOURCE_ID,
+          sourceFragmentId: FRAGMENT_TEXT,
+          score: 0.5,
+          matchedVia: "text",
+        },
+      ],
+      coverage: "full",
+      isDone: true,
+    });
+    const hit = decoded.entries[0]!;
+    expect(hit.kind).toBe("source_fragment");
+    expect(
+      serializeSourceReference({
+        sourceId: hit.sourceId ?? SOURCE_ID,
+        fragmentId: hit.sourceFragmentId ?? null,
+        projectId: null,
+      }),
+    ).toBe(`/zrodlo?zrodlo=${SOURCE_ID}&fragment=${FRAGMENT_TEXT}`);
+  });
+
+  it("serializes exactly the route the host mounts for the dossier", () => {
+    // A drift between the serializer's route constant and the mounted
+    // entry's routePath would break every search hit's link silently.
+    expect(SOURCE_ROUTE_PATH).toBe(sourceDetailFeatureEntry.routePath);
   });
 });
 

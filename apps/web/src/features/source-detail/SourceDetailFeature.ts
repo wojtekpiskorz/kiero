@@ -69,7 +69,8 @@ import {
   type MemberOverview,
 } from "../company/CompanyGate";
 import { asConvexId } from "../company/convex-ids";
-import { PROJECT_PARAM, SOURCE_PARAM, searchParam } from "../company/route-params";
+import { PROJECT_PARAM } from "../company/route-params";
+import { inspectSourceSearch, serializeSourceReference } from "./source-route";
 import { ReassignControl } from "./reassign";
 import { WithdrawControl, WithdrawnRecord } from "./withdrawal";
 import {
@@ -114,16 +115,15 @@ function SourceDetailMain({
   readonly overview: MemberOverview;
 }): ReactNode {
   const projects = useQueryState({ query: api.projects.functions.projectsOverview, args: {} });
-  // The canonical deep-link key (the same ?zrodlo= the conversation route
-  // owns): this surface is its full-history expansion. The optional
-  // &fragment=<id> a search hit carries marks the matched anchor.
-  const [sourceId, setSourceId] = useState<string | null>(() => searchParam(SOURCE_PARAM));
-  const [fragmentId, setFragmentId] = useState<string | null>(() => searchParam("fragment"));
+  // The canonical deep link (R5): the dossier route with its encoded
+  // `zrodlo` param, inspected through the one source-route contract — this
+  // surface IS the full-history expansion of that link, fetched by id and
+  // independent of every feed's pagination. The inspection union is kept
+  // as-is: a malformed target refuses honestly instead of firing a doomed
+  // read, an absent one renders the no-source hint.
+  const [inspection, setInspection] = useState(() => inspectSourceSearch(window.location.search));
   useEffect(() => {
-    const onPop = () => {
-      setSourceId(searchParam(SOURCE_PARAM));
-      setFragmentId(searchParam("fragment"));
-    };
+    const onPop = () => setInspection(inspectSourceSearch(window.location.search));
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
@@ -138,7 +138,16 @@ function SourceDetailMain({
   );
   const members = new Map<string, MemberView>(overview.members.map((m) => [m.userId, m]));
 
-  if (sourceId === null) {
+  if (inspection.kind === "malformed") {
+    return createElement(
+      "section",
+      null,
+      createElement("h1", null, copy.title),
+      createElement("p", { role: "alert" }, copy.notFound),
+      createElement("p", null, createElement("a", { href: "/" }, copy.noSourceLink)),
+    );
+  }
+  if (inspection.kind === "absent") {
     return createElement(
       "section",
       null,
@@ -150,12 +159,13 @@ function SourceDetailMain({
   // key: a source switch (deep link, back, an evidence link) remounts the
   // body so the accumulated evidence pages and cursor reset with the row.
   return createElement(SourceDetailBody, {
-    key: sourceId,
-    sourceId,
-    highlightedFragmentId: fragmentId,
+    key: inspection.reference.sourceId,
+    sourceId: inspection.reference.sourceId,
+    highlightedFragmentId: inspection.reference.fragmentId,
+    navigationProjectId: inspection.reference.projectId,
     projectNames,
     members,
-    clear: () => setSourceId(null),
+    clear: () => setInspection({ kind: "absent" }),
   });
 }
 
@@ -166,12 +176,14 @@ function SourceDetailMain({
 function SourceDetailBody({
   sourceId,
   highlightedFragmentId,
+  navigationProjectId,
   projectNames,
   members,
   clear,
 }: {
   readonly sourceId: string;
   readonly highlightedFragmentId: string | null;
+  readonly navigationProjectId: string | null;
   readonly projectNames: ReadonlyMap<string, string>;
   readonly members: ReadonlyMap<string, MemberView>;
   readonly clear: () => void;
@@ -252,8 +264,16 @@ function SourceDetailBody({
     });
   }, [evidencePage]);
 
+  // The canonical link this surface displays and copies (R5): the same
+  // serializer every consumer uses, whole-source (no fragment pin).
   const canonicalUrl =
-    typeof window === "undefined" ? null : `${window.location.origin}/?${SOURCE_PARAM}=${sourceId}`;
+    typeof window === "undefined"
+      ? null
+      : `${window.location.origin}${serializeSourceReference({ sourceId, fragmentId: null, projectId: null })}`;
+  // The project context the conversation link scopes to (R5): the deep
+  // link's navigation param when the boss arrived with one, else the
+  // row's first project, else the company-wide conversation.
+  const conversationProjectId = navigationProjectId ?? row.projectIds[0] ?? null;
   const author = members.get(row.authorUserId);
   const authorLabel = author === undefined ? copy.unknownAuthorLabel : `${author.displayName} (${author.email})`;
   const withdrawerId = row.withdrawnByUserId;
@@ -292,16 +312,29 @@ function SourceDetailBody({
       ),
       createElement("p", { "data-testid": "source-author-text" }, createElement("strong", null, row.authorText)),
       createElement("p", null, createElement("strong", null, copy.canonicalLinkLabel)),
-      createElement("p", null, createElement("code", null, canonicalUrl ?? `/?${SOURCE_PARAM}=${sourceId}`)),
+      createElement(
+        "p",
+        null,
+        createElement(
+          "code",
+          null,
+          canonicalUrl ?? serializeSourceReference({ sourceId, fragmentId: null, projectId: null }),
+        ),
+      ),
       createElement(
         "p",
         null,
         createElement(
           "a",
           {
-            href: `/?${SOURCE_PARAM}=${encodeURIComponent(sourceId)}${
-              row.projectIds[0] === undefined ? "" : `&${PROJECT_PARAM}=${encodeURIComponent(row.projectIds[0])}`
-            }`,
+            // Navigation into the conversation scope only (R5): the
+            // legacy ?zrodlo= deep link now redirects back to this
+            // dossier, so the project context — the link's param or the
+            // row's first project — is what scopes the conversation view.
+            href:
+              conversationProjectId === null
+                ? "/"
+                : `/?${PROJECT_PARAM}=${encodeURIComponent(conversationProjectId)}`,
           },
           copy.openInConversation,
         ),
