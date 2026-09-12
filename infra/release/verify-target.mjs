@@ -1,8 +1,8 @@
 /**
- * Release target verification (I7): the wrong-environment guard every
+ * Release target verification (I7/R6): the wrong-environment guard every
  * deploy job runs BEFORE touching anything.
  *
- * Two layers, both deterministic and secret-free (names only, never
+ * Three layers, all deterministic and secret-free (names only, never
  * values):
  *
  * - WORKFLOW STRUCTURE: given the workflow text and a job id, extract
@@ -13,15 +13,26 @@
  * - RUNTIME LABEL: the environment label the run carries (KIERO_ENVIRONMENT)
  *   must equal the target; a staging deploy that believes it is "dev" or
  *   "alpha-production" refuses to start.
+ * - TARGET DESCRIPTOR (R6): the shared descriptor (target-descriptor.mjs)
+ *   must be valid, name the same target and GitHub environment, and pin a
+ *   checksName that really is a job name in .github/workflows/checks.yml,
+ *   so the Checks identity the deploy gate matches cannot drift silently.
  *
  * Used by .github/workflows/release.yml and by tests/i7 (imported).
  */
 
-/** The allowed deployment targets and their secret-name prefixes. */
-export const RELEASE_TARGETS = {
-  staging: { secretPrefix: "STAGING_", environmentName: "staging" },
-  production: { secretPrefix: "PRODUCTION_", environmentName: "alpha-production" },
-};
+import {
+  committedDescriptorViolations,
+  isCommittedDescriptorPath,
+  loadTargetDescriptor,
+  RELEASE_TARGETS,
+} from "./target-descriptor.mjs";
+import { parseCliFlags } from "./cli-flags.mjs";
+
+// RELEASE_TARGETS is defined ONCE, canonically in target-descriptor.mjs;
+// it is re-exported here so the guard's historical import surface stays
+// stable for tests and node consumers.
+export { RELEASE_TARGETS };
 
 /**
  * Extracts the block of one top-level job from workflow YAML text
@@ -100,32 +111,73 @@ export function checkReleaseTarget({
   return violations;
 }
 
+/** Escapes a literal string for embedding in a RegExp. */
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Cross-checks the shared target descriptor against the requested target
+ * and the deterministic Checks workflow (R6). Returns violations; empty
+ * means the descriptor agrees with both.
+ */
+export function checkDescriptorAgainstWorkflow({ descriptor, target, checksWorkflowText }) {
+  const violations = [];
+  if (descriptor.target !== target) {
+    violations.push(
+      `descriptor target is "${descriptor.target}" but the requested target is "${target}"`,
+    );
+  }
+  const spec = RELEASE_TARGETS[target];
+  if (spec === undefined) {
+    return [`unknown target "${target}" (expected one of ${Object.keys(RELEASE_TARGETS).join(", ")})`];
+  }
+  if (descriptor.githubEnvironment !== spec.environmentName) {
+    violations.push(
+      `descriptor githubEnvironment is "${descriptor.githubEnvironment}" but ${target} requires "${spec.environmentName}"`,
+    );
+  }
+  if (checksWorkflowText !== undefined) {
+    const jobNamePattern = new RegExp(`name:\\s*["']?${escapeRegExp(descriptor.checksName)}["']?\\s*$`, "m");
+    if (!jobNamePattern.test(checksWorkflowText)) {
+      violations.push(
+        `descriptor checksName "${descriptor.checksName}" is not a job name in the Checks workflow`,
+      );
+    }
+  }
+  return violations;
+}
+
 // ---------------------------------------------------------------------------
 // CLI (release.yml calls this before every deploy)
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const args = { target: null, workflow: null };
-  for (let index = 2; index < argv.length; index += 1) {
-    const current = argv[index];
-    if (current === "--target") {
-      args.target = argv[index + 1];
-      index += 1;
-    } else if (current === "--workflow") {
-      args.workflow = argv[index + 1];
-      index += 1;
-    }
+  const { args, error } = parseCliFlags(argv, {
+    flags: ["target", "workflow", "descriptor", "checks-workflow"],
+  });
+  if (error !== undefined) {
+    return { error };
   }
-  return args;
+  return { args };
 }
 
+const USAGE =
+  "usage: verify-target.mjs --target <staging|production> --workflow <release.yml> [--descriptor <targets/x.json>] [--checks-workflow <checks.yml>]";
+
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const { target, workflow } = parseArgs(process.argv);
-  if (target === null || workflow === null) {
-    console.error("usage: verify-release-target.mjs --target <staging|production> --workflow <release.yml>");
+  const { readFileSync } = await import("node:fs");
+  const parsed = parseArgs(process.argv.slice(2));
+  const args = parsed.args ?? {};
+  const { target, workflow, descriptor: descriptorPath, checksWorkflow } = args;
+  if (parsed.error !== undefined) {
+    console.error(`release target verification USAGE ERROR: ${parsed.error}\n${USAGE}`);
     process.exit(2);
   }
-  const { readFileSync } = await import("node:fs");
+  if (target === undefined || workflow === undefined) {
+    console.error(USAGE);
+    process.exit(2);
+  }
   const jobByTarget = { staging: "staging-deploy", production: "production-deploy" };
   const violations = checkReleaseTarget({
     target,
@@ -133,6 +185,26 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     jobId: jobByTarget[target],
     environmentLabel: process.env.KIERO_ENVIRONMENT ?? target,
   });
+  if (descriptorPath !== undefined) {
+    const loaded = loadTargetDescriptor(descriptorPath);
+    if (loaded.violations !== undefined) {
+      violations.push(...loaded.violations.map((violation) => `descriptor: ${violation}`));
+    } else {
+      violations.push(
+        ...checkDescriptorAgainstWorkflow({
+          descriptor: loaded.descriptor,
+          target,
+          checksWorkflowText: checksWorkflow === undefined ? undefined : readFileSync(checksWorkflow, "utf8"),
+        }).map((violation) => `descriptor: ${violation}`),
+      );
+      // A COMMITTED descriptor may never carry the stub transport: the
+      // workflow references these files, and a stub there could mint
+      // synthetic deployed evidence.
+      if (isCommittedDescriptorPath(descriptorPath)) {
+        violations.push(...committedDescriptorViolations(loaded.descriptor));
+      }
+    }
+  }
   if (violations.length > 0) {
     console.error(`release target verification FAILED for ${target}:`);
     for (const violation of violations) {

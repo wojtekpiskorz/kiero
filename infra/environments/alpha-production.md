@@ -3,7 +3,12 @@
 Status: PENDING, NOT PROVISIONED. This descriptor fixes the identity,
 naming and EU contract the future alpha must follow. Nothing here has been
 created; per the issue rules, purchases, OAuth consent screens, domains and
-production services stay explicit pending actions.
+production services stay explicit pending actions. The R6 release adapter
+consumes the same names through
+`infra/release/targets/production.json` and records a BLOCKED outcome
+(naming the missing configuration) until they exist; the workflow's
+`environment: alpha-production` key is a NAME and is not evidence that
+GitHub protection is configured (live repository state, owner/I8 action).
 
 ## Identity
 
@@ -38,8 +43,10 @@ when those integrations land.
 
 `kiero-alpha-<role>`: `kiero-alpha-media`, `kiero-alpha-backup`,
 `kiero-alpha-gateway`, `kiero-alpha-media-worker`,
-`kiero-alpha-export-worker`, `kiero-alpha-backup-worker`, Convex project
-`kiero-alpha-core`.
+`kiero-alpha-export-worker`, `kiero-alpha-backup-worker`,
+`kiero-alpha-web` (the Cloudflare Pages project serving the built PWA
+bundle; named by the R6 release adapter's `wrangler-pages` transport),
+Convex project `kiero-alpha-core`.
 
 ## EU requirements (hard constraints from the accepted architecture)
 
@@ -71,8 +78,16 @@ when those integrations land.
 npx --yes convex@1.45.0 project create kiero-alpha-core
 npx --yes convex@1.45.0 deployment create wojtek-piskorz-jr:kiero-alpha-core:main --type prod --region eu --default
 wrangler r2 bucket create kiero-alpha-media  --jurisdiction eu --location weur
-wrangler r2 bucket create kiero-alpha-backup --jurisdiction eu --location weur
+wrangler r2 bucket create kiero-alpha-backup  --jurisdiction eu --location weur
+npx wrangler pages project create kiero-alpha-web --production-branch main
 ```
+
+GitHub-side owner actions: create the `alpha-production` environment,
+configure its protection (required reviewers, an owner action this YAML
+cannot perform), set its variable `PRODUCTION_CONVEX_URL` and its secrets
+`PRODUCTION_CONVEX_DEPLOYMENT`, `PRODUCTION_CLOUDFLARE_API_TOKEN`,
+`PRODUCTION_CLOUDFLARE_ACCOUNT_ID` (plus the `PRODUCTION_<NAME>` runtime
+credentials above as provisioning proceeds).
 
 (The `team:project:ref --type ... --region eu --default` shape is the one
 VERIFIED for the dev deployment in
