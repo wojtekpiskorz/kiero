@@ -1,9 +1,12 @@
 # Environment: synthetic staging (`staging`)
 
-Status: PENDING PROVISIONING. No staging Convex project, buckets or workers
-exist yet; this descriptor is the contract GitHub Actions uses when it begins
-deploying synthetic staging (per the accepted release flow). Nothing in this
-file was executed against a provider.
+Status: PENDING PROVISIONING. No staging Convex project, buckets, workers
+or Pages project exist yet; this descriptor is the contract GitHub Actions
+uses when it begins deploying synthetic staging (per the accepted release
+flow). Nothing in this file was executed against a provider. The R6
+release adapter consumes the same names through
+`infra/release/targets/staging.json` and records a BLOCKED outcome (naming
+the missing configuration) until they exist.
 
 ## Identity
 
@@ -35,13 +38,22 @@ Actions secrets, suffixless names in the runtimes):
 `CONVEX_BACKUP_ADMIN_KEY` (candidate name, finalized by I5).
 
 GitHub Actions secret names for staging follow `STAGING_<NAME>` (for example
-`STAGING_OPENROUTER_API_KEY`); only unsuffixed names exist today.
+`STAGING_OPENROUTER_API_KEY`); only unsuffixed names exist today. The R6
+release workflow also references `STAGING_CONVEX_DEPLOYMENT` (the
+staging deployment reference, consumed as `CONVEX_DEPLOYMENT`),
+`STAGING_CLOUDFLARE_API_TOKEN` and `STAGING_CLOUDFLARE_ACCOUNT_ID`
+(wrangler deploy credentials for the Pages web host and the four workers,
+consumed under wrangler's own names). The non-secret `VITE_CONVEX_URL`
+build input is mapped from the `staging` GitHub environment variable
+`STAGING_CONVEX_URL` (`vars` context), created at provisioning time.
 
 ## Resource naming convention
 
 `kiero-staging-<role>`: `kiero-staging-media`, `kiero-staging-backup`,
 `kiero-staging-gateway`, `kiero-staging-media-worker`,
 `kiero-staging-export-worker`, `kiero-staging-backup-worker`,
+`kiero-staging-web` (the Cloudflare Pages project serving the built PWA
+bundle; named by the R6 release adapter's `wrangler-pages` transport),
 Convex project `kiero-staging-core`.
 
 ## EU requirements
@@ -70,8 +82,14 @@ Convex project `kiero-staging-core`.
 npx --yes convex@1.45.0 project create kiero-staging-core
 npx --yes convex@1.45.0 deployment create wojtek-piskorz-jr:kiero-staging-core:staging --type prod --region eu
 wrangler r2 bucket create kiero-staging-media  --jurisdiction eu --location weur
-wrangler r2 bucket create kiero-staging-backup --jurisdiction eu --location weur
+wrangler r2 bucket create kiero-staging-backup  --jurisdiction eu --location weur
+npx wrangler pages project create kiero-staging-web --production-branch main
 ```
+
+GitHub-side owner actions: create the `staging` environment, set its
+variable `STAGING_CONVEX_URL` and its secrets `STAGING_CONVEX_DEPLOYMENT`,
+`STAGING_CLOUDFLARE_API_TOKEN`, `STAGING_CLOUDFLARE_ACCOUNT_ID` (plus the
+`STAGING_<NAME>` runtime credentials above as provisioning proceeds).
 
 Owner: the CI/deploy ticket that first wires deploys (checks.yml workflow +
 first staging deploy), in coordination with I1-recorded facts. These stay

@@ -1,13 +1,24 @@
 /**
- * Release evidence recording (I7): appends one immutable record per
- * release attempt to infra/release/evidence/releases.jsonl.
+ * Release evidence recording (I7/R6): appends immutable records to the
+ * append-only ledger infra/release/evidence/releases.jsonl (or a path the
+ * caller chooses). The ledger carries two record kinds:
  *
- * The record carries versions and digests, never secret values: target,
- * revision, the rehearsal row count, the runtime and client versions and
- * the SHA-256 of the migration ledger the rehearsal produced. The file is
- * append-only by convention and by tooling: this script never rewrites or
- * removes lines, and the release workflow uploads the resulting file as
- * a build artifact alongside the deployment.
+ * - "release-attempt" (one per workflow dispatch): target, revision,
+ *   descriptor, the rehearsal verdict and row count, the runtime and
+ *   client versions, the SHA-256 of the migration ledger and the
+ *   dispatcher's notes when supplied.
+ * - "component-outcome" (one per component per deploy run, written by
+ *   deploy-component.mjs): the THREE truthful terminal states:
+ *     deployed: component + revision + digest + descriptor + remote
+ *               identity (a transport that reported no identity cannot
+ *               produce this state);
+ *     skipped:  ONLY when the target descriptor excludes the component;
+ *     blocked:  missing or unauthorized configuration (names only),
+ *               refused/missing Checks, failed build or transport.
+ *
+ * The file is append-only by convention and by tooling: this module never
+ * rewrites or removes lines. Secret VALUES never appear; blocked records
+ * carry configuration NAMES and observed labels only.
  *
  * Importable (tests/i7) and runnable (release.yml).
  */
@@ -20,7 +31,10 @@ import { fileURLToPath as nodeFileURLToPath } from "node:url";
 /** The canonical evidence ledger path (append-only). */
 export const RELEASE_EVIDENCE_PATH = new URL("./evidence/releases.jsonl", import.meta.url);
 
-/** Builds one record (pure; the caller supplies every field). */
+/** The terminal component outcomes (R6 truthfulness contract). */
+export const COMPONENT_OUTCOMES = ["deployed", "skipped", "blocked"];
+
+/** Builds one "release-attempt" record (pure; the caller supplies every field). */
 export function buildReleaseRecord({
   target,
   revision,
@@ -28,19 +42,74 @@ export function buildReleaseRecord({
   rehearsalRows,
   runtimeVersion,
   clientVersion,
+  descriptorId = null,
+  notes = null,
   migrationLedgerText = null,
   recordedAtIso = new Date().toISOString(),
 }) {
   return {
+    kind: "release-attempt",
     recordedAtIso,
     target,
     revision,
+    ...(descriptorId === null ? {} : { descriptorId }),
+    ...(notes === null || notes === "" ? {} : { notes }),
     rehearsal: rehearsalPassed ? `${rehearsalRows} PASS` : "FAILED",
     runtimeVersion,
     clientVersion,
     ...(migrationLedgerText === null
       ? {}
       : { migrationLedgerSha256: sha256Hex(migrationLedgerText) }),
+  };
+}
+
+/**
+ * Builds one "component-outcome" record from a deploy-components outcome
+ * (pure; the caller supplies every field). The outcome detail is copied
+ * verbatim; deploy-component.mjs guarantees names-only payloads.
+ */
+export function buildComponentOutcomeRecord({
+  target,
+  revision,
+  descriptorId,
+  outcome,
+  recordedAtIso = new Date().toISOString(),
+}) {
+  if (!COMPONENT_OUTCOMES.includes(outcome.outcome)) {
+    throw new Error(`unknown component outcome "${String(outcome.outcome)}"`);
+  }
+  const { component, outcome: state, ...detail } = outcome;
+  if (typeof component !== "string" || component === "") {
+    throw new Error("component outcome requires a non-empty component id");
+  }
+  if (state === "deployed") {
+    if (typeof detail.digest !== "string" || detail.digest === "") {
+      throw new Error("deployed requires an artifact digest");
+    }
+    if (
+      typeof detail.remoteIdentity !== "object" ||
+      detail.remoteIdentity === null ||
+      typeof detail.remoteIdentity.id !== "string" ||
+      detail.remoteIdentity.id === ""
+    ) {
+      throw new Error("deployed requires a remote identity (kind + id)");
+    }
+  }
+  if (state === "skipped" && detail.skipReason !== "excluded-by-descriptor") {
+    throw new Error('skipped requires skipReason "excluded-by-descriptor"');
+  }
+  if (state === "blocked" && typeof detail.blockedReason !== "string") {
+    throw new Error("blocked requires a blockedReason");
+  }
+  return {
+    kind: "component-outcome",
+    recordedAtIso,
+    target,
+    revision,
+    descriptorId,
+    component,
+    outcome: state,
+    ...detail,
   };
 }
 
@@ -83,21 +152,59 @@ function fileURLToPath(url) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const args = process.argv.slice(2);
-  const flag = (name) => {
-    const index = args.indexOf(name);
-    return index === -1 ? null : args[index + 1];
-  };
-  const target = flag("--target");
-  const revision = flag("--revision") ?? "unknown";
-  const rehearsalPassed = flag("--rehearsal-passed") === "true";
-  const rehearsalRows = Number(flag("--rehearsal-rows") ?? 0);
-  const runtimeVersion = flag("--runtime-version") ?? "unknown";
-  const clientVersion = flag("--client-version") ?? "unknown";
-  const ledgerPath = flag("--migration-ledger");
-  if (target === null) {
-    console.error("usage: record-release-evidence.mjs --target <staging|production> [--revision <sha>] ...");
+  const { loadTargetDescriptor } = await import("./target-descriptor.mjs");
+  const { parseCliFlags } = await import("./cli-flags.mjs");
+  const USAGE =
+    "usage: record-release-evidence.mjs --target <staging|production> [--descriptor <targets/x.json>] [--revision <sha>] [--ledger <releases.jsonl>] ...";
+  const { args, error } = parseCliFlags(process.argv.slice(2), {
+    flags: [
+      "target",
+      "revision",
+      "descriptor",
+      "rehearsal-passed",
+      "rehearsal-rows",
+      "runtime-version",
+      "client-version",
+      "notes",
+      "ledger",
+      "migration-ledger",
+    ],
+  });
+  if (error !== undefined) {
+    console.error(`release evidence USAGE ERROR: ${error}\n${USAGE}`);
     process.exit(2);
+  }
+  const target = args.target;
+  const revision = args.revision ?? "unknown";
+  const descriptorPath = args.descriptor;
+  const rehearsalPassed = args.rehearsalPassed === "true";
+  const rehearsalRows = Number(args.rehearsalRows ?? 0);
+  const runtimeVersion = args.runtimeVersion ?? "unknown";
+  const clientVersion = args.clientVersion ?? "unknown";
+  const notes = args.notes ?? null;
+  const ledgerPath = args.ledger;
+  const migrationLedgerPath = args.migrationLedger;
+  if (target === undefined) {
+    console.error(USAGE);
+    process.exit(2);
+  }
+  let descriptorId = null;
+  if (descriptorPath !== undefined) {
+    const loaded = loadTargetDescriptor(descriptorPath);
+    if (loaded.violations !== undefined) {
+      console.error("release evidence REFUSED: the target descriptor is invalid:");
+      for (const violation of loaded.violations) {
+        console.error(`  - ${violation}`);
+      }
+      process.exit(1);
+    }
+    if (loaded.descriptor.target !== target) {
+      console.error(
+        `release evidence REFUSED: descriptor target ${loaded.descriptor.target} does not match --target ${target}`,
+      );
+      process.exit(1);
+    }
+    descriptorId = loaded.descriptor.descriptorId;
   }
   const record = buildReleaseRecord({
     target,
@@ -106,8 +213,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     rehearsalRows,
     runtimeVersion,
     clientVersion,
-    migrationLedgerText: ledgerPath === null ? null : readFileSync(ledgerPath, "utf8"),
+    descriptorId,
+    notes,
+    migrationLedgerText:
+      migrationLedgerPath === undefined ? null : readFileSync(migrationLedgerPath, "utf8"),
   });
-  appendReleaseRecord(record);
+  appendReleaseRecord(record, ledgerPath ?? undefined);
   console.log(`release evidence recorded: ${JSON.stringify(record)}`);
 }

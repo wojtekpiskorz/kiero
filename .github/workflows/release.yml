@@ -1,37 +1,44 @@
 name: Release
 
-# The pinned release workflow (I7). Three rules this file exists to keep:
+# The pinned release workflow (I7, repaired by R6). Three rules this file
+# exists to keep:
 #
 # 1. PRODUCTION IS EXPLICIT. The only trigger is workflow_dispatch with a
-#    chosen target; checks (checks.yml) and a successful staging deploy can
-#    never promote anything by themselves. The production job also runs
-#    inside the protected `alpha-production` GitHub environment, so a
-#    human approval gate stands between staging evidence and production.
+#    chosen target; checks (checks.yml) and a staging deploy can never
+#    promote anything by themselves. The production job runs under the
+#    alpha-production environment NAME; whether GitHub protection
+#    (required reviewers) is configured on that environment is live
+#    repository state this YAML cannot prove; provisioning and the first
+#    protected execution belong to the owner and I8.
 # 2. SECRETS ARE ENVIRONMENT-SCOPED. The staging job may reference only
 #    STAGING_* secrets and the production job only PRODUCTION_*; the
-#    verify-release-target guard re-checks THIS file at deploy time and the
+#    verify-target guard re-checks THIS file at deploy time and the
 #    runtime environment label, so a smuggled cross-environment secret
-#    fails the job before anything is touched.
-# 3. NOTHING DEPLOYS WITHOUT THE REHEARSAL. The deterministic release
-#    rehearsal (expand / interrupt / resume / mixed versions / contract)
-#    must pass first; its ledger digest and row count land in the immutable
-#    release evidence record.
+#    fails the job before anything is touched. The Checks gate token is
+#    the workflow's own github.token (a context reference, not a secret).
+# 3. NOTHING DEPLOYS WITHOUT THE REHEARSAL AND THE EXACT-SHA CHECKS. The
+#    deterministic release rehearsal (expand / interrupt / resume /
+#    mixed versions / contract) must pass first, and the named
+#    deterministic Checks job must have completed SUCCESS for the exact
+#    GITHUB_SHA before any transport runs.
 #
-# Provisioning honesty: the staging (kiero-staging-core) and alpha
-# production (kiero-alpha-core) Convex projects are PENDING owner actions
-# (infra/environments/*.md). Until they exist, the deploy steps stop at the
-# guard and print the exact pending commands instead of pretending.
+# Provisioning honesty (R6): the staging and alpha production clouds are
+# PENDING owner actions (infra/environments/*.md). Until the named
+# configuration exists, deploy-component.mjs records a BLOCKED outcome per
+# component (names only) and the job FAILS while still uploading the
+# evidence ledger: a green job always means deployed bytes, never a
+# placeholder.
 
 on:
   workflow_dispatch:
     inputs:
       target:
-        description: "Release target (production requires the alpha-production environment approval)"
+        description: "Release target (production runs in the alpha-production environment; protection is owner-provisioned)"
         type: choice
         options: [staging, production]
         required: true
       notes:
-        description: "Why this release is being cut (printed next to the evidence record)"
+        description: "Why this release is being cut (recorded verbatim in the release-attempt evidence record)"
         type: string
         required: false
         default: ""
@@ -41,7 +48,7 @@ permissions:
 
 # One release per target at a time: a concurrent attempt QUEUES (never
 # cancels a running release), and a queued production run still stops at
-# the protected-environment approval before doing anything.
+# the alpha-production environment before doing anything.
 concurrency:
   group: release-${{ github.event.inputs.target }}
   cancel-in-progress: false
@@ -77,99 +84,143 @@ jobs:
     name: Deploy synthetic staging (isolated environment)
     needs: rehearse
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment: staging
+    permissions:
+      contents: read
+      checks: read
     env:
       KIERO_ENVIRONMENT: staging
-      # Mapping through env: the secrets context cannot appear in step if:
-      # conditions; the name is the ONLY thing this file hard-codes.
-      STAGING_PROVISIONED: ${{ secrets.STAGING_CONVEX_DEPLOYMENT }}
+      # Name-only mappings (values live server-side; the guard checks the
+      # NAMES this job references against the descriptor's prefix).
+      RELEASE_NOTES: ${{ github.event.inputs.notes }}
+      VITE_CONVEX_URL: ${{ vars.STAGING_CONVEX_URL }}
+      CONVEX_DEPLOYMENT: ${{ secrets.STAGING_CONVEX_DEPLOYMENT }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22.22.3
           cache: npm
-      - name: Verify the release target (structure + label; names only, never values)
-        run: node infra/release/verify-release-target.mjs --target staging --workflow .github/workflows/release.yml
+      - name: Verify the release target (structure + label + descriptor; names only, never values)
+        run: >
+          node infra/release/verify-target.mjs --target staging
+          --workflow .github/workflows/release.yml
+          --descriptor infra/release/targets/staging.json
+          --checks-workflow .github/workflows/checks.yml
       - name: Clean install from the lockfile
         run: npm ci
       - name: Download the rehearsal evidence
         uses: actions/download-artifact@v4
         with:
           name: rehearsal-evidence
-      - name: Stop if synthetic staging is not provisioned yet (owner action)
-        if: ${{ env.STAGING_PROVISIONED == '' }}
-        run: |
-          echo "STAGING PENDING PROVISIONING: the Convex project kiero-staging-core does not exist yet."
-          echo "Exact owner commands are recorded in infra/environments/synthetic-staging.md."
-          echo "This job stays green so the workflow's guard rails remain exercised; no deploy happened."
-      - name: Deploy the web build to the staging host
-        if: ${{ env.STAGING_PROVISIONED != '' }}
-        run: echo "staging web deploy lands with the provisioning owner action (guarded above)"
-      - name: Record the release evidence (append-only, digests only)
-        run: |
-          node infra/release/record-release-evidence.mjs \
-            --target staging \
-            --revision "$GITHUB_SHA" \
-            --rehearsal-passed "$(jq -r .passed rehearsal-summary.json)" \
-            --rehearsal-rows "$(jq -r .rows rehearsal-summary.json)" \
-            --runtime-version a3.0 \
-            --client-version i7.1 \
-            --migration-ledger rehearsal-ledger.jsonl
-      - name: Upload the appended evidence ledger for curation
+      - name: Require the deterministic Checks success for this exact SHA
+        env:
+          CHECKS_GITHUB_TOKEN: ${{ github.token }}
+        run: >
+          node infra/release/verify-checks.mjs
+          --repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA"
+          --descriptor infra/release/targets/staging.json
+          --token-env CHECKS_GITHUB_TOKEN --out checks-report.json
+      - name: Deploy every descriptor component through the checked adapter
+        if: ${{ always() }}
+        run: >
+          node infra/release/deploy-component.mjs
+          --descriptor infra/release/targets/staging.json
+          --revision "$GITHUB_SHA" --checks-report checks-report.json
+          --ledger infra/release/evidence/releases.jsonl
+          --outcomes deploy-outcomes.json
+      - name: Record the release attempt (append-only, digests only)
+        if: ${{ always() }}
+        run: >
+          node infra/release/record-release-evidence.mjs
+          --target staging --descriptor infra/release/targets/staging.json
+          --revision "$GITHUB_SHA" --notes "$RELEASE_NOTES"
+          --rehearsal-passed "$(jq -r .passed rehearsal-summary.json)"
+          --rehearsal-rows "$(jq -r .rows rehearsal-summary.json)"
+          --runtime-version a3.0 --client-version i7.1
+          --migration-ledger rehearsal-ledger.jsonl
+      - name: Upload the evidence ledger and outcomes (blocked runs fail while uploading evidence)
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: release-evidence-staging
-          path: infra/release/evidence/releases.jsonl
+          path: |
+            infra/release/evidence/releases.jsonl
+            deploy-outcomes.json
+            checks-report.json
           if-no-files-found: error
 
   production-deploy:
-    name: Deploy alpha production (explicit trigger + protected environment)
+    name: Deploy alpha production (explicit trigger + alpha-production environment)
     needs: [rehearse, staging-deploy]
     if: ${{ github.event.inputs.target == 'production' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment: alpha-production
+    permissions:
+      contents: read
+      checks: read
     env:
       KIERO_ENVIRONMENT: production
-      PRODUCTION_PROVISIONED: ${{ secrets.PRODUCTION_CONVEX_DEPLOYMENT }}
+      RELEASE_NOTES: ${{ github.event.inputs.notes }}
+      VITE_CONVEX_URL: ${{ vars.PRODUCTION_CONVEX_URL }}
+      CONVEX_DEPLOYMENT: ${{ secrets.PRODUCTION_CONVEX_DEPLOYMENT }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.PRODUCTION_CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.PRODUCTION_CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22.22.3
           cache: npm
-      - name: Verify the release target (structure + label; names only, never values)
-        run: node infra/release/verify-release-target.mjs --target production --workflow .github/workflows/release.yml
+      - name: Verify the release target (structure + label + descriptor; names only, never values)
+        run: >
+          node infra/release/verify-target.mjs --target production
+          --workflow .github/workflows/release.yml
+          --descriptor infra/release/targets/production.json
+          --checks-workflow .github/workflows/checks.yml
       - name: Clean install from the lockfile
         run: npm ci
       - name: Download the rehearsal evidence
         uses: actions/download-artifact@v4
         with:
           name: rehearsal-evidence
-      - name: Stop if alpha production is not provisioned yet (owner action)
-        if: ${{ env.PRODUCTION_PROVISIONED == '' }}
-        run: |
-          echo "PRODUCTION PENDING PROVISIONING: the Convex project kiero-alpha-core does not exist yet."
-          echo "Exact owner commands are recorded in infra/environments/alpha-production.md."
-          echo "No deploy happened; the explicit trigger and protected environment are wired."
-      - name: Deploy the web build to the production host
-        if: ${{ env.PRODUCTION_PROVISIONED != '' }}
-        run: echo "production web deploy lands with the provisioning owner action (guarded above)"
-      - name: Record the release evidence (append-only, digests only)
-        run: |
-          node infra/release/record-release-evidence.mjs \
-            --target production \
-            --revision "$GITHUB_SHA" \
-            --rehearsal-passed "$(jq -r .passed rehearsal-summary.json)" \
-            --rehearsal-rows "$(jq -r .rows rehearsal-summary.json)" \
-            --runtime-version a3.0 \
-            --client-version i7.1 \
-            --migration-ledger rehearsal-ledger.jsonl
-      - name: Upload the appended evidence ledger for curation
+      - name: Require the deterministic Checks success for this exact SHA
+        env:
+          CHECKS_GITHUB_TOKEN: ${{ github.token }}
+        run: >
+          node infra/release/verify-checks.mjs
+          --repo "$GITHUB_REPOSITORY" --sha "$GITHUB_SHA"
+          --descriptor infra/release/targets/production.json
+          --token-env CHECKS_GITHUB_TOKEN --out checks-report.json
+      - name: Deploy every descriptor component through the checked adapter
+        if: ${{ always() }}
+        run: >
+          node infra/release/deploy-component.mjs
+          --descriptor infra/release/targets/production.json
+          --revision "$GITHUB_SHA" --checks-report checks-report.json
+          --ledger infra/release/evidence/releases.jsonl
+          --outcomes deploy-outcomes.json
+      - name: Record the release attempt (append-only, digests only)
+        if: ${{ always() }}
+        run: >
+          node infra/release/record-release-evidence.mjs
+          --target production --descriptor infra/release/targets/production.json
+          --revision "$GITHUB_SHA" --notes "$RELEASE_NOTES"
+          --rehearsal-passed "$(jq -r .passed rehearsal-summary.json)"
+          --rehearsal-rows "$(jq -r .rows rehearsal-summary.json)"
+          --runtime-version a3.0 --client-version i7.1
+          --migration-ledger rehearsal-ledger.jsonl
+      - name: Upload the evidence ledger and outcomes (blocked runs fail while uploading evidence)
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: release-evidence-production
-          path: infra/release/evidence/releases.jsonl
+          path: |
+            infra/release/evidence/releases.jsonl
+            deploy-outcomes.json
+            checks-report.json
           if-no-files-found: error

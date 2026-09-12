@@ -25,3 +25,13 @@ export declare function checkReleaseTarget(input: {
   jobId: string;
   environmentLabel?: string;
 }): string[];
+
+export declare function checkDescriptorAgainstWorkflow(input: {
+  descriptor: {
+    readonly target: string;
+    readonly githubEnvironment: string;
+    readonly checksName: string;
+  };
+  target: string;
+  checksWorkflowText?: string;
+}): string[];

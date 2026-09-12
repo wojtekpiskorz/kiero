@@ -6,15 +6,33 @@
 
 export declare const RELEASE_EVIDENCE_PATH: URL;
 
-export interface ReleaseEvidenceRecord {
+export declare const COMPONENT_OUTCOMES: readonly string[];
+
+export interface ReleaseAttemptRecord {
+  readonly kind: "release-attempt";
   readonly recordedAtIso: string;
   readonly target: string;
   readonly revision: string;
+  readonly descriptorId?: string;
+  readonly notes?: string;
   readonly rehearsal: string;
   readonly runtimeVersion: string;
   readonly clientVersion: string;
   readonly migrationLedgerSha256?: string;
 }
+
+export interface ComponentOutcomeRecord {
+  readonly kind: "component-outcome";
+  readonly recordedAtIso: string;
+  readonly target: string;
+  readonly revision: string;
+  readonly descriptorId: string;
+  readonly component: string;
+  readonly outcome: "deployed" | "skipped" | "blocked";
+  readonly [field: string]: unknown;
+}
+
+export type ReleaseEvidenceRecord = ReleaseAttemptRecord | ComponentOutcomeRecord;
 
 export declare function buildReleaseRecord(input: {
   target: string;
@@ -23,9 +41,23 @@ export declare function buildReleaseRecord(input: {
   rehearsalRows: number;
   runtimeVersion: string;
   clientVersion: string;
+  descriptorId?: string | null;
+  notes?: string | null;
   migrationLedgerText?: string | null;
   recordedAtIso?: string;
-}): ReleaseEvidenceRecord;
+}): ReleaseAttemptRecord;
+
+export declare function buildComponentOutcomeRecord(input: {
+  target: string;
+  revision: string;
+  descriptorId: string;
+  outcome: {
+    readonly component: string;
+    readonly outcome: "deployed" | "skipped" | "blocked";
+    readonly [field: string]: unknown;
+  };
+  recordedAtIso?: string;
+}): ComponentOutcomeRecord;
 
 export declare function sha256Hex(text: string): string;
 

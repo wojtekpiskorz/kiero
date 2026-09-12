@@ -1,0 +1,86 @@
+{
+  "descriptorId": "infra/release/targets/staging@2026-09-12",
+  "target": "staging",
+  "githubEnvironment": "staging",
+  "secretPrefix": "STAGING_",
+  "checksName": "npm ci, typecheck, test, build (Node 22.22.3)",
+  "components": [
+    {
+      "id": "web",
+      "included": true,
+      "build": "npm run build --workspace @kiero/web",
+      "artifact": "apps/web/dist",
+      "transport": {
+        "kind": "wrangler-pages",
+        "projectName": "kiero-staging-web"
+      },
+      "requiredConfig": [
+        "VITE_CONVEX_URL",
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID"
+      ]
+    },
+    {
+      "id": "convex-functions",
+      "included": true,
+      "build": null,
+      "artifact": "convex",
+      "transport": {
+        "kind": "convex-deploy"
+      },
+      "requiredConfig": ["CONVEX_DEPLOYMENT"]
+    },
+    {
+      "id": "gateway",
+      "included": true,
+      "build": null,
+      "artifact": "apps/gateway",
+      "transport": {
+        "kind": "wrangler-deploy",
+        "cwd": "apps/gateway",
+        "wranglerEnv": "staging",
+        "workerName": "kiero-staging-gateway"
+      },
+      "requiredConfig": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+    },
+    {
+      "id": "media-worker",
+      "included": true,
+      "build": null,
+      "artifact": "apps/media-worker",
+      "transport": {
+        "kind": "wrangler-deploy",
+        "cwd": "apps/media-worker",
+        "wranglerEnv": "staging",
+        "workerName": "kiero-staging-media-worker"
+      },
+      "requiredConfig": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+    },
+    {
+      "id": "export-worker",
+      "included": true,
+      "build": null,
+      "artifact": "apps/export-worker",
+      "transport": {
+        "kind": "wrangler-deploy",
+        "cwd": "apps/export-worker",
+        "wranglerEnv": "staging",
+        "workerName": "kiero-staging-export-worker"
+      },
+      "requiredConfig": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+    },
+    {
+      "id": "backup-worker",
+      "included": true,
+      "build": null,
+      "artifact": "apps/backup-worker",
+      "transport": {
+        "kind": "wrangler-deploy",
+        "cwd": "apps/backup-worker",
+        "wranglerEnv": "staging",
+        "workerName": "kiero-staging-backup-worker"
+      },
+      "requiredConfig": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+    }
+  ]
+}
