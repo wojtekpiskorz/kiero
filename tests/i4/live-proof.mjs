@@ -58,6 +58,18 @@
  *       answering the ledger's uniform not-found).
  * - G1  the purge route refuses a missing service credential (401) -
  *       only the Convex action's service identity may delete.
+ * - R2  the clarification purge legs (issue #127): witnessed text sources
+ *       seeded into the ADMIN'S OWN firm (guarded E6 surface + the admin's
+ *       registry session), clarifications raised/resolved through the REAL
+ *       public memory dispatch, the confirmed purge through the checked
+ *       sources dispatch, then (a) the immediate reads redact/hide from the
+ *       tombstone on, (b) a late raise on the purged fragment refuses typed
+ *       with no row, (c) the durable executor completes with sticky
+ *       redaction, (d) stored rows converge to the fixed copy with the
+ *       content-free purgeAudit and surviving independent evidence, (e) the
+ *       transcripts stage retries with no restored content, no duplicate
+ *       audit and no second ledger record, and (f) independent active
+ *       evidence stays actionable (R2-P3).
  *
  * Run: KIERO_I4_CONVEX=nautical-loris-352 KIERO_I4_GATEWAY=https://kiero-dev-gateway-i4.wojtek-524.workers.dev node tests/i4/live-proof.mjs
  * (Not a vitest file: live evidence, transcribed into the issue report.)
@@ -123,7 +135,9 @@ async function signInFixture(email) {
   if (ensured?.state !== "live") {
     throw new Error(`session provisioning failed for ${email}`);
   }
-  return { client, token, email };
+  // The registry session id is the server-side session the guarded E6
+  // seeding surface accepts (the R2 canary seeds into this person's firm).
+  return { client, token, email, sessionId: ensured.sessionId };
 }
 
 const admit = (client, operation, input) =>
@@ -398,6 +412,278 @@ record(
   "G1 the gateway purge route refuses a missing service credential (401)",
   noBearer.status === 401 ? "PASS" : "FAIL",
   `status=${noBearer.status}`,
+);
+
+// --- R2 clarification canary (issue #127): the deletion-purge live legs -----------
+//
+// The canary world rides the SAME admin/member firm above. Two witnessed
+// text sources are seeded through the guarded E6 surface with the ADMIN'S
+// OWN registry session (the real signed-in person's firm); the
+// clarifications are raised and resolved through the REAL public memory
+// dispatch (the admin's own Convex Auth credential, the exact client
+// command path); the confirmed purge runs through the REAL checked sources
+// dispatch (probePurgeAsCaller); the boss-facing reads ride the public
+// clarifications query; and the stored rows plus the content-free purge
+// audit come back through the guarded storage probes. Deleted-content
+// canaries must never survive any read, stored row or audit anywhere.
+
+const R2_SOURCE_TEXT = "Kaczmarek wpłacił zaliczkę 5000 zł w piątek";
+const R2_KEEPER_TEXT = "Przelew zaliczki wpłynął we wtorek.";
+const R2_QUESTION_A = "Ile zaliczki wpłacił Kaczmarek — 5000 zł z piątkowej wiadomości?";
+const R2_QUESTION_B = "Która zaliczka obowiązuje — piątkowa czy wtorkowa?";
+const R2_NOTE_B = "Obowiązuje zaliczka 5000 zł z wiadomości Kaczmarka.";
+const R2_REDACTED_QUESTION = "Pytanie zostało trwale usunięte wraz z wiadomością źródłową.";
+const R2_REDACTED_NOTE = "Rozstrzygnięcie zostało trwale usunięte wraz z wiadomością źródłową.";
+// The clarification-surface canaries: texts these reads and rows can
+// carry. The source text itself rides the conversation/detail surfaces,
+// covered live by I2a/I2b in the same transcript.
+const R2_CANARIES = [R2_QUESTION_A, R2_QUESTION_B, R2_NOTE_B];
+
+const memoryCommand = (operation, input) =>
+  admin.client.mutation("memory/findings/functions:dispatchMemoryCommandEntry", {
+    envelope: { operation, input, expectedRevisions: [] },
+  });
+const readClarificationRowsLive = () =>
+  admin.client.query("memory/findings/functions:readClarifications", { scope: { _tag: "company" } });
+const storedClarificationsLive = async () => {
+  const result = await admin.client.action("memory/findings/probe:probeClarificationStorage", {});
+  return { rows: result?._tag === "ok" && Array.isArray(result.value?.rows) ? result.value.rows : null };
+};
+
+const seedR2Source = (key, text) =>
+  admin.client.action("agent/probe:probeSeedE6Source", {
+    sessionId: admin.sessionId,
+    acceptanceKey: key,
+    authorText: text,
+    sentAtIso: new Date().toISOString(),
+  });
+
+const doomedSeed = await seedR2Source(`i4-r2-doomed-${RUN}`, R2_SOURCE_TEXT);
+const keeperSeed = await seedR2Source(`i4-r2-keeper-${RUN}`, R2_KEEPER_TEXT);
+if (doomedSeed?._tag !== "ok" || keeperSeed?._tag !== "ok") {
+  throw new Error(`R2 source seeding failed: ${JSON.stringify([doomedSeed, keeperSeed])}`);
+}
+const doomed = { sourceId: doomedSeed.value.sourceId, fragmentId: doomedSeed.value.fragmentId };
+const keeper = { sourceId: keeperSeed.value.sourceId, fragmentId: keeperSeed.value.fragmentId };
+
+// Case A: open, anchored ONLY on the doomed fragment (must leave the
+// actionable list). Case B: resolved source-backed, question anchored on
+// doomed+keeper and resolution evidence on doomed+keeper (must stay listed,
+// fully redacted, with only the surviving references).
+const caseA = await memoryCommand("memory.raiseClarification", {
+  question: R2_QUESTION_A,
+  conflictingEvidence: [doomed.fragmentId],
+  scope: { _tag: "company" },
+});
+const caseB = await memoryCommand("memory.raiseClarification", {
+  question: R2_QUESTION_B,
+  conflictingEvidence: [doomed.fragmentId, keeper.fragmentId],
+  scope: { _tag: "company" },
+});
+if (caseA?._tag !== "ok" || caseB?._tag !== "ok") {
+  throw new Error(`R2 raise failed: ${JSON.stringify([caseA, caseB])}`);
+}
+const resolvedB = await memoryCommand("memory.resolveClarification", {
+  clarificationId: caseB.value.clarificationId,
+  resolutionNote: R2_NOTE_B,
+  evidence: [
+    { sourceId: doomed.sourceId, fragmentId: doomed.fragmentId },
+    { sourceId: keeper.sourceId, fragmentId: keeper.fragmentId },
+  ],
+});
+
+const preRows = await readClarificationRowsLive();
+const preStoredRows = (await storedClarificationsLive()).rows;
+const preStoredB = (preStoredRows ?? []).find((row) => row.clarificationId === caseB.value.clarificationId);
+const preA = preRows.find((row) => row.clarificationId === caseA.value.clarificationId);
+const preB = preRows.find((row) => row.clarificationId === caseB.value.clarificationId);
+record(
+  "R2-0 the canary text is REALLY present before the purge (both cases, the real command path)",
+  preA?.question === R2_QUESTION_A && preA.state === "open" &&
+    preB?.question === R2_QUESTION_B && preB.state === "resolved" &&
+    preB.resolutionNote === R2_NOTE_B && preB.resolutionEvidence.length === 2 &&
+    resolvedB?._tag === "ok"
+    ? "PASS"
+    : "FAIL",
+  `caseA=${preA?.state} caseB=${preB?.state} evidence=${preB?.resolutionEvidence?.length} resolve=${resolvedB?._tag}`,
+);
+
+// The confirmed purge of the doomed source (the same checked dispatch as I1).
+const r2Purge = await purgeAs(admin, doomed.sourceId, CONFIRMATION);
+if (r2Purge?._tag !== "ok") {
+  throw new Error(`R2 purge failed: ${JSON.stringify(r2Purge)}`);
+}
+
+// R2-1: the immediate reads (the tombstone already redacts; Pamięć and Co
+// teraz ride this one shared read).
+const postRows = await readClarificationRowsLive();
+const postSerialized = JSON.stringify(postRows);
+const postB = postRows.find((row) => row.clarificationId === caseB.value.clarificationId);
+record(
+  "R2-1a after the confirmed purge no read exposes the deleted text",
+  R2_CANARIES.every((canary) => postSerialized.includes(canary) === false) ? "PASS" : "FAIL",
+  R2_CANARIES.filter((canary) => postSerialized.includes(canary)).join("|") || "clean",
+);
+record(
+  "R2-1b the redacted open case left the actionable list (Pamięć and Co teraz ride this read)",
+  postRows.some((row) => row.clarificationId === caseA.value.clarificationId) === false ? "PASS" : "FAIL",
+  `stillListed=${postRows.some((row) => row.clarificationId === caseA.value.clarificationId)}`,
+);
+record(
+  "R2-1c the redacted resolved case keeps actor, timestamps, basis and only the surviving references",
+  postB !== undefined && preB !== undefined &&
+    postB.question === R2_REDACTED_QUESTION && postB.resolutionNote === R2_REDACTED_NOTE &&
+    postB.questionRedacted === true && postB.resolutionNoteRedacted === true &&
+    postB.resolutionBasis === "source_backed" &&
+    postB.conflictingEvidence.length === 1 && postB.conflictingEvidence[0].sourceId === keeper.sourceId &&
+    postB.resolutionEvidence.length === 1 && postB.resolutionEvidence[0].sourceId === keeper.sourceId &&
+    postB.resolvedByUserId === preB.resolvedByUserId && postB.resolvedAtMs === preB.resolvedAtMs &&
+    postB.raisedAtMs === preB.raisedAtMs
+    ? "PASS"
+    : "FAIL",
+  `qRedacted=${postB?.questionRedacted} nRedacted=${postB?.resolutionNoteRedacted} conflict=${postB?.conflictingEvidence?.length} evidence=${postB?.resolutionEvidence?.length}`,
+);
+
+// R2-2: a late raise anchored on the purged fragment refuses typed and
+// commits no row (the late-write rule; R2-P2's live cousin). The honest
+// code depends on the executor's progress, both refuse: before the
+// transcripts stage the retained fragment reads source_not_active; after
+// it the deleted fragment reads not_found.
+const LATE_QUESTION = "Późna sprawa po usunięciu źródła?";
+const idsBeforeLateRaise = ((await storedClarificationsLive()).rows ?? [])
+  .map((row) => row.clarificationId)
+  .sort();
+const lateRaise = await memoryCommand("memory.raiseClarification", {
+  question: LATE_QUESTION,
+  conflictingEvidence: [doomed.fragmentId],
+  scope: { _tag: "company" },
+});
+const storageAfterLateRaise = await storedClarificationsLive();
+const idsAfterLateRaise = (storageAfterLateRaise.rows ?? [])
+  .map((row) => row.clarificationId)
+  .sort();
+const refusalCode = lateRaise?.error?.code;
+record(
+  "R2-2 a late raise anchored on the purged fragment refuses typed with no row",
+  lateRaise?._tag === "error" && lateRaise.error._tag === "validation" &&
+    (refusalCode === "conflicting_fragment_not_found" ||
+      refusalCode === "conflicting_fragment_source_not_active") &&
+    JSON.stringify(idsAfterLateRaise) === JSON.stringify(idsBeforeLateRaise) &&
+    (storageAfterLateRaise.rows ?? []).every((row) => row.question !== LATE_QUESTION)
+    ? "PASS"
+    : "FAIL",
+  `error=${lateRaise?.error?._tag}:${refusalCode} rowsUnchanged=${JSON.stringify(idsAfterLateRaise) === JSON.stringify(idsBeforeLateRaise)}`,
+);
+
+// R2-3: the durable executor completes every stage (the clarification purge
+// rides the transcripts stage) and the reads stay sticky.
+const r2Completed = await waitForStages(
+  admin,
+  r2Purge.value.deletionRecordId,
+  (row) => row.stages.every((s) => s.state === "purged"),
+);
+const stickyRows = await readClarificationRowsLive();
+const stickySerialized = JSON.stringify(stickyRows);
+record(
+  "R2-3 every purge stage completes and the redaction stays sticky after completion",
+  r2Completed !== null &&
+    R2_CANARIES.every((canary) => stickySerialized.includes(canary) === false) &&
+    stickyRows.some((row) => row.clarificationId === caseA.value.clarificationId) === false &&
+    stickyRows.find((row) => row.clarificationId === caseB.value.clarificationId)?.question === R2_REDACTED_QUESTION
+    ? "PASS"
+    : "FAIL",
+  r2Completed === null ? "timeout waiting for stages" : r2Completed.stages.map((s) => `${s.stageKind}:${s.state}`).join(","),
+);
+
+// R2-4: the stored rows converged (the storage-freeze half) with the
+// content-free audit, and the independent source survives untouched.
+const stored = await storedClarificationsLive();
+const storedSerialized = JSON.stringify(stored.rows ?? []);
+const storedA = stored.rows?.find((row) => row.clarificationId === caseA.value.clarificationId);
+const storedB = stored.rows?.find((row) => row.clarificationId === caseB.value.clarificationId);
+const ledgerState = await deletionState(admin);
+const ledgerCount = ledgerState?.value?.deletions?.filter(
+  (r) => r.targetSourceId === doomed.sourceId,
+).length;
+record(
+  "R2-4a stored text converged to the fixed redaction copy with content-free audit metadata",
+  storedA?.question === R2_REDACTED_QUESTION && storedB?.question === R2_REDACTED_QUESTION &&
+    storedB.resolutionNote === R2_REDACTED_NOTE &&
+    storedA.purgeAudit?.redactedSourceIds?.length === 1 &&
+    storedA.purgeAudit.redactedSourceIds[0] === doomed.sourceId &&
+    typeof storedA.purgeAudit.questionRedactedAtMs === "number" &&
+    storedB?.purgeAudit?.resolutionNoteRedactedAtMs !== undefined &&
+    typeof storedB.purgeAudit.resolutionNoteRedactedAtMs === "number" &&
+    R2_CANARIES.every((canary) => storedSerialized.includes(canary) === false)
+    ? "PASS"
+    : "FAIL",
+  `auditA=${JSON.stringify(storedA?.purgeAudit)} auditB.note=${storedB?.purgeAudit?.resolutionNoteRedactedAtMs ?? "missing"}`,
+);
+const uploadsState = await admin.client.action("sources/uploads/probe:probeUploadsState", {});
+const keeperRow = uploadsState?.value?.sources?.find((row) => row.sourceId === keeper.sourceId);
+const doomedRow = uploadsState?.value?.sources?.find((row) => row.sourceId === doomed.sourceId);
+record(
+  "R2-4b timestamps, actor and the independent active source survive the purge",
+  preStoredB !== undefined && storedB !== undefined &&
+    storedB.raisedAtMs === preStoredB.raisedAtMs &&
+    storedB.resolvedAtMs === preStoredB.resolvedAtMs &&
+    storedB.resolvedByUserId === preStoredB.resolvedByUserId &&
+    keeperRow?.lifecycle === "active" && doomedRow?.lifecycle === "purged" && ledgerCount === 1
+    ? "PASS"
+    : "FAIL",
+  `keeper=${keeperRow?.lifecycle} doomed=${doomedRow?.lifecycle} ledgerRecords=${ledgerCount}`,
+);
+
+// R2-5: the per-stage idempotency report. The completed transcripts stage
+// returns to the interruption state and the REAL executor replays it: no
+// restored content, no duplicate audit, no second ledger record. Without a
+// completed record there is nothing to retry; the row records that FAIL and
+// the script keeps going.
+const beforeRetry = await storedClarificationsLive();
+const beforeRetryA = beforeRetry.rows?.find((row) => row.clarificationId === caseA.value.clarificationId);
+const stageAttemptBefore = r2Completed?.stages?.find((s) => s.stageKind === "transcripts")?.attempts;
+const retry = r2Completed === null
+  ? undefined
+  : await admin.client.action("operations/deletion/probe:probeRetryPurgeStage", {
+      deletionRecordId: r2Purge.value.deletionRecordId,
+      stageKind: "transcripts",
+    });
+const afterRetry = await storedClarificationsLive();
+const afterRetryA = afterRetry.rows?.find((row) => row.clarificationId === caseA.value.clarificationId);
+const ledgerAfterRetry = await deletionState(admin);
+const ledgerCountAfterRetry = ledgerAfterRetry?.value?.deletions?.filter(
+  (r) => r.targetSourceId === doomed.sourceId,
+).length;
+record(
+  "R2-5 the transcripts stage retries with no restored content, no duplicate audit and no second ledger record",
+  retry?._tag === "ok" && retry.value.outcome === "succeeded" &&
+    retry.value.stages.every((s) => s.state === "purged") &&
+    retry.value.stages.find((s) => s.stageKind === "transcripts").attempts === stageAttemptBefore + 1 &&
+    Array.isArray(afterRetry.rows) && JSON.stringify(afterRetry.rows) === JSON.stringify(beforeRetry.rows) &&
+    afterRetryA?.purgeAudit?.redactedSourceIds?.length === 1 &&
+    beforeRetryA?.purgeAudit?.questionRedactedAtMs !== undefined &&
+    afterRetryA.purgeAudit.questionRedactedAtMs === beforeRetryA.purgeAudit.questionRedactedAtMs &&
+    ledgerCountAfterRetry === 1
+    ? "PASS"
+    : "FAIL",
+  `outcome=${retry?._tag === "ok" ? retry.value.outcome : (retry?.error?.code ?? "no completed record to retry")} rowsStable=${Array.isArray(afterRetry.rows) && Array.isArray(beforeRetry.rows) && JSON.stringify(afterRetry.rows) === JSON.stringify(beforeRetry.rows)} auditIds=${afterRetryA?.purgeAudit?.redactedSourceIds?.length} firstRedactionKept=${afterRetryA?.purgeAudit?.questionRedactedAtMs === beforeRetryA?.purgeAudit?.questionRedactedAtMs} ledger=${ledgerCountAfterRetry}`,
+);
+
+// R2-6 (R2-P3 live): independent active evidence stays actionable after the
+// purge: a fresh case anchored on the surviving source raises and reads.
+const caseC = await memoryCommand("memory.raiseClarification", {
+  question: "Kiedy wpłynął przelew zaliczki?",
+  conflictingEvidence: [keeper.fragmentId],
+  scope: { _tag: "company" },
+});
+const finalRows = await readClarificationRowsLive();
+const rowC = finalRows.find((row) => row.clarificationId === caseC?.value?.clarificationId);
+record(
+  "R2-6 independent active evidence stays actionable after the purge (R2-P3)",
+  caseC?._tag === "ok" && rowC?.question === "Kiedy wpłynął przelew zaliczki?" && rowC.questionRedacted === false
+    ? "PASS"
+    : "FAIL",
+  `raise=${caseC?._tag} listed=${rowC !== undefined} redacted=${rowC?.questionRedacted}`,
 );
 
 // The owner-token gap rows stay explicit.
