@@ -540,22 +540,34 @@ record(
 );
 
 // R2-2: a late raise anchored on the purged fragment refuses typed and
-// commits no row (the late-write rule; R2-P2's live cousin).
-const storageBeforeLateRaise = await storedClarificationsLive();
+// commits no row (the late-write rule; R2-P2's live cousin). The honest
+// code depends on the executor's progress, both refuse: before the
+// transcripts stage the retained fragment reads source_not_active; after
+// it the deleted fragment reads not_found.
+const LATE_QUESTION = "Późna sprawa po usunięciu źródła?";
+const idsBeforeLateRaise = (await storedClarificationsLive()).value.rows
+  .map((row) => row.clarificationId)
+  .sort();
 const lateRaise = await memoryCommand("memory.raiseClarification", {
-  question: "Późna sprawa po usunięciu źródła?",
+  question: LATE_QUESTION,
   conflictingEvidence: [doomed.fragmentId],
   scope: { _tag: "company" },
 });
 const storageAfterLateRaise = await storedClarificationsLive();
+const idsAfterLateRaise = storageAfterLateRaise.value.rows
+  .map((row) => row.clarificationId)
+  .sort();
+const refusalCode = lateRaise?.error?.code;
 record(
   "R2-2 a late raise anchored on the purged fragment refuses typed with no row",
   lateRaise?._tag === "error" && lateRaise.error._tag === "validation" &&
-    lateRaise.error.code === "conflicting_fragment_source_not_active" &&
-    JSON.stringify(storageAfterLateRaise.value.rows) === JSON.stringify(storageBeforeLateRaise.value.rows)
+    (refusalCode === "conflicting_fragment_not_found" ||
+      refusalCode === "conflicting_fragment_source_not_active") &&
+    JSON.stringify(idsAfterLateRaise) === JSON.stringify(idsBeforeLateRaise) &&
+    storageAfterLateRaise.value.rows.every((row) => row.question !== LATE_QUESTION)
     ? "PASS"
     : "FAIL",
-  `error=${lateRaise?.error?._tag}:${lateRaise?.error?.code} rowsUnchanged=${JSON.stringify(storageAfterLateRaise.value.rows) === JSON.stringify(storageBeforeLateRaise.value.rows)}`,
+  `error=${lateRaise?.error?._tag}:${refusalCode} rowsUnchanged=${JSON.stringify(idsAfterLateRaise) === JSON.stringify(idsBeforeLateRaise)}`,
 );
 
 // R2-3: the durable executor completes every stage (the clarification purge
