@@ -20,11 +20,13 @@
  *   dropped what tenant checks, lifecycle or the current revision
  *   superseded (E5's keep rules), and the row the UI shows is the
  *   canonical record, not the index;
- * - the authoritative open: source hits deep-link to `/zrodlo?zrodlo=<id>`
- *   (the canonical source URL's full-history expansion, with the matched
- *   fragment's anchor highlighted); finding hits expand to C2's
- *   `memory.readFindingHistory` (the current revision with provenance)
- *   and link into "Pamięć";
+ * - the authoritative open: source hits deep-link through R5's one shared
+ *   serializer (`../source-detail/source-route`) into the canonical
+ *   dossier route with its encoded `zrodlo` param (the source URL's
+ *   full-history expansion, with the matched fragment's anchor
+ *   highlighted); finding hits expand to C2's `memory.readFindingHistory`
+ *   (the current revision with provenance) and link their evidence
+ *   through the same serializer;
  * - paging: `isDone`/cursor honored with a "Pokaż więcej" button — pages
  *   append, no unbounded reload.
  */
@@ -54,7 +56,7 @@ import {
   type SubmitEvent,
 } from "../company/CompanyGate";
 import { asConvexId } from "../company/convex-ids";
-import { SOURCE_PARAM } from "../company/route-params";
+import { serializeSourceReference } from "../source-detail/source-route";
 import {
   coverageLine,
   dayToEndMs,
@@ -353,9 +355,13 @@ function SourceHit({
       createElement(
         "a",
         {
-          href: `/zrodlo?${SOURCE_PARAM}=${encodeURIComponent(sourceId)}${
-            entry.sourceFragmentId === undefined ? "" : `&fragment=${encodeURIComponent(entry.sourceFragmentId)}`
-          }`,
+          // R5: the one canonical serializer builds the hit's link, with
+          // the matched fragment's anchor when the entry pins one.
+          href: serializeSourceReference({
+            sourceId,
+            fragmentId: entry.sourceFragmentId ?? null,
+            projectId: null,
+          }),
         },
         copy.sourceLinkLabel,
       ),
@@ -414,7 +420,15 @@ function FindingDetails({ findingId }: { readonly findingId: string }): ReactNod
               `${copy.evidenceSourceLabel} `,
               createElement(
                 "a",
-                { href: `/?${SOURCE_PARAM}=${encodeURIComponent(witness.sourceId)}` },
+                {
+                  // R5: the one canonical serializer builds the evidence
+                  // link (with the fragment's anchor).
+                  href: serializeSourceReference({
+                    sourceId: witness.sourceId,
+                    fragmentId: witness.fragmentId,
+                    projectId: null,
+                  }),
+                },
                 copy.sourceLinkLabel,
               ),
             ),

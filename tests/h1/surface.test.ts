@@ -48,6 +48,7 @@ import {
   ResolutionBasisView,
   resolutionBasisLabels,
 } from "../../apps/web/src/features/memory/MemoryFeature";
+import { AgentAnswerPanel } from "../../apps/web/src/features/conversation/ConversationFeature";
 import { appFeatures } from "../../apps/web/src/app/app-features";
 import { conversationFeatureEntry } from "../../apps/web/src/app/features/conversation/entry";
 import { memoryFeatureEntry } from "../../apps/web/src/app/features/memory/entry";
@@ -575,7 +576,7 @@ describe("clarification resolution basis (the R1 surface)", () => {
     }
   });
 
-  it("renders a source-backed row with its saved evidence links", () => {
+  it("renders a source-backed row with its saved evidence links (R5 canonical route)", () => {
     const html = renderToString(
       createElement(ResolutionBasisView, {
         row: resolvedRow("source_backed", [
@@ -585,10 +586,33 @@ describe("clarification resolution basis (the R1 surface)", () => {
       }),
     );
     expect(html).toContain("Podstawa rozstrzygnięcia");
-    expect(html).toContain(`/?zrodlo=${SOURCE_ID}`);
-    expect(html).toContain(`/?zrodlo=${FIRM_SOURCE_ID}`);
+    // R5 (issue #130): the saved evidence renders the canonical dossier
+    // route with its encoded `zrodlo` param (and the fragment), never the
+    // legacy conversation-route form. React escapes the query separator
+    // inside the attribute.
+    expect(html).toContain(`/zrodlo?zrodlo=${SOURCE_ID}&amp;fragment=${FRAGMENT_ID}`);
+    expect(html).toContain(`/zrodlo?zrodlo=${FIRM_SOURCE_ID}`);
+    expect(html).not.toContain(`/?zrodlo=`);
     expect(html).toContain(`fragment ${FRAGMENT_ID}`);
     expect(html).toContain(memoryCopy.sourceLinkLabel);
+  });
+
+  it("keeps the evidence link openable far below the conversation feed cap (121 newer messages)", () => {
+    // R5-P1's deterministic half: the link targets the dossier route, whose
+    // read depends only on the source id — not on the row being inside the
+    // conversation's loaded page. A source with 121 newer rows sits below
+    // the feed's 120-row growth cap, so no feed position can list it; the
+    // rendered route is therefore asserted without any feed fixture at all
+    // (the live deployment half of this case runs against the leased dev
+    // deployment, like the other live halves).
+    const OLD_SOURCE = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2z";
+    const html = renderToString(
+      createElement(ResolutionBasisView, {
+        row: resolvedRow("source_backed", [{ sourceId: OLD_SOURCE, fragmentId: null }]) as never,
+      }),
+    );
+    expect(html).toContain(`/zrodlo?zrodlo=${OLD_SOURCE}`);
+    expect(html).not.toContain("/?zrodlo=");
   });
 
   it("renders a manual decision and a pre-repair row honestly, without invented evidence", () => {
@@ -638,6 +662,53 @@ describe("clarification resolution basis (the R1 surface)", () => {
       resolutionNote: "Obowiązuje kwota z czwartkowej rozmowy.",
     });
     expect(decoded.evidence).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R5 (issue #130): the agent answer's evidence quotes link into the
+// canonical dossier route — the basis stays one click from the original.
+// ---------------------------------------------------------------------------
+
+describe("the agent answer's evidence links (the R5 surface)", () => {
+  /** One answered run whose single statement cites one evidence row. */
+  const answeredRun = {
+    outcome: "answered",
+    answer: {
+      answerText: "Płytki dowożone w środę rano.",
+      statements: [
+        {
+          text: "Dowóz płytek w środę rano.",
+          basis: "direct",
+          evidenceIds: ["ev1"],
+          derivedFromFindingIds: [],
+        },
+      ],
+      disclosures: { updatingFindingIds: [], processingSourceIds: [] },
+    },
+    clarificationsRaised: [],
+    changes: [],
+    evidence: [
+      { evidenceId: "ev1", sourceId: SOURCE_ID, quote: "w środę rano", groundsUpdating: false },
+    ],
+    turns: 2,
+    refreshes: 0,
+    observedModels: ["stub-route"],
+    finalText: "",
+  };
+
+  it("renders each quote as a link into the canonical dossier route", () => {
+    const html = renderToString(
+      createElement(AgentAnswerPanel, {
+        answer: { sourceId: SOURCE_ID, status: "done", run: answeredRun } as never,
+      }),
+    );
+    expect(html).toContain("Źródło:");
+    expect(html).toContain("w środę rano");
+    expect(html).toContain(`/zrodlo?zrodlo=${SOURCE_ID}`);
+    // The wire pins no fragment: the whole source is the basis.
+    expect(html).not.toContain("fragment=");
+    expect(html).not.toContain("/?zrodlo=");
   });
 });
 

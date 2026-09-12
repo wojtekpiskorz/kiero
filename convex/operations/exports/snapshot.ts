@@ -247,6 +247,36 @@ export function chooseMediaItem(
 const bounded = (rows: readonly unknown[]): boolean =>
   rows.length <= EXPORT_BOUNDS.maxRecordsPerCollection;
 
+// ---------------------------------------------------------------------------
+// R5 (issue #130): the canonical relative source target of the archive
+// ---------------------------------------------------------------------------
+
+/**
+ * The archive route prefix and source param key this serializer targets —
+ * the SAME literal wire form the app's shared serializer
+ * (`apps/web/src/features/source-detail/source-route`) produces. Kept as a
+ * runtime-neutral local twin ON PURPOSE: the Convex backend must not import
+ * browser feature code, so the two halves share a tested wire contract
+ * instead (tests/i3 pin them equal against one corpus). The target stays
+ * RELATIVE: no deployment host name ever enters the export.
+ */
+const SOURCE_ROUTE_PATH = "/zrodlo";
+const SOURCE_PARAM = "zrodlo";
+
+/**
+ * The canonical relative target of one archived source record: the dossier
+ * route with the encoded source id, openable in the app regardless of
+ * conversation pagination (R5-P1's export half).
+ */
+export function sourceArchiveTarget(sourceId: string): string {
+  return `${SOURCE_ROUTE_PATH}?${SOURCE_PARAM}=${encodeURIComponent(sourceId)}`;
+}
+
+/** Adds the canonical relative target to one projected source row. */
+function withSourceTarget(row: SnapshotRow, sourceId: Id<"sources">): SnapshotRow {
+  return { ...row, canonicalTarget: sourceArchiveTarget(sourceId) };
+}
+
 /**
  * Reads the whole company snapshot in the caller's transaction. `nowMs`
  * is the transaction's time (Convex fixes `Date.now()` per transaction);
@@ -381,7 +411,12 @@ export async function readCompanySnapshot(
     projectAliases: (await db.aliasesOfCompany(companyId)).map((row) => project(row)),
     contacts: (await db.contactsOfCompany(companyId)).map((row) => project(row)),
     contactRoles: (await db.contactRolesOfCompany(companyId)).map((row) => project(row)),
-    sources: sources.map((row) => project(row, ["acceptanceKey", "acceptanceFingerprint"])),
+    sources: sources.map((row) =>
+      // R5: every archived source record carries its canonical relative
+      // target (no host); the field is additive under the current archive
+      // format, whose version constant the I3 lane owns.
+      withSourceTarget(project(row, ["acceptanceKey", "acceptanceFingerprint"]), row._id),
+    ),
     sourceProjectLinks,
     extractions,
     sourceFragments,

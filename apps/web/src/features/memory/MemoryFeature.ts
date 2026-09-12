@@ -12,7 +12,8 @@
  *   read) — every immutable revision with its origin (publication from a
  *   message, explicit correction, withdrawal marking), author, time,
  *   reason, what it supersedes, and its evidence witnesses linking back to
- *   the canonical source URL `/?zrodlo=<id>`;
+ *   the canonical dossier route with its encoded `zrodlo` param (R5's
+ *   shared serializer in ../source-detail/source-route);
  * - the correction flow: correction-as-new-source lives in the conversation
  *   feature (a new message referencing the old one); a DIRECT structured
  *   correction uses C2's audited command `memory.correctFinding` with the
@@ -54,7 +55,8 @@ import {
   type SubmitEvent,
 } from "../company/CompanyGate";
 import { asConvexId } from "../company/convex-ids";
-import { PROJECT_PARAM, SOURCE_PARAM, searchParam, writeScopeParam } from "../company/route-params";
+import { PROJECT_PARAM, searchParam, writeScopeParam } from "../company/route-params";
+import { serializeSourceReference } from "../source-detail/source-route";
 import {
   failureHint,
   findingValueLabel,
@@ -308,7 +310,13 @@ function FindingHistoryPanel({
                       createElement(
                         "a",
                         {
-                          href: `/?${SOURCE_PARAM}=${encodeURIComponent(witness.sourceId)}`,
+                          // R5: the one canonical serializer builds the
+                          // evidence link (with the fragment's anchor).
+                          href: serializeSourceReference({
+                            sourceId: witness.sourceId,
+                            fragmentId: witness.fragmentId,
+                            projectId: null,
+                          }),
                         },
                         copy.sourceLinkLabel,
                       ),
@@ -477,7 +485,15 @@ export function ResolutionBasisView({ row }: { readonly row: ClarificationWireRo
           { key: `${witness.sourceId}#${witness.fragmentId ?? "whole"}#${index}` },
           createElement(
             "a",
-            { href: `/?${SOURCE_PARAM}=${encodeURIComponent(witness.sourceId)}` },
+            {
+              // R5: the one canonical serializer builds the saved
+              // resolution-evidence link (with the fragment's anchor).
+              href: serializeSourceReference({
+                sourceId: witness.sourceId,
+                fragmentId: witness.fragmentId,
+                projectId: null,
+              }),
+            },
             copy.sourceLinkLabel,
           ),
           witness.fragmentId === null ? "" : ` (fragment ${witness.fragmentId})`,
@@ -601,7 +617,15 @@ function ClarificationRow({
                 { key: witness.fragmentId },
                 createElement(
                   "a",
-                  { href: `/?${SOURCE_PARAM}=${encodeURIComponent(witness.sourceId)}` },
+                  {
+                    // R5: the one canonical serializer builds the
+                    // conflicting-evidence link (with the fragment).
+                    href: serializeSourceReference({
+                      sourceId: witness.sourceId,
+                      fragmentId: witness.fragmentId,
+                      projectId: null,
+                    }),
+                  },
                   copy.sourceLinkLabel,
                 ),
                 ` (fragment ${witness.fragmentId})`,
