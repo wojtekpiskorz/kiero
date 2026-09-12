@@ -81,6 +81,7 @@ import {
 } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { resolveAccessContextFromConvexAuth } from "../access/identity/resolution";
+import { resolveEvidenceHandles } from "./execute";
 import { loadAnswerContext } from "./context";
 
 /** The answer-flow pipeline version (loop shape, tool routing). */
@@ -350,13 +351,26 @@ async function runCheckedExecution(
       };
     }
     case "agent_resolve_clarification": {
-      const args = call.arguments as { clarificationId: string; resolutionNote: string };
+      const args = call.arguments as { clarificationId: string; resolutionNote: string; evidenceIds: string[] };
+      // R1 (issue #126): resolve the cited handles against the run's current
+      // evidence ledger — deduplicated, wire-shaped once (the pure mapping
+      // lives beside the executor's input type). The reducer already refused
+      // unresolved handles; one that vanished anyway refuses honestly.
+      const cited = resolveEvidenceHandles(state.evidence, args.evidenceIds);
+      if (cited.missingHandle !== null) {
+        return {
+          state,
+          toolResult: `ODRZUCONO: cytowanie ${cited.missingHandle} nie wskazuje dowodu z tej tury (evN)`,
+          done: false,
+        };
+      }
       const executed = await runExecution<{ outcome?: string; error?: string }>(
         () =>
           ctx.runMutation(internal.agent.execute.executeResolveClarification, {
             questionSourceId,
             clarificationId: args.clarificationId as Id<"clarifications">,
             resolutionNote: args.resolutionNote,
+            evidence: cited.references,
           }),
         "rozstrzygnięcia",
       );
@@ -368,7 +382,7 @@ async function runCheckedExecution(
         state,
         toolResult:
           envelope.outcome === "resolved"
-            ? "Sprawa rozstrzygnięta; notatka zapisana z autorem."
+            ? "Sprawa rozstrzygnięta; notatka i podstawa źródłowa zapisane z autorem."
             : `ODRZUCONO: rozstrzygnięcie nie powiodło się (${envelope.error ?? envelope.outcome ?? "nieznany błąd"})`,
         done: false,
       };

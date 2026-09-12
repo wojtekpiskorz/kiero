@@ -7,6 +7,13 @@
  * saying which, so the refusal leaks no existence information across the
  * tenant boundary. Imported by the changeset transactions, corrections,
  * the current read and the withdrawal marking.
+ *
+ * R1 (issue #126) addition: `checkResolutionEvidenceReference` is the ONE
+ * per-reference rule for evidence cited by a clarification resolution
+ * (existence, company, active lifecycle, fragment ownership). Both the
+ * agent executor and the resolution transaction validate through it — each
+ * layer still runs its own end-to-end check; only the rule text lives
+ * here, so the two can never drift apart.
  */
 
 import type { RequestContext } from "@kiero/runtime";
@@ -115,4 +122,45 @@ export async function companyDependencyEdges(
     dependent: row.dependentFindingId,
     dependsOn: row.dependsOnFindingId,
   }));
+}
+
+/** The typed refusal code of one resolution-evidence reference check (R1). */
+export type ResolutionEvidenceRefusalCode =
+  | "resolution_source_not_found"
+  | "resolution_source_not_in_company"
+  | "resolution_source_not_active"
+  | "resolution_fragment_mismatch";
+
+/**
+ * R1 (issue #126): the per-reference rule for evidence cited by a
+ * clarification resolution — the cited source must EXIST, belong to the
+ * resolved company and be ACTIVE ("Źródło wycofane" no longer grounds a
+ * resolution), and a cited fragment must belong to that source. Returns
+ * the typed refusal code, or null when the reference is valid; the caller
+ * wraps the code in its own error shape and keeps its own dedupe.
+ */
+export async function checkResolutionEvidenceReference(
+  db: Db,
+  companyId: Id<"companies">,
+  reference: { readonly sourceId: string; readonly fragmentId: string | null },
+): Promise<ResolutionEvidenceRefusalCode | null> {
+  const sourceId = db.normalizeId("sources", reference.sourceId);
+  const source = sourceId === null ? null : await db.get(sourceId);
+  if (source === null) {
+    return "resolution_source_not_found";
+  }
+  if (source.companyId !== companyId) {
+    return "resolution_source_not_in_company";
+  }
+  if (source.lifecycle !== "active") {
+    return "resolution_source_not_active";
+  }
+  if (reference.fragmentId !== null) {
+    const fragmentId = db.normalizeId("sourceFragments", reference.fragmentId);
+    const fragment = fragmentId === null ? null : await db.get(fragmentId);
+    if (fragment === null || fragment.sourceId !== source._id) {
+      return "resolution_fragment_mismatch";
+    }
+  }
+  return null;
 }

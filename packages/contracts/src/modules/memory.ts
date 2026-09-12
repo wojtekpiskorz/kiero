@@ -92,6 +92,36 @@ export const PlannedRevision = Schema.Struct({
 });
 export type PlannedRevision = Schema.Schema.Type<typeof PlannedRevision>;
 
+/**
+ * The recorded basis of one clarification resolution (R1 amendment,
+ * additive, flagged on the B3 precedent): a source-backed resolution cites
+ * the NEW evidence that grounds it; a manual resolution is the boss's own
+ * decision stated in the note. `legacy_unknown` is the READ-side default
+ * for pre-repair rows whose basis was never stored — an unknown historical
+ * agent resolution is never labeled a manual boss decision.
+ */
+export const ClarificationResolutionBasis = Schema.Literals([
+  "source_backed",
+  "manual_boss_decision",
+  "legacy_unknown",
+]);
+export type ClarificationResolutionBasis = Schema.Schema.Type<
+  typeof ClarificationResolutionBasis
+>;
+
+/**
+ * One normalized evidence reference of a clarification resolution (R1): the
+ * source plus the optional fragment — whole-source evidence when
+ * `fragmentId` is null, per the fragment contract.
+ */
+export const ResolutionEvidenceReference = Schema.Struct({
+  sourceId: tableIdSchema("sources"),
+  fragmentId: Schema.NullOr(tableIdSchema("sourceFragments")),
+});
+export type ResolutionEvidenceReference = Schema.Schema.Type<
+  typeof ResolutionEvidenceReference
+>;
+
 export const memoryOperations = {
   "memory.readCurrentFindings": operationEntry({
     kind: "operation",
@@ -213,6 +243,18 @@ export const memoryOperations = {
         resolvedByUserId: Schema.NullOr(tableIdSchema("users")),
         resolutionNote: Schema.NullOr(Schema.String),
         resolvedAtMs: Schema.NullOr(Schema.Number),
+        /**
+         * R1 amendment (additive, flagged): the recorded basis of the
+         * resolution — null while open; `legacy_unknown` for pre-repair
+         * resolved rows whose basis was never stored.
+         */
+        resolutionBasis: Schema.NullOr(ClarificationResolutionBasis),
+        /**
+         * R1 amendment (additive, flagged): the persisted evidence
+         * references of a source-backed resolution (empty for open rows,
+         * manual resolutions and pre-repair rows).
+         */
+        resolutionEvidence: Schema.Array(ResolutionEvidenceReference),
         /** The sourced contradiction the question is about (E3's evidence). */
         conflictingEvidence: Schema.Array(
           Schema.Struct({
@@ -254,9 +296,18 @@ export const memoryOperations = {
     input: Schema.Struct({
       clarificationId: tableIdSchema("clarifications"),
       resolutionNote: Schema.NonEmptyString,
+      /**
+       * R1 amendment (additive, flagged on the B3 precedent): the normalized
+       * NEW evidence grounding the resolution (company-owned active source,
+       * matching fragment, validated by the transaction). Absent or empty =
+       * a manual boss decision (note only) — the pre-repair note-only
+       * envelopes of the Memory and Co teraz surfaces still decode, and no
+       * source is ever fabricated for them.
+       */
+      evidence: Schema.optionalKey(Schema.Array(ResolutionEvidenceReference)),
     }),
     result: Schema.Struct({ clarificationId: tableIdSchema("clarifications") }),
-    errorKinds: ["forbidden", "not_found", "conflict"],
+    errorKinds: ["forbidden", "not_found", "validation", "conflict"],
   }),
   /**
    * C3 completion (the owning lane finishes the A2 candidate). Creates a

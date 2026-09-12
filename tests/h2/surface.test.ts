@@ -36,7 +36,7 @@
 
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
-import { operations, ResultEnvelope } from "@kiero/contracts";
+import { memoryOperations, operations, ResultEnvelope } from "@kiero/contracts";
 import { subjectLinkPath } from "@kiero/domain";
 import {
   CHECKLIST_ITEM_STATE_LABELS,
@@ -732,6 +732,85 @@ describe("failure hints for the load-bearing refusal codes", () => {
       untilMs: 1_752_000_000_000,
     });
     expect((snoozeInput as { untilMs: number }).untilMs).toBe(1_752_000_000_000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R1 (issue #126): the Co teraz clarification resolution stays note-only
+// (a manual boss decision), and the rows it renders decode with the new
+// basis fields.
+// ---------------------------------------------------------------------------
+
+describe("clarification resolution on the Co teraz surface (R1)", () => {
+  it("still decodes the note-only envelope the /co-teraz answer form sends", () => {
+    // The exact input OpenQuestionRow dispatches: a Polish note alone, no
+    // evidence key. The additive command keeps accepting it — a manual
+    // decision with no fabricated source.
+    const decoded = Schema.decodeUnknownSync(
+      memoryOperations["memory.resolveClarification"].input,
+    )({
+      clarificationId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2c",
+      resolutionNote: "Obowiązuje kwota z czwartkowej rozmowy.",
+    });
+    expect((decoded as { resolutionNote: string }).resolutionNote).toContain("czwartkowej");
+    expect((decoded as { evidence?: unknown }).evidence).toBeUndefined();
+  });
+
+  it("decodes the evidence-carrying envelope the agent path sends", () => {
+    const decoded = Schema.decodeUnknownSync(
+      memoryOperations["memory.resolveClarification"].input,
+    )({
+      clarificationId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2c",
+      resolutionNote: "Nowe źródło rozstrzyga.",
+      evidence: [
+        { sourceId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2s", fragmentId: null },
+        { sourceId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2m", fragmentId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2g" },
+      ],
+    });
+    const evidence = (decoded as unknown as { evidence: unknown[] }).evidence;
+    expect(evidence).toHaveLength(2);
+  });
+
+  it("renders rows carrying the new basis fields without breaking the surface data", () => {
+    // The clarifications the /co-teraz scope questions consume now carry
+    // the basis and evidence; open rows (all this surface renders) decode
+    // with the null basis.
+    const decoded = Schema.decodeUnknownSync(
+      memoryOperations["memory.readClarifications"].result,
+    )([
+      {
+        clarificationId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2c",
+        question: "Który termin montażu obowiązuje?",
+        state: "open",
+        raisedAtMs: 30,
+        resolvedByUserId: null,
+        resolutionNote: null,
+        resolvedAtMs: null,
+        conflictingEvidence: [
+          { fragmentId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2g", sourceId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2s" },
+        ],
+        resolutionBasis: null,
+        resolutionEvidence: [],
+      },
+      {
+        clarificationId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2d",
+        question: "Kto koordynuje dowóz?",
+        state: "resolved",
+        raisedAtMs: 40,
+        resolvedByUserId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2u",
+        resolutionNote: "Koordynuje szef A.",
+        resolvedAtMs: 50,
+        conflictingEvidence: [],
+        resolutionBasis: "source_backed",
+        resolutionEvidence: [
+          { sourceId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2s", fragmentId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2g" },
+        ],
+      },
+    ]);
+    expect(decoded[0]?.resolutionBasis).toBeNull();
+    expect(decoded[1]?.resolutionEvidence[0]?.sourceId).toBe(
+      "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2s",
+    );
   });
 });
 

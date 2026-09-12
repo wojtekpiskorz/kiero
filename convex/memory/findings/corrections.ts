@@ -9,7 +9,12 @@
  *   time never decides ("Korekta ustalenia ... nie przepisuje wcześniejszej
  *   wiadomości źródłowej").
  * - `performRaiseClarification` / `performResolveClarification`: the shared
- *   open question for entitled bosses; resolution keeps its author.
+ *   open question for entitled bosses; resolution keeps its author. R1
+ *   (issue #126): resolution additionally persists whether its basis is
+ *   source-backed (normalized source + optional fragment references,
+ *   validated against the current state) or a manual boss decision (a note
+ *   alone, no fabricated source); a repeated resolve refuses and never
+ *   replaces the stored evidence.
  *
  * Every perform* body runs inside ONE Convex mutation; everything that can
  * throw or refuse runs before the first write (the D1 discipline).
@@ -20,6 +25,7 @@ import {
   errorResult,
   events,
   okResult,
+  type ClosedError,
   type ResultEnvelope,
 } from "@kiero/contracts";
 import {
@@ -35,10 +41,12 @@ import type { Id } from "../../_generated/dataModel";
 import { publishEvent } from "../../platform/publish";
 import { checkExtensionFindingValue, recordExtensionValueUsage } from "../extensions/validate";
 import {
+  checkResolutionEvidenceReference,
   normalizedActor,
   normalizedCompany,
   requireFinding,
   requireProject,
+  type ResolutionEvidenceRefusalCode,
 } from "./references";
 import {
   correctFindingEntry,
@@ -191,6 +199,70 @@ export async function performRaiseClarification(
   );
 }
 
+/**
+ * One normalized resolution-evidence reference, as the transaction stores it.
+ * `fragmentId` null = whole-source evidence (the fragment contract's rule).
+ */
+interface StoredResolutionEvidence {
+  readonly sourceId: Id<"sources">;
+  readonly fragmentId: Id<"sourceFragments"> | null;
+}
+
+/**
+ * Wraps one shared refusal code in THIS transaction's error shape: the
+ * cross-company refusal is a closed `forbidden` (tenant boundary), the
+ * other three are `validation` (the reference names nothing usable).
+ */
+function resolutionEvidenceError(code: ResolutionEvidenceRefusalCode): ClosedError {
+  return code === "resolution_source_not_in_company"
+    ? forbiddenError(code, "sources")
+    : validationError(code);
+}
+
+/**
+ * R1: validates the cited resolution evidence against the CURRENT state,
+ * before any write (the D1 discipline — a refusal leaves the case open and
+ * stores nothing). The per-reference rule lives ONCE in ./references
+ * (`checkResolutionEvidenceReference`); this wrapper adds the transaction's
+ * error shape and collapses duplicate (source, fragment) pairs, preserving
+ * first-seen order.
+ */
+async function validatedResolutionEvidence(
+  tx: MutationCtx,
+  companyId: Id<"companies">,
+  cited: readonly {
+    sourceId: string;
+    fragmentId: string | null;
+  }[],
+): Promise<
+  | { readonly ok: true; readonly evidence: readonly StoredResolutionEvidence[] }
+  | { readonly ok: false; readonly error: ClosedError }
+> {
+  const evidence: StoredResolutionEvidence[] = [];
+  const seen = new Set<string>();
+  for (const reference of cited) {
+    const refusal = await checkResolutionEvidenceReference(tx.db, companyId, reference);
+    if (refusal !== null) {
+      return { ok: false, error: resolutionEvidenceError(refusal) };
+    }
+    const sourceId = tx.db.normalizeId("sources", reference.sourceId) as Id<"sources">;
+    let fragmentId: Id<"sourceFragments"> | null = null;
+    if (reference.fragmentId !== null) {
+      fragmentId = tx.db.normalizeId(
+        "sourceFragments",
+        reference.fragmentId,
+      ) as Id<"sourceFragments">;
+    }
+    const deduplicationKey = `${sourceId}#${fragmentId ?? ""}`;
+    if (seen.has(deduplicationKey)) {
+      continue;
+    }
+    seen.add(deduplicationKey);
+    evidence.push({ sourceId, fragmentId });
+  }
+  return { ok: true, evidence };
+}
+
 export async function performResolveClarification(
   tx: MutationCtx,
   context: RequestContext,
@@ -217,6 +289,18 @@ export async function performResolveClarification(
   if (actorUserId === null) {
     return errorResult(validationError("actor_user_unresolved"));
   }
+  // R1: validate the cited evidence against the current state BEFORE any
+  // write — an unknown, cross-company, inactive or mismatched-fragment
+  // reference refuses the WHOLE command (the case stays open). Absent or
+  // empty evidence is a manual boss decision, never a fabricated source.
+  const validated = await validatedResolutionEvidence(
+    tx,
+    companyId,
+    input.evidence ?? [],
+  );
+  if (!validated.ok) {
+    return errorResult(validated.error);
+  }
   const resolved = events["memory.clarificationResolved"];
   if (resolved === undefined) {
     return errorResult(validationError("memory_events_missing"));
@@ -230,6 +314,14 @@ export async function performResolveClarification(
     resolvedByUserId: actorUserId,
     resolutionNote: input.resolutionNote,
     resolvedAtMs: nowMs,
+    resolutionBasis:
+      validated.evidence.length > 0 ? "source_backed" : "manual_boss_decision",
+    resolutionEvidence: validated.evidence.map((reference) => ({
+      sourceId: reference.sourceId,
+      ...(reference.fragmentId === null
+        ? {}
+        : { sourceFragmentId: reference.fragmentId }),
+    })),
   });
   await publishEvent(tx, {
     companyId: context.actor.companyId,

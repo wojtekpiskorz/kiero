@@ -12,7 +12,9 @@
  *   (fragment-typed conflicting evidence; publishes `memory.
  *   clarificationRaised`, the event vocabulary F2 consumes);
  * - clarification resolution: `memory.resolveClarification` through the
- *   same dispatch, with author and note;
+ *   same dispatch, with author, note and — R1 (issue #126) — the cited
+ *   evidence validated against the current ledger (company-owned ACTIVE
+ *   source, matching fragment) and persisted with the resolution;
  * - domain changes: C4's `performChangeTask`/`performChangeEvent` cores —
  *   the exact implementations the registered `work.changeTask`/
  *   `work.changeEvent` dispatches run after decode and policy — with the
@@ -28,6 +30,7 @@ import { v } from "convex/values";
 import { okResult, type ResultEnvelope } from "@kiero/contracts";
 import {
   decideAnswerFreshness,
+  type AnswerEvidenceEntry,
   type AnswerFreshnessDecision,
 } from "@kiero/agent/tools";
 import {
@@ -36,6 +39,7 @@ import {
   resolveRequestContext,
 } from "../platform/context";
 import { dispatchMemoryCommand } from "../memory/findings/dispatch";
+import { checkResolutionEvidenceReference } from "../memory/findings/references";
 import {
   ensureFragment,
   resolveTextExtraction,
@@ -159,39 +163,195 @@ export const executeClarification = internalMutation({
   },
 });
 
+/**
+ * One normalized resolution-evidence reference the checked memory command
+ * receives: the source plus the fragment the citation anchored to (every
+ * reference resolves to a durable fragment; the nullable type mirrors
+ * ensureEvidenceFragment's contract).
+ */
+interface NormalizedEvidenceReference {
+  readonly sourceId: Id<"sources">;
+  readonly fragmentId: Id<"sourceFragments"> | null;
+}
+
+/**
+ * R1 (issue #126): validates the run's resolve evidence against the
+ * CURRENT ledger state and normalizes it to durable references. Pass 1
+ * validates every reference BEFORE anything is ensured or written, through
+ * the ONE shared per-reference rule (../memory/findings/references —
+ * existence, company, active lifecycle, fragment ownership; an invalid
+ * reference refuses the whole execution); pass 2 anchors fragment-less
+ * references through the extraction journal (whole-source or text-range
+ * fragments) and collapses duplicates AFTER anchoring (a pre-anchor key
+ * cannot see that two offset citations anchor onto the same fragment).
+ */
+async function resolveEvidenceReferences(
+  db: MutationCtx["db"],
+  companyId: Id<"companies">,
+  evidence: readonly EvidenceWire[],
+): Promise<
+  | { readonly ok: true; readonly references: readonly NormalizedEvidenceReference[] }
+  | { readonly ok: false; readonly error: string }
+> {
+  for (const reference of evidence) {
+    const refusal = await checkResolutionEvidenceReference(db, companyId, reference);
+    if (refusal !== null) {
+      return { ok: false, error: refusal };
+    }
+  }
+  const references: NormalizedEvidenceReference[] = [];
+  const seen = new Set<string>();
+  for (const reference of evidence) {
+    const sourceId = db.normalizeId("sources", reference.sourceId);
+    if (sourceId === null) {
+      return { ok: false, error: "resolution_source_not_found" };
+    }
+    // ensureEvidenceFragment re-reads the (already validated) source and
+    // anchors the citation as a durable fragment when none was cited.
+    const fragmentId = await ensureEvidenceFragment(db, companyId, reference);
+    const deduplicationKey = `${sourceId}#${fragmentId ?? ""}`;
+    if (seen.has(deduplicationKey)) {
+      continue;
+    }
+    seen.add(deduplicationKey);
+    references.push({ sourceId, fragmentId });
+  }
+  return { ok: true, references };
+}
+
+/** One cited evidence reference in the FINAL wire shape the executor takes. */
+export interface ResolveEvidenceHandleReference {
+  readonly sourceId: Id<"sources">;
+  readonly fragmentId?: Id<"sourceFragments">;
+  readonly startOffset?: number;
+  readonly endOffset?: number;
+}
+
+/** The loop-side handle mapping's result: the references, or the first gap. */
+export interface ResolvedEvidenceHandles {
+  /**
+   * Deduplicated, first-occurrence-order wire references (final shape).
+   * A mutable array: the generated mutation args take one as-is.
+   */
+  readonly references: ResolveEvidenceHandleReference[];
+  /** The first cited handle absent from the ledger, when one is. */
+  readonly missingHandle: string | null;
+}
+
+/**
+ * R1 (issue #126): maps cited ledger handles to the FINAL wire references
+ * `executeResolveClarification` receives — deduplicated, first-occurrence
+ * order, the optional-spread shape produced ONCE (no intermediate
+ * nulls-shaped pass to re-map). Pure over the run's evidence ledger; the
+ * reducer has already refused unresolved handles by dispatch time, so
+ * `missingHandle` (one that vanished anyway) lets the loop refuse honestly
+ * instead of silently dropping the evidence it cited.
+ */
+export function resolveEvidenceHandles(
+  evidence: readonly AnswerEvidenceEntry[],
+  handles: readonly string[],
+): ResolvedEvidenceHandles {
+  const references: ResolveEvidenceHandleReference[] = [];
+  const seen = new Set<string>();
+  for (const handle of handles) {
+    if (seen.has(handle)) {
+      continue;
+    }
+    seen.add(handle);
+    const entry = evidence.find((candidate) => candidate.evidenceId === handle);
+    if (entry === undefined) {
+      return { references, missingHandle: handle };
+    }
+    references.push({
+      sourceId: entry.sourceId as Id<"sources">,
+      ...(entry.fragmentId === null
+        ? {}
+        : { fragmentId: entry.fragmentId as Id<"sourceFragments"> }),
+      ...(entry.startOffset === null ? {} : { startOffset: entry.startOffset }),
+      ...(entry.endOffset === null ? {} : { endOffset: entry.endOffset }),
+    });
+  }
+  return { references, missingHandle: null };
+}
+
+/** The checked resolve execution's input (exported for the deterministic tests). */
+export interface ExecuteResolveClarificationInput {
+  readonly questionSourceId: Id<"sources">;
+  readonly clarificationId: Id<"clarifications">;
+  readonly resolutionNote: string;
+  readonly evidence?: readonly ResolveEvidenceHandleReference[];
+}
+
+/**
+ * The checked resolve execution body (R1): resolves the cited evidence
+ * against the current ledger, refuses atomically on any invalid reference,
+ * and runs `memory.resolveClarification` with the normalized references so
+ * the resolution transaction persists them with its basis.
+ */
+export async function executeResolveClarificationCore(
+  ctx: MutationCtx,
+  args: ExecuteResolveClarificationInput,
+): Promise<ResultEnvelope> {
+  const source = await ctx.db.get(args.questionSourceId);
+  if (source === null) {
+    return okResult({ outcome: "failed", error: "question_source_missing" });
+  }
+  const session = await authorSessionId(ctx.db, source.authorUserId);
+  if (session === null) {
+    return okResult({ outcome: "failed", error: "actor_session_unavailable" });
+  }
+  const evidence: EvidenceWire[] = (args.evidence ?? []).map((reference) => ({
+    sourceId: reference.sourceId,
+    fragmentId: reference.fragmentId ?? null,
+    startOffset: reference.startOffset ?? null,
+    endOffset: reference.endOffset ?? null,
+  }));
+  // Current-ledger validation FIRST: any invalid reference refuses the
+  // whole execution before a fragment is ensured or the command runs.
+  const normalized = await resolveEvidenceReferences(ctx.db, source.companyId, evidence);
+  if (!normalized.ok) {
+    return okResult({ outcome: "failed", error: normalized.error });
+  }
+  const result = await dispatchMemoryCommand(
+    ctx,
+    {
+      operation: "memory.resolveClarification",
+      input: {
+        clarificationId: args.clarificationId,
+        resolutionNote: args.resolutionNote,
+        evidence: normalized.references.map((reference) => ({
+          sourceId: reference.sourceId,
+          fragmentId: reference.fragmentId,
+        })),
+      },
+      expectedRevisions: [],
+    },
+    session,
+  );
+  if (result._tag !== "ok") {
+    return okResult({ outcome: "failed", error: result.error.code });
+  }
+  const receipt = result.value as { clarificationId: Id<"clarifications"> };
+  return okResult({ outcome: "resolved", clarificationId: receipt.clarificationId });
+}
+
 export const executeResolveClarification = internalMutation({
   args: {
     questionSourceId: v.id("sources"),
     clarificationId: v.id("clarifications"),
     resolutionNote: v.string(),
+    evidence: v.optional(
+      v.array(
+        v.object({
+          sourceId: v.id("sources"),
+          fragmentId: v.optional(v.id("sourceFragments")),
+          startOffset: v.optional(v.float64()),
+          endOffset: v.optional(v.float64()),
+        }),
+      ),
+    ),
   },
-  handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const source = await ctx.db.get(args.questionSourceId);
-    if (source === null) {
-      return okResult({ outcome: "failed", error: "question_source_missing" });
-    }
-    const session = await authorSessionId(ctx.db, source.authorUserId);
-    if (session === null) {
-      return okResult({ outcome: "failed", error: "actor_session_unavailable" });
-    }
-    const result = await dispatchMemoryCommand(
-      ctx,
-      {
-        operation: "memory.resolveClarification",
-        input: {
-          clarificationId: args.clarificationId,
-          resolutionNote: args.resolutionNote,
-        },
-        expectedRevisions: [],
-      },
-      session,
-    );
-    if (result._tag !== "ok") {
-      return okResult({ outcome: "failed", error: result.error.code });
-    }
-    const receipt = result.value as { clarificationId: Id<"clarifications"> };
-    return okResult({ outcome: "resolved", clarificationId: receipt.clarificationId });
-  },
+  handler: (ctx, args) => executeResolveClarificationCore(ctx, args),
 });
 
 // ---------------------------------------------------------------------------
