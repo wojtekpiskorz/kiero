@@ -14,9 +14,9 @@
  *
  * The form is relative (no host): the same string serves in-app anchors,
  * the conversation route's legacy redirect and the export archive's
- * source records (the backend half is a runtime-neutral twin pinned to
- * this contract by tests/i3 — convex must not import browser feature
- * code).
+ * source records (the backend half is the shared runtime-neutral helper
+ * convex/sources/target.ts, pinned to this contract by tests/i3 — convex
+ * must not import browser feature code).
  *
  * Determinism rules the parser enforces:
  *
@@ -68,8 +68,9 @@ export interface SourceReference {
 
 /**
  * Serializes one reference into the canonical relative link. This is the
- * ONLY sanctioned way an in-app consumer builds a source URL; the export
- * archive carries a runtime-neutral twin of this exact form.
+ * ONLY sanctioned way an in-app consumer builds a source URL; the backend
+ * half (convex/sources/target.ts) serves push payloads and export records
+ * the same form.
  */
 export function serializeSourceReference(reference: SourceReference): string {
   const params = new URLSearchParams();

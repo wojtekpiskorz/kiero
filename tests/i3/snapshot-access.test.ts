@@ -24,6 +24,8 @@ import {
   type SnapshotDb,
 } from "../../convex/operations/exports/snapshot";
 import { serializeSourceReference } from "../../apps/web/src/features/source-detail/source-route";
+import { sourceTargetOf } from "../../convex/sources/target";
+import { sourceTargetOf as pushSourceTargetOf } from "../../convex/attention/push/model";
 import { resolveExportAccess, type ExportAccessDb } from "../../convex/operations/exports/access";
 import { resolveMediaAccess, mediaAccessDb as _unused2, type MediaAccessDb } from "../../convex/sources/media_access/access";
 import { EXPORT_BOUNDS } from "../../convex/operations/exports/protocol";
@@ -290,10 +292,14 @@ describe("the tenant-scoped snapshot reader", () => {
     }
   });
 
-  it("pins the backend twin to the app serializer's wire contract", () => {
-    // The Convex half must not import browser feature code, so it carries a
-    // runtime-neutral twin; this corpus pins the two outputs equal — the
-    // tested wire contract R5's acceptance names.
+  it("pins the single backend helper to the app serializer's wire contract", () => {
+    // The Convex half must not import browser feature code, so it lives in
+    // ONE runtime-neutral shared helper (convex/sources/target.ts) that
+    // both consumers re-export — never a private twin. Identity pins the
+    // twin away; the corpus pins the wire form to the app serializer, the
+    // tested contract R5's acceptance names.
+    expect(sourceArchiveTarget).toBe(sourceTargetOf);
+    expect(pushSourceTargetOf).toBe(sourceTargetOf);
     const corpus = [
       "s1",
       "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f",
@@ -301,7 +307,7 @@ describe("the tenant-scoped snapshot reader", () => {
       "with-dash_and_underscore",
     ];
     for (const id of corpus) {
-      expect(sourceArchiveTarget(id)).toBe(
+      expect(sourceTargetOf(id)).toBe(
         serializeSourceReference({ sourceId: id, fragmentId: null, projectId: null }),
       );
     }

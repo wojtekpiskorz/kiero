@@ -33,6 +33,7 @@
  */
 
 import type { PushLegReport } from "./protocol";
+import { sourceTargetOf } from "../../sources/target";
 
 /** The F2-shaped summary of one source-entry or clarification batch. */
 export interface EntrySummary {
@@ -238,26 +239,22 @@ const FRAGMENT_LIMIT = 120;
 
 // ---------------------------------------------------------------------------
 // The validated relative targets (R3). The SAME literal wire forms the app
-// registers: the source dossier route (R5's serializer contract, kept as a
-// runtime-neutral twin like convex/operations/exports/snapshot.ts), the
-// task record screen's param key (apps/web/src/features/now/state.ts) and
-// the Co teraz route whose live read reloads current clarification state.
+// registers: the source dossier route (R5's serializer contract, served by
+// the ONE shared runtime-neutral helper convex/sources/target.ts — never a
+// local twin), the task record screen's param key
+// (apps/web/src/features/now/state.ts) and the Co teraz route whose live
+// read reloads current clarification state.
 // RELATIVE only: no host ever enters the payload, and the service worker
 // re-validates against its own scope before navigating.
 // ---------------------------------------------------------------------------
 
-/** The dossier route of one "Wiadomość źródłowa" (the R5 wire contract). */
-export const SOURCE_ROUTE_PATH = "/zrodlo";
+/** The dossier route and target of one "Wiadomość źródłowa" (R5's wire contract). */
+export { SOURCE_ROUTE_PATH, sourceTargetOf } from "../../sources/target";
 /** The task record screen's deep-link key (the accepted record route). */
 export const TASK_ROUTE_PATH = "/praca";
 export const TASK_ROUTE_PARAM = "zadanie";
 /** The authenticated route whose live read reloads current open cases. */
 export const CLARIFICATION_ROUTE_PATH = "/co-teraz";
-
-/** The canonical relative target of one source record. */
-export function sourceTargetOf(sourceId: string): string {
-  return `${SOURCE_ROUTE_PATH}?zrodlo=${encodeURIComponent(sourceId)}`;
-}
 
 /** The canonical relative target of one task record. */
 export function taskTargetOf(taskId: string): string {
