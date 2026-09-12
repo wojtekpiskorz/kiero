@@ -23,5 +23,9 @@ export const SOURCE_PARAM = "zrodlo";
 
 /** The canonical relative dossier target of one source record. */
 export function sourceTargetOf(sourceId: string): string {
+  // encodeURIComponent and the app serializer's URLSearchParams.toString()
+  // agree on every character a Convex table id can contain (the app's
+  // closed [0-9A-Za-z_-] id charset), so the corpus pin in tests/i3 is
+  // structurally exhaustive for real ids.
   return `${SOURCE_ROUTE_PATH}?${SOURCE_PARAM}=${encodeURIComponent(sourceId)}`;
 }

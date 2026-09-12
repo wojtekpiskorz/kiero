@@ -273,16 +273,26 @@ let feedText = (await page.textContent("main")) ?? "";
 record("L1/old-marker-absent-from-first-page", !feedText.includes(OLD_MARKER) ? "PASS" : "FAIL", "marker not in the first 30 rows");
 
 // Grow the feed to the 120-row cap: the old source must stay unreachable
-// in the feed itself (the reason the canonical dossier exists).
+// in the feed itself (the reason the canonical dossier exists). Page
+// growth is polled (bounded), not slept: a slow live subscription would
+// make a fixed wait record a spurious FAIL.
+const expectedPageSize = async (target) => {
+  const deadline = Date.now() + 30_000;
+  let count = await articleCount();
+  while (count < target && Date.now() < deadline) {
+    await sleep(500);
+    count = await articleCount();
+  }
+  return count;
+};
 let cappedCount = initialCount;
 for (let click = 0; click < 3; click += 1) {
   const more = page.locator('button:has-text("Pokaż starsze wiadomości")');
   if ((await more.count()) === 0) break;
   await more.click();
-  await sleep(1_200);
+  cappedCount = await expectedPageSize(Math.min(initialCount + (click + 1) * 30, 120));
 }
-await sleep(1_500);
-cappedCount = await articleCount();
+cappedCount = await expectedPageSize(120);
 feedText = (await page.textContent("main")) ?? "";
 record(
   "L1/old-source-beyond-the-120-cap",
