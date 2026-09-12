@@ -1,6 +1,6 @@
 # Core dependency graph
 
-Snapshot reconciled on 2026-09-12 against reviewed application `4aa1cc64b3ecab669c76ffa672832d4c5638ac68`. Native GitHub blockers determine current readiness. There are 158 core edges and one external planning edge, A0 blocked by completed #13.
+Snapshot reconciled on 2026-09-12 against reviewed application `4aa1cc64b3ecab669c76ffa672832d4c5638ac68`. Native GitHub blockers determine current readiness. There are 160 core edges and one external planning edge, A0 blocked by completed #13.
 
 ## Remaining work
 
@@ -26,7 +26,7 @@ flowchart TD
   I10["I10 #137"]
   I11["I11 #138"]
   J6["J6 #139"]
-  M0["M0 #125"]
+  M1["M1 #141"]
   I10 --> I6
   J6 --> J3
   J6 --> J4
@@ -35,13 +35,10 @@ flowchart TD
   J4 --> J5
   I9 --> J5
   I11 --> J5
-  M0 --> R1
+  M1 --> J5
   R1 --> R2
   R2 --> R3
-  M0 --> R4
   R1 --> R5
-  M0 --> R6
-  M0 --> R7
   R6 --> I8
   I8 --> B5
   I8 --> D7
@@ -69,7 +66,7 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 
 ## Complete direct dependency inventory
 
-| Key | Cached state at reconciliation | Direct native blockers | Role |
+| Key | Cached state | Direct native blockers | Role |
 | --- | --- | --- | --- |
 | [A0 #65](https://github.com/wojtekpiskorz/kiero/issues/65) | CLOSED | None; [planning #13](https://github.com/wojtekpiskorz/kiero/issues/13) | Historical implementation |
 | [A1 #16](https://github.com/wojtekpiskorz/kiero/issues/16) | CLOSED | [A0 #65](https://github.com/wojtekpiskorz/kiero/issues/65) | Historical implementation |
@@ -120,7 +117,7 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [J2 #61](https://github.com/wojtekpiskorz/kiero/issues/61) | CLOSED | [D4 #32](https://github.com/wojtekpiskorz/kiero/issues/32), [E4 #38](https://github.com/wojtekpiskorz/kiero/issues/38), [E6 #40](https://github.com/wojtekpiskorz/kiero/issues/40), [H2 #50](https://github.com/wojtekpiskorz/kiero/issues/50), [H3 #51](https://github.com/wojtekpiskorz/kiero/issues/51), [H4 #52](https://github.com/wojtekpiskorz/kiero/issues/52), [H1 #49](https://github.com/wojtekpiskorz/kiero/issues/49) | Historical implementation |
 | [J3 #62](https://github.com/wojtekpiskorz/kiero/issues/62) | OPEN | [J2 #61](https://github.com/wojtekpiskorz/kiero/issues/61), [J6 #139](https://github.com/wojtekpiskorz/kiero/issues/139) | Remaining execution |
 | [J4 #63](https://github.com/wojtekpiskorz/kiero/issues/63) | OPEN | [J2 #61](https://github.com/wojtekpiskorz/kiero/issues/61), [G4 #48](https://github.com/wojtekpiskorz/kiero/issues/48), [G5 #107](https://github.com/wojtekpiskorz/kiero/issues/107), [I7 #59](https://github.com/wojtekpiskorz/kiero/issues/59), [J6 #139](https://github.com/wojtekpiskorz/kiero/issues/139) | Remaining execution |
-| [J5 #64](https://github.com/wojtekpiskorz/kiero/issues/64) | OPEN | [I6 #58](https://github.com/wojtekpiskorz/kiero/issues/58), [J3 #62](https://github.com/wojtekpiskorz/kiero/issues/62), [J4 #63](https://github.com/wojtekpiskorz/kiero/issues/63), [I9 #136](https://github.com/wojtekpiskorz/kiero/issues/136), [I11 #138](https://github.com/wojtekpiskorz/kiero/issues/138) | Remaining execution |
+| [J5 #64](https://github.com/wojtekpiskorz/kiero/issues/64) | OPEN | [I6 #58](https://github.com/wojtekpiskorz/kiero/issues/58), [J3 #62](https://github.com/wojtekpiskorz/kiero/issues/62), [J4 #63](https://github.com/wojtekpiskorz/kiero/issues/63), [I9 #136](https://github.com/wojtekpiskorz/kiero/issues/136), [I11 #138](https://github.com/wojtekpiskorz/kiero/issues/138), [M1 #141](https://github.com/wojtekpiskorz/kiero/issues/141) | Remaining execution |
 | [G5 #107](https://github.com/wojtekpiskorz/kiero/issues/107) | CLOSED | [G2 #46](https://github.com/wojtekpiskorz/kiero/issues/46), [G4 #48](https://github.com/wojtekpiskorz/kiero/issues/48) | Historical implementation |
 | [E7 #115](https://github.com/wojtekpiskorz/kiero/issues/115) | CLOSED | [C5 #28](https://github.com/wojtekpiskorz/kiero/issues/28), [H3 #51](https://github.com/wojtekpiskorz/kiero/issues/51) | Historical implementation |
 | [R1 #126](https://github.com/wojtekpiskorz/kiero/issues/126) | OPEN | [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125), [C2 #25](https://github.com/wojtekpiskorz/kiero/issues/25), [E6 #40](https://github.com/wojtekpiskorz/kiero/issues/40), [H1 #49](https://github.com/wojtekpiskorz/kiero/issues/49), [H2 #50](https://github.com/wojtekpiskorz/kiero/issues/50) | Remaining execution |
@@ -137,6 +134,7 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [I10 #137](https://github.com/wojtekpiskorz/kiero/issues/137) | OPEN | [R3 #128](https://github.com/wojtekpiskorz/kiero/issues/128), [D7 #135](https://github.com/wojtekpiskorz/kiero/issues/135), [I5 #57](https://github.com/wojtekpiskorz/kiero/issues/57) | Remaining execution |
 | [I11 #138](https://github.com/wojtekpiskorz/kiero/issues/138) | OPEN | [I8 #133](https://github.com/wojtekpiskorz/kiero/issues/133), [I2 #54](https://github.com/wojtekpiskorz/kiero/issues/54) | Remaining execution |
 | [J6 #139](https://github.com/wojtekpiskorz/kiero/issues/139) | OPEN | [R3 #128](https://github.com/wojtekpiskorz/kiero/issues/128), [R4 #129](https://github.com/wojtekpiskorz/kiero/issues/129), [R5 #130](https://github.com/wojtekpiskorz/kiero/issues/130), [R7 #132](https://github.com/wojtekpiskorz/kiero/issues/132), [D7 #135](https://github.com/wojtekpiskorz/kiero/issues/135), [B5 #134](https://github.com/wojtekpiskorz/kiero/issues/134) | Remaining execution |
-| [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125) | OPEN | None | Map administration |
+| [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125) | CLOSED | None | Map administration |
+| [M1 #141](https://github.com/wojtekpiskorz/kiero/issues/141) | OPEN | [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125) | Map administration |
 
-M0 state is captured before its documentation PR merges. The live audit reports its subsequent closure and the resulting R1/R4/R6/R7 frontier. It is administrative work, not a core feature.
+Administration rows are documentation work, not core features. Their cached states change only through bounded administration PRs that rerun the audit and keep every derived cell equal to the manifest.
