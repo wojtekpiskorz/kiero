@@ -214,3 +214,78 @@ describe("no listed consumer hand-builds a source route", () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe("the dossier's hooks never sit below an early return", () => {
+  // The live /zrodlo crash R5's browser leg caught: SourceDetailBody ran
+  // its evidence-accumulation useEffect BELOW the pending-state early
+  // returns, so the loading -> success transition changed the hook count
+  // and React unmounted the route into the error boundary. renderToString
+  // tests cannot see it (one pass, one state); this guard can: in the
+  // feature file, every hook call must precede the first return of its
+  // function.
+  it("calls every hook before the first return of every function in the feature file", () => {
+    const file = join(
+      import.meta.dirname,
+      "..",
+      "..",
+      "apps/web/src/features/source-detail/SourceDetailFeature.ts",
+    );
+    // Strip comments and string BODIES first, so braces and arrows inside
+    // them cannot skew the scan.
+    const stripped = readFileSync(file, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "")
+      .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+      .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+      .replace(/`(?:[^`\\]|\\.)*`/g, "``");
+    const lines = stripped.split("\n");
+    const offenders: string[] = [];
+    let depth = 0;
+    // Function frames (component bodies, callbacks) vs plain blocks, as an
+    // explicit stack: a `return` only exits the component when no callback
+    // frame is open above the component's own frame.
+    const frames: ("fn" | "block")[] = [];
+    const fnDepthOf = () => frames.filter((frame) => frame === "fn").length;
+    let current: { name: string; firstReturn: number | null; hooks: number[] } | null = null;
+    lines.forEach((line, index) => {
+      const declaration = /^(?:export )?function (\w+)\(/.exec(line);
+      if (declaration !== null && depth === 0) {
+        current = { name: declaration[1]!, firstReturn: null, hooks: [] };
+      }
+      const fnDepthAtLineStart = fnDepthOf();
+      if (current !== null) {
+        if (/\buse[A-Z]\w*\(/.test(line) && fnDepthAtLineStart === 1) {
+          current.hooks.push(index);
+        }
+        if (current.firstReturn === null && /^\s*return\b/.test(line) && fnDepthAtLineStart === 1) {
+          current.firstReturn = index;
+        }
+      }
+      // An arrow body or a declared function body opens a function frame;
+      // every other brace (object literals, if/else blocks) is a block.
+      const lineOpensFunction =
+        /=>\s*\{\s*$/.test(line.trim()) || /\bfunction\b[^{]*\{\s*$/.test(line.trim());
+      for (const brace of line.match(/\{/g) ?? []) {
+        void brace;
+        frames.push(lineOpensFunction ? "fn" : "block");
+        depth += 1;
+      }
+      for (const brace of line.match(/\}/g) ?? []) {
+        void brace;
+        frames.pop();
+        depth -= 1;
+      }
+      if (current !== null && depth === 0) {
+        for (const hook of current.hooks) {
+          if (current.firstReturn !== null && hook > current.firstReturn) {
+            offenders.push(
+              `${current.name}: hook at line ${hook + 1} after the first component return at line ${current.firstReturn + 1}`,
+            );
+          }
+        }
+        current = null;
+      }
+    });
+    expect(offenders).toEqual([]);
+  });
+});

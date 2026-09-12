@@ -204,6 +204,10 @@ function SourceDetailBody({
     },
   });
   const markRead = useMutation(api.attention.read_state.commands.markSourceReadCommand);
+  const evidencePage =
+    evidence.status === "success" && evidence.data._tag === "ok"
+      ? Schema.decodeUnknownSync(SourceEvidencePage)(evidence.data.value)
+      : null;
 
   // One read marking per view-open of the original (F1, idempotent server
   // side): seeing the original changes this person's state everywhere.
@@ -222,6 +226,27 @@ function SourceDetailBody({
       console.warn(copy.markReadFailure);
     });
   }, [sourceId, markRead]);
+
+  // Pages accumulate: each fetch is ONE page past the cursor (the tracked
+  // continueCursor), so paging N pages costs N page reads, not the O(N^2)
+  // re-read of the whole prefix a growing numItems caused. BOTH hooks sit
+  // above every early return: the exposition and evidence queries settle
+  // at different instants, so a hook below a pending-state return would
+  // change the hook count across the loading -> success transition and
+  // crash the route (Rules of Hooks; caught live on /zrodlo by R5's
+  // browser leg).
+  useEffect(() => {
+    if (evidencePage === null) {
+      return;
+    }
+    setEvidenceRows((previous) => {
+      const seen = new Set(previous.map((r) => `${r.findingId}:${r.citedRevisionId}:${r.fragmentId ?? "whole"}`));
+      const appended = evidencePage.page.filter(
+        (r) => !seen.has(`${r.findingId}:${r.citedRevisionId}:${r.fragmentId ?? "whole"}`),
+      );
+      return appended.length === 0 ? previous : [...previous, ...appended];
+    });
+  }, [evidencePage]);
 
   if (exposition.status === "error") {
     return createElement(SessionEnded);
@@ -244,25 +269,6 @@ function SourceDetailBody({
     );
   }
   const row = Schema.decodeUnknownSync(SourceExpositionRow)(exposition.data.value);
-  const evidencePage =
-    evidence.status === "success" && evidence.data._tag === "ok"
-      ? Schema.decodeUnknownSync(SourceEvidencePage)(evidence.data.value)
-      : null;
-  // Pages accumulate: each fetch is ONE page past the cursor (the tracked
-  // continueCursor), so paging N pages costs N page reads, not the O(N^2)
-  // re-read of the whole prefix a growing numItems caused.
-  useEffect(() => {
-    if (evidencePage === null) {
-      return;
-    }
-    setEvidenceRows((previous) => {
-      const seen = new Set(previous.map((r) => `${r.findingId}:${r.citedRevisionId}:${r.fragmentId ?? "whole"}`));
-      const appended = evidencePage.page.filter(
-        (r) => !seen.has(`${r.findingId}:${r.citedRevisionId}:${r.fragmentId ?? "whole"}`),
-      );
-      return appended.length === 0 ? previous : [...previous, ...appended];
-    });
-  }, [evidencePage]);
 
   // The canonical link this surface displays and copies (R5): the same
   // serializer every consumer uses, whole-source (no fragment pin).
