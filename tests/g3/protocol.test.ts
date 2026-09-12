@@ -21,6 +21,20 @@
  *   bounded disambiguating list;
  * - update legs send EXACTLY the managed fields they were given (never
  *   reminders, never transparency — personally captured settings survive).
+ *
+ * Two SEPARATE harness budgets keep ordinary calls tolerant of machine
+ * load without weakening the deadline proofs (a one-off map review saw an
+ * ordinary first request miss a shared 150 ms budget under load):
+ *
+ * - NORMAL_LOCAL_TIMEOUT_MS gives every success/status case room for CI
+ *   scheduling of a localhost round trip; the fake answers immediately,
+ *   so the headroom costs no runtime and a genuine hang still fails;
+ * - DELIBERATE_TIMEOUT_MS is passed EXPLICITLY by each deadline test,
+ *   which stalls the fake far beyond that small deadline and first parks
+ *   a request-received barrier: the deadline provably hits with the
+ *   request ALREADY at the server (timeout-after-request), not during
+ *   connection startup. If the barrier never resolves the test fails on
+ *   the runner timeout — a visible failure, never a hidden pass.
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -46,15 +60,29 @@ interface FakeGoogle {
     listItems?: unknown[];
     body?: unknown;
   };
+  /** Resolves once the NEXT request has reached the fake (the barrier). */
+  requestReceived: () => Promise<void>;
 }
 
 let fake: FakeGoogle;
 
-const SHORT_TIMEOUT_MS = 150;
+/** Ordinary local round trips: room for CI scheduling, no cost when fast. */
+const NORMAL_LOCAL_TIMEOUT_MS = 2_000;
+
+/** The small explicit deadline the deliberate timeout tests pass per call. */
+const DELIBERATE_TIMEOUT_MS = 150;
+
+/** The fake stalls its answer far beyond the deliberate deadline. */
+const STALL_BEYOND_DEADLINE_MS = 10 * DELIBERATE_TIMEOUT_MS;
 
 beforeAll(async () => {
   const requests: FakeGoogle["requests"] = [];
   const behavior: FakeGoogle["behavior"] = {};
+  const requestWaiters: Array<() => void> = [];
+  const requestReceived = (): Promise<void> =>
+    new Promise<void>((resolve) => {
+      requestWaiters.push(resolve);
+    });
   const server = createServer((request, response) => {
     let body = "";
     request.on("data", (chunk: Buffer) => {
@@ -68,24 +96,32 @@ beforeAll(async () => {
         query: url.searchParams,
         body,
       });
+      // Request-received barrier: release waiters BEFORE the answer, so a
+      // deadline test can prove the timeout hit with the request delivered.
+      for (const resolve of requestWaiters.splice(0)) {
+        resolve();
+      }
+      // Snapshot the scripted answer at RECEIVE time: a delayed answer for
+      // a client that already aborted must never consume behavior (or a
+      // script slot) that a LATER test has set by then.
+      const scripted = behavior.script?.shift();
+      const status = scripted ?? behavior.status ?? 200;
+      const payload =
+        behavior.body ??
+        (status >= 400
+          ? { error: { code: status, message: "fixture" } }
+          : url.pathname.endsWith("/events")
+            ? behavior.listItems === undefined
+              ? { items: [] }
+              : { items: behavior.listItems }
+            : {
+                id: "fake-evt-1",
+                status: "confirmed",
+                summary: "Zadanie: Beton",
+                start: { date: "2031-05-04" },
+                end: { date: "2031-05-05" },
+              });
       const answer = (): void => {
-        const scripted = behavior.script?.shift();
-        const status = scripted ?? behavior.status ?? 200;
-        const payload =
-          behavior.body ??
-          (status >= 400
-            ? { error: { code: status, message: "fixture" } }
-            : url.pathname.endsWith("/events")
-              ? behavior.listItems === undefined
-                ? { items: [] }
-                : { items: behavior.listItems }
-              : {
-                  id: "fake-evt-1",
-                  status: "confirmed",
-                  summary: "Zadanie: Beton",
-                  start: { date: "2031-05-04" },
-                  end: { date: "2031-05-05" },
-                });
         response.writeHead(status, { "content-type": "application/json" });
         response.end(JSON.stringify(payload));
       };
@@ -101,18 +137,19 @@ beforeAll(async () => {
   if (address === null || typeof address === "string") {
     throw new Error("fake google: no port");
   }
-  fake = { server, url: `http://127.0.0.1:${address.port}`, requests, behavior };
+  fake = { server, url: `http://127.0.0.1:${address.port}`, requests, behavior, requestReceived };
 });
 
 afterAll(async () => {
   await new Promise<void>((resolve) => fake.server.close(() => resolve()));
 });
 
-const base = () => ({
+/** Ordinary calls use the generous local budget; deadline tests pass theirs. */
+const base = (timeoutMs: number = NORMAL_LOCAL_TIMEOUT_MS) => ({
   apiBase: `${fake.url}`,
   accessToken: "fake-access",
   calendarId: "cal-1",
-  timeoutMs: SHORT_TIMEOUT_MS,
+  timeoutMs,
 });
 
 describe("create legs (MutationReport)", () => {
@@ -147,8 +184,15 @@ describe("create legs (MutationReport)", () => {
 
   it("keeps a deadline-hit create uncertain with the timeout word (the timeout-after-success case)", async () => {
     fake.requests.length = 0;
-    fake.behavior.delayMs = 10 * SHORT_TIMEOUT_MS;
-    const report = await createCalendarEvent({ ...base(), body: { summary: "Z" } });
+    fake.behavior.delayMs = STALL_BEYOND_DEADLINE_MS;
+    const received = fake.requestReceived();
+    const report = await createCalendarEvent({
+      ...base(DELIBERATE_TIMEOUT_MS),
+      body: { summary: "Z" },
+    });
+    // The stall, not connection startup, produced this timeout: the fake
+    // had the request in hand before the deadline expired.
+    await received;
     expect(report).toEqual({ kind: "unknown", cause: "timeout" });
     expect(fake.requests).toHaveLength(1);
     delete fake.behavior.delayMs;
@@ -218,9 +262,16 @@ describe("list legs (ObservationResult, the observation filter)", () => {
   });
 
   it("a deadline-hit list is uncertain with the timeout word", async () => {
-    fake.behavior.delayMs = 10 * SHORT_TIMEOUT_MS;
-    const observation = await listEventsBySemanticId({ ...base(), semanticId: "sem-9" });
+    fake.requests.length = 0;
+    fake.behavior.delayMs = STALL_BEYOND_DEADLINE_MS;
+    const received = fake.requestReceived();
+    const observation = await listEventsBySemanticId({
+      ...base(DELIBERATE_TIMEOUT_MS),
+      semanticId: "sem-9",
+    });
+    await received;
     expect(observation).toEqual({ kind: "unknown", cause: "timeout" });
+    expect(fake.requests).toHaveLength(1);
     delete fake.behavior.delayMs;
   });
 });
@@ -282,6 +333,23 @@ describe("observeEventById (the get leg with inline 404 disambiguation)", () => 
     expect(fake.requests).toHaveLength(2);
     fake.behavior.status = 200;
   });
+
+  it("keeps a deadline-hit get uncertain with the timeout word (ONE request, no disambiguating list)", async () => {
+    // An uncertain get must NOT fall into the 404 disambiguation path:
+    // the timeout word plus a single recorded request pins that.
+    fake.requests.length = 0;
+    fake.behavior.delayMs = STALL_BEYOND_DEADLINE_MS;
+    const received = fake.requestReceived();
+    const observation = await observeEventById({
+      ...base(DELIBERATE_TIMEOUT_MS),
+      eventId: "evt-3",
+      semanticId: "sem-9",
+    });
+    await received;
+    expect(observation).toEqual({ kind: "unknown", cause: "timeout" });
+    expect(fake.requests).toHaveLength(1);
+    delete fake.behavior.delayMs;
+  });
 });
 
 describe("update legs (the managed-fields contract on the wire)", () => {
@@ -318,13 +386,17 @@ describe("update legs (the managed-fields contract on the wire)", () => {
   });
 
   it("keeps a deadline-hit update uncertain with the timeout word (the patch may have applied)", async () => {
-    fake.behavior.delayMs = 10 * SHORT_TIMEOUT_MS;
+    fake.requests.length = 0;
+    fake.behavior.delayMs = STALL_BEYOND_DEADLINE_MS;
+    const received = fake.requestReceived();
     const report = await updateCalendarEvent({
-      ...base(),
+      ...base(DELIBERATE_TIMEOUT_MS),
       eventId: "evt-3",
       body: { summary: "Nowy" },
     });
+    await received;
     expect(report).toEqual({ kind: "unknown", cause: "timeout" });
+    expect(fake.requests).toHaveLength(1);
     delete fake.behavior.delayMs;
   });
 });
