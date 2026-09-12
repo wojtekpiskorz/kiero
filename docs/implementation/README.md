@@ -19,9 +19,9 @@ Start with the [live implementation map](https://github.com/wojtekpiskorz/kiero/
 
 ## Next implementation work
 
-With M0, R1, R4, R6, R7 and M1 closed, R2, R5 and I8 have no open native blockers. Claim only an unassigned issue after a fresh dependency and ownership audit. Root order is a scheduling opportunity, not a promise of available accounts or cloud capacity.
+With M0, R1, R2, R4, R6, R7 and M1 closed, R3, R5 and I8 have no open native blockers. Claim only an unassigned issue after a fresh dependency and ownership audit. Root order is a scheduling opportunity, not a promise of available accounts or cloud capacity.
 
-R1-R3 repair clarification provenance, purge and push delivery. R4 protects source reassignment against stale editors. R5 fixes old-source links. R6 replaces the broken/placeholder release path with executable tooling. R7 removes the known Calendar test timing flake while preserving timeout assertions.
+R1-R3 repair clarification provenance, purge and push delivery; R2 is closed with its live purge evidence. R4 protects source reassignment against stale editors. R5 fixes old-source links. R6 replaces the broken/placeholder release path with executable tooling. R7 removes the known Calendar test timing flake while preserving timeout assertions.
 
 I8 establishes an isolated real qualification environment after R6. B5, D7 and I11 then prove actual identity, media and alert delivery. I9 proves export, I10 proves complete scheduled backups, I6 proves quarantined restore, and J6 rechecks the joined repaired application. J3 and J4 qualify AI and physical devices/Google. J5 audits complete core delivery.
 
