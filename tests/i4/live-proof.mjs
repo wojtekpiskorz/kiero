@@ -494,7 +494,7 @@ const resolvedB = await memoryCommand("memory.resolveClarification", {
 
 const preRows = await readClarificationRowsLive();
 const preStoredRows = (await storedClarificationsLive()).rows;
-const preStoredB = preStoredRows.find((row) => row.clarificationId === caseB.value.clarificationId);
+const preStoredB = (preStoredRows ?? []).find((row) => row.clarificationId === caseB.value.clarificationId);
 const preA = preRows.find((row) => row.clarificationId === caseA.value.clarificationId);
 const preB = preRows.find((row) => row.clarificationId === caseB.value.clarificationId);
 record(
