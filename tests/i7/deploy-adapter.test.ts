@@ -519,7 +519,9 @@ describe("the exact workflow command against the committed descriptor (local tru
         expect(row.missingConfigNames).toEqual(["VITE_CONVEX_URL", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]);
       }
       if (row.component === "convex-functions") {
-        expect(row.missingConfigNames).toEqual(["CONVEX_DEPLOYMENT"]);
+        // I8 runbook R4: the deployment-scoped key is required by name too
+        // (a reference alone cannot authenticate CI; probe P7's 401).
+        expect(row.missingConfigNames).toEqual(["CONVEX_DEPLOYMENT", "CONVEX_DEPLOY_KEY"]);
       }
     }
   });
