@@ -480,13 +480,6 @@ export function payloadKindOf(
       : "source_entry";
 }
 
-/**
- * The routing data of one payload: the ids of the LIVE records only (a
- * purged member of the batch leaves no routing id behind) plus the
- * validated relative target. An empty target means "no specific record"
- * (the transaction denies before composing when nothing is live); the
- * service worker treats it like any absent target and opens its own scope.
- */
 /** Delivery TTL: every notification kind stays meaningful for a working day. */
 export function ttlSecondsOf(): number {
   return 24 * 60 * 60;
