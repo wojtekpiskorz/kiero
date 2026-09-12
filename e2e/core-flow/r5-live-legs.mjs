@@ -219,13 +219,18 @@ async function oldSourceState() {
   const exposition = await boss.client.query("sources/read/views:sourceExposition", { sourceId: OLD_ID });
   return value(exposition)?.processingState ?? null;
 }
-const terminalStates = new Set(["processed", "failed"]);
-let oldState = null;
-for (let attempt = 0; attempt < 40 && !(oldState !== null && terminalStates.has(oldState)); attempt += 1) {
-  oldState = await oldSourceState();
-  if (oldState !== null && terminalStates.has(oldState)) break;
-  await sleep(6_000);
+/** Polls (bounded) until the old source's interpretation is terminal. */
+async function waitForTerminal(maxAttempts = 40) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const state = await oldSourceState();
+    if (state !== null && (state === "processed" || state === "failed")) {
+      return state;
+    }
+    await sleep(6_000);
+  }
+  return null;
 }
+let oldState = await waitForTerminal();
 if (oldState === "failed") {
   note("old source interpretation FAILED (honest window); one bounded model-stage restart");
   const latest = await anonConvex().action("processing/text/probe:probeLatestRunForSource", { sourceId: OLD_ID });
@@ -241,12 +246,7 @@ if (oldState === "failed") {
       runId,
     });
     note(`restart: ${errCode(restarted)}`);
-    oldState = null;
-    for (let attempt = 0; attempt < 40 && !(oldState !== null && terminalStates.has(oldState)); attempt += 1) {
-      oldState = await oldSourceState();
-      if (oldState !== null && terminalStates.has(oldState)) break;
-      await sleep(6_000);
-    }
+    oldState = await waitForTerminal();
   } else {
     note("restart unavailable: no workflow checkpoint on the run");
   }
@@ -263,7 +263,7 @@ if (oldState === "processed") {
 note(`old source processingState=${oldState}; matched fragment=${fragmentId ?? "none"}`);
 record(
   "S6/old-source-terminal",
-  oldState !== null && terminalStates.has(oldState) ? "PASS" : "FAIL",
+  oldState === "processed" || oldState === "failed" ? "PASS" : "FAIL",
   `state=${oldState}`,
 );
 
@@ -281,6 +281,11 @@ page.on("pageerror", (error) => console.log(`  [page-error] ${error.message}`));
 const canonical = (id, fragment = null) =>
   `/zrodlo?zrodlo=${encodeURIComponent(id)}${fragment === null ? "" : `&fragment=${encodeURIComponent(fragment)}`}`;
 const articleCount = async () => page.locator("main article").count();
+/** Waits (bounded) until the dossier's identity section renders. */
+const waitForDossier = () =>
+  page.waitForFunction(() => document.body?.innerText?.includes("Wiadomość źródłowa") === true, null, {
+    timeout: 30_000,
+  });
 
 // The app must be up before any leg (the dev server is the operator's leg).
 {
@@ -345,9 +350,7 @@ record(
 // The direct canonical open: the dossier fetches by id, feed-independent.
 await page.goto(`${APP_URL}${canonical(OLD_ID)}`, { waitUntil: "domcontentloaded" });
 await page.waitForSelector("h1", { timeout: 30_000 });
-await page.waitForFunction(() => document.body?.innerText?.includes("Wiadomość źródłowa") === true, null, {
-  timeout: 30_000,
-});
+await waitForDossier();
 const dossierText = (await page.textContent("main")) ?? "";
 record(
   "L1/dossier-opens-the-old-source-directly",
@@ -369,9 +372,7 @@ record(
 
 // L2: the legacy conversation deep link redirects to the dossier.
 await page.goto(`${APP_URL}/?zrodlo=${encodeURIComponent(OLD_ID)}`, { waitUntil: "domcontentloaded" });
-await page.waitForFunction(() => document.body?.innerText?.includes("Wiadomość źródłowa") === true, null, {
-  timeout: 30_000,
-});
+await waitForDossier();
 const redirectedTo = new URL(page.url()).pathname + new URL(page.url()).search;
 record(
   "L2/legacy-link-redirects-to-canonical-dossier",
@@ -392,9 +393,7 @@ if (fragmentId !== null) {
     `${APP_URL}/?zrodlo=${encodeURIComponent(OLD_ID)}&fragment=${encodeURIComponent(fragmentId)}`,
     { waitUntil: "domcontentloaded" },
   );
-  await page.waitForFunction(() => document.body?.innerText?.includes("Wiadomość źródłowa") === true, null, {
-    timeout: 30_000,
-  });
+  await waitForDossier();
   const fragmentTarget = new URL(page.url()).pathname + new URL(page.url()).search;
   record(
     "L2/legacy-fragment-identity-kept",

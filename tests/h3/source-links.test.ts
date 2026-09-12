@@ -242,18 +242,34 @@ describe("the dossier's hooks never sit below an early return", () => {
     const offenders: string[] = [];
     let depth = 0;
     // Function frames (component bodies, callbacks) vs plain blocks, as an
-    // explicit stack: a `return` only exits the component when no callback
-    // frame is open above the component's own frame.
+    // explicit stack walked CHAR BY CHAR in source order: a `return` only
+    // exits the component when no callback frame is open above the
+    // component's own frame. A `{` opens a function frame exactly when it
+    // directly follows `=>` (an arrow body) or when it closes the parameter
+    // list of a `function` signature (paren depth back to zero); everything
+    // else — destructured params, type literals, object arguments, if/else
+    // blocks — is a block. Interleaving opens and closes matters: batched
+    // processing once let a single-line signature's closers eat its own
+    // body brace (advisory round 1, finding 1).
     const frames: ("fn" | "block")[] = [];
     const fnDepthOf = () => frames.filter((frame) => frame === "fn").length;
-    let current: { name: string; firstReturn: number | null; hooks: number[] } | null = null;
+    let signatureParens: number | null = null;
+    let current: {
+      name: string;
+      firstReturn: number | null;
+      hooks: number[];
+      openedBody: boolean;
+    } | null = null;
     lines.forEach((line, index) => {
       const declaration = /^(?:export )?function (\w+)\(/.exec(line);
       if (declaration !== null && depth === 0) {
-        current = { name: declaration[1]!, firstReturn: null, hooks: [] };
+        current = { name: declaration[1]!, firstReturn: null, hooks: [], openedBody: false };
       }
       const fnDepthAtLineStart = fnDepthOf();
       if (current !== null) {
+        if (fnDepthAtLineStart >= 1) {
+          current.openedBody = true;
+        }
         if (/\buse[A-Z]\w*\(/.test(line) && fnDepthAtLineStart === 1) {
           current.hooks.push(index);
         }
@@ -261,24 +277,51 @@ describe("the dossier's hooks never sit below an early return", () => {
           current.firstReturn = index;
         }
       }
-      // An arrow body or a declared function body opens a function frame;
-      // every other brace (object literals, if/else blocks) is a block. On
-      // multi-brace lines (single-line typed signatures, destructured
-      // params) only the FINAL `{` is the body brace.
-      const opensFunctionBody =
-        /=>\s*\{\s*$/.test(line.trim()) || (/\bfunction\b/.test(line) && /\{\s*$/.test(line.trim()));
-      for (const brace of line.match(/\{/g) ?? []) {
-        void brace;
-        frames.push("block");
-        depth += 1;
-      }
-      if (opensFunctionBody && frames.length > 0) {
-        frames[frames.length - 1] = "fn";
-      }
-      for (const brace of line.match(/\}/g) ?? []) {
-        void brace;
-        frames.pop();
-        depth -= 1;
+      let arrowPending = false;
+      for (let position = 0; position < line.length; position += 1) {
+        const character = line[position]!;
+        if (character === "=" && line[position + 1] === ">") {
+          arrowPending = true;
+          position += 1;
+          continue;
+        }
+        const startsKeyword =
+          line.startsWith("function", position) &&
+          (position === 0 || !/[A-Za-z0-9_]/.test(line[position - 1]!)) &&
+          !/[A-Za-z0-9_]/.test(line[position + 8] ?? "");
+        if (character === "f" && signatureParens === null && startsKeyword) {
+          signatureParens = 0;
+          position += 7;
+          continue;
+        }
+        if (signatureParens !== null) {
+          if (character === "(") {
+            signatureParens += 1;
+            arrowPending = false;
+            continue;
+          }
+          if (character === ")") {
+            signatureParens -= 1;
+            arrowPending = false;
+            continue;
+          }
+          if (character === "{" && signatureParens === 0) {
+            frames.push("fn");
+            depth += 1;
+            signatureParens = null;
+            continue;
+          }
+        }
+        if (character === "{") {
+          frames.push(arrowPending ? "fn" : "block");
+          depth += 1;
+        } else if (character === "}") {
+          frames.pop();
+          depth -= 1;
+        }
+        if (!/\s/.test(character)) {
+          arrowPending = false;
+        }
       }
       if (current !== null && depth === 0) {
         for (const hook of current.hooks) {
@@ -287,6 +330,9 @@ describe("the dossier's hooks never sit below an early return", () => {
               `${current.name}: hook at line ${hook + 1} after the first component return at line ${current.firstReturn + 1}`,
             );
           }
+        }
+        if (!current.openedBody) {
+          offenders.push(`${current.name}: declaration never opened a function frame (guard coverage drifted)`);
         }
         current = null;
       }
