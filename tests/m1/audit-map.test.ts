@@ -121,13 +121,13 @@ describe("M1 audit: derived map table content", () => {
           file: "dependency-graph.md",
           mutate: content =>
             content.replace(
-              "| [M1 #141](https://github.com/wojtekpiskorz/kiero/issues/141) | OPEN |",
-              "| [M1 #141](https://github.com/wojtekpiskorz/kiero/issues/141) | CLOSED |",
+              "| [R2 #127](https://github.com/wojtekpiskorz/kiero/issues/127) | OPEN |",
+              "| [R2 #127](https://github.com/wojtekpiskorz/kiero/issues/127) | CLOSED |",
             ),
         },
       ],
     });
-    expectFail(run, "M1: graph table state CLOSED differs from cached OPEN");
+    expectFail(run, "R2: graph table state CLOSED differs from cached OPEN");
   });
 
   it("fails on a stale integrated-table remaining owner (M1-P1)", () => {
@@ -137,7 +137,7 @@ describe("M1 audit: derived map table content", () => {
           file: "inventory.md",
           mutate: content =>
             content.replace(
-              /(\| \[C2 #25\]\([^)]*\)[^\n]*?)\[R1 #126\]\(https:\/\/github\.com\/wojtekpiskorz\/kiero\/issues\/126\)/,
+              /(\| \[C2 #25\]\([^)]*\)[^\n]*?)\[R2 #127\]\(https:\/\/github\.com\/wojtekpiskorz\/kiero\/issues\/127\)/,
               "$1[E7 #115](https://github.com/wojtekpiskorz/kiero/issues/115)",
             ),
         },
@@ -151,7 +151,7 @@ describe("M1 audit: derived map table content", () => {
       tables: [
         {
           file: "dependency-graph.md",
-          mutate: content => content.replace('  M1["M1 #141"]\n', '  M1["M1 #141"]\n  M0["M0 #125"]\n'),
+          mutate: content => content.replace('  R2["R2 #127"]\n', '  R2["R2 #127"]\n  R1["R1 #126"]\n'),
         },
       ],
     });
@@ -330,9 +330,9 @@ describe("M1 audit: derived map table content", () => {
   it("still detects unordered owned-path overlap between open entries (M1-P3)", () => {
     const run = auditFixture({
       manifest: manifest => {
-        const r6 = manifest.entries.find(entry => entry.key === "R6");
-        if (r6 === undefined) throw new Error("fixture manifest lost R6");
-        r6.ownedPaths = [...(r6.ownedPaths as string[]), "docs/implementation/issues.json"];
+        const j3 = manifest.entries.find(entry => entry.key === "J3");
+        if (j3 === undefined) throw new Error("fixture manifest lost J3");
+        j3.ownedPaths = [...(j3.ownedPaths as string[]), "e2e/devices/**"];
       },
     });
     expect(run.status).toBe(1);
