@@ -201,6 +201,12 @@ export const retryPurgeStage = internalMutation({
     if (!PURGE_STAGE_KINDS.includes(args.stageKind as PurgeStageKind)) {
       return errorResult(validationError("unknown_purge_stage_kind"));
     }
+    // The external media stage's replay belongs to the job's own external
+    // action, never to a probe: a synthetic replay could strand the stage
+    // pending with no job machinery to complete it.
+    if (args.stageKind === "media_objects") {
+      return errorResult(validationError("probe_retry_in_transaction_stage_only"));
+    }
     return await replayPurgeStageForRecord(ctx, {
       deletionRecordId: args.deletionRecordId,
       stageKind: args.stageKind as PurgeStageKind,

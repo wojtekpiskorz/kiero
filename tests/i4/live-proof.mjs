@@ -445,8 +445,10 @@ const memoryCommand = (operation, input) =>
   });
 const readClarificationRowsLive = () =>
   admin.client.query("memory/findings/functions:readClarifications", { scope: { _tag: "company" } });
-const storedClarificationsLive = () =>
-  admin.client.action("memory/findings/probe:probeClarificationStorage", {});
+const storedClarificationsLive = async () => {
+  const result = await admin.client.action("memory/findings/probe:probeClarificationStorage", {});
+  return { rows: result?._tag === "ok" && Array.isArray(result.value?.rows) ? result.value.rows : null };
+};
 
 const seedR2Source = (key, text) =>
   admin.client.action("agent/probe:probeSeedE6Source", {
@@ -491,7 +493,7 @@ const resolvedB = await memoryCommand("memory.resolveClarification", {
 });
 
 const preRows = await readClarificationRowsLive();
-const preStoredRows = (await storedClarificationsLive()).value.rows;
+const preStoredRows = (await storedClarificationsLive()).rows;
 const preStoredB = preStoredRows.find((row) => row.clarificationId === caseB.value.clarificationId);
 const preA = preRows.find((row) => row.clarificationId === caseA.value.clarificationId);
 const preB = preRows.find((row) => row.clarificationId === caseB.value.clarificationId);
@@ -529,7 +531,7 @@ record(
 );
 record(
   "R2-1c the redacted resolved case keeps actor, timestamps, basis and only the surviving references",
-  postB !== undefined &&
+  postB !== undefined && preB !== undefined &&
     postB.question === R2_REDACTED_QUESTION && postB.resolutionNote === R2_REDACTED_NOTE &&
     postB.questionRedacted === true && postB.resolutionNoteRedacted === true &&
     postB.resolutionBasis === "source_backed" &&
@@ -548,7 +550,7 @@ record(
 // transcripts stage the retained fragment reads source_not_active; after
 // it the deleted fragment reads not_found.
 const LATE_QUESTION = "Późna sprawa po usunięciu źródła?";
-const idsBeforeLateRaise = (await storedClarificationsLive()).value.rows
+const idsBeforeLateRaise = ((await storedClarificationsLive()).rows ?? [])
   .map((row) => row.clarificationId)
   .sort();
 const lateRaise = await memoryCommand("memory.raiseClarification", {
@@ -557,7 +559,7 @@ const lateRaise = await memoryCommand("memory.raiseClarification", {
   scope: { _tag: "company" },
 });
 const storageAfterLateRaise = await storedClarificationsLive();
-const idsAfterLateRaise = storageAfterLateRaise.value.rows
+const idsAfterLateRaise = (storageAfterLateRaise.rows ?? [])
   .map((row) => row.clarificationId)
   .sort();
 const refusalCode = lateRaise?.error?.code;
@@ -567,7 +569,7 @@ record(
     (refusalCode === "conflicting_fragment_not_found" ||
       refusalCode === "conflicting_fragment_source_not_active") &&
     JSON.stringify(idsAfterLateRaise) === JSON.stringify(idsBeforeLateRaise) &&
-    storageAfterLateRaise.value.rows.every((row) => row.question !== LATE_QUESTION)
+    (storageAfterLateRaise.rows ?? []).every((row) => row.question !== LATE_QUESTION)
     ? "PASS"
     : "FAIL",
   `error=${lateRaise?.error?._tag}:${refusalCode} rowsUnchanged=${JSON.stringify(idsAfterLateRaise) === JSON.stringify(idsBeforeLateRaise)}`,
@@ -596,9 +598,9 @@ record(
 // R2-4: the stored rows converged (the storage-freeze half) with the
 // content-free audit, and the independent source survives untouched.
 const stored = await storedClarificationsLive();
-const storedSerialized = JSON.stringify(stored);
-const storedA = stored.value.rows.find((row) => row.clarificationId === caseA.value.clarificationId);
-const storedB = stored.value.rows.find((row) => row.clarificationId === caseB.value.clarificationId);
+const storedSerialized = JSON.stringify(stored.rows ?? []);
+const storedA = stored.rows?.find((row) => row.clarificationId === caseA.value.clarificationId);
+const storedB = stored.rows?.find((row) => row.clarificationId === caseB.value.clarificationId);
 const ledgerState = await deletionState(admin);
 const ledgerCount = ledgerState?.value?.deletions?.filter(
   (r) => r.targetSourceId === doomed.sourceId,
@@ -610,18 +612,20 @@ record(
     storedA.purgeAudit?.redactedSourceIds?.length === 1 &&
     storedA.purgeAudit.redactedSourceIds[0] === doomed.sourceId &&
     typeof storedA.purgeAudit.questionRedactedAtMs === "number" &&
+    storedB?.purgeAudit?.resolutionNoteRedactedAtMs !== undefined &&
     typeof storedB.purgeAudit.resolutionNoteRedactedAtMs === "number" &&
     R2_CANARIES.every((canary) => storedSerialized.includes(canary) === false)
     ? "PASS"
     : "FAIL",
-  `auditA=${JSON.stringify(storedA?.purgeAudit)} auditB.note=${storedB?.purgeAudit?.resolutionNoteRedactedAtMs}`,
+  `auditA=${JSON.stringify(storedA?.purgeAudit)} auditB.note=${storedB?.purgeAudit?.resolutionNoteRedactedAtMs ?? "missing"}`,
 );
 const uploadsState = await admin.client.action("sources/uploads/probe:probeUploadsState", {});
 const keeperRow = uploadsState?.value?.sources?.find((row) => row.sourceId === keeper.sourceId);
 const doomedRow = uploadsState?.value?.sources?.find((row) => row.sourceId === doomed.sourceId);
 record(
   "R2-4b timestamps, actor and the independent active source survive the purge",
-  preStoredB !== undefined && storedB.raisedAtMs === preStoredB.raisedAtMs &&
+  preStoredB !== undefined && storedB !== undefined &&
+    storedB.raisedAtMs === preStoredB.raisedAtMs &&
     storedB.resolvedAtMs === preStoredB.resolvedAtMs &&
     storedB.resolvedByUserId === preStoredB.resolvedByUserId &&
     keeperRow?.lifecycle === "active" && doomedRow?.lifecycle === "purged" && ledgerCount === 1
@@ -636,7 +640,7 @@ record(
 // completed record there is nothing to retry; the row records that FAIL and
 // the script keeps going.
 const beforeRetry = await storedClarificationsLive();
-const beforeRetryA = beforeRetry.value.rows.find((row) => row.clarificationId === caseA.value.clarificationId);
+const beforeRetryA = beforeRetry.rows?.find((row) => row.clarificationId === caseA.value.clarificationId);
 const stageAttemptBefore = r2Completed?.stages?.find((s) => s.stageKind === "transcripts")?.attempts;
 const retry = r2Completed === null
   ? undefined
@@ -645,7 +649,7 @@ const retry = r2Completed === null
       stageKind: "transcripts",
     });
 const afterRetry = await storedClarificationsLive();
-const afterRetryA = afterRetry.value.rows.find((row) => row.clarificationId === caseA.value.clarificationId);
+const afterRetryA = afterRetry.rows?.find((row) => row.clarificationId === caseA.value.clarificationId);
 const ledgerAfterRetry = await deletionState(admin);
 const ledgerCountAfterRetry = ledgerAfterRetry?.value?.deletions?.filter(
   (r) => r.targetSourceId === doomed.sourceId,
@@ -655,14 +659,14 @@ record(
   retry?._tag === "ok" && retry.value.outcome === "succeeded" &&
     retry.value.stages.every((s) => s.state === "purged") &&
     retry.value.stages.find((s) => s.stageKind === "transcripts").attempts === stageAttemptBefore + 1 &&
-    JSON.stringify(afterRetry.value.rows) === JSON.stringify(beforeRetry.value.rows) &&
+    Array.isArray(afterRetry.rows) && JSON.stringify(afterRetry.rows) === JSON.stringify(beforeRetry.rows) &&
     afterRetryA?.purgeAudit?.redactedSourceIds?.length === 1 &&
     beforeRetryA?.purgeAudit?.questionRedactedAtMs !== undefined &&
     afterRetryA.purgeAudit.questionRedactedAtMs === beforeRetryA.purgeAudit.questionRedactedAtMs &&
     ledgerCountAfterRetry === 1
     ? "PASS"
     : "FAIL",
-  `outcome=${retry?._tag === "ok" ? retry.value.outcome : (retry?.error?.code ?? "no completed record to retry")} rowsStable=${JSON.stringify(afterRetry.value.rows) === JSON.stringify(beforeRetry.value.rows)} auditIds=${afterRetryA?.purgeAudit?.redactedSourceIds?.length} firstRedactionKept=${afterRetryA?.purgeAudit?.questionRedactedAtMs === beforeRetryA?.purgeAudit?.questionRedactedAtMs} ledger=${ledgerCountAfterRetry}`,
+  `outcome=${retry?._tag === "ok" ? retry.value.outcome : (retry?.error?.code ?? "no completed record to retry")} rowsStable=${Array.isArray(afterRetry.rows) && Array.isArray(beforeRetry.rows) && JSON.stringify(afterRetry.rows) === JSON.stringify(beforeRetry.rows)} auditIds=${afterRetryA?.purgeAudit?.redactedSourceIds?.length} firstRedactionKept=${afterRetryA?.purgeAudit?.questionRedactedAtMs === beforeRetryA?.purgeAudit?.questionRedactedAtMs} ledger=${ledgerCountAfterRetry}`,
 );
 
 // R2-6 (R2-P3 live): independent active evidence stays actionable after the

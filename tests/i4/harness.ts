@@ -4,7 +4,11 @@
  * eq chains), plus the table list the deletion lane touches.
  */
 
+import { Schema } from "effect";
+import { ActorContext } from "@kiero/contracts";
+import type { RequestContext } from "@kiero/runtime";
 import { fakeCtx, type FakeCtx } from "../d2/harness";
+import type { DurableJobDoc } from "../../convex/platform/executors";
 
 export { fakeCtx };
 export type { FakeCtx, Row } from "../d2/harness";
@@ -46,11 +50,6 @@ export function asTx(ctx: FakeCtx): never {
 }
 
 // --- shared purge-world fixtures (the consolidation every i4 file rides) ------------
-
-import { Schema } from "effect";
-import { ActorContext } from "@kiero/contracts";
-import type { RequestContext } from "@kiero/runtime";
-import type { DurableJobDoc } from "../../convex/platform/executors";
 
 const FIXTURE_SENT_AT_MS = Date.parse("2026-09-08T07:00:00.000Z");
 
