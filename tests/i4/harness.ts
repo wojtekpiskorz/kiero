@@ -24,6 +24,7 @@ export const DELETION_TABLES = [
   "extractions",
   "sourceFragments",
   "changeSets",
+  "clarifications",
   "findings",
   "findingRevisions",
   "evidenceLinks",

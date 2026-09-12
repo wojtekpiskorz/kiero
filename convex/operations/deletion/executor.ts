@@ -17,7 +17,12 @@
  *   fragments are DELETED (this is permanent deletion, not withdrawal
  *   history); an in-flight change set of the source fails with the typed
  *   purge reason so a late AI plan cannot publish over the tombstone
- *   (E3's publish re-check stays the structural guard).
+ *   (E3's publish re-check stays the structural guard). R2 (issue #127):
+ *   BEFORE the fragments leave, the clarification content linked through
+ *   them (and through R1 resolution evidence) is purged in one idempotent
+ *   per-source pass — associations removed, possibly derived text
+ *   replaced with the fixed redaction copy, content-free audit metadata
+ *   recorded, surviving ACTIVE references kept.
  * - `search_index` (in transaction): the source's derived search rows go
  *   through E5's own delete core (the same one the `refresh_source` drain
  *   edge calls), so this stage is the 24-hour VERIFICATION authority even
@@ -48,6 +53,7 @@ import type { MutationCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import type { DurableJobDoc, JobExecutor, JobOutcome } from "../../platform/executors";
 import { deleteSourceEntries } from "../../search/records";
+import { purgeClarificationContentForSource } from "../../memory/findings/corrections";
 import { markPurgedSupport } from "./marking";
 import { sourcePurgeRecordOf } from "./purge";
 import { PURGE_STAGE_KINDS, type PurgeStageKind } from "./schema";
@@ -152,6 +158,16 @@ async function purgeFindingsMarking(tx: MutationCtx, stage: StageRow): Promise<v
 
 /** The transcripts/extractions/fragments stage (permanent row deletion). */
 async function purgeTranscripts(tx: MutationCtx, stage: StageRow): Promise<void> {
+  // R2 (issue #127): FIRST the clarifications the fragments anchor. Their
+  // content purge must run while the fragment rows still exist (it finds
+  // linked cases through them): links to the deleted source are removed,
+  // possibly derived text is replaced with the fixed redaction copy, and
+  // content-free audit metadata is recorded — idempotently, so a stage
+  // retry after an interrupted transaction redacts nothing twice.
+  await purgeClarificationContentForSource(tx, {
+    companyId: stage.companyId,
+    sourceId: stage.sourceId,
+  });
   const sourceId = stage.sourceId;
   const transcripts = await tx.db
     .query("audioTranscripts")

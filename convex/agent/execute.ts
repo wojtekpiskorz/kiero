@@ -23,6 +23,15 @@
  *   dispatch (the operation C3 declared "for E6 tools");
  * - the staleness recheck: current revision counters versus the run's
  *   load-time snapshot (`decideAnswerFreshness`).
+ *
+ * R2 (issue #127) adds the ONE agent-entry rule to every execution above:
+ * the question source's accepted LIFECYCLE decides, not row existence — a
+ * retained tombstone (permanent deletion) refuses the execution with the
+ * typed `question_source_not_active` code before any write or event, and
+ * the staleness recheck ABORTS on it so a computed answer can never land
+ * over a deleted world. Cited evidence was already lifecycle-checked by R1
+ * (`checkResolutionEvidenceReference`); the raise path now refuses an
+ * inactive conflicting-evidence source the same way.
  */
 
 import { Schema } from "effect";
@@ -39,7 +48,11 @@ import {
   resolveRequestContext,
 } from "../platform/context";
 import { dispatchMemoryCommand } from "../memory/findings/dispatch";
-import { checkResolutionEvidenceReference } from "../memory/findings/references";
+import {
+  checkResolutionEvidenceReference,
+  requireActiveSource,
+  requireSource,
+} from "../memory/findings/references";
 import {
   ensureFragment,
   resolveTextExtraction,
@@ -51,7 +64,7 @@ import {
   performChangeTask,
 } from "../work/operations";
 import { internalMutation, type MutationCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { currentFindingRevisions } from "./context";
 
 /** One cited evidence reference in wire form (as the loop hands it over). */
@@ -62,15 +75,19 @@ interface EvidenceWire {
   readonly endOffset: number | null;
 }
 
-/** Resolves one evidence reference to a fragment id (ensuring it when new). */
+/**
+ * Resolves one evidence reference to a fragment id (ensuring it when new).
+ * R2 (issue #127): only an ACTIVE company source can anchor evidence
+ * (`requireActiveSource`, the one dead-source predicate) — a retained
+ * tombstone is a dead anchor, never a place to ensure a fragment.
+ */
 async function ensureEvidenceFragment(
   db: MutationCtx["db"],
   companyId: Id<"companies">,
   evidence: EvidenceWire,
 ): Promise<Id<"sourceFragments"> | null> {
-  const sourceId = db.normalizeId("sources", evidence.sourceId);
-  const source = sourceId === null ? null : await db.get(sourceId);
-  if (source === null || source.companyId !== companyId) {
+  const source = await requireActiveSource(db, evidence.sourceId, companyId);
+  if (source === null) {
     return null;
   }
   if (evidence.fragmentId !== null) {
@@ -97,8 +114,129 @@ async function ensureEvidenceFragment(
 }
 
 // ---------------------------------------------------------------------------
+// The one agent-entry preamble (R2, issue #127).
+// ---------------------------------------------------------------------------
+
+/** The typed refusals the question-source preamble can return. */
+export type QuestionSourceRefusal =
+  | "question_source_missing"
+  | "question_source_not_active"
+  | "actor_session_unavailable";
+
+/** The resolved preamble: the ACTIVE question source and the author session. */
+export type QuestionSourceEntry =
+  | {
+      readonly ok: true;
+      readonly source: Doc<"sources">;
+      readonly session: NonNullable<Awaited<ReturnType<typeof authorSessionId>>>;
+    }
+  | { readonly ok: false; readonly error: QuestionSourceRefusal };
+
+/**
+ * R2 (issue #127): the ONE preamble every checked execution shares — the
+ * question source's accepted LIFECYCLE decides, not row existence (a
+ * retained tombstone refuses with the typed `question_source_not_active`
+ * code), and the author's server-resolved session must exist. Callers wrap
+ * the refusal in their own result envelope; nothing was written.
+ */
+async function requireQuestionSourceSession(
+  db: MutationCtx["db"],
+  questionSourceId: Id<"sources">,
+): Promise<QuestionSourceEntry> {
+  const source = await db.get(questionSourceId);
+  if (source === null) {
+    return { ok: false, error: "question_source_missing" };
+  }
+  if (source.lifecycle !== "active") {
+    return { ok: false, error: "question_source_not_active" };
+  }
+  const session = await authorSessionId(db, source.authorUserId);
+  if (session === null) {
+    return { ok: false, error: "actor_session_unavailable" };
+  }
+  return { ok: true, source, session };
+}
+
+// ---------------------------------------------------------------------------
 // Clarifications (Sprawa do wyjaśnienia, source-backed through C2).
 // ---------------------------------------------------------------------------
+
+/** The checked raise execution's input (exported for the deterministic tests). */
+export interface ExecuteClarificationInput {
+  readonly questionSourceId: Id<"sources">;
+  readonly question: string;
+  readonly scopeKind: "company" | "project";
+  readonly projectId?: Id<"projects">;
+  readonly evidence?: readonly {
+    sourceId: Id<"sources">;
+    fragmentId?: Id<"sourceFragments">;
+    startOffset?: number;
+    endOffset?: number;
+  }[];
+}
+
+/**
+ * The checked raise execution body (R2): the QUESTION source must be
+ * ACTIVE (a retained tombstone refuses with a typed code — late work
+ * publishes nothing), every conflicting-evidence source must be active
+ * too, and the final command runs the C2 dispatch whose own fragment
+ * checks re-verify the same lifecycle (each layer checks end to end).
+ */
+export async function executeClarificationCore(
+  ctx: MutationCtx,
+  args: ExecuteClarificationInput,
+): Promise<ResultEnvelope> {
+  const entry = await requireQuestionSourceSession(ctx.db, args.questionSourceId);
+  if (!entry.ok) {
+    // R2 (issue #127): a tombstone between model work and commit is a typed
+    // refusal — no row, no event, nothing published over the deleted world.
+    return okResult({ outcome: "failed", error: entry.error });
+  }
+  const { source, session } = entry;
+  const fragmentIds: Id<"sourceFragments">[] = [];
+  for (const evidence of args.evidence ?? []) {
+    const evidenceSource = await requireSource(ctx.db, evidence.sourceId, source.companyId);
+    if (evidenceSource !== null && evidenceSource.lifecycle !== "active") {
+      // An inactive cited source is a REFUSAL, not a silent drop: a raise
+      // computed against a world that included the now-deleted source must
+      // not publish a narrower case over that deletion.
+      return okResult({ outcome: "failed", error: "conflicting_evidence_source_not_active" });
+    }
+    const fragmentId = await ensureEvidenceFragment(ctx.db, source.companyId, {
+      sourceId: evidence.sourceId,
+      fragmentId: evidence.fragmentId ?? null,
+      startOffset: evidence.startOffset ?? null,
+      endOffset: evidence.endOffset ?? null,
+    });
+    if (fragmentId !== null) {
+      fragmentIds.push(fragmentId);
+    }
+  }
+  if (fragmentIds.length === 0) {
+    return okResult({ outcome: "failed", error: "conflicting_evidence_unresolvable" });
+  }
+  const result = await dispatchMemoryCommand(
+    ctx,
+    {
+      operation: "memory.raiseClarification",
+      input: {
+        question: args.question,
+        conflictingEvidence: fragmentIds,
+        scope:
+          args.scopeKind === "company"
+            ? { _tag: "company" }
+            : { _tag: "project", projectId: args.projectId },
+      },
+      expectedRevisions: [],
+    },
+    session,
+  );
+  if (result._tag !== "ok") {
+    return okResult({ outcome: "failed", error: result.error.code });
+  }
+  const receipt = result.value as { clarificationId: Id<"clarifications"> };
+  return okResult({ outcome: "raised", clarificationId: receipt.clarificationId });
+}
 
 export const executeClarification = internalMutation({
   args: {
@@ -115,52 +253,7 @@ export const executeClarification = internalMutation({
       }),
     ),
   },
-  handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const source = await ctx.db.get(args.questionSourceId);
-    if (source === null) {
-      return okResult({ outcome: "failed", error: "question_source_missing" });
-    }
-    const session = await authorSessionId(ctx.db, source.authorUserId);
-    if (session === null) {
-      return okResult({ outcome: "failed", error: "actor_session_unavailable" });
-    }
-    const fragmentIds: Id<"sourceFragments">[] = [];
-    for (const evidence of args.evidence) {
-      const fragmentId = await ensureEvidenceFragment(ctx.db, source.companyId, {
-        sourceId: evidence.sourceId,
-        fragmentId: evidence.fragmentId ?? null,
-        startOffset: evidence.startOffset ?? null,
-        endOffset: evidence.endOffset ?? null,
-      });
-      if (fragmentId !== null) {
-        fragmentIds.push(fragmentId);
-      }
-    }
-    if (fragmentIds.length === 0) {
-      return okResult({ outcome: "failed", error: "conflicting_evidence_unresolvable" });
-    }
-    const result = await dispatchMemoryCommand(
-      ctx,
-      {
-        operation: "memory.raiseClarification",
-        input: {
-          question: args.question,
-          conflictingEvidence: fragmentIds,
-          scope:
-            args.scopeKind === "company"
-              ? { _tag: "company" }
-              : { _tag: "project", projectId: args.projectId },
-        },
-        expectedRevisions: [],
-      },
-      session,
-    );
-    if (result._tag !== "ok") {
-      return okResult({ outcome: "failed", error: result.error.code });
-    }
-    const receipt = result.value as { clarificationId: Id<"clarifications"> };
-    return okResult({ outcome: "raised", clarificationId: receipt.clarificationId });
-  },
+  handler: (ctx, args) => executeClarificationCore(ctx, args),
 });
 
 /**
@@ -292,14 +385,13 @@ export async function executeResolveClarificationCore(
   ctx: MutationCtx,
   args: ExecuteResolveClarificationInput,
 ): Promise<ResultEnvelope> {
-  const source = await ctx.db.get(args.questionSourceId);
-  if (source === null) {
-    return okResult({ outcome: "failed", error: "question_source_missing" });
+  const entry = await requireQuestionSourceSession(ctx.db, args.questionSourceId);
+  if (!entry.ok) {
+    // R2 (issue #127): the accepted lifecycle, not row existence — a late
+    // resolve over a tombstoned question world refuses, publishes nothing.
+    return okResult({ outcome: "failed", error: entry.error });
   }
-  const session = await authorSessionId(ctx.db, source.authorUserId);
-  if (session === null) {
-    return okResult({ outcome: "failed", error: "actor_session_unavailable" });
-  }
+  const { source, session } = entry;
   const evidence: EvidenceWire[] = (args.evidence ?? []).map((reference) => ({
     sourceId: reference.sourceId,
     fragmentId: reference.fragmentId ?? null,
@@ -365,14 +457,13 @@ export const executeWorkChange = internalMutation({
     input: v.any(),
   },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const source = await ctx.db.get(args.questionSourceId);
-    if (source === null) {
-      return okResult({ outcome: "failed", error: "question_source_missing" });
+    const entry = await requireQuestionSourceSession(ctx.db, args.questionSourceId);
+    if (!entry.ok) {
+      // R2 (issue #127): one agent-entry rule — every checked execution
+      // refuses a tombstoned question source (existence alone lies).
+      return okResult({ outcome: "failed", error: entry.error });
     }
-    const session = await authorSessionId(ctx.db, source.authorUserId);
-    if (session === null) {
-      return okResult({ outcome: "failed", error: "actor_session_unavailable" });
-    }
+    const { source, session } = entry;
     const context = await resolveRequestContext(
       ctx.db,
       bridgeIdentity(session, Date.now()),
@@ -423,14 +514,12 @@ export const executeExtensionValidate = internalMutation({
     value: v.any(),
   },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const source = await ctx.db.get(args.questionSourceId);
-    if (source === null) {
-      return okResult({ outcome: "failed", error: "question_source_missing" });
+    const entry = await requireQuestionSourceSession(ctx.db, args.questionSourceId);
+    if (!entry.ok) {
+      // R2 (issue #127): the one agent-entry rule (see executeWorkChange).
+      return okResult({ outcome: "failed", error: entry.error });
     }
-    const session = await authorSessionId(ctx.db, source.authorUserId);
-    if (session === null) {
-      return okResult({ outcome: "failed", error: "actor_session_unavailable" });
-    }
+    const { session } = entry;
     const result = await dispatchMemoryCommand(
       ctx,
       {
@@ -451,6 +540,48 @@ export const executeExtensionValidate = internalMutation({
 // The staleness recheck (in-flight answer/change guard).
 // ---------------------------------------------------------------------------
 
+/** The staleness recheck's input (exported for the deterministic tests). */
+export interface StalenessRecheckInput {
+  readonly questionSourceId: Id<"sources">;
+  readonly loadRevisions: readonly { findingId: Id<"findings">; revision: number }[];
+}
+
+/** The staleness recheck body (exported for the deterministic tests). */
+export async function stalenessRecheckCore(
+  ctx: MutationCtx,
+  args: StalenessRecheckInput,
+): Promise<{ decision: AnswerFreshnessDecision }> {
+  const source = await ctx.db.get(args.questionSourceId);
+  if (source === null) {
+    // The question source vanished mid-run: the honest decision is an
+    // ABORT (never a fabricated refresh shape decideAnswerFreshness
+    // cannot produce). The loop REFUSES the submit, so the answer
+    // never lands over a world whose question no longer exists.
+    return {
+      decision: { decision: "abort", reason: "question_source_missing" },
+    };
+  }
+  if (source.lifecycle !== "active") {
+    // R2 (issue #127): I4 RETAINS a tombstone row, so existence alone
+    // would let a computed answer land over a permanently deleted world.
+    // The accepted lifecycle decides: a tombstone never counts as active.
+    return {
+      decision: { decision: "abort", reason: "question_source_not_active" },
+    };
+  }
+  const current = await currentFindingRevisions(
+    ctx.db,
+    source.companyId,
+    args.loadRevisions,
+  );
+  return {
+    decision: decideAnswerFreshness({
+      loadRevisions: args.loadRevisions,
+      currentRevisions: current,
+    }),
+  };
+}
+
 export const stalenessRecheck = internalMutation({
   args: {
     questionSourceId: v.id("sources"),
@@ -458,27 +589,5 @@ export const stalenessRecheck = internalMutation({
       v.object({ findingId: v.id("findings"), revision: v.float64() }),
     ),
   },
-  handler: async (ctx, args): Promise<{ decision: AnswerFreshnessDecision }> => {
-    const source = await ctx.db.get(args.questionSourceId);
-    if (source === null) {
-      // The question source vanished mid-run: the honest decision is an
-      // ABORT (never a fabricated refresh shape decideAnswerFreshness
-      // cannot produce). The loop REFUSES the submit, so the answer
-      // never lands over a world whose question no longer exists.
-      return {
-        decision: { decision: "abort", reason: "question_source_missing" },
-      };
-    }
-    const current = await currentFindingRevisions(
-      ctx.db,
-      source.companyId,
-      args.loadRevisions,
-    );
-    return {
-      decision: decideAnswerFreshness({
-        loadRevisions: args.loadRevisions,
-        currentRevisions: current,
-      }),
-    };
-  },
+  handler: (ctx, args) => stalenessRecheckCore(ctx, args),
 });
