@@ -12,7 +12,6 @@ flowchart TD
   J3["J3 #62"]
   J4["J4 #63"]
   J5["J5 #64"]
-  R3["R3 #128"]
   R5["R5 #130"]
   I8["I8 #133"]
   B5["B5 #134"]
@@ -31,13 +30,10 @@ flowchart TD
   I11 --> J5
   I8 --> B5
   I8 --> D7
-  R3 --> I9
   D7 --> I9
   R5 --> I9
-  R3 --> I10
   D7 --> I10
   I8 --> I11
-  R3 --> J6
   R5 --> J6
   D7 --> J6
   B5 --> J6
@@ -109,7 +105,7 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [E7 #115](https://github.com/wojtekpiskorz/kiero/issues/115) | CLOSED | [C5 #28](https://github.com/wojtekpiskorz/kiero/issues/28), [H3 #51](https://github.com/wojtekpiskorz/kiero/issues/51) | Historical implementation |
 | [R1 #126](https://github.com/wojtekpiskorz/kiero/issues/126) | CLOSED | [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125), [C2 #25](https://github.com/wojtekpiskorz/kiero/issues/25), [E6 #40](https://github.com/wojtekpiskorz/kiero/issues/40), [H1 #49](https://github.com/wojtekpiskorz/kiero/issues/49), [H2 #50](https://github.com/wojtekpiskorz/kiero/issues/50) | Remaining execution |
 | [R2 #127](https://github.com/wojtekpiskorz/kiero/issues/127) | CLOSED | [R1 #126](https://github.com/wojtekpiskorz/kiero/issues/126), [I4 #56](https://github.com/wojtekpiskorz/kiero/issues/56) | Remaining execution |
-| [R3 #128](https://github.com/wojtekpiskorz/kiero/issues/128) | OPEN | [R2 #127](https://github.com/wojtekpiskorz/kiero/issues/127), [F3 #43](https://github.com/wojtekpiskorz/kiero/issues/43), [F4 #44](https://github.com/wojtekpiskorz/kiero/issues/44) | Remaining execution |
+| [R3 #128](https://github.com/wojtekpiskorz/kiero/issues/128) | CLOSED | [R2 #127](https://github.com/wojtekpiskorz/kiero/issues/127), [F3 #43](https://github.com/wojtekpiskorz/kiero/issues/43), [F4 #44](https://github.com/wojtekpiskorz/kiero/issues/44) | Remaining execution |
 | [R4 #129](https://github.com/wojtekpiskorz/kiero/issues/129) | CLOSED | [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125), [E7 #115](https://github.com/wojtekpiskorz/kiero/issues/115) | Remaining execution |
 | [R5 #130](https://github.com/wojtekpiskorz/kiero/issues/130) | OPEN | [R1 #126](https://github.com/wojtekpiskorz/kiero/issues/126), [H3 #51](https://github.com/wojtekpiskorz/kiero/issues/51) | Remaining execution |
 | [R6 #131](https://github.com/wojtekpiskorz/kiero/issues/131) | CLOSED | [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125), [I7 #59](https://github.com/wojtekpiskorz/kiero/issues/59) | Remaining execution |
