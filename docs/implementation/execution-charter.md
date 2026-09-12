@@ -18,7 +18,7 @@ The unstyled UI uses semantic forms, buttons, lists and plain status/error text.
 
 ## Advisory review setup
 
-A0 precedes the three implementation lanes. It installs and proves the Astroix-style thermo-nuclear and unslop workflow before A1, E1 and I1 create their PRs. Review comments are advisory; deterministic required checks remain separate. A0 owns `.github/workflows/ai-review.yml`, vendored review skills and initial Kiero instructions/glossary. It runs without application dependencies. A1 preserves this setup while adding `.github/workflows/checks.yml`, the workspace and the remaining handoff contracts. The reference and activation evidence are specified by A0 in the [issue manifest](issues.json).
+A0 is integrated and proved the Astroix-style thermo-nuclear and unslop workflow before the initial implementation lanes. Review comments are advisory; deterministic required checks remain separate. A0 owns `.github/workflows/ai-review.yml`, vendored review skills and initial Kiero instructions/glossary. It runs without application dependencies. A1 preserved this setup and added `.github/workflows/checks.yml`, the workspace and the remaining handoff contracts. The reference and activation evidence are specified by A0 in the [issue manifest](issues.json).
 
 ## Initial module layout and ownership
 
@@ -57,7 +57,7 @@ Each feature exports through the fixed interface chosen by the foundation. The f
 
 The selected runtime, authorization and durable source publication are proved before their consumers can be declared ready. Fixtures and pure-rule development can proceed independently where the graph allows it. The early real text checkpoint has no artificial dependency on multimodal capture, Calendar, final styling or full-system recovery qualification.
 
-Every proof records exact revision, environment, versions, expected/observed outcomes and a repeatable command or physical-device procedure. Integration failures are not solved by weakening product promises. P01–P12 remain NOT RUN until real evidence changes their status. Tests that mirror helpers without crossing the real module interface cannot discharge an integration proof.
+Every proof records exact revision, environment, versions, expected/observed outcomes and a repeatable command or physical-device procedure. Integration failures are not solved by weakening product promises. The current [proof register](proof-ownership.md) distinguishes partial historical observations from current case-level qualification. Mandatory missing evidence keeps its owning issue open. Tests that mirror helpers without crossing the real module interface cannot discharge an integration proof.
 
 The full-core join combines all capture modes, search, typed extension/task tools and source-backed answers. Later qualification checks providers, physical devices, Calendar beyond one week, notifications, deleted data, exports, recovery and releases. The [readiness contract](../mvp/alpha-readiness.md) defines AI thresholds and tester entry. Core qualification reports any UX integration still outstanding and does not start the live alpha automatically.
 
@@ -68,3 +68,12 @@ The UX/UI team receives stable operation names, states, permission rules, source
 ## Scope left for other work
 
 Final visual design and its implementation, public billing, Telegram, live voice conversations, full offline operation, marketing publication, accounting, profitability ranking and additional end-user tiers remain outside this core charter. The ordinary v1 user belongs to one company; the model supports future multiple memberships. GM is explicit and audited. Formal privacy work deferred under Q195 remains deferred.
+
+
+## Reconciled execution after the 2026-09-12 review
+
+The [inventory](inventory.md) preserves all 48 integrated historical implementation tasks and adds bounded repairs and real-service proof owners. The [graph](dependency-graph.md) and native issue dependencies order that work. Historical bootstrap language above describes accepted module origins; it is not the current ready frontier.
+
+Follow the later [owner Convex policy](https://github.com/wojtekpiskorz/kiero/issues/15#issuecomment-5618841487). All proof refs remain under existing `kiero-dev-core`; creating projects to escape quotas is prohibited. I8 must prove staging separation and I6 must prove quarantine separation within that constraint. When unavailable, record the specific owner decision required and keep the dependent proof blocked. Never mutate another lane's deployment or silently weaken isolation.
+
+A required live proof may outlast its code PR. Use a non-closing PR reference until every acceptance case and required real-service/device result is attached. Final evidence records current revision/configuration and rerun impact. See [proof ownership](proof-ownership.md) for the result schema and exact J3 threshold. J5 requires the complete accepted core; it cannot convert an unfinished operation into a design-track item.
