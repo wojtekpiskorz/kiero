@@ -1,38 +1,36 @@
 # Kiero core implementation package
 
-Build the complete accepted core behind an unstyled, functional PWA. The owner wants real data and real processing early, while full UX/UI is developed separately from the [UX/UI package](../handoffs/ux-ui/README.md). This package is an execution plan; no application implementation or provider proof has run during chartering.
+The application is implemented across 48 integrated historical issues. The 2026-09-12 review identified repairs and missing real-service qualification. The map now tracks 67 native children: 52 prior implementation issues, 14 new repair/proof issues and the M0 reconciliation task. Eighteen implementation and qualification issues remain after M0.
 
-Live tracker: [Implementation map: Kiero core MVP and barebones PWA](https://github.com/wojtekpiskorz/kiero/issues/15). Its 50 native sub-issues contain the full implementation scopes; native blockers determine which work can start.
+The target remains a complete accepted core behind an unstyled Polish PWA. Final design integration, production activation and the four-week live alpha remain separate work.
 
-Read in this order:
+Start with the [live implementation map](https://github.com/wojtekpiskorz/kiero/issues/15) and [coordinator prompt](coordinator-start-prompt.md). Before selecting work, run `rtk proxy node docs/implementation/audit-map.mjs --remote` from a clean, current checkout. GitHub native blockers are readiness authority; this committed inventory is a dated cache.
 
-1. [Execution charter](execution-charter.md) for scope, module ownership, parallel work and completion.
-2. [Dependency graph](dependency-graph.md) for the initial lanes, early checkpoint and final joins. Re-query native GitHub dependencies before claiming work; the generated graph is a snapshot.
-3. [Issue manifest](issues.json) for complete ticket content and direct prerequisites. The live linked issue is the execution record.
-4. [Architecture](../mvp/architecture-design.md), [proof matrix](../mvp/architecture-proof-matrix.md), [alpha readiness](../mvp/alpha-readiness.md) and the resolutions named by the selected ticket.
+## Read for the selected task
 
-[UX coverage](ux-coverage.md) maps all 61 design-inventory entries to core owners. [Proof ownership](proof-ownership.md) maps every P01–P12 proof to its implementation and qualification tickets.
+- [Inventory](inventory.md): all issues, integrated PRs, evidence limits and remaining owners.
+- [Dependency graph](dependency-graph.md): repair order, parallel branches and every direct dependency.
+- [Execution charter](execution-charter.md): accepted scope, ownership and completion conditions.
+- [Proof ownership](proof-ownership.md): P01-P12 evidence boundaries, thresholds and responsible issues.
+- [UX coverage](ux-coverage.md): all 61 accepted design-inventory operations and follow-up owners.
+- [Full manifest](issues.json): canonical cached issue bodies, hashes, identities and native edges.
+- [Review record](../evidence/map-review/2026-09-12.md): verified baseline, defects and test results.
+- [Architecture proof cases](../mvp/architecture-proof-matrix.md), [alpha readiness](../mvp/alpha-readiness.md), [contracts](contracts/README.md) and [glossary](../../CONTEXT.md): accepted requirements.
 
-## Start the whole map with a coordinator
+## Next implementation work
 
-Use the [coordinator starter prompt](coordinator-start-prompt.md) for a goal covering the complete map. The coordinator delegates one issue per implementation worker, fills available capacity with independent ready issues, and owns claims, worktrees, review, commits, PRs, merges, closure and recovery checkpoints. The one-issue rule applies to each assignment; the coordinator continues across the entire map.
+After M0 closes, R1, R4, R6 and R7 have no open native blockers. Claim only an unassigned issue after a fresh dependency and ownership audit. Root order is a scheduling opportunity, not a promise of available accounts or cloud capacity.
 
-## Start a standalone single-issue task
+R1-R3 repair clarification provenance, purge and push delivery. R4 protects source reassignment against stale editors. R5 fixes old-source links. R6 replaces the broken/placeholder release path with executable tooling. R7 removes the known Calendar test timing flake while preserving timeout assertions.
 
-Use this mode for an independent task outside the whole-map coordinator. Delegated workers use the coordinator's bounded assignment instead; the coordinator retains their Git and GitHub lifecycle.
+I8 establishes an isolated real qualification environment after R6. B5, D7 and I11 then prove actual identity, media and alert delivery. I9 proves export, I10 proves complete scheduled backups, I6 proves quarantined restore, and J6 rechecks the joined repaired application. J3 and J4 qualify AI and physical devices/Google. J5 audits complete core delivery.
 
-> Implement one currently unassigned, open, unblocked issue from the Kiero core implementation map. First read its complete body, the execution charter, its linked contracts and the live checkout. Claim only that issue, create an issue-specific `codex/` worktree branch, and preserve unrelated changes. Deliver the issue's real behavior through its declared module interface and barebones Polish controls where specified. Use the selected Convex/Effect/Cloudflare/OpenRouter architecture and prove the stated integration. Record failures honestly and keep secrets server-side. Before editing a shared contract or another issue's paths, resolve ownership and add the necessary prerequisite rather than silently widening the task. Open one reviewable PR with focused evidence. Independent ready issues may run in parallel; their merges and shared generated files are coordinated. Reconcile live blockers after integration. Do not implement final styling or substitute prototype simulations for real behavior.
+## Resources and unresolved external work
 
-## PR review before implementation
+The owner's later [Convex instruction](https://github.com/wojtekpiskorz/kiero/issues/15#issuecomment-5618841487) keeps proof refs under the existing `kiero-dev-core` project and forbids creating projects to escape quota. I8 must prove equivalent staging isolation within that constraint; I6 must prove quarantine isolation. If impossible, keep the owning issue OPEN/BLOCKED with the exact owner decision required.
 
-A0 installs the Astroix-style advisory thermo-nuclear and unslop review. It is the first ready issue; A1, E1 and I1 depend on it and can run concurrently once it is integrated and proved. The review uses the repository Actions secret `ZAI_API_KEY`, separately from the application OpenRouter key. Both names were present on GitHub when checked on 2026-09-09. If the secret must be added again, use `gh secret set ZAI_API_KEY --repo wojtekpiskorz/kiero` directly for the interactive prompt; `rtk proxy` did not display that prompt in this environment. The issue specifies the reference files and live PR evidence required for activation.
+Real credentials, two Google accounts, tester handsets plus iPhone/Android coverage, configured alert destinations and more than seven elapsed days are explicit task prerequisites. Credential presence is not runtime proof. Provision only within the task's authorized scope and use server-side secret stores. The implementation sequence cannot compress the required Google observation interval.
 
-## First useful checkpoint
+## Completion
 
-The text lane reaches real sign-in and company access, durable source acceptance, OpenRouter analysis, typed memory publication, project/source views and correction before waiting for audio, photo, Calendar or final design. The [dependency graph](dependency-graph.md) identifies its join. Later tickets add all remaining core requirements and then qualify the assembled system.
-
-## Existing local capabilities
-
-At chartering, `/Users/woji/Dev/Kiero/.env` contained an `OPENROUTER_API_KEY` assignment and GitHub exposed a repository secret with that name. Only presence was inspected. Wrangler was on PATH; a global `convex` executable was not. The owner reports Convex CLI access. The environment-preparation ticket must resolve the actual pinned CLI invocation and verify project/account access without printing credentials.
-
-Do not copy `.env` into commits, issue bodies, fixtures, browser bundles or logs. Worktree setup must use an explicit ignored development secret path or environment injection; it must not assume the root's untracked file follows a new worktree. The GitHub secret does not automatically configure Convex or Workers. Provision each runtime's server-side binding through the relevant ticket and keep development, staging and production separated.
+Each implementation assignment owns one issue, one issue-specific `codex/` worktree branch and one PR. The coordinator owns Git lifecycle and shared integration. Required evidence belongs in the issue and linked artifacts before closure. A merged PR with outstanding mandatory proof leaves its issue open. Failed qualification creates a concrete prerequisite and native blocker; it does not reduce an accepted threshold.

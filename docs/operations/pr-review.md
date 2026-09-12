@@ -19,7 +19,7 @@ The reviewer reads `.agents/skills/thermo-nuclear-code-quality-review/SKILL.md`,
 
 - Engineering choices go through the thermo-nuclear standard: abstraction quality, spaghetti growth, missed code-judo simplifications. Its Output Expectations and Approval Bar govern findings.
 - Prose goes through unslop: any prose the PR adds (docs, comments, titles) and the reviewer's own output. Polish product text is judged against `CONTEXT.md`, not against the English AI-tell list. Polish is the product language, not slop.
-- Deterministic findings are not the reviewer's job. This pre-application repository has no deterministic checks yet; A1 will add `checks.yml` and own mechanical findings from then on.
+- Deterministic findings are not the reviewer's job. A1 added `checks.yml`; it owns mechanical findings on the pinned workspace.
 
 Rounds are stateless. Each run recovers prior rounds from the PR thread (`gh pr view --json body,comments`; the default human-readable view also fetches the status-check rollup, which the job token cannot read, so use the JSON form): findings whose fixes landed are verified where the fix actually lives (current diff, branch, or `origin/main`) and dropped; findings explicitly rejected or overruled on the thread stay closed. The full diff is re-inspected every round regardless.
 

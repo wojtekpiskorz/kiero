@@ -2,13 +2,13 @@
 
 Prepared on 2026-09-08 for [Grilling: architektura, stack i hosting MVP](https://github.com/wojtekpiskorz/kiero/issues/11). This consolidates evidence already required by the accepted contracts. It is a planning artifact, not a completed verification report or an implementation ticket list. Q209–Q210 service/runtime choices are accepted. Q211's revised Free-first plan and narrower native-platform-log coverage are accepted.
 
-Every row is **NOT RUN**. The repository currently contains planning documents, with no installed application or lockfile. Upstream documentation establishes candidate capability only. A failed proof must produce a concrete repair or a disclosed contract change; it cannot silently weaken an accepted behavior.
+These are the accepted proof requirements, preserved from chartering. Application code and partial evidence now exist. Current ownership, evidence limits and results are tracked in the [implementation proof register](../implementation/proof-ownership.md); this requirements table is not a current all-NOT-RUN verdict. Upstream documentation alone establishes capability, not application proof. A failed proof must produce a concrete repair or a disclosed contract change; it cannot silently weaken an accepted behavior.
 
 ## Evidence and sequencing
 
 Record the exact code revision, published package versions, provider route, environment, input fixtures, observed outcome and cost for each proof. Keep independent expected results and a repeatable command or device procedure. Use synthetic or deliberately approved samples. Record temporary service failures separately from incorrect application behavior.
 
-Prove the typed integration, authentication and durable source-publication boundaries first. Media/AI, external delivery and recovery probes can then exercise those foundations. Release and device probes must use the integrated candidate. This dependency order does not create multiple active implementation tickets.
+Prove the typed integration, authentication and durable source-publication boundaries first. Media/AI, external delivery and recovery probes can then exercise those foundations. Release and device probes must use the integrated candidate. Independent ready issues may run in parallel under the current execution charter and live native blockers.
 
 | ID | Boundary | Evidence required before declaring it ready |
 | --- | --- | --- |
