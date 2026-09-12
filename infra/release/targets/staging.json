@@ -28,7 +28,7 @@
       "transport": {
         "kind": "convex-deploy"
       },
-      "requiredConfig": ["CONVEX_DEPLOYMENT"]
+      "requiredConfig": ["CONVEX_DEPLOYMENT", "CONVEX_DEPLOY_KEY"]
     },
     {
       "id": "gateway",
