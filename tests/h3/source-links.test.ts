@@ -28,6 +28,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import ts from "typescript";
 import {
   FRAGMENT_PARAM,
   SOURCE_ROUTE_PATH,
@@ -222,7 +223,10 @@ describe("the dossier's hooks never sit below an early return", () => {
   // and React unmounted the route into the error boundary. renderToString
   // tests cannot see it (one pass, one state); this guard can: in the
   // feature file, every hook call must precede the first return of its
-  // function.
+  // function. Parsed through the TypeScript AST (the pinned compiler is
+  // already a devDependency): regex literals, generics, const-arrow
+  // components and nested declarations are handled by construction, which
+  // two rounds of hand-rolled scanning each got wrong in a new way.
   it("calls every hook before the first return of every function in the feature file", () => {
     const file = join(
       import.meta.dirname,
@@ -230,113 +234,63 @@ describe("the dossier's hooks never sit below an early return", () => {
       "..",
       "apps/web/src/features/source-detail/SourceDetailFeature.ts",
     );
-    // Strip comments and string BODIES first, so braces and arrows inside
-    // them cannot skew the scan.
-    const stripped = readFileSync(file, "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\/\/[^\n]*/g, "")
-      .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
-      .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
-      .replace(/`(?:[^`\\]|\\.)*`/g, "``");
-    const lines = stripped.split("\n");
+    const sourceFile = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
     const offenders: string[] = [];
-    let depth = 0;
-    // Function frames (component bodies, callbacks) vs plain blocks, as an
-    // explicit stack walked CHAR BY CHAR in source order: a `return` only
-    // exits the component when no callback frame is open above the
-    // component's own frame. A `{` opens a function frame exactly when it
-    // directly follows `=>` (an arrow body) or when it closes the parameter
-    // list of a `function` signature (paren depth back to zero); everything
-    // else — destructured params, type literals, object arguments, if/else
-    // blocks — is a block. Interleaving opens and closes matters: batched
-    // processing once let a single-line signature's closers eat its own
-    // body brace (advisory round 1, finding 1).
-    const frames: ("fn" | "block")[] = [];
-    const fnDepthOf = () => frames.filter((frame) => frame === "fn").length;
-    let signatureParens: number | null = null;
-    let current: {
-      name: string;
-      firstReturn: number | null;
-      hooks: number[];
-      openedBody: boolean;
-    } | null = null;
-    lines.forEach((line, index) => {
-      const declaration = /^(?:export )?function (\w+)\(/.exec(line);
-      if (declaration !== null && depth === 0) {
-        current = { name: declaration[1]!, firstReturn: null, hooks: [], openedBody: false };
-      }
-      const fnDepthAtLineStart = fnDepthOf();
-      if (current !== null) {
-        if (fnDepthAtLineStart >= 1) {
-          current.openedBody = true;
+    const isHookCall = (node: ts.CallExpression) =>
+      ts.isIdentifier(node.expression) && /^use[A-Z]/.test(node.expression.text);
+    const lineOf = (position: number) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
+    // Check EVERY function-like node against its own body: a hook call or
+    // a return statement belongs to it only while no other function-like
+    // node is open in between (statement nesting is irrelevant).
+    const checkFunction = (name: string, body: ts.ConciseBody): void => {
+      let firstReturn: number | null = null;
+      const hooks: number[] = [];
+      const visit = (node: ts.Node): void => {
+        if (ts.isReturnStatement(node) && firstReturn === null) {
+          firstReturn = lineOf(node.getStart(sourceFile));
         }
-        if (/\buse[A-Z]\w*\(/.test(line) && fnDepthAtLineStart === 1) {
-          current.hooks.push(index);
+        if (ts.isCallExpression(node) && isHookCall(node)) {
+          hooks.push(lineOf(node.getStart(sourceFile)));
         }
-        if (current.firstReturn === null && /^\s*return\b/.test(line) && fnDepthAtLineStart === 1) {
-          current.firstReturn = index;
+        node.forEachChild((child) => {
+          if (ts.isFunctionDeclaration(child) || ts.isFunctionExpression(child) || ts.isArrowFunction(child)) {
+            // nested function-like nodes get their own check instead
+            return;
+          }
+          visit(child);
+        });
+      };
+      visit(body);
+      for (const hook of hooks) {
+        if (firstReturn !== null && hook > firstReturn) {
+          offenders.push(`${name}: hook at line ${hook} after the first component return at line ${firstReturn}`);
         }
       }
-      let arrowPending = false;
-      for (let position = 0; position < line.length; position += 1) {
-        const character = line[position]!;
-        if (character === "=" && line[position + 1] === ">") {
-          arrowPending = true;
-          position += 1;
-          continue;
-        }
-        const startsKeyword =
-          line.startsWith("function", position) &&
-          (position === 0 || !/[A-Za-z0-9_]/.test(line[position - 1]!)) &&
-          !/[A-Za-z0-9_]/.test(line[position + 8] ?? "");
-        if (character === "f" && signatureParens === null && startsKeyword) {
-          signatureParens = 0;
-          position += 7;
-          continue;
-        }
-        if (signatureParens !== null) {
-          if (character === "(") {
-            signatureParens += 1;
-            arrowPending = false;
-            continue;
+    };
+    const nameOf = (node: ts.Node): string => {
+      const identifier = node.getChildren(sourceFile).find(ts.isIdentifier);
+      return identifier === undefined ? "<anonymous>" : identifier.text;
+    };
+    const visitModule = (node: ts.Node): void => {
+      if (ts.isFunctionDeclaration(node) && node.body !== undefined) {
+        checkFunction(nameOf(node), node.body);
+      } else if (
+        ts.isVariableStatement(node) &&
+        node.declarationList.declarations.some((declaration) => declaration.initializer !== undefined)
+      ) {
+        for (const declaration of node.declarationList.declarations) {
+          const initializer = declaration.initializer;
+          if (
+            initializer !== undefined &&
+            (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))
+          ) {
+            checkFunction(ts.isIdentifier(declaration.name) ? declaration.name.text : "<anonymous>", initializer.body);
           }
-          if (character === ")") {
-            signatureParens -= 1;
-            arrowPending = false;
-            continue;
-          }
-          if (character === "{" && signatureParens === 0) {
-            frames.push("fn");
-            depth += 1;
-            signatureParens = null;
-            continue;
-          }
-        }
-        if (character === "{") {
-          frames.push(arrowPending ? "fn" : "block");
-          depth += 1;
-        } else if (character === "}") {
-          frames.pop();
-          depth -= 1;
-        }
-        if (!/\s/.test(character)) {
-          arrowPending = false;
         }
       }
-      if (current !== null && depth === 0) {
-        for (const hook of current.hooks) {
-          if (current.firstReturn !== null && hook > current.firstReturn) {
-            offenders.push(
-              `${current.name}: hook at line ${hook + 1} after the first component return at line ${current.firstReturn + 1}`,
-            );
-          }
-        }
-        if (!current.openedBody) {
-          offenders.push(`${current.name}: declaration never opened a function frame (guard coverage drifted)`);
-        }
-        current = null;
-      }
-    });
+      node.forEachChild(visitModule);
+    };
+    visitModule(sourceFile);
     expect(offenders).toEqual([]);
   });
 });

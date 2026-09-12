@@ -112,3 +112,30 @@ export async function openAuthenticatedBrowser({
   const page = await context.newPage();
   return { browser, context, page };
 }
+
+/**
+ * The ONE bounded model-stage restart of a FAILED interpretation run
+ * (the J1/E3 sanctioned recovery live-proof.mjs established): resolves
+ * the run and its workflow checkpoint, restarts the model stage exactly
+ * once, and reports the outcome code. The caller owns the polling and
+ * the exactly-once policy around it; never retried into fake success.
+ */
+export async function boundedModelRestart(anonClient, { sourceId, sessionId }) {
+  const value = (result) => (result?._tag === "ok" ? result.value : null);
+  const errCode = (result) => (result?._tag === "error" ? result.error.code : "ok");
+  const latest = await anonClient.action("processing/text/probe:probeLatestRunForSource", { sourceId });
+  const runId = value(latest)?.runId ?? null;
+  const state = runId === null
+    ? null
+    : value(await anonClient.action("processing/text/probe:probeAnalysisState", { runId, sessionId }));
+  const checkpoint = state === null ? {} : JSON.parse(state.run.checkpoint ?? "{}");
+  if (typeof checkpoint.workflowId !== "string") {
+    return { restarted: false, reason: "no workflow checkpoint on the run" };
+  }
+  const restarted = await anonClient.action("processing/text/probe:probeRestartAnalysis", {
+    workflowId: checkpoint.workflowId,
+    from: "model",
+    runId,
+  });
+  return { restarted: restarted?._tag === "ok", code: errCode(restarted) };
+}

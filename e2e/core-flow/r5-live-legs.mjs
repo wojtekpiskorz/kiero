@@ -51,6 +51,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { chromium } from "playwright-core";
 import { homedir } from "node:os";
 import {
+  boundedModelRestart,
   envelope,
   fixtureCodeOf,
   openAuthenticatedBrowser,
@@ -233,22 +234,10 @@ async function waitForTerminal(maxAttempts = 40) {
 let oldState = await waitForTerminal();
 if (oldState === "failed") {
   note("old source interpretation FAILED (honest window); one bounded model-stage restart");
-  const latest = await anonConvex().action("processing/text/probe:probeLatestRunForSource", { sourceId: OLD_ID });
-  const runId = value(latest)?.runId ?? null;
-  const state = runId === null
-    ? null
-    : value(await anonConvex().action("processing/text/probe:probeAnalysisState", { runId, sessionId: boss.sessionId }));
-  const checkpoint = state === null ? {} : JSON.parse(state.run.checkpoint ?? "{}");
-  if (typeof checkpoint.workflowId === "string") {
-    const restarted = await anonConvex().action("processing/text/probe:probeRestartAnalysis", {
-      workflowId: checkpoint.workflowId,
-      from: "model",
-      runId,
-    });
-    note(`restart: ${errCode(restarted)}`);
+  const outcome = await boundedModelRestart(anonConvex(), { sourceId: OLD_ID, sessionId: boss.sessionId });
+  note(`restart: ${JSON.stringify(outcome)}`);
+  if (outcome.restarted) {
     oldState = await waitForTerminal();
-  } else {
-    note("restart unavailable: no workflow checkpoint on the run");
   }
 }
 let fragmentId = null;
