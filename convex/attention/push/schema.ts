@@ -29,7 +29,13 @@ export const pushTables = {
    * `pending` rows await or repeat a transport leg; `delivered` and
    * `failed` are terminal; `unknown` is the echo/G3 uncertain state
    * (timeout-after-send): it blocks blind re-sends because the device
-   * may already have shown the notification.
+   * may already have shown the notification. R3 (issue #128) adds the
+   * terminal `suppressed` state: permanent deletion (and the prepare's
+   * own lifecycle preflight) terminally suppresses affected UNSENT work
+   * and replaces its stored payload with non-content data. Only `pending`
+   * rows are ever re-driven, so adding the literal can reactivate
+   * nothing: no migration moves row states, and the prepare, the
+   * completion and the stale-pending sweep all key on `pending` alone.
    */
   pushDeliveries: defineTable({
     intentId: shared.notificationIntentId,
@@ -41,6 +47,7 @@ export const pushTables = {
       v.literal("delivered"),
       v.literal("failed"),
       v.literal("unknown"),
+      v.literal("suppressed"),
     ),
     /** Bounded transport attempts taken so far. */
     attempts: shared.counter,
@@ -52,7 +59,11 @@ export const pushTables = {
     finishedAtMs: v.optional(shared.tsMs),
   })
     .index("by_intent_subscription", ["intentId", "subscriptionId"])
-    .index("by_state_updated", ["state", "updatedAtMs"]),
+    .index("by_state_updated", ["state", "updatedAtMs"])
+    // R3 (issue #128): the deletion purge's affected-work scan rides the
+    // company prefix instead of the global state index, keeping the purge
+    // transaction's reads bounded to one firm.
+    .index("by_company_state", ["companyId", "state"]),
 
   /**
    * PROOF-ONLY fake push service devices (F3, the G3 calendarProofEvents

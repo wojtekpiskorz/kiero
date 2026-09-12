@@ -16,11 +16,19 @@
  *   solution demands); it also re-reads the preview material and the
  *   hide-preview preference at that same instant, so the payload can
  *   never carry content the recipient may no longer see.
+ * - R3 (issue #128): the stored deliveryJson decodes through the runtime
+ *   union in ./model.ts (malformed and unsupported summaries refuse
+ *   before any delivery row exists), the three typed adapters re-read
+ *   CURRENT lifecycle state (R2's shared clarification content rule
+ *   included), and every retry re-composes the payload instead of
+ *   replaying the stored one. When no live content remains, the pending
+ *   rows terminally suppress and no fetch leaves.
  * - the idempotency key is the (intent, subscription) pair: prepare is a
  *   no-op for devices that already have a delivery row, and only `pending`
  *   rows are ever re-driven, so concurrent retries collapse (one
  *   notification per device) and uncertain outcomes (timeout-after-send)
- *   are never blindly repeated.
+ *   are never blindly repeated; terminally suppressed rows (deletion)
+ *   never re-enter retry either.
  * - terminal 404/410 provider answers revoke the subscription inside the
  *   completing transaction (the "subscriptions expire" problem).
  */
@@ -33,14 +41,19 @@ import {
   type ResultEnvelope,
 } from "@kiero/contracts";
 import { forbiddenError, notFoundError, validationError, type RequestContext } from "@kiero/runtime";
+import { isClosedTaskState } from "@kiero/domain";
 import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import type { Doc, Id } from "../../_generated/dataModel";
 import { preferenceWriteOf } from "../preferences/operations";
+import { clarificationContentRuleOf } from "../../memory/findings/references";
 import { isBase64Url, base64UrlDecode, type PushLegReport } from "./protocol";
 import {
   composePushPayload,
+  decodeDeliverySummary,
+  payloadKindOf,
   settleLegOutcome,
-  type DeliveredSummary,
+  suppressedPayloadJson,
+  type DecodedSummary,
   type PushNotificationPayload,
 } from "./model";
 
@@ -272,13 +285,64 @@ async function activeSubscriptionsOf(
   return enabled;
 }
 
-/** Reads one summary's live preview material (re-read at delivery time). */
+/**
+ * Reads one summary's live preview material (re-read at delivery time).
+ * The three typed adapters (R3):
+ *
+ * - task reminders (the narrow F4 adapter): re-read the CURRENT task rows
+ *   of the collapsed batch; completed, cancelled, deleted and cross-company
+ *   tasks suppress (ids are routing hints, never access);
+ * - source entries: only ACTIVE sources preview (F2's own delivery rule,
+ *   rechecked here so the race between F2's sweep and the transport cannot
+ *   notify about a withdrawn or purged entry);
+ * - clarifications: R2's shared content rule (`clarificationContentRuleOf`)
+ *   decides - a redacted open case left every actionable list, so it never
+ *   previews, and possibly deleted-derived text never leaves.
+ *
+ * Returns null when NO live content remains: the work is invalid and the
+ * prepare denies before any leg exists (no fetch leaves).
+ */
 async function payloadInputsOf(
   tx: MutationCtx,
   companyId: Id<"companies">,
   userId: Id<"users">,
-  summary: DeliveredSummary,
-): Promise<PushNotificationPayload> {
+  summary: DecodedSummary,
+): Promise<PushNotificationPayload | null> {
+  const preferences = await tx.db
+    .query("notificationPreferences")
+    .withIndex("by_company_user", (q) =>
+      q.eq("companyId", companyId).eq("userId", userId),
+    )
+    .first();
+  const hidePreview = preferenceWriteOf(preferences ?? null).hidePreviewContent;
+
+  if (summary.semanticKind === "task_reminder") {
+    const tasks = [];
+    for (const taskIdValue of summary.taskIds) {
+      const taskId = tx.db.normalizeId("tasks", taskIdValue);
+      const task = taskId === null ? null : await tx.db.get(taskId);
+      if (task === null || task.companyId !== companyId) {
+        continue;
+      }
+      tasks.push({
+        taskId: task._id,
+        title: task.title,
+        stillOpen: !isClosedTaskState(task.state),
+      });
+    }
+    if (!tasks.some((task) => task.stillOpen)) {
+      return null;
+    }
+    return composePushPayload({
+      summary,
+      scope: { kind: "company", projectNames: [] },
+      sources: [],
+      clarifications: [],
+      tasks,
+      hidePreview,
+    });
+  }
+
   const projectNames: string[] = [];
   for (const projectIdValue of summary.scope.projectIds) {
     const projectId = tx.db.normalizeId("projects", projectIdValue);
@@ -295,7 +359,7 @@ async function payloadInputsOf(
     readonly photoCount: number;
     readonly stillActive: boolean;
   }[] = [];
-  for (const sourceIdValue of summary.sourceIds ?? []) {
+  for (const sourceIdValue of summary.sourceIds) {
     const sourceId = tx.db.normalizeId("sources", sourceIdValue);
     const source = sourceId === null ? null : await tx.db.get(sourceId);
     if (source === null || source.companyId !== companyId) {
@@ -316,36 +380,88 @@ async function payloadInputsOf(
     });
   }
   const clarifications = [];
-  for (const clarificationIdValue of summary.clarificationIds ?? []) {
-    const clarificationId = tx.db.normalizeId("clarifications", clarificationIdValue);
-    const clarification = clarificationId === null ? null : await tx.db.get(clarificationId);
+  for (const clarificationIdValue of summary.clarificationIds) {
+    const clarificationId = tx.db.normalizeId(
+      "clarifications",
+      clarificationIdValue,
+    );
+    const clarification =
+      clarificationId === null ? null : await tx.db.get(clarificationId);
     if (clarification === null || clarification.companyId !== companyId) {
       continue;
     }
+    // R2's shared lifecycle rule: an open case whose question possibly
+    // derived from permanently deleted content is redacted and left every
+    // actionable list, so it must not preview either.
+    const rule = await clarificationContentRuleOf(tx.db, clarification);
     clarifications.push({
       clarificationId: clarification._id,
       question: clarification.question,
-      stillOpen: clarification.state === "open",
+      stillOpen: clarification.state === "open" && !rule.questionRedacted,
     });
   }
-  const preferences = await tx.db
-    .query("notificationPreferences")
-    .withIndex("by_company_user", (q) => q.eq("companyId", companyId).eq("userId", userId))
-    .first();
+  const liveContent =
+    summary.semanticKind === "clarification"
+      ? clarifications.some((entry) => entry.stillOpen)
+      : sources.some((source) => source.stillActive);
+  if (!liveContent) {
+    return null;
+  }
   return composePushPayload({
     summary,
     scope: { kind: summary.scope.kind, projectNames },
     sources,
     clarifications,
-    hidePreview: preferenceWriteOf(preferences ?? null).hidePreviewContent,
+    hidePreview,
   });
+}
+
+/**
+ * Terminally suppresses every still-pending per-device row of one intent
+ * (R3): the work is invalid (its content died), so no later sweep or
+ * replayed event may transport the stored payload. The stored payload is
+ * replaced with non-content data; delivered/failed/unknown rows keep
+ * their settled truth.
+ */
+export async function suppressPendingDeliveriesOfIntent(
+  tx: MutationCtx,
+  intentId: Id<"notificationIntents">,
+  reason: string,
+): Promise<number> {
+  const nowMs = Date.now();
+  const intent = await tx.db.get(intentId);
+  const kind = payloadKindOf(intent?.semanticKind ?? "source_entry");
+  const rows = await tx.db
+    .query("pushDeliveries")
+    .withIndex("by_intent_subscription", (q) => q.eq("intentId", intentId))
+    .collect();
+  let suppressed = 0;
+  for (const row of rows) {
+    if (row.state !== "pending") {
+      continue;
+    }
+    await tx.db.patch(row._id, {
+      state: "suppressed",
+      lastErrorKind: reason,
+      payloadJson: suppressedPayloadJson(kind),
+      updatedAtMs: nowMs,
+      finishedAtMs: nowMs,
+    });
+    suppressed += 1;
+  }
+  return suppressed;
 }
 
 /**
  * Prepares one delivered intent's per-device legs. Idempotent by
  * (intent, subscription): devices with an existing row are skipped, so
  * concurrent jobs/sweeps collapse onto one row set. The payload is
- * composed ONCE per prepare from live reads and stored on every new row.
+ * composed from live reads on EVERY prepare (R3): a retried pending row
+ * carries the re-composed payload, never the stored snapshot, so routing
+ * identities and preview material are current immediately before each
+ * transport attempt. When the re-read finds no live content left (the
+ * source purged, the case resolved, the task completed), the work is
+ * invalid: the pending rows terminally suppress and no fetch leaves.
  */
 export async function performPreparePushDelivery(
   tx: MutationCtx,
@@ -360,11 +476,17 @@ export async function performPreparePushDelivery(
     // failed intents notify nobody, pending ones are not this lane's.
     return { kind: "denied", reason: `intent_${intent.state}` };
   }
-  const summary = JSON.parse(intent.deliveryJson) as DeliveredSummary;
-  if (summary.semanticKind === "confirmation") {
+  const decoded = decodeDeliverySummary(intent.deliveryJson);
+  if (decoded.kind === "invalid") {
+    // Malformed or unsupported summaries refuse BEFORE any delivery row
+    // exists (R3: the runtime decode replaces the cast after JSON.parse).
+    return { kind: "denied", reason: "summary_invalid" };
+  }
+  if (decoded.kind === "confirmation") {
     // Defensive: the kind exists in the union but F2 never creates it.
     return { kind: "denied", reason: "confirmation_never_pushed" };
   }
+  const summary = decoded.summary;
 
   // Live rights at delivery time (before any leg leaves).
   if (!(await membershipActive(tx, intent.companyId, intent.recipientUserId))) {
@@ -379,12 +501,23 @@ export async function performPreparePushDelivery(
     return { kind: "denied", reason: "no_active_subscription" };
   }
 
-  const payload: PushNotificationPayload = await payloadInputsOf(
+  const payload = await payloadInputsOf(
     tx,
     intent.companyId,
     intent.recipientUserId,
     summary,
   );
+  if (payload === null) {
+    // The content died between delivery and transport: terminally
+    // suppress whatever was already prepared, so the stored preview can
+    // never leave on a retry (the prepare-delete-retry race, R3-P1).
+    await suppressPendingDeliveriesOfIntent(
+      tx,
+      intent._id,
+      "content_no_longer_available",
+    );
+    return { kind: "denied", reason: "content_no_longer_available" };
+  }
   const payloadJson = JSON.stringify(payload);
   const nowMs = Date.now();
   const legs: PreparedLeg[] = [];
@@ -397,17 +530,20 @@ export async function performPreparePushDelivery(
       .first();
     if (existing !== null) {
       if (existing.state === "pending") {
+        // Reload right before the transport attempt: the re-composed
+        // payload replaces the stored snapshot on the row AND the leg.
+        await tx.db.patch(existing._id, { payloadJson, updatedAtMs: nowMs });
         legs.push({
           deliveryId: existing._id,
           subscriptionId: subscription._id,
           endpoint: subscription.endpoint,
           p256dhKeyBase64: subscription.p256dhKeyBase64,
           authKeyBase64: subscription.authKeyBase64,
-          payloadJson: existing.payloadJson,
+          payloadJson,
           attempts: existing.attempts,
         });
       }
-      continue; // delivered/failed/unknown: settled per-device, never re-driven
+      continue; // delivered/failed/unknown/suppressed: settled per-device, never re-driven
     }
     const deliveryId = await tx.db.insert("pushDeliveries", {
       intentId: intent._id,
