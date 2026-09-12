@@ -5,6 +5,11 @@
  * scripts (e2e/core-flow/live-proof.mjs, e2e/core-flow/browser-leg.mjs
  * and e2e/core-text/live-proof.mjs) had each copied verbatim.
  *
+ * R5 round 2 (the advisory consolidation): the sanitized evidence
+ * recorder and the authenticated-browser bootstrap the leg scripts had
+ * also copied verbatim. `chromium` stays caller-injected so this module
+ * imports no browser dependency of its own.
+ *
  * Not a vitest file: live-evidence support only, run manually with node.
  * Everything here is sanitized: routing metadata, states and ids only; no
  * tokens and no secrets are printed (the sign-in RETURNS the session
@@ -55,4 +60,55 @@ export async function signInWithFixtureCode(url, email, code) {
     throw new Error(`session provisioning failed for ${email}: ${JSON.stringify(ensured)}`);
   }
   return { client, token, refreshToken, sessionId: ensured.sessionId, email };
+}
+
+/** The sanitized evidence recorder (the live-proof tally core, extracted). */
+export function recorder() {
+  const results = [];
+  return {
+    results,
+    record(id, outcome, detail) {
+      results.push({ id, outcome });
+      console.log(`[${outcome}] ${id}${detail === undefined ? "" : ` :: ${detail}`}`);
+      return outcome === "PASS";
+    },
+    note(line) {
+      console.log(`NOTE | ${line}`);
+    },
+    counts() {
+      return results.reduce((acc, r) => ({ ...acc, [r.outcome]: (acc[r.outcome] ?? 0) + 1 }), {});
+    },
+    allPassed() {
+      return results.every((r) => r.outcome === "PASS");
+    },
+  };
+}
+
+/**
+ * Opens the real Chromium with the persona's Convex auth pre-seeded into
+ * localStorage (the authenticated-browser bootstrap the browser legs had
+ * copied verbatim). `chromium` is caller-injected (playwright-core from
+ * the caller's context); tokens are written to the browser profile only,
+ * never logged.
+ */
+export async function openAuthenticatedBrowser({
+  chromium,
+  executablePath,
+  convexUrl,
+  token,
+  refreshToken,
+  locale = "pl-PL",
+}) {
+  const browser = await chromium.launch({ executablePath, headless: true });
+  const context = await browser.newContext({ locale });
+  await context.addInitScript(
+    ({ url, t, r }) => {
+      const ns = url.replace(/[^a-zA-Z0-9]/g, "");
+      localStorage.setItem(`__convexAuthJWT_${ns}`, t);
+      localStorage.setItem(`__convexAuthRefreshToken_${ns}`, r);
+    },
+    { url: convexUrl, t: token, r: refreshToken },
+  );
+  const page = await context.newPage();
+  return { browser, context, page };
 }

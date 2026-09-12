@@ -52,6 +52,7 @@ import {
   type SnapshotRow,
 } from "./protocol";
 import { contentTypeForKind } from "../../sources/media_access/protocol";
+import { sourceTargetOf } from "../../sources/target";
 
 /** The read surface the snapshot walks (one method per collection). */
 export interface SnapshotDb {
@@ -252,29 +253,23 @@ const bounded = (rows: readonly unknown[]): boolean =>
 // ---------------------------------------------------------------------------
 
 /**
- * The archive route prefix and source param key this serializer targets —
- * the SAME literal wire form the app's shared serializer
- * (`apps/web/src/features/source-detail/source-route`) produces. Kept as a
- * runtime-neutral local twin ON PURPOSE: the Convex backend must not import
- * browser feature code, so the two halves share a tested wire contract
- * instead (tests/i3 pin them equal against one corpus). The target stays
- * RELATIVE: no deployment host name ever enters the export.
- */
-const SOURCE_ROUTE_PATH = "/zrodlo";
-const SOURCE_PARAM = "zrodlo";
-
-/**
  * The canonical relative target of one archived source record: the dossier
  * route with the encoded source id, openable in the app regardless of
  * conversation pagination (R5-P1's export half).
+ *
+ * Served by the ONE shared runtime-neutral helper
+ * (`convex/sources/target.ts`) — the same wire form the app's serializer
+ * (`apps/web/src/features/source-detail/source-route`) produces; the
+ * Convex backend must not import browser feature code, so the two halves
+ * share that tested wire contract instead (tests/i3 pin them equal
+ * against one corpus). The target stays RELATIVE: no deployment host name
+ * ever enters the export.
  */
-export function sourceArchiveTarget(sourceId: string): string {
-  return `${SOURCE_ROUTE_PATH}?${SOURCE_PARAM}=${encodeURIComponent(sourceId)}`;
-}
+export { sourceTargetOf as sourceArchiveTarget } from "../../sources/target";
 
 /** Adds the canonical relative target to one projected source row. */
 function withSourceTarget(row: SnapshotRow, sourceId: Id<"sources">): SnapshotRow {
-  return { ...row, canonicalTarget: sourceArchiveTarget(sourceId) };
+  return { ...row, canonicalTarget: sourceTargetOf(sourceId) };
 }
 
 /**
