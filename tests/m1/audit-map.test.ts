@@ -121,13 +121,13 @@ describe("M1 audit: derived map table content", () => {
           file: "dependency-graph.md",
           mutate: content =>
             content.replace(
-              "| [R3 #128](https://github.com/wojtekpiskorz/kiero/issues/128) | OPEN |",
-              "| [R3 #128](https://github.com/wojtekpiskorz/kiero/issues/128) | CLOSED |",
+              "| [R5 #130](https://github.com/wojtekpiskorz/kiero/issues/130) | OPEN |",
+              "| [R5 #130](https://github.com/wojtekpiskorz/kiero/issues/130) | CLOSED |",
             ),
         },
       ],
     });
-    expectFail(run, "R3: graph table state CLOSED differs from cached OPEN");
+    expectFail(run, "R5: graph table state CLOSED differs from cached OPEN");
   });
 
   it("fails on a stale integrated-table remaining owner (M1-P1)", () => {
@@ -151,7 +151,7 @@ describe("M1 audit: derived map table content", () => {
       tables: [
         {
           file: "dependency-graph.md",
-          mutate: content => content.replace('  R3["R3 #128"]\n', '  R3["R3 #128"]\n  R1["R1 #126"]\n'),
+          mutate: content => content.replace('  R5["R5 #130"]\n', '  R5["R5 #130"]\n  R1["R1 #126"]\n'),
         },
       ],
     });
