@@ -19,7 +19,7 @@ Start with the [live implementation map](https://github.com/wojtekpiskorz/kiero/
 
 ## Next implementation work
 
-With M0 closed, R1, R4, R6, R7 and the M1 map administration task have no open native blockers. Claim only an unassigned issue after a fresh dependency and ownership audit. Root order is a scheduling opportunity, not a promise of available accounts or cloud capacity.
+With M0, R1, R4, R6, R7 and M1 closed, R2, R5 and I8 have no open native blockers. Claim only an unassigned issue after a fresh dependency and ownership audit. Root order is a scheduling opportunity, not a promise of available accounts or cloud capacity.
 
 R1-R3 repair clarification provenance, purge and push delivery. R4 protects source reassignment against stale editors. R5 fixes old-source links. R6 replaces the broken/placeholder release path with executable tooling. R7 removes the known Calendar test timing flake while preserving timeout assertions.
 
