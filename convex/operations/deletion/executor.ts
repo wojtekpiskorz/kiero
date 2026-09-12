@@ -320,18 +320,18 @@ async function purgeNotificationWork(
       q.eq("companyId", stage.companyId).eq("state", "pending"),
     )
     .collect();
-  const affectedIntents = new Set<Id<"notificationIntents">>();
-  for (const row of pendingPushRows) {
-    const intent = await tx.db.get(row.intentId);
+  const affectedIntents = new Map<Id<"notificationIntents">, string>();
+  for (const intentId of new Set(pendingPushRows.map((row) => row.intentId))) {
+    const intent = await tx.db.get(intentId);
     if (intent === null) {
       continue;
     }
     if (await pushIntentAffectedByPurge(tx, intent, stage.sourceId)) {
-      affectedIntents.add(intent._id);
+      affectedIntents.set(intent._id, intent.semanticKind);
     }
   }
-  for (const intentId of affectedIntents) {
-    await suppressPendingDeliveriesOfIntent(tx, intentId, "source_purged");
+  for (const [intentId, semanticKind] of affectedIntents) {
+    await suppressPendingDeliveriesOfIntent(tx, intentId, "source_purged", semanticKind);
   }
   await markStagePurged(tx, stage);
 }

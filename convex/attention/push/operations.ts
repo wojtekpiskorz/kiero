@@ -48,6 +48,7 @@ import { preferenceWriteOf } from "../preferences/operations";
 import { clarificationContentRuleOf } from "../../memory/findings/references";
 import { isBase64Url, base64UrlDecode, type PushLegReport } from "./protocol";
 import {
+  type SourcePreview,
   composePushPayload,
   decodeDeliverySummary,
   payloadKindOf,
@@ -348,14 +349,7 @@ async function payloadInputsOf(
       projectNames.push(project.displayName);
     }
   }
-  const sources: {
-    readonly sourceId: string;
-    readonly authorName: string;
-    readonly authorText: string | null;
-    readonly audioCount: number;
-    readonly photoCount: number;
-    readonly stillActive: boolean;
-  }[] = [];
+  const sources: SourcePreview[] = [];
   for (const sourceIdValue of summary.sourceIds) {
     const sourceId = tx.db.normalizeId("sources", sourceIdValue);
     const source = sourceId === null ? null : await tx.db.get(sourceId);
@@ -424,10 +418,11 @@ export async function suppressPendingDeliveriesOfIntent(
   tx: MutationCtx,
   intentId: Id<"notificationIntents">,
   reason: string,
+  /** The caller already holds the intent; no re-read inside. */
+  semanticKind: string,
 ): Promise<number> {
   const nowMs = Date.now();
-  const intent = await tx.db.get(intentId);
-  const kind = payloadKindOf(intent?.semanticKind ?? "source_entry");
+  const kind = payloadKindOf(semanticKind);
   const rows = await tx.db
     .query("pushDeliveries")
     .withIndex("by_intent_subscription", (q) => q.eq("intentId", intentId))
@@ -512,6 +507,7 @@ export async function performPreparePushDelivery(
       tx,
       intent._id,
       "content_no_longer_available",
+      intent.semanticKind,
     );
     return { kind: "denied", reason: "content_no_longer_available" };
   }
