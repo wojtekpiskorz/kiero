@@ -80,6 +80,21 @@ export interface ClarificationWireRow {
     readonly fragmentId: string;
     readonly sourceId: string;
   }[];
+  /**
+   * R1 amendment (additive, flagged): the recorded basis of the resolution —
+   * null while open; `legacy_unknown` for PRE-REPAIR resolved rows whose
+   * basis was never stored (never a guessed manual decision).
+   */
+  readonly resolutionBasis:
+    | "source_backed"
+    | "manual_boss_decision"
+    | "legacy_unknown"
+    | null;
+  /** R1: the persisted evidence references (empty unless source-backed). */
+  readonly resolutionEvidence: readonly {
+    readonly sourceId: string;
+    readonly fragmentId: string | null;
+  }[];
 }
 
 type ReadResult<T> =
@@ -186,7 +201,9 @@ async function conflictingEvidenceOf(
 /**
  * The clarifications of one scope (open and resolved, oldest first): the
  * shared open questions a boss may answer, with the sourced contradiction
- * each one is about. Resolved rows keep their author, note and time.
+ * each one is about. Resolved rows keep their author, note and time, plus
+ * the R1 basis and the persisted evidence references of a source-backed
+ * resolution (pre-repair rows read as `legacy_unknown`).
  */
 export async function readClarificationRows(
   db: QueryCtx["db"],
@@ -240,6 +257,20 @@ export async function readClarificationRows(
       resolutionNote: clarification.resolutionNote ?? null,
       resolvedAtMs: clarification.resolvedAtMs ?? null,
       conflictingEvidence: await conflictingEvidenceOf(db, clarification),
+      // R1: an open row has no basis; a resolved row carries its stored
+      // basis, and a PRE-REPAIR row (basis never stored) reads as the
+      // explicit `legacy_unknown` — an unknown historical agent resolution
+      // is never labeled a manual boss decision.
+      resolutionBasis:
+        clarification.state === "open"
+          ? null
+          : (clarification.resolutionBasis ?? "legacy_unknown"),
+      resolutionEvidence: (clarification.resolutionEvidence ?? []).map(
+        (reference) => ({
+          sourceId: reference.sourceId,
+          fragmentId: reference.sourceFragmentId ?? null,
+        }),
+      ),
     });
   }
   return { ok: true, rows: out };

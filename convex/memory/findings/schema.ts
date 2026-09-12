@@ -238,6 +238,32 @@ export const findingsTables = {
     resolvedByUserId: v.optional(shared.userId),
     resolutionNote: v.optional(v.string()),
     resolvedAtMs: v.optional(shared.tsMs),
+    /**
+     * R1 amendment (additive, flagged on the E7 precedent): whether the
+     * resolution's basis is source-backed or a manual boss decision.
+     * Absent on open rows and on PRE-REPAIR resolved rows — the read side
+     * then reports `legacy_unknown`, never a guessed manual decision.
+     */
+    resolutionBasis: v.optional(
+      v.union(
+        v.literal("source_backed"),
+        v.literal("manual_boss_decision"),
+      ),
+    ),
+    /**
+     * R1 amendment (additive, flagged): the normalized evidence references a
+     * source-backed resolution rests on (validated company-owned active
+     * source + matching fragment). `sourceFragmentId` absent = whole-source
+     * evidence, the fragment contract's rule.
+     */
+    resolutionEvidence: v.optional(
+      v.array(
+        v.object({
+          sourceId: shared.sourceId,
+          sourceFragmentId: v.optional(shared.sourceFragmentId),
+        }),
+      ),
+    ),
   })
     .index("by_company_state", ["companyId", "state"])
     .index("by_project", ["companyId", "scopeProjectId"]),

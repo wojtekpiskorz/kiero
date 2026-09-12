@@ -27,6 +27,8 @@
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
 import { memoryOperations, operations } from "@kiero/contracts";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
 import {
   ConversationPage,
   SourceConversationRow,
@@ -42,6 +44,10 @@ import {
   knowledgeStateLabel,
   memoryCopy,
 } from "../../apps/web/src/features/memory/state";
+import {
+  ResolutionBasisView,
+  resolutionBasisLabels,
+} from "../../apps/web/src/features/memory/MemoryFeature";
 import { appFeatures } from "../../apps/web/src/app/app-features";
 import { conversationFeatureEntry } from "../../apps/web/src/app/features/conversation/entry";
 import { memoryFeatureEntry } from "../../apps/web/src/app/features/memory/entry";
@@ -379,6 +385,9 @@ describe("clarification surfacing (the H1-flagged clarifications read)", () => {
         resolutionNote: null,
         resolvedAtMs: null,
         conflictingEvidence: [{ fragmentId: FRAGMENT_ID, sourceId: SOURCE_ID }],
+        // R1: the read always carries the basis (null while open).
+        resolutionBasis: null,
+        resolutionEvidence: [],
       },
       {
         clarificationId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2d",
@@ -389,12 +398,15 @@ describe("clarification surfacing (the H1-flagged clarifications read)", () => {
         resolutionNote: "Koordynuje szef A.",
         resolvedAtMs: 50,
         conflictingEvidence: [],
+        resolutionBasis: "manual_boss_decision",
+        resolutionEvidence: [],
       },
     ];
     const decoded = Schema.decodeUnknownSync(clarificationsEntry.result)(wire);
     expect(decoded).toHaveLength(2);
     expect(decoded[0]?.conflictingEvidence[0]?.sourceId).toBe(SOURCE_ID);
     expect(decoded[1]?.resolutionNote).toBe("Koordynuje szef A.");
+    expect(decoded[1]?.resolutionBasis).toBe("manual_boss_decision");
   });
 });
 
@@ -493,6 +505,139 @@ describe("the read-marking command the conversation surface issues", () => {
       read: true,
     }) as { readonly read: boolean };
     expect(decoded.read).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R1 (issue #126): the resolution basis on the memory surface — manual and
+// source-backed resolutions read honestly, pre-repair rows never guess.
+// ---------------------------------------------------------------------------
+
+describe("clarification resolution basis (the R1 surface)", () => {
+  const clarificationsEntry = memoryOperations["memory.readClarifications"];
+
+  /** One resolved wire row carrying the given basis and evidence. */
+  function resolvedRow(
+    resolutionBasis: "source_backed" | "manual_boss_decision" | "legacy_unknown",
+    resolutionEvidence: { sourceId: string; fragmentId: string | null }[] = [],
+  ) {
+    return {
+      clarificationId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2d",
+      question: "Która kwota obowiązuje?",
+      state: "resolved" as const,
+      raisedAtMs: 40,
+      resolvedByUserId: USER_ID,
+      resolutionNote: "Rozstrzygnięcie.",
+      resolvedAtMs: 50,
+      conflictingEvidence: [],
+      resolutionBasis,
+      resolutionEvidence,
+    };
+  }
+
+  it("decodes every basis of the closed vocabulary, with evidence references", () => {
+    for (const basis of ["source_backed", "manual_boss_decision", "legacy_unknown"] as const) {
+      const wire = [
+        resolvedRow(basis, [{ sourceId: SOURCE_ID, fragmentId: FRAGMENT_ID }]),
+      ];
+      expect(() =>
+        Schema.decodeUnknownSync(clarificationsEntry.result)(wire),
+      ).not.toThrow();
+    }
+    // An open row decodes with a null basis and no evidence.
+    const open = Schema.decodeUnknownSync(clarificationsEntry.result)([
+      {
+        clarificationId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2c",
+        question: "Pytanie",
+        state: "open",
+        raisedAtMs: 30,
+        resolvedByUserId: null,
+        resolutionNote: null,
+        resolvedAtMs: null,
+        conflictingEvidence: [],
+        resolutionBasis: null,
+        resolutionEvidence: [],
+      },
+    ]);
+    expect(open[0]?.resolutionBasis).toBeNull();
+  });
+
+  it("labels every basis of the contract's closed vocabulary with the shared heading", () => {
+    // Typed Record over the contract's literal union: a vocabulary change
+    // fails the build; each label carries the product heading.
+    expect(Object.keys(resolutionBasisLabels).sort()).toEqual([
+      "legacy_unknown",
+      "manual_boss_decision",
+      "source_backed",
+    ]);
+    for (const label of Object.values(resolutionBasisLabels)) {
+      expect(label).toContain("Podstawa rozstrzygnięcia");
+    }
+  });
+
+  it("renders a source-backed row with its saved evidence links", () => {
+    const html = renderToString(
+      createElement(ResolutionBasisView, {
+        row: resolvedRow("source_backed", [
+          { sourceId: SOURCE_ID, fragmentId: FRAGMENT_ID },
+          { sourceId: FIRM_SOURCE_ID, fragmentId: null },
+        ]) as never,
+      }),
+    );
+    expect(html).toContain("Podstawa rozstrzygnięcia");
+    expect(html).toContain(`/?zrodlo=${SOURCE_ID}`);
+    expect(html).toContain(`/?zrodlo=${FIRM_SOURCE_ID}`);
+    expect(html).toContain(`fragment ${FRAGMENT_ID}`);
+    expect(html).toContain(memoryCopy.sourceLinkLabel);
+  });
+
+  it("renders a manual decision and a pre-repair row honestly, without invented evidence", () => {
+    const manual = renderToString(
+      createElement(ResolutionBasisView, {
+        row: resolvedRow("manual_boss_decision") as never,
+      }),
+    );
+    expect(manual).toContain("Podstawa rozstrzygnięcia");
+    expect(manual).toContain("decyzja szefa");
+    expect(manual).not.toContain("zrodlo=");
+    const legacy = renderToString(
+      createElement(ResolutionBasisView, {
+        row: resolvedRow("legacy_unknown") as never,
+      }),
+    );
+    expect(legacy).toContain("nieznana");
+    expect(legacy).not.toContain("zrodlo=");
+    // An open row renders nothing (there is no basis yet).
+    expect(
+      renderToString(
+        createElement(ResolutionBasisView, {
+          row: {
+            clarificationId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2c",
+            question: "Pytanie",
+            state: "open",
+            raisedAtMs: 30,
+            resolvedByUserId: null,
+            resolutionNote: null,
+            resolvedAtMs: null,
+            conflictingEvidence: [],
+            resolutionBasis: null,
+            resolutionEvidence: [],
+          } as never,
+        }),
+      ),
+    ).toBe("");
+  });
+
+  it("still decodes the manual note-only envelope the memory surface sends", () => {
+    // The exact envelope ClarificationRow issues (note only, no evidence
+    // key): the additive command keeps accepting it — a manual decision.
+    const decoded = Schema.decodeUnknownSync(
+      memoryOperations["memory.resolveClarification"].input,
+    )({
+      clarificationId: "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2c",
+      resolutionNote: "Obowiązuje kwota z czwartkowej rozmowy.",
+    });
+    expect(decoded.evidence).toBeUndefined();
   });
 });
 

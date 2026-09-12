@@ -440,6 +440,53 @@ function DirectCorrectionForm({
 // Clarifications: E3's sourced questions, answered by a boss
 // ---------------------------------------------------------------------------
 
+/**
+ * R1 (issue #126): the labels of the recorded resolution basis. Local to
+ * this file because the shared memory copy module is outside this issue's
+ * owned paths; a future copy consolidation can move them unchanged.
+ */
+export const resolutionBasisLabels = {
+  source_backed: "Podstawa rozstrzygnięcia: nowe źródło.",
+  manual_boss_decision: "Podstawa rozstrzygnięcia: decyzja szefa (notatka).",
+  legacy_unknown: "Podstawa rozstrzygnięcia: nieznana (starszy zapis).",
+} as const;
+
+/**
+ * Renders the recorded basis of one resolved clarification: a source-backed
+ * row lists its saved evidence links ("Podstawa rozstrzygnięcia"), a manual
+ * decision and a pre-repair row say so explicitly — no basis is invented.
+ * Exported for the deterministic surface tests (renderToString).
+ */
+export function ResolutionBasisView({ row }: { readonly row: ClarificationWireRow }): ReactNode {
+  if (row.resolutionBasis === null) {
+    return null;
+  }
+  if (row.resolutionBasis !== "source_backed") {
+    return createElement("p", null, resolutionBasisLabels[row.resolutionBasis]);
+  }
+  return createElement(
+    "p",
+    null,
+    resolutionBasisLabels.source_backed,
+    createElement(
+      "ul",
+      null,
+      ...row.resolutionEvidence.map((witness, index) =>
+        createElement(
+          "li",
+          { key: `${witness.sourceId}#${witness.fragmentId ?? "whole"}#${index}` },
+          createElement(
+            "a",
+            { href: `/?${SOURCE_PARAM}=${encodeURIComponent(witness.sourceId)}` },
+            copy.sourceLinkLabel,
+          ),
+          witness.fragmentId === null ? "" : ` (fragment ${witness.fragmentId})`,
+        ),
+      ),
+    ),
+  );
+}
+
 function ClarificationsSection({
   memoryArgs,
   members,
@@ -562,34 +609,39 @@ function ClarificationRow({
             ),
           ),
         ),
-    row.state === "open"
-      ? createElement(
-          "form",
-          { onSubmit: (event) => void submit(event) },
-          createElement("label", { htmlFor: `answer-${row.clarificationId}` }, copy.clarificationAnswerLabel),
-          createElement("textarea", {
-            id: `answer-${row.clarificationId}`,
-            rows: 2,
-            placeholder: copy.clarificationAnswerPlaceholder,
-            value: answer,
-            onChange: (event: ChangeEvent<HTMLTextAreaElement>) => setAnswer(event.target.value),
-            required: true,
-          }),
+    ...(row.state === "open"
+      ? [
           createElement(
-            "button",
-            { type: "submit", disabled: saving || answer.trim().length === 0 },
-            saving ? copy.clarificationAnswering : copy.clarificationSubmit,
+            "form",
+            { onSubmit: (event: SubmitEvent) => void submit(event) },
+            createElement("label", { htmlFor: `answer-${row.clarificationId}` }, copy.clarificationAnswerLabel),
+            createElement("textarea", {
+              id: `answer-${row.clarificationId}`,
+              rows: 2,
+              placeholder: copy.clarificationAnswerPlaceholder,
+              value: answer,
+              onChange: (event: ChangeEvent<HTMLTextAreaElement>) => setAnswer(event.target.value),
+              required: true,
+            }),
+            createElement(
+              "button",
+              { type: "submit", disabled: saving || answer.trim().length === 0 },
+              saving ? copy.clarificationAnswering : copy.clarificationSubmit,
+            ),
+            notice === null
+              ? null
+              : createElement("p", { role: notice.kind === "error" ? "alert" : "status" }, notice.text),
           ),
-          notice === null
-            ? null
-            : createElement("p", { role: notice.kind === "error" ? "alert" : "status" }, notice.text),
-        )
-      : createElement(
-          "p",
-          null,
-          `${copy.clarificationResolvedBy}: ${resolverLabel}${
-            row.resolvedAtMs === null ? "" : ` (${instantLabel(row.resolvedAtMs)})`
-          }${row.resolutionNote === null ? "" : ` — ${row.resolutionNote}`}`,
-        ),
+        ]
+      : [
+          createElement(
+            "p",
+            null,
+            `${copy.clarificationResolvedBy}: ${resolverLabel}${
+              row.resolvedAtMs === null ? "" : ` (${instantLabel(row.resolvedAtMs)})`
+            }${row.resolutionNote === null ? "" : ` — ${row.resolutionNote}`}`,
+          ),
+          createElement(ResolutionBasisView, { row }),
+        ]),
   );
 }
