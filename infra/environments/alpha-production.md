@@ -10,6 +10,15 @@ consumes the same names through
 `environment: alpha-production` key is a NAME and is not evidence that
 GitHub protection is configured (live repository state, owner/I8 action).
 
+OWNER DECISION REQUIRED BEFORE PROVISIONING (I8 note, 2026-09-12): the
+provisioning commands below still prescribe creating a NEW Convex project
+`kiero-alpha-core`, while the owner's 2026-09 instruction ("no new Convex
+projects, ever") was issued against quota escaping. Whether the real alpha
+environment counts as a sanctioned exception (it is the product target, not
+a quota workaround) or must reuse a deployment under `kiero-dev-core` is an
+explicit owner decision at alpha provisioning time; I8 changed only the
+staging topology and leaves this identity untouched.
+
 ## Identity
 
 | Aspect | Value |
@@ -32,12 +41,17 @@ through CI environment variables, never through committed files.
 ## Secret-name inventory (names only)
 
 Identical NAME set to dev/staging (values are production-only and live in
-GitHub Actions `alpha-production` environment secrets): `OPENROUTER_API_KEY`,
-`AUTH_RESEND_KEY`, `AXIOM_API_TOKEN`, `R2_MEDIA_ACCESS_KEY_ID`,
-`R2_MEDIA_SECRET_ACCESS_KEY`, `R2_BACKUP_ACCESS_KEY_ID`,
-`R2_BACKUP_SECRET_ACCESS_KEY`, `CONVEX_BACKUP_ADMIN_KEY` (candidate name,
-finalized by I5). Google OAuth and Web Push secret names are added by B1/G4
-when those integrations land.
+GitHub Actions `alpha-production` environment secrets); the reconciled
+inventory is [infra/bindings/](../bindings/README.md), the single namespace
+authority (I8): `OPENROUTER_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM`,
+`AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`, `WEB_PUSH_VAPID_PUBLIC_KEY`/
+`WEB_PUSH_VAPID_PRIVATE_KEY`/`WEB_PUSH_VAPID_SUBJECT`, `AXIOM_API_TOKEN`,
+`R2_MEDIA_ACCESS_KEY_ID`, `R2_MEDIA_SECRET_ACCESS_KEY`,
+`R2_BACKUP_ACCESS_KEY_ID`, `R2_BACKUP_SECRET_ACCESS_KEY`,
+`R2_MEDIA_READ_ACCESS_KEY_ID`, `R2_MEDIA_READ_SECRET_ACCESS_KEY`,
+`KIERO_SERVICE_TOKEN`, `KIERO_MEDIA_WORKER_TOKEN`, `KIERO_CALENDAR_TOKEN_KEY`,
+`CONVEX_BACKUP_ADMIN_KEY`. (The dead `AUTH_RESEND_KEY` name is removed; the
+runtime reads `RESEND_API_KEY`/`RESEND_FROM`.)
 
 ## Resource naming convention
 

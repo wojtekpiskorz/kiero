@@ -1,16 +1,19 @@
 # Runtime bindings inventory (names only)
 
-Owned by issue [I1 #53]. This directory defines which NAME each runtime
+Owned by issue [I1 #53]; reconciled with the live runtime reads by
+[I8 #133] (2026-09-12). This directory defines which NAME each runtime
 consumes and the documented injection method for it. It never contains
 values. Environment-specific value sources are defined in
-[infra/environments/](../environments/README.md).
+[infra/environments/](../environments/README.md); per-binding presence and
+observed behavior for the staging candidate live in
+[docs/evidence/staging/README.md](../../docs/evidence/staging/README.md).
 
 | Binding file | Runtime | Consumes |
 | --- | --- | --- |
-| [convex-functions.md](convex-functions.md) | Convex functions (server actions) | `OPENROUTER_API_KEY`, later auth/email/push keys |
-| [gateway-worker.md](gateway-worker.md) | `apps/gateway` Cloudflare Worker | R2 binding (non-secret), `CONVEX_SITE_URL` var, telemetry secret |
-| [media-export-workers.md](media-export-workers.md) | `apps/media-worker`, `apps/export-worker` EU Containers | media-bucket S3 credentials, telemetry secret |
-| [backup-worker.md](backup-worker.md) | `apps/backup-worker` EU Container | backup-bucket-only S3 credentials, Convex export key |
+| [convex-functions.md](convex-functions.md) | Convex functions (server actions) | `OPENROUTER_API_KEY`, `RESEND_API_KEY`/`RESEND_FROM`, `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`, Web Push VAPID keys, service/media tokens, calendar key, telemetry, executor URLs |
+| [gateway-worker.md](gateway-worker.md) | `apps/gateway` Cloudflare Worker | R2 binding (non-secret), `CONVEX_SITE_URL`/`ALLOWED_APP_ORIGINS` vars, `IMAGES`/normalizer config, telemetry secret |
+| [media-export-workers.md](media-export-workers.md) | `apps/media-worker`, `apps/export-worker` EU Containers | media-bucket S3 credentials, segment/service tokens, telemetry secret |
+| [backup-worker.md](backup-worker.md) | `apps/backup-worker` EU Container | backup-bucket-only S3 credentials, read-only media credentials, Convex export key |
 
 ## Injection methods (verified or documented)
 
@@ -34,6 +37,9 @@ values. Environment-specific value sources are defined in
    across environments is intentional and this inventory is the single
    namespace authority.
 4. `infra/environments/preflight.mjs` hard-codes the two secret names that
-   exist today (`OPENROUTER_API_KEY`, `ZAI_API_KEY`); when this inventory
-   grows, the preflight must derive its name lists from this README instead of
-   extending the hard-coded set.
+   exist today (`OPENROUTER_API_KEY`, `ZAI_API_KEY`); when the set of
+   PROVISIONED secrets grows (new names actually present in a store), the
+   preflight must derive its name lists from this README instead of
+   extending the hard-coded set. The I8 reconciliation grew the documented
+   NAME inventory only; the provisioned set is unchanged, so the trigger
+   has not fired.
