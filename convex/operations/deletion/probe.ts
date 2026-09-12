@@ -18,6 +18,10 @@
  *   purge route, with an explicit URL override (the proof drives the REAL
  *   deployed route without touching deployment env).
  * - `probePurgeTick`: forces the 24-hour tracking pass's decision now.
+ * - `probeRetryPurgeStage` (R2, issue #127): returns one COMPLETED stage
+ *   of a fully purged record to the interruption state and replays the
+ *   REAL executor, the per-stage idempotency evidence surface (admin
+ *   caller only).
  */
 
 import { v } from "convex/values";
@@ -27,17 +31,14 @@ import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
 import {
   forbiddenError,
   notFoundError,
-  unauthenticatedError,
   unsupportedError,
   validationError,
 } from "@kiero/runtime";
-import { probeDisabled, probeGuardEnabled } from "../../sources/probe_shared";
-import { resolveAccessContextFromConvexAuth } from "../../access/identity/resolution";
+import { probeDisabled, probeGuardEnabled, resolveCallerContext } from "../../sources/probe_shared";
 import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
-import type { DurableJobDoc } from "../../platform/executors";
 import { PURGE_STAGE_KINDS, type PurgeStageKind } from "./schema";
-import { callPurgeRoute, purgeSourceExecutor } from "./executor";
+import { callPurgeRoute, purgeSourceExecutor, syntheticPurgeJobDoc } from "./executor";
 import { runPurgeOverduePass } from "./functions";
 
 /** The caller's company's deletion ledger and purge stage states. */
@@ -113,15 +114,16 @@ export const probePurgeTick = internalMutation({
 // --- R2 per-stage retry evidence surface (issue #127) ------------------------------
 
 /**
- * The per-stage retry core (unit-tested through the I4 harness): returns one
- * COMPLETED stage to the visible interruption state a refused attempt
- * leaves, then re-runs the REAL durable executor for the record. The
- * replayed stage body must converge to the same purged state with no
- * restored content and no duplicate audit — the idempotency contract the
- * R2 purge legs prove live. No identity logic here; the guarded wrapper
- * below owns authorization (the fixture-control precedent of
- * probeAgeUpload: the only honest way to reach the retry state once the
- * window already closed successfully).
+ * The per-stage retry core (unit-tested through the I4 harness): on one
+ * FULLY PURGED record, returns the named stage to the visible interruption
+ * state a refused attempt leaves, then re-runs the REAL durable executor.
+ * The replayed stage body must converge to the same purged state with no
+ * restored content and no duplicate audit, the idempotency contract the
+ * R2 purge legs prove live. In-flight records refuse typed: their retry
+ * belongs to the real durable job, never to a probe. The replay re-marks
+ * the stage purged, so its purgedAtMs and attempts reflect the RETRY, not
+ * the original completion (the fixture-control precedent of probeAgeUpload).
+ * No identity logic here; the guarded wrapper below owns authorization.
  */
 export async function replayPurgeStageForRecord(
   ctx: MutationCtx,
@@ -142,24 +144,22 @@ export async function replayPurgeStageForRecord(
   if (stage === undefined) {
     return errorResult(notFoundError("deletionPurgeStages", "stage_row_missing"));
   }
-  if (stage.state === "purged") {
-    await ctx.db.patch(stage._id, {
-      state: "failed",
-      lastErrorKind: "probe_stage_retry",
-    });
+  // The completed-record precondition, enforced: an in-flight record's
+  // stages belong to the real durable job (and the external media path's
+  // outcome is recorded by the job's own action, never a probe).
+  if (!stages.every((row) => row.state === "purged")) {
+    return errorResult(validationError("purge_record_not_complete"));
   }
+  await ctx.db.patch(stage._id, {
+    state: "failed",
+    lastErrorKind: "probe_stage_retry",
+  });
   const input = { sourceId: record.targetSourceId, deletionRecordId: record._id };
-  const job = {
-    jobKey: `probe-retry-${record._id}-${Date.now()}`,
-    kind: "deletion.purge_source",
-    inputJson: JSON.stringify(input),
-    attempts: 0,
-    maxAttempts: 6,
-    state: "running",
-    createdAtMs: Date.now(),
-    updatedAtMs: Date.now(),
-  } as unknown as DurableJobDoc;
-  const outcome = await purgeSourceExecutor.execute(ctx, job, input);
+  const outcome = await purgeSourceExecutor.execute(
+    ctx,
+    syntheticPurgeJobDoc(input, `probe-retry-${record._id}-${Date.now()}`),
+    input,
+  );
   const after = await ctx.db
     .query("deletionPurgeStages")
     .withIndex("by_record", (q) => q.eq("deletionRecordId", record._id))
@@ -180,14 +180,17 @@ export async function replayPurgeStageForRecord(
 export const retryPurgeStage = internalMutation({
   args: { deletionRecordId: v.id("deletionRecords"), stageKind: v.string() },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
-    const context = await resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
-    if (context === null) {
-      return errorResult(unauthenticatedError());
+    if (!probeGuardEnabled()) {
+      return probeDisabled();
     }
-    if (context.actor.membershipRole !== "admin") {
+    const resolved = await resolveCallerContext(ctx.db, ctx.auth);
+    if (!resolved.ok) {
+      return resolved.result;
+    }
+    if (resolved.context.actor.membershipRole !== "admin") {
       return errorResult(forbiddenError("purge_retry_admin_only"));
     }
-    const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
+    const companyId = ctx.db.normalizeId("companies", resolved.context.actor.companyId);
     if (companyId === null) {
       return errorResult(forbiddenError("company_scope_unresolved", "companies"));
     }

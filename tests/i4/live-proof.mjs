@@ -434,7 +434,10 @@ const R2_QUESTION_B = "Która zaliczka obowiązuje — piątkowa czy wtorkowa?";
 const R2_NOTE_B = "Obowiązuje zaliczka 5000 zł z wiadomości Kaczmarka.";
 const R2_REDACTED_QUESTION = "Pytanie zostało trwale usunięte wraz z wiadomością źródłową.";
 const R2_REDACTED_NOTE = "Rozstrzygnięcie zostało trwale usunięte wraz z wiadomością źródłową.";
-const R2_CANARIES = [R2_SOURCE_TEXT, R2_QUESTION_A, R2_QUESTION_B, R2_NOTE_B];
+// The clarification-surface canaries: texts these reads and rows can
+// carry. The source text itself rides the conversation/detail surfaces,
+// covered live by I2a/I2b in the same transcript.
+const R2_CANARIES = [R2_QUESTION_A, R2_QUESTION_B, R2_NOTE_B];
 
 const memoryCommand = (operation, input) =>
   admin.client.mutation("memory/findings/functions:dispatchMemoryCommandEntry", {
@@ -618,7 +621,8 @@ const keeperRow = uploadsState?.value?.sources?.find((row) => row.sourceId === k
 const doomedRow = uploadsState?.value?.sources?.find((row) => row.sourceId === doomed.sourceId);
 record(
   "R2-4b timestamps, actor and the independent active source survive the purge",
-  storedB.raisedAtMs === preStoredB.raisedAtMs && storedB.resolvedAtMs === preStoredB.resolvedAtMs &&
+  preStoredB !== undefined && storedB.raisedAtMs === preStoredB.raisedAtMs &&
+    storedB.resolvedAtMs === preStoredB.resolvedAtMs &&
     storedB.resolvedByUserId === preStoredB.resolvedByUserId &&
     keeperRow?.lifecycle === "active" && doomedRow?.lifecycle === "purged" && ledgerCount === 1
     ? "PASS"
@@ -628,14 +632,18 @@ record(
 
 // R2-5: the per-stage idempotency report. The completed transcripts stage
 // returns to the interruption state and the REAL executor replays it: no
-// restored content, no duplicate audit, no second ledger record.
+// restored content, no duplicate audit, no second ledger record. Without a
+// completed record there is nothing to retry; the row records that FAIL and
+// the script keeps going.
 const beforeRetry = await storedClarificationsLive();
 const beforeRetryA = beforeRetry.value.rows.find((row) => row.clarificationId === caseA.value.clarificationId);
-const stageAttemptBefore = r2Completed.stages.find((s) => s.stageKind === "transcripts").attempts;
-const retry = await admin.client.action("operations/deletion/probe:probeRetryPurgeStage", {
-  deletionRecordId: r2Purge.value.deletionRecordId,
-  stageKind: "transcripts",
-});
+const stageAttemptBefore = r2Completed?.stages?.find((s) => s.stageKind === "transcripts")?.attempts;
+const retry = r2Completed === null
+  ? undefined
+  : await admin.client.action("operations/deletion/probe:probeRetryPurgeStage", {
+      deletionRecordId: r2Purge.value.deletionRecordId,
+      stageKind: "transcripts",
+    });
 const afterRetry = await storedClarificationsLive();
 const afterRetryA = afterRetry.value.rows.find((row) => row.clarificationId === caseA.value.clarificationId);
 const ledgerAfterRetry = await deletionState(admin);
@@ -648,16 +656,17 @@ record(
     retry.value.stages.every((s) => s.state === "purged") &&
     retry.value.stages.find((s) => s.stageKind === "transcripts").attempts === stageAttemptBefore + 1 &&
     JSON.stringify(afterRetry.value.rows) === JSON.stringify(beforeRetry.value.rows) &&
-    afterRetryA.purgeAudit.redactedSourceIds.length === 1 &&
+    afterRetryA?.purgeAudit?.redactedSourceIds?.length === 1 &&
+    beforeRetryA?.purgeAudit?.questionRedactedAtMs !== undefined &&
     afterRetryA.purgeAudit.questionRedactedAtMs === beforeRetryA.purgeAudit.questionRedactedAtMs &&
     ledgerCountAfterRetry === 1
     ? "PASS"
     : "FAIL",
-  `outcome=${retry?.value?.outcome ?? retry?.error?.code} rowsStable=${JSON.stringify(afterRetry.value.rows) === JSON.stringify(beforeRetry.value.rows)} auditIds=${afterRetryA?.purgeAudit?.redactedSourceIds?.length} firstRedactionKept=${afterRetryA?.purgeAudit?.questionRedactedAtMs === beforeRetryA?.purgeAudit?.questionRedactedAtMs} ledger=${ledgerCountAfterRetry}`,
+  `outcome=${retry?._tag === "ok" ? retry.value.outcome : (retry?.error?.code ?? "no completed record to retry")} rowsStable=${JSON.stringify(afterRetry.value.rows) === JSON.stringify(beforeRetry.value.rows)} auditIds=${afterRetryA?.purgeAudit?.redactedSourceIds?.length} firstRedactionKept=${afterRetryA?.purgeAudit?.questionRedactedAtMs === beforeRetryA?.purgeAudit?.questionRedactedAtMs} ledger=${ledgerCountAfterRetry}`,
 );
 
 // R2-6 (R2-P3 live): independent active evidence stays actionable after the
-// purge — a fresh case anchored on the surviving source raises and reads.
+// purge: a fresh case anchored on the surviving source raises and reads.
 const caseC = await memoryCommand("memory.raiseClarification", {
   question: "Kiedy wpłynął przelew zaliczki?",
   conflictingEvidence: [keeper.fragmentId],

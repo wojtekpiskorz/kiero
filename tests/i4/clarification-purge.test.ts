@@ -30,8 +30,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { Schema } from "effect";
-import { ActorContext, type ResultEnvelope } from "@kiero/contracts";
+import { type ResultEnvelope } from "@kiero/contracts";
 import type { RequestContext } from "@kiero/runtime";
 import { performPurgeSource, PURGE_CONFIRMATION_PHRASE } from "../../convex/operations/deletion/purge";
 import { readClarificationRows } from "../../convex/memory/findings/exposition";
@@ -42,8 +41,15 @@ import {
 } from "../../convex/memory/findings/references";
 import { purgeSourceExecutor } from "../../convex/operations/deletion/executor";
 import { PURGE_STAGE_KINDS } from "../../convex/operations/deletion/schema";
-import { DELETION_TABLES, asTx, fakeCtx, type FakeCtx } from "./harness";
-import type { DurableJobDoc } from "../../convex/platform/executors";
+import {
+  DELETION_TABLES,
+  asTx,
+  fakeCtx,
+  fakePurgeJob,
+  seedBossCompanyContext,
+  seedWitnessedTextSource,
+  type FakeCtx,
+} from "./harness";
 
 // ---------------------------------------------------------------------------
 // The seeded world: one company, three sources, six clarifications.
@@ -83,59 +89,6 @@ interface PurgeWorld {
   readonly deletionRecordId: string;
 }
 
-async function seedBossContext(ctx: FakeCtx): Promise<{ context: RequestContext; userId: string }> {
-  const companyId = await ctx.db.insert("companies", { name: "Firma", timezone: "Europe/Warsaw" });
-  const userId = await ctx.db.insert("users", { email: "szef@firma.invalid" });
-  const sessionId = await ctx.db.insert("sessions", { userId, state: "live", createdAtMs: 1 });
-  const actor = Schema.decodeUnknownSync(ActorContext)({
-    userId,
-    companyId,
-    membershipRole: "admin",
-    isGm: false,
-    sessionId,
-    via: "user",
-  });
-  return { context: { actor, resolvedAtMs: Date.now() }, userId };
-}
-
-/** Seeds one active source with a text extraction and one fragment. */
-async function seedSourceWithFragment(
-  ctx: FakeCtx,
-  companyId: string,
-  authorUserId: string,
-  text: string,
-  lifecycle: "active" | "withdrawn" = "active",
-): Promise<SeededFragment> {
-  const sourceId = await ctx.db.insert("sources", {
-    companyId,
-    authorUserId,
-    authorText: text,
-    sentAtMs: RAISED_AT_MS - 7_200_000,
-    sentAtTimezone: "Europe/Warsaw",
-    fullyAcceptedAtMs: RAISED_AT_MS - 7_200_000,
-    lifecycle,
-    ...(lifecycle === "withdrawn"
-      ? { withdrawnAtMs: RAISED_AT_MS - 1_800_000, withdrawnReason: "pomyłka" }
-      : {}),
-  });
-  const extractionId = await ctx.db.insert("extractions", {
-    sourceId,
-    kind: "text",
-    pipelineVersion: "text/1",
-    model: "fixture",
-    provider: "fixture",
-    processingRunId: "kprocessingrunst0000000000000",
-    createdAtMs: RAISED_AT_MS - 3_600_000,
-  });
-  const fragmentId = await ctx.db.insert("sourceFragments", {
-    extractionId,
-    sourceId,
-    anchor: { _tag: "text_range", startOffset: 0, endOffset: text.length },
-    createdAtMs: RAISED_AT_MS - 3_600_000,
-  });
-  return { sourceId, fragmentId: fragmentId as string };
-}
-
 async function seedClarification(
   ctx: FakeCtx,
   companyId: string,
@@ -152,10 +105,10 @@ async function seedClarification(
 /** Seeds the world WITHOUT deleting anything yet. */
 async function seedPurgeWorld(): Promise<Omit<PurgeWorld, "deletionRecordId">> {
   const ctx = fakeCtx(DELETION_TABLES);
-  const { context, userId } = await seedBossContext(ctx);
+  const { context, userId } = await seedBossCompanyContext(ctx);
   const companyId = context.actor.companyId as string;
-  const deleted = await seedSourceWithFragment(ctx, companyId, userId, CANARY_SOURCE_TEXT);
-  const activeT = await seedSourceWithFragment(ctx, companyId, userId, "Termin montażu 20 września");
+  const deleted = await seedWitnessedTextSource(ctx, companyId, userId, CANARY_SOURCE_TEXT);
+  const activeT = await seedWitnessedTextSource(ctx, companyId, userId, "Termin montażu 20 września");
   const activeU = await seedWithFragmentU(ctx, companyId, userId);
   const openDeadId = await seedClarification(ctx, companyId, {
     question: CANARY_QUESTION,
@@ -229,7 +182,7 @@ async function seedWithFragmentU(
   companyId: string,
   userId: string,
 ): Promise<SeededFragment> {
-  return await seedSourceWithFragment(ctx, companyId, userId, "Przelew zaliczki wpłynął we wtorek");
+  return await seedWitnessedTextSource(ctx, companyId, userId, "Przelew zaliczki wpłynął we wtorek");
 }
 
 /** Tombstones the deleted source through the REAL initiating transaction. */
@@ -266,17 +219,7 @@ function storedRow(world: PurgeWorld | Omit<PurgeWorld, "deletionRecordId">, id:
 /** Runs the full durable purge executor (every stage, in transaction). */
 async function runExecutor(world: PurgeWorld): Promise<void> {
   const input = { sourceId: world.deleted.sourceId, deletionRecordId: world.deletionRecordId };
-  const job = {
-    jobKey: `job-${world.deletionRecordId}`,
-    kind: "deletion.purge_source",
-    inputJson: JSON.stringify(input),
-    attempts: 0,
-    maxAttempts: 6,
-    state: "running",
-    createdAtMs: 1,
-    updatedAtMs: 1,
-  } as unknown as DurableJobDoc;
-  const outcome = await purgeSourceExecutor.execute(asTx(world.ctx), job, input);
+  const outcome = await purgeSourceExecutor.execute(asTx(world.ctx), fakePurgeJob(input), input);
   if (outcome.outcome !== "succeeded" && outcome.outcome !== "external") {
     throw new Error(`purge executor failed: ${JSON.stringify(outcome)}`);
   }
@@ -475,7 +418,7 @@ describe("a withdrawn source keeps its content, links and answerable cases", () 
     // The resolve leg dispatches through the real command path, which
     // resolves the actor's membership like every dispatch does.
     const ctx = fakeCtx([...DELETION_TABLES, "memberships", "gmAccessGrants"]);
-    const { context, userId } = await seedBossContext(ctx);
+    const { context, userId } = await seedBossCompanyContext(ctx);
     const companyId = context.actor.companyId as string;
     await ctx.db.insert("memberships", {
       companyId,
@@ -484,7 +427,7 @@ describe("a withdrawn source keeps its content, links and answerable cases", () 
       state: "active",
       createdAtMs: 1,
     });
-    const withdrawn = await seedSourceWithFragment(
+    const withdrawn = await seedWitnessedTextSource(
       ctx,
       companyId,
       userId,
@@ -537,7 +480,7 @@ describe("a withdrawn source keeps its content, links and answerable cases", () 
 
   it("a RESOLVED row citing a withdrawn source keeps its real note and evidence (no false redaction copy)", async () => {
     const world = await seedWithdrawnWorld();
-    const active = await seedSourceWithFragment(world.ctx, world.companyId, world.userId, "Termin 20 września");
+    const active = await seedWitnessedTextSource(world.ctx, world.companyId, world.userId, "Termin 20 września");
     const resolvedId = await world.ctx.db.insert("clarifications", {
       companyId: world.companyId,
       scopeKind: "company",
@@ -583,7 +526,7 @@ describe("a withdrawn source keeps its content, links and answerable cases", () 
       raisedAtMs: RAISED_AT_MS,
     });
     // An unrelated source gets permanently deleted and fully purged.
-    const doomed = await seedSourceWithFragment(world.ctx, world.companyId, world.userId, CANARY_SOURCE_TEXT);
+    const doomed = await seedWitnessedTextSource(world.ctx, world.companyId, world.userId, CANARY_SOURCE_TEXT);
     await world.ctx.db.insert("clarifications", {
       companyId: world.companyId,
       scopeKind: "company",
@@ -596,21 +539,8 @@ describe("a withdrawn source keeps its content, links and answerable cases", () 
       sourceId: doomed.sourceId as never,
       confirmation: PURGE_CONFIRMATION_PHRASE,
     }) as ResultEnvelope & { value: { deletionRecordId: string } }).value.deletionRecordId;
-    const job = {
-      jobKey: `job-${record}`,
-      kind: "deletion.purge_source",
-      inputJson: JSON.stringify({ sourceId: doomed.sourceId, deletionRecordId: record }),
-      attempts: 0,
-      maxAttempts: 6,
-      state: "running",
-      createdAtMs: 1,
-      updatedAtMs: 1,
-    } as unknown as DurableJobDoc;
-    await purgeSourceExecutor.execute(
-      asTx(world.ctx),
-      job,
-      { sourceId: doomed.sourceId, deletionRecordId: record },
-    );
+    const input = { sourceId: doomed.sourceId, deletionRecordId: record };
+    await purgeSourceExecutor.execute(asTx(world.ctx), fakePurgeJob(input), input);
 
     const stored = world.ctx.db.rows("clarifications").find((candidate) => candidate._id === openId)!;
     expect(stored.question).toBe("Który termin obowiązuje — 10 października?");
@@ -628,7 +558,7 @@ describe("cross-company and malformed conflicting references", () => {
     const world = await seedPurgeWorld();
     const foreignCompany = await world.ctx.db.insert("companies", { name: "Obca", timezone: "UTC" });
     const foreignUserId = await world.ctx.db.insert("users", { email: "szef@obca.invalid" });
-    const foreign = await seedSourceWithFragment(
+    const foreign = await seedWitnessedTextSource(
       world.ctx,
       foreignCompany,
       foreignUserId,

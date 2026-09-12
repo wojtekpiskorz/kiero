@@ -10,92 +10,50 @@
  * These tests pin the core's contract directly (the guarded wrapper is the
  * standard caller-credential pattern proven by the deletion probes):
  *
- * - A completed record's stage returns to the visible failed state and the
- *   REAL executor replay drives it back to purged.
+ * - A FULLY PURGED record's stage returns to the visible failed state and
+ *   the REAL executor replay drives it back to purged.
  * - The replay redacts nothing twice: stored clarification rows are
  *   byte-identical, the purge audit keeps exactly one redacted source id
  *   and its FIRST redaction timestamps.
- * - An unknown record or stage kind refuses typed, committing nothing.
+ * - A record whose stages are not all purged refuses typed: its retry
+ *   belongs to the real durable job, never to a probe.
+ * - An unknown record refuses typed, committing nothing.
  */
 
 import { describe, expect, it } from "vitest";
-import { Schema } from "effect";
-import { ActorContext, type ResultEnvelope } from "@kiero/contracts";
-import type { RequestContext } from "@kiero/runtime";
+import type { ResultEnvelope } from "@kiero/contracts";
 import { performPurgeSource, PURGE_CONFIRMATION_PHRASE } from "../../convex/operations/deletion/purge";
 import { purgeSourceExecutor } from "../../convex/operations/deletion/executor";
 import { replayPurgeStageForRecord } from "../../convex/operations/deletion/probe";
 import { REDACTED_CLARIFICATION_QUESTION_COPY } from "../../convex/memory/findings/references";
-import { DELETION_TABLES, asTx, fakeCtx, type FakeCtx } from "./harness";
-import type { DurableJobDoc } from "../../convex/platform/executors";
+import {
+  DELETION_TABLES,
+  asTx,
+  fakeCtx,
+  fakePurgeJob,
+  seedBossCompanyContext,
+  seedWitnessedTextSource,
+} from "./harness";
 
 const RAISED_AT_MS = Date.parse("2026-09-08T09:00:00.000Z");
 
-/** Seeds one company/admin session context (the clarification-purge pattern). */
-async function seedBossContext(ctx: FakeCtx): Promise<RequestContext> {
-  const companyId = await ctx.db.insert("companies", { name: "Firma", timezone: "Europe/Warsaw" });
-  const userId = await ctx.db.insert("users", { email: "szef@firma.invalid" });
-  const sessionId = await ctx.db.insert("sessions", { userId, state: "live", createdAtMs: 1 });
-  const actor = Schema.decodeUnknownSync(ActorContext)({
-    userId,
-    companyId,
-    membershipRole: "admin",
-    isGm: false,
-    sessionId,
-    via: "user",
-  });
-  return { actor, resolvedAtMs: Date.now() } as RequestContext;
-}
-
-/** One active text source with a whole-source fragment. */
-async function seedSourceWithFragment(
-  ctx: FakeCtx,
-  companyId: string,
-  userId: string,
-  text: string,
-): Promise<{ sourceId: string; fragmentId: string }> {
-  const sourceId = await ctx.db.insert("sources", {
-    companyId,
-    authorUserId: userId,
-    authorText: text,
-    sentAtMs: RAISED_AT_MS - 7_200_000,
-    sentAtTimezone: "Europe/Warsaw",
-    fullyAcceptedAtMs: RAISED_AT_MS - 7_200_000,
-    lifecycle: "active",
-  });
-  const extractionId = await ctx.db.insert("extractions", {
-    sourceId,
-    kind: "text",
-    pipelineVersion: "text/1",
-    model: "fixture",
-    provider: "fixture",
-    processingRunId: "kprocessingrunst0000000000000",
-    createdAtMs: RAISED_AT_MS - 3_600_000,
-  });
-  const fragmentId = await ctx.db.insert("sourceFragments", {
-    extractionId,
-    sourceId,
-    anchor: { _tag: "whole_source" },
-    createdAtMs: RAISED_AT_MS - 3_600_000,
-  });
-  return { sourceId: sourceId as string, fragmentId: fragmentId as string };
-}
-
 interface RetryWorld {
-  readonly ctx: FakeCtx;
-  readonly context: RequestContext;
   readonly sourceId: string;
   readonly clarificationId: string;
   readonly deletionRecordId: string;
 }
 
-/** Seeds, raises the canary case, purges fully and runs the executor. */
-async function seedCompletedPurge(): Promise<RetryWorld> {
+interface SeededWorld extends RetryWorld {
+  readonly ctx: ReturnType<typeof fakeCtx>;
+  readonly context: Awaited<ReturnType<typeof seedBossCompanyContext>>["context"];
+}
+
+/** Seeds the boss world, raises the canary case and tombstones the source. */
+async function seedTombstonedWorld(): Promise<SeededWorld> {
   const ctx = fakeCtx(DELETION_TABLES);
-  const context = await seedBossContext(ctx);
+  const { context, userId } = await seedBossCompanyContext(ctx);
   const companyId = context.actor.companyId as string;
-  const userId = context.actor.userId as string;
-  const doomed = await seedSourceWithFragment(ctx, companyId, userId, "Kaczmarek wpłacił zaliczkę 5000 zł w piątek");
+  const doomed = await seedWitnessedTextSource(ctx, companyId, userId, "Kaczmarek wpłacił zaliczkę 5000 zł w piątek");
   const clarificationId = (await ctx.db.insert("clarifications", {
     companyId,
     scopeKind: "company",
@@ -108,27 +66,28 @@ async function seedCompletedPurge(): Promise<RetryWorld> {
     sourceId: doomed.sourceId as never,
     confirmation: PURGE_CONFIRMATION_PHRASE,
   }) as ResultEnvelope & { value: { deletionRecordId: string } }).value;
-  const input = { sourceId: doomed.sourceId, deletionRecordId: record.deletionRecordId };
-  const job = {
-    jobKey: `job-${record.deletionRecordId}`,
-    kind: "deletion.purge_source",
-    inputJson: JSON.stringify(input),
-    attempts: 0,
-    maxAttempts: 6,
-    state: "running",
-    createdAtMs: 1,
-    updatedAtMs: 1,
-  } as unknown as DurableJobDoc;
-  const outcome = await purgeSourceExecutor.execute(asTx(ctx), job, input);
+  return {
+    ctx,
+    context,
+    sourceId: doomed.sourceId,
+    clarificationId,
+    deletionRecordId: record.deletionRecordId,
+  };
+}
+
+/** Runs the full executor once so every stage reaches purged. */
+async function runPurgeOnce(world: SeededWorld): Promise<void> {
+  const input = { sourceId: world.sourceId, deletionRecordId: world.deletionRecordId };
+  const outcome = await purgeSourceExecutor.execute(asTx(world.ctx), fakePurgeJob(input), input);
   if (outcome.outcome !== "succeeded") {
     throw new Error(`purge executor failed: ${JSON.stringify(outcome)}`);
   }
-  return { ctx, context, sourceId: doomed.sourceId, clarificationId, deletionRecordId: record.deletionRecordId };
 }
 
 describe("replayPurgeStageForRecord (the R2 per-stage retry core)", () => {
   it("re-runs a completed stage to purged with byte-identical clarifications and a single first-timestamp audit", async () => {
-    const world = await seedCompletedPurge();
+    const world = await seedTombstonedWorld();
+    await runPurgeOnce(world);
     const before = JSON.stringify(world.ctx.db.rows("clarifications"));
     const stageBefore = world.ctx.db
       .rows("deletionPurgeStages")
@@ -165,8 +124,25 @@ describe("replayPurgeStageForRecord (the R2 per-stage retry core)", () => {
     expect(audit.questionRedactedAtMs).toBeTypeOf("number");
   });
 
+  it("refuses typed while any stage is not purged: an in-flight record's retry belongs to the durable job", async () => {
+    const world = await seedTombstonedWorld();
+    // No executor run: the stage rows are still pending.
+    const result = await replayPurgeStageForRecord(asTx(world.ctx) as never, {
+      deletionRecordId: world.deletionRecordId as never,
+      stageKind: "transcripts",
+    });
+    expect(result._tag).toBe("error");
+    if (result._tag === "error") {
+      expect(result.error._tag).toBe("validation");
+      expect(result.error.code).toBe("purge_record_not_complete");
+    }
+    const stages = world.ctx.db.rows("deletionPurgeStages");
+    expect(stages.every((stage) => stage.state === "pending")).toBe(true);
+  });
+
   it("refuses typed for an unknown record, committing nothing", async () => {
-    const world = await seedCompletedPurge();
+    const world = await seedTombstonedWorld();
+    await runPurgeOnce(world);
     const before = JSON.stringify(world.ctx.db.rows("deletionPurgeStages"));
 
     const missingRecord = await replayPurgeStageForRecord(asTx(world.ctx) as never, {

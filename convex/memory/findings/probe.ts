@@ -26,24 +26,27 @@
  *   transition and the marking core.
  * - `probeMemoryState`: the tenant-scoped inspection read the evidence
  *   script asserts on.
+ * - `probeClarificationStorage` (R2, issue #127): the guarded STORED
+ *   clarification rows for the caller's company (the storage-freeze half
+ *   of the deletion-purge evidence, with the content-free purgeAudit).
  */
 
 import { v } from "convex/values";
 import { Schema } from "effect";
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
-import { forbiddenError, unauthenticatedError, unsupportedError } from "@kiero/runtime";
+import { forbiddenError, unsupportedError } from "@kiero/runtime";
 import { resolveRelativeDay } from "@kiero/domain";
 import { action, internalMutation, internalQuery } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
-import { resolveAccessContextFromConvexAuth } from "../../access/identity/resolution";
 import { bridgeIdentity, resolveRequestContext } from "../../platform/context";
 import {
   ISOLATION_COMPANY,
   ISOLATION_EMAIL,
   SERVICE_EMAIL,
   bridgeContextForEmail,
+  resolveCallerContext,
   resolveProbeSession,
   serviceIdentityUnavailable,
 } from "../../sources/probe_shared";
@@ -598,11 +601,11 @@ export const probeMemoryState = action({
 export const clarificationStorage = internalQuery({
   args: {},
   handler: async (ctx): Promise<ResultEnvelope> => {
-    const context = await resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
-    if (context === null) {
-      return errorResult(unauthenticatedError());
+    const resolved = await resolveCallerContext(ctx.db, ctx.auth);
+    if (!resolved.ok) {
+      return resolved.result;
     }
-    const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
+    const companyId = ctx.db.normalizeId("companies", resolved.context.actor.companyId);
     if (companyId === null) {
       return errorResult(forbiddenError("company_scope_unresolved", "companies"));
     }

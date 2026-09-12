@@ -317,6 +317,28 @@ async function prepareMediaStage(tx: MutationCtx, stage: StageRow): Promise<stri
 // The executor.
 // ---------------------------------------------------------------------------
 
+/**
+ * A synthetic purge job document for evidence replays: the guarded retry
+ * probe and the focused tests drive the executor with the same shape the
+ * scheduler hands it. It is NEVER inserted into durableJobs; the real job
+ * row remains the retry authority.
+ */
+export function syntheticPurgeJobDoc(
+  input: { sourceId: Id<"sources">; deletionRecordId: Id<"deletionRecords"> },
+  jobKey: string,
+): DurableJobDoc {
+  return {
+    jobKey,
+    kind: "deletion.purge_source",
+    inputJson: JSON.stringify(input),
+    attempts: 0,
+    maxAttempts: 6,
+    state: "running",
+    createdAtMs: Date.now(),
+    updatedAtMs: Date.now(),
+  } as unknown as DurableJobDoc;
+}
+
 /** The registered executor for `deletion.purge_source`. */
 export const purgeSourceExecutor: JobExecutor = {
   jobKind: "deletion.purge_source",

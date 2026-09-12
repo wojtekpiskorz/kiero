@@ -22,11 +22,12 @@
  */
 
 import { errorResult, type ResultEnvelope } from "@kiero/contracts";
-import { forbiddenError, unsupportedError, type RequestContext } from "@kiero/runtime";
+import { forbiddenError, unauthenticatedError, unsupportedError, type RequestContext } from "@kiero/runtime";
 import { api } from "../_generated/api";
 import type { ActionCtx, MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id, Doc } from "../_generated/dataModel";
 import { bridgeIdentity, resolveRequestContext, type ResolutionDb } from "../platform/context";
+import { resolveAccessContextFromConvexAuth } from "../access/identity/resolution";
 
 /** The A3 platform proof service account (seeded by platform/probe:probeSeed). */
 export const SERVICE_EMAIL = "platform-service@kiero.invalid";
@@ -50,6 +51,26 @@ export function probeDisabled(): ResultEnvelope {
 /** The sanitized refusal for an unresolvable service identity. */
 export function serviceIdentityUnavailable(): ResultEnvelope {
   return errorResult(forbiddenError("service_identity_unavailable"));
+}
+
+/**
+ * Resolves the CALLER's context for the guarded caller-pattern probes (the
+ * D2 uploads precedent): the caller's own verified Convex Auth credential
+ * through the canonical chain, or the sanitized unauthenticated refusal.
+ * Shared so each lane's probe stops hand-rolling the same four lines.
+ */
+export async function resolveCallerContext(
+  db: Parameters<typeof resolveAccessContextFromConvexAuth>[0],
+  auth: Parameters<typeof resolveAccessContextFromConvexAuth>[1],
+): Promise<
+  | { ok: true; context: NonNullable<Awaited<ReturnType<typeof resolveAccessContextFromConvexAuth>>> }
+  | { ok: false; result: ResultEnvelope }
+> {
+  const context = await resolveAccessContextFromConvexAuth(db, auth, Date.now());
+  if (context === null) {
+    return { ok: false, result: errorResult(unauthenticatedError()) };
+  }
+  return { ok: true, context };
 }
 
 /** Resolves the service account's session id (the A3 fixture identity). */
