@@ -38,6 +38,14 @@
  *  R7  tenant isolation: company B reassigns its own placement; company A
  *      cannot touch B's source.
  *
+ * R4 repair scenarios (issue #129): every command declares the REQUIRED
+ * `expectedProjectIds` observed-placement precondition, read from the same
+ * tenant state the dossier reads:
+ *  R8  two independently loaded forms: A commits, B's stale complete set is
+ *      refused `source_placement_stale` with ZERO new events/jobs, A's
+ *      placement survives, and B's deliberate reload-and-resubmit commits
+ *      with exactly one event and one recomputation identity.
+ *
  * Run: node tests/e7/live-proof.mjs
  * (Not a vitest file: live evidence, transcribed into the session report.
  * Everything printed is sanitized: states, ids and Polish product text
@@ -81,9 +89,13 @@ const memory = (operation, input, sessionId) =>
     envelope: envelope(operation, input),
     ...(sessionId === undefined ? {} : { sessionId }),
   });
-const reassign = (sourceId, projectIds, sessionId, idempotencyKey) =>
+const reassign = (sourceId, projectIds, expectedProjectIds, sessionId, idempotencyKey) =>
   client().action("sources/reassign/probe:probeReassignSource", {
-    envelope: envelope("sources.reassignSource", { sourceId, projectIds }, idempotencyKey),
+    envelope: envelope(
+      "sources.reassignSource",
+      { sourceId, projectIds, expectedProjectIds },
+      idempotencyKey,
+    ),
     ...(sessionId === undefined ? {} : { sessionId }),
   });
 const withdraw = (sourceId, reason) =>
@@ -244,7 +256,10 @@ await publishOne(S_MOV, {
 
 // --- R1: the certified dispatch executes; placement is visible everywhere ------
 {
-  const moved = await reassign(S_MOV, [P_B]);
+  // The observed-placement precondition (issue #129): the editor's expected
+  // set is read from the same tenant state the dossier reads.
+  const observedBefore = sourceRow(await readState(), S_MOV).projectIds;
+  const moved = await reassign(S_MOV, [P_B], observedBefore);
   const st = await untilState(
     (s) =>
       s.jobs.some(
@@ -349,7 +364,7 @@ await publishOne(S_MOV, {
   const before = (await readState()).jobs.filter(
     (j) => j.kind === "memory.recompute_dependents" && (j.dedupKey ?? "").startsWith("sources.reassignSource:"),
   ).length;
-  const replay = await reassign(S_MOV, [P_B]);
+  const replay = await reassign(S_MOV, [P_B], sourceRow(await readState(), S_MOV).projectIds);
   const after = (await readState()).jobs.filter(
     (j) => j.kind === "memory.recompute_dependents" && (j.dedupKey ?? "").startsWith("sources.reassignSource:"),
   ).length;
@@ -374,9 +389,18 @@ await publishOne(S_MOV, {
   const SESSION_B = isolation.value.sessionId;
   const SOURCE_B = isolation.value.sourceId;
   const PROJECT_B = isolation.value.project;
-  const foreignProject = await reassign(S_MOV, [P_A, PROJECT_B]);
-  // A's own session attempting B's source (no sessionId override).
-  const foreignSource = await reassign(SOURCE_B, []);
+  const foreignProject = await reassign(
+    S_MOV,
+    [P_A, PROJECT_B],
+    sourceRow(await readState(), S_MOV).projectIds,
+  );
+  // A's own session attempting B's source (no sessionId override); the
+  // expected set is A's own honest observation of A's own source.
+  const foreignSource = await reassign(
+    SOURCE_B,
+    [],
+    sourceRow(await readState(), S_MOV).projectIds,
+  );
   const r4ok =
     foreignProject._tag === "error" &&
     (foreignProject.error.code === "tenant_scope_mismatch" ||
@@ -390,7 +414,8 @@ await publishOne(S_MOV, {
   );
 
   // --- R7: tenant isolation (B reassigns its own placement) ---------------------
-  const ownMove = await reassign(SOURCE_B, [], SESSION_B);
+  const observedOwn = sourceRow(await readState(SESSION_B), SOURCE_B).projectIds;
+  const ownMove = await reassign(SOURCE_B, [], observedOwn, SESSION_B);
   const defaultCompanyProbe = await readState(SESSION_B);
   const ownRow = defaultCompanyProbe.sources.find((s) => s.sourceId === SOURCE_B);
   const r7ok =
@@ -406,7 +431,8 @@ await publishOne(S_MOV, {
 
 // --- R5: to/from company-general ------------------------------------------------
 {
-  const generalized = await reassign(S_GEN, [P_A]);
+  const observedGeneral = sourceRow(await readState(), S_GEN).projectIds;
+  const generalized = await reassign(S_GEN, [P_A], observedGeneral);
   const st = await readState();
   const gen = sourceRow(st, S_GEN);
   const company = findingBy(st, key("faktura.dane"));
@@ -427,7 +453,8 @@ await publishOne(S_MOV, {
 {
   // Moving BACK to A is a real change; the updating marking is NOT re-marked
   // (C5's idempotence: revalidation replaces it, never a second marking).
-  const back = await reassign(S_MOV, [P_A]);
+  const observedBack = sourceRow(await readState(), S_MOV).projectIds;
+  const back = await reassign(S_MOV, [P_A], observedBack);
   await untilState(
     (s) =>
       s.jobs.filter(
@@ -457,7 +484,8 @@ await publishOne(S_MOV, {
   );
   const withdrawnRow = sourceRow(st2, S_MOV);
   const replayWithdraw = await withdraw(S_MOV, "powtórne wycofanie");
-  const reassignAfterWithdraw = await reassign(S_MOV, [P_B]);
+  const observedWithdrawn = sourceRow(await readState(), S_MOV).projectIds;
+  const reassignAfterWithdraw = await reassign(S_MOV, [P_B], observedWithdrawn);
   const r6ok =
     backOk &&
     withdrawn._tag === "ok" &&
@@ -472,6 +500,74 @@ await publishOne(S_MOV, {
     "R6 moving back never re-marks; withdrawal still executes (actor/time/reason recorded), stays one-shot, and a withdrawn source refuses reassignment",
     r6ok ? "PASS" : "FAIL",
     `back=${back._tag} markedRevs=${marked.revisionCounter} wd=${withdrawn._tag}/${withdrawnRow.lifecycle} replay=${replayWithdraw.error?.code} afterWd=${reassignAfterWithdraw.error?.code}`,
+  );
+}
+
+// --- R8: two independently loaded forms (issue #129's two-editor race) -----------
+{
+  // S_GEN sits at [P_A] after R5. Two editors independently load its
+  // placement from the dossier read (the same snapshot the form would use).
+  const detailA = await sourceDetail(S_GEN);
+  const detailB = await sourceDetail(S_GEN);
+  if (detailA._tag !== "ok" || detailB._tag !== "ok") throw new Error("R8 detail reads failed");
+  const observedA = detailA.value.projectIds;
+  const observedB = detailB.value.projectIds;
+  const reassignEvents = (st) =>
+    st.events.filter((e) => e.eventName === "sources.sourceReassigned").length;
+  const reassignJobs = (st) =>
+    st.jobs.filter(
+      (j) => j.kind === "memory.recompute_dependents" && (j.dedupKey ?? "").startsWith("sources.reassignSource:"),
+    ).length;
+  const beforeSt = await readState();
+
+  // A commits the move to B's project with A's observed set.
+  const movedByA = await reassign(S_GEN, [P_B], observedA);
+  await untilState(
+    (s) => (reassignJobs(s) > reassignJobs(beforeSt) ? null : "R8 first reaction pending"),
+    "R8 A's accepted recompute job",
+  );
+  const afterA = await readState();
+
+  // B's still-open form submits its stale desired set declaring the
+  // placement B observed: refused, and NOTHING registers (the E7
+  // regression holds for the stale refusal too).
+  const staleByB = await reassign(S_GEN, [P_A, P_B], observedB);
+  const afterB = await readState();
+  const committedDetail = await sourceDetail(S_GEN);
+  const staleRefusedNothing =
+    staleByB._tag === "error" &&
+    staleByB.error._tag === "conflict" &&
+    staleByB.error.code === "source_placement_stale" &&
+    reassignEvents(afterB) === reassignEvents(afterA) &&
+    reassignJobs(afterB) === reassignJobs(afterA) &&
+    committedDetail._tag === "ok" &&
+    committedDetail.value.projectIds.length === 1 &&
+    committedDetail.value.projectIds[0] === P_B;
+  record(
+    "R8 B's stale complete set is refused source_placement_stale with zero events/jobs; A's placement survives",
+    staleRefusedNothing ? "PASS" : "FAIL",
+    `stale=${staleByB.error?.code} events=${reassignEvents(afterA)}->${reassignEvents(afterB)} jobs=${reassignJobs(afterA)}->${reassignJobs(afterB)} committed=${committedDetail.value?.projectIds?.join(",")}`,
+  );
+
+  // B reloads the authoritative placement and DELIBERATELY resubmits.
+  const reloadDetail = await sourceDetail(S_GEN);
+  if (reloadDetail._tag !== "ok") throw new Error("R8 reload detail read failed");
+  const authoritative = reloadDetail.value.projectIds;
+  const resubmitted = await reassign(S_GEN, [P_A, P_B], authoritative);
+  await untilState(
+    (s) => (reassignJobs(s) > reassignJobs(afterB) ? null : "R8 second reaction pending"),
+    "R8 B's accepted recompute job",
+  );
+  const afterResubmit = await readState();
+  const resubmitOk =
+    resubmitted._tag === "ok" &&
+    resubmitted.value.projectIds.length === 2 &&
+    reassignEvents(afterResubmit) === reassignEvents(afterB) + 1 &&
+    reassignJobs(afterResubmit) === reassignJobs(afterB) + 1;
+  record(
+    "R8 B's reload-and-resubmit commits with exactly one event and one recomputation identity",
+    resubmitOk ? "PASS" : "FAIL",
+    `resubmitted=${resubmitted._tag} events=${reassignEvents(afterB)}->${reassignEvents(afterResubmit)} jobs=${reassignJobs(afterB)}->${reassignJobs(afterResubmit)}`,
   );
 }
 

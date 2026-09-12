@@ -10,8 +10,15 @@
  *
  * - guards: the source belongs to the actor's company, is still `active`
  *   (a withdrawn source keeps its historical placement, reassignment
- *   never rewrites withdrawal's history) and every referenced project is
- *   the company's own;
+ *   never rewrites withdrawal's history) and every referenced project —
+ *   declared OR observed — is the company's own;
+ * - R4 (issue #129): the command's REQUIRED `expectedProjectIds`
+ *   precondition names the complete set the editor observed; a mismatch
+ *   with the current committed set refuses the typed
+ *   `source_placement_stale` conflict BEFORE any write, event or
+ *   recomputation job, so a stale editor form never silently overwrites a
+ *   newer reassignment (the comparison ignores ordering and duplicates,
+ *   and nothing is ever merged);
  * - a typed conflict refuses a set equal to the current links (nothing to
  *   change), so client retries can never double-fire the reaction;
  * - the link rows themselves move (`sourceProjectLinks` is the single
@@ -46,6 +53,7 @@ import {
   executors,
   okResult,
   sourcesOperations,
+  type ClosedError,
   type ResultEnvelope,
 } from "@kiero/contracts";
 import {
@@ -95,11 +103,12 @@ export function dedupeProjectIds(projectIds: readonly string[]): string[] {
 /**
  * Set equality of the declared links against the current ones: a
  * reassignment that changes nothing is refused as a typed conflict (the
- * order of a set is not its meaning).
+ * order of a set is not its meaning). Generic over the id type so the
+ * branded references compare without casts.
  */
-export function sameLinkSet(
-  declared: readonly string[],
-  current: readonly string[],
+export function sameLinkSet<ProjectId extends string>(
+  declared: readonly ProjectId[],
+  current: readonly ProjectId[],
 ): boolean {
   if (declared.length !== current.length) {
     return false;
@@ -165,6 +174,41 @@ function registrationTargets(): { ok: true } | {
 // ---------------------------------------------------------------------------
 
 /**
+ * Resolves ONE complete project set — the declared replacement or the
+ * observed-placement precondition — into the company's own normalized
+ * project ids: de-duplicated (order preserved), bounded, reference-checked
+ * and tenant-checked, BEFORE any write. One rule serves both sets the
+ * command carries (they can never drift apart); a failure is the typed
+ * error the transaction returns verbatim (the registrationTargets shape).
+ */
+async function resolveCompanyProjects(
+  tx: MutationCtx,
+  refs: readonly string[],
+  companyId: Id<"companies">,
+): Promise<{ ok: true; projectIds: Id<"projects">[] } | { ok: false; error: ClosedError }> {
+  const deduped = dedupeProjectIds(refs);
+  if (deduped.length > MAX_PROJECT_LINKS) {
+    return { ok: false, error: validationError("too_many_project_links") };
+  }
+  const projectIds: Id<"projects">[] = [];
+  for (const projectRef of deduped) {
+    const projectId = tx.db.normalizeId("projects", projectRef);
+    if (projectId === null) {
+      return { ok: false, error: validationError("project_reference_not_found") };
+    }
+    const project = await tx.db.get(projectId);
+    if (project === null) {
+      return { ok: false, error: validationError("project_reference_not_found") };
+    }
+    if (project.companyId !== companyId) {
+      return { ok: false, error: forbiddenError("tenant_scope_mismatch", "projects") };
+    }
+    projectIds.push(projectId);
+  }
+  return { ok: true, projectIds };
+}
+
+/**
  * Performs the whole reassignment in the caller's mutation transaction:
  * guards, the link set change, the canonical event and the durable scope
  * re-assessment registration, atomically.
@@ -199,38 +243,38 @@ export async function performReassignment(
     );
   }
 
-  // --- the declared set: deduplicated, bounded, reference-checked ---------
-  const declared = dedupeProjectIds(input.projectIds);
-  if (declared.length > MAX_PROJECT_LINKS) {
-    return errorResult(validationError("too_many_project_links"));
+  // --- the two project sets the command carries: ONE resolution rule -------
+  // The declared replacement and the observed-placement precondition (R4, a
+  // REQUIRED contract key) resolve through the SAME company-project rule:
+  // a foreign or unknown reference in EITHER set refuses BEFORE any write
+  // and never exposes placement, and the comparison ignores ordering and
+  // duplicates (resolveCompanyProjects de-duplicates).
+  const declared = await resolveCompanyProjects(tx, input.projectIds, companyId);
+  if (!declared.ok) {
+    return errorResult(declared.error);
   }
-  const linkedProjects: Id<"projects">[] = [];
-  for (const projectRef of declared) {
-    const projectId = tx.db.normalizeId("projects", projectRef);
-    if (projectId === null) {
-      return errorResult(validationError("project_reference_not_found"));
-    }
-    const project = await tx.db.get(projectId);
-    if (project === null) {
-      return errorResult(validationError("project_reference_not_found"));
-    }
-    if (project.companyId !== companyId) {
-      return errorResult(forbiddenError("tenant_scope_mismatch", "projects"));
-    }
-    linkedProjects.push(projectId);
+  const observed = await resolveCompanyProjects(tx, input.expectedProjectIds, companyId);
+  if (!observed.ok) {
+    return errorResult(observed.error);
   }
 
-  // --- the current links: nothing-to-change refuses as a typed conflict ---
+  // --- the current links: the stale precondition fires FIRST ---------------
+  // A complete replacement declares what the editor SAW; if the committed
+  // set moved since that read, the form is stale and the command refuses
+  // BEFORE any write, event or recomputation job (the refused editor
+  // reloads the authoritative placement through the detail read; the stale
+  // and current sets are never merged). This precedes the nothing-to-change
+  // refusal: an editor whose desired set happens to equal the current one
+  // still never reassigns blindly off a stale observation.
   const currentLinks = await tx.db
     .query("sourceProjectLinks")
     .withIndex("by_source", (q) => q.eq("sourceId", source._id))
     .collect();
-  if (
-    sameLinkSet(
-      linkedProjects.map((id) => id as string),
-      currentLinks.map((link) => link.projectId as string),
-    )
-  ) {
+  const currentProjectIds = currentLinks.map((link) => link.projectId);
+  if (!sameLinkSet(observed.projectIds, currentProjectIds)) {
+    return errorResult(conflictError("source_placement_stale", "sources", source._id));
+  }
+  if (sameLinkSet(declared.projectIds, currentProjectIds)) {
     return errorResult(conflictError("source_links_unchanged", "sources", source._id));
   }
 
@@ -242,15 +286,15 @@ export async function performReassignment(
 
   // --- the atomic commit: links + event + job, or nothing -----------------
   const nowMs = Date.now();
-  const declaredSet = new Set<string>(linkedProjects.map((id) => id as string));
+  const declaredSet = new Set(declared.projectIds);
   for (const link of currentLinks) {
-    if (!declaredSet.has(link.projectId as string)) {
+    if (!declaredSet.has(link.projectId)) {
       await tx.db.delete(link._id);
     }
   }
-  const currentSet = new Set<string>(currentLinks.map((link) => link.projectId as string));
-  for (const projectId of linkedProjects) {
-    if (currentSet.has(projectId as string)) {
+  const currentSet = new Set(currentProjectIds);
+  for (const projectId of declared.projectIds) {
+    if (currentSet.has(projectId)) {
       continue; // kept links keep their assignment actor and time (history)
     }
     await tx.db.insert("sourceProjectLinks", {
@@ -273,7 +317,7 @@ export async function performReassignment(
   await publishEvent(tx, {
     companyId: context.actor.companyId,
     eventName: "sources.sourceReassigned",
-    payload: { sourceId: source._id, projectIds: linkedProjects },
+    payload: { sourceId: source._id, projectIds: declared.projectIds },
     dedupKey,
   });
   await registerDurableJob(tx, {
@@ -294,7 +338,7 @@ export async function performReassignment(
   return okResult(
     Schema.decodeUnknownSync(reassignSourceEntry.result)({
       reassignedAtMs: nowMs,
-      projectIds: linkedProjects,
+      projectIds: declared.projectIds,
     }),
   );
 }
