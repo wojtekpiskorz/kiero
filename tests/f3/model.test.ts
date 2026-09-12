@@ -16,14 +16,15 @@ import {
   sourcePreviewLine,
   ttlSecondsOf,
   type ClarificationPreview,
-  type DeliveredSummary,
+  type EntrySummary,
+  type TaskSummary,
   type ScopeView,
   type SourcePreview,
 } from "../../convex/attention/push/model";
 
 const T0 = Date.parse("2026-09-09T10:00:00.000Z");
 
-const companySummary: DeliveredSummary = {
+const companySummary: EntrySummary = {
   semanticKind: "source_entry",
   bucket: "company",
   scope: { kind: "company", projectIds: [] },
@@ -166,12 +167,10 @@ describe("the preview matrix", () => {
   });
 
   it("labels a task_reminder summary task_reminder in BOTH preview paths", () => {
-    const taskSummary: DeliveredSummary = {
+    const taskSummary: TaskSummary = {
       semanticKind: "task_reminder",
       bucket: "task:k1111111111111111111111",
-      scope: { kind: "company", projectIds: [] },
-      sourceIds: ["k1111111111111111111111"],
-      clarificationIds: [],
+      taskIds: ["k1111111111111111111111"],
       deliveredAtMs: T0,
     };
     const visible = composePushPayload({

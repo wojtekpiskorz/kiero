@@ -29,7 +29,11 @@
  *   if the drain reaction lagged.
  * - `notification_work` (in transaction): the source's pending or
  *   evaluating notification intents suppress with the machine purge reason
- *   (the due-time lifecycle re-check remains the structural guard).
+ *   (the due-time lifecycle re-check remains the structural guard), and
+ *   R3 terminally suppresses every affected still-pending push delivery
+ *   row - prepared payloads included - replacing the stored payload with
+ *   non-content data so no retry can transport the deleted preview;
+ *   settled rows (delivered/failed/unknown) keep their honest truth.
  * - `exports` (in transaction): verifies every linked export is terminal
  *   (the eager invalidation and the per-request check did the work; this
  *   records the auditable completion).
@@ -54,6 +58,9 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import type { DurableJobDoc, JobExecutor, JobOutcome } from "../../platform/executors";
 import { deleteSourceEntries } from "../../search/records";
 import { purgeClarificationContentForSource } from "../../memory/findings/corrections";
+import { decodeDeliverySummary } from "../../attention/push/model";
+import { suppressPendingDeliveriesOfIntent } from "../../attention/push/operations";
+import { clarificationContentRuleOf } from "../../memory/findings/references";
 import { markPurgedSupport } from "./marking";
 import { sourcePurgeRecordOf } from "./purge";
 import { PURGE_STAGE_KINDS, type PurgeStageKind } from "./schema";
@@ -227,8 +234,68 @@ async function purgeSearchIndex(tx: MutationCtx, stage: StageRow): Promise<void>
   await markStagePurged(tx, stage);
 }
 
-/** The notification stage (pending/evaluating intents suppress). */
-async function purgeNotificationWork(tx: MutationCtx, stage: StageRow): Promise<void> {
+/**
+ * Does one intent's still-pending push work fall under this purge? Direct
+ * intents carry `sourceId`; collapsed batch members cover the source
+ * through their summary's `sourceIds` without `sourceId` pointing at it
+ * (the by_source index cannot find those). Clarification summaries carry
+ * no source ids, so their pending work is checked EAGERLY against the R2
+ * content rule: a case the purge redacted or hid suppresses now, with the
+ * stored payload replaced, instead of waiting for the prepare safety net.
+ * Task-reminder summaries never reference sources.
+ */
+async function pushIntentAffectedByPurge(
+  tx: MutationCtx,
+  intent: Doc<"notificationIntents">,
+  sourceId: Id<"sources">,
+): Promise<boolean> {
+  if (intent.sourceId !== undefined && intent.sourceId === sourceId) {
+    return true;
+  }
+  if (intent.deliveryJson === undefined) {
+    return false;
+  }
+  const decoded = decodeDeliverySummary(intent.deliveryJson);
+  if (decoded.kind !== "decoded") {
+    return false;
+  }
+  if (decoded.summary.semanticKind === "task_reminder") {
+    return false;
+  }
+  if (decoded.summary.sourceIds.includes(sourceId)) {
+    return true;
+  }
+  if (decoded.summary.semanticKind !== "clarification") {
+    return false;
+  }
+  for (const clarificationId of decoded.summary.clarificationIds) {
+    const normalized = tx.db.normalizeId("clarifications", clarificationId);
+    const clarification = normalized === null ? null : await tx.db.get(normalized);
+    if (clarification === null || clarification.companyId !== intent.companyId) {
+      continue;
+    }
+    const rule = await clarificationContentRuleOf(tx.db, clarification);
+    if (!rule.actionable || rule.questionRedacted || rule.resolutionNoteRedacted) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The notification stage: pending/evaluating intents suppress with the
+ * machine purge reason (the due-time lifecycle re-check remains the
+ * structural guard), and R3 (issue #128) terminally suppresses every
+ * AFFECTED still-pending push delivery row - including prepared payloads
+ * whose intent already delivered - replacing the stored payload with
+ * non-content data so a retry can never transport the deleted preview.
+ * Delivered, failed and unknown rows are untouched: an already accepted
+ * external request is never claimed as recalled.
+ */
+async function purgeNotificationWork(
+  tx: MutationCtx,
+  stage: StageRow,
+): Promise<void> {
   const intents = await tx.db
     .query("notificationIntents")
     .withIndex("by_source", (q) => q.eq("sourceId", stage.sourceId))
@@ -242,6 +309,29 @@ async function purgeNotificationWork(tx: MutationCtx, stage: StageRow): Promise<
         lastEvaluatedAtMs: nowMs,
       });
     }
+  }
+  // R3: the affected-work scan rides the company-state index (bounded to
+  // this firm's pending rows), and every affected intent's pending rows go
+  // through the ONE production suppressor the prepare path uses, so the
+  // stored payload replacement can never drift between the two writers.
+  const pendingPushRows = await tx.db
+    .query("pushDeliveries")
+    .withIndex("by_company_state", (q) =>
+      q.eq("companyId", stage.companyId).eq("state", "pending"),
+    )
+    .collect();
+  const affectedIntents = new Map<Id<"notificationIntents">, string>();
+  for (const intentId of new Set(pendingPushRows.map((row) => row.intentId))) {
+    const intent = await tx.db.get(intentId);
+    if (intent === null) {
+      continue;
+    }
+    if (await pushIntentAffectedByPurge(tx, intent, stage.sourceId)) {
+      affectedIntents.set(intent._id, intent.semanticKind);
+    }
+  }
+  for (const [intentId, semanticKind] of affectedIntents) {
+    await suppressPendingDeliveriesOfIntent(tx, intentId, "source_purged", semanticKind);
   }
   await markStagePurged(tx, stage);
 }

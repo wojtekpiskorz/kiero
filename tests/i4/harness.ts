@@ -34,6 +34,9 @@ export const DELETION_TABLES = [
   "evidenceLinks",
   "findingDependencies",
   "notificationIntents",
+  // R3 (issue #128): the notification stage scans pending push rows of
+  // the purged source, so every purge-executor world needs the table.
+  "pushDeliveries",
   "searchEntries",
   "exports",
   "exportSourceLinks",

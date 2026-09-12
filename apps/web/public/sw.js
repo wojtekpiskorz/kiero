@@ -10,18 +10,64 @@
  *
  * Push messages arrive RFC 8030/8291-encrypted; the browser decrypts and
  * hands this worker the JSON payload the Kiero server composed:
- *   { v: 1, kind, title, body, data: { sourceIds?, clarificationIds? } }
+ *   { v: 1, kind, title, body, data: { sourceIds?, clarificationIds?,
+ *     taskIds?, target } }
  *
  * notificationclick never marks anything read ("Nieprzeczytany wpis"
  * changes only when the person sees the original in the app) and never
- * opens an absolute URL from the payload: it focuses an existing window
- * or opens the worker's OWN scope, so an old notification can only ever
- * land the user inside the current app, which resolves current data and
- * live access checks.
+ * performs any server call. R3 (issue #128): the click navigates only to
+ * a VALIDATED relative same-origin target - the payload's canonical
+ * source dossier, task record or Co teraz route - and it rejects
+ * absolute, protocol-relative, cross-origin and unknown routes outright
+ * (the scope fallback opens instead). An existing app window is focused
+ * and navigated; otherwise the target opens as a new window. The app
+ * resolves current data and live access after the click, so an old
+ * notification can never steer the user outside the current app.
  */
 
 const FALLBACK_TITLE = "Kiero";
 const FALLBACK_BODY = "Nowe powiadomienie";
+
+/** The only routes a notification may open (the canonical record routes). */
+const ALLOWED_ROUTE_PATHS = ["/zrodlo", "/praca", "/co-teraz"];
+
+/**
+ * Validates the payload's routing target: a RELATIVE path inside the
+ * worker's OWN origin whose pathname is one of the allowed record routes.
+ * Everything else (absolute URLs, protocol-relative URLs, foreign
+ * origins, unknown paths, non-strings) refuses to null, and the click
+ * falls back to the worker's own scope.
+ */
+function notificationTarget(routing) {
+  if (routing === null || typeof routing !== "object") {
+    return null;
+  }
+  const raw = routing.target;
+  if (typeof raw !== "string" || raw.length === 0) {
+    return null;
+  }
+  if (raw.charCodeAt(0) !== 47) {
+    return null; // must be relative: no scheme, no host
+  }
+  if (raw.charCodeAt(1) === 47) {
+    return null; // protocol-relative is a foreign origin in disguise
+  }
+  let scopeUrl;
+  let resolved;
+  try {
+    scopeUrl = new URL(self.registration.scope);
+    resolved = new URL(raw, scopeUrl);
+  } catch (error) {
+    return null;
+  }
+  if (resolved.origin !== scopeUrl.origin) {
+    return null; // cross-origin
+  }
+  if (!ALLOWED_ROUTE_PATHS.includes(resolved.pathname)) {
+    return null; // unknown route
+  }
+  return resolved.pathname + resolved.search;
+}
 
 self.addEventListener("push", (event) => {
   let payload = {};
@@ -53,14 +99,27 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   event.waitUntil(
     (async () => {
+      const target = notificationTarget(event.notification.data);
       const windowClients = await self.clients.matchAll({
         type: "window",
         includeUncontrolled: true,
       });
       for (const client of windowClients) {
         if (client.url.startsWith(self.registration.scope)) {
-          return client.focus();
+          const focused = await client.focus();
+          if (target !== null) {
+            try {
+              await client.navigate(target);
+            } catch (error) {
+              // Navigation refused (for example a cross-origin frame):
+              // stay on the focused window, which reloads current state.
+            }
+          }
+          return focused;
         }
+      }
+      if (target !== null) {
+        return self.clients.openWindow(target);
       }
       return self.clients.openWindow(self.registration.scope);
     })(),

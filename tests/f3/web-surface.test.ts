@@ -28,10 +28,16 @@ describe("the shipped service worker", () => {
     expect(workerSource).not.toMatch(/caches\./);
   });
 
-  it("opens only its OWN scope on click, never a payload URL", () => {
-    // openWindow's argument is the registration scope, not payload data.
+  it("opens a validated relative target or its own scope, never raw payload data", () => {
+    // R3 (issue #128): the click navigates the payload's VALIDATED target
+    // (relative, same-origin, allowlisted pathname) or falls back to the
+    // registration scope; the raw payload value never reaches openWindow
+    // unvalidated (tests/f3/sw-routes.test.ts pins the full policy on the
+    // real file, this keeps the source-level invariant).
+    expect(workerSource).toMatch(/openWindow\(target\)/);
     expect(workerSource).toMatch(/openWindow\(self\.registration\.scope\)/);
     expect(workerSource).not.toMatch(/openWindow\(.*data/);
+    expect(workerSource).toMatch(/notificationTarget/);
   });
 
   it("never marks anything read on click (no server call in the click path)", () => {
