@@ -12,6 +12,16 @@
  * existing reads: company resolved from the verified context, project
  * scope tenant-checked, everything ordered and bounded.
  *
+ * R2 (issue #127) makes this read ride the ONE shared clarification
+ * content rule (`clarificationContentRuleOf` in ./references, the lane's
+ * rule-text home): a link whose source's CONTENT is gone (missing,
+ * cross-company or `purged`) is dead, possibly derived text redacts to
+ * the fixed Polish copy, and a redacted open case is not actionable —
+ * while a withdrawn source keeps its content, links and answerable
+ * cases (withdrawal deletes nothing). The agent context loader and the
+ * durable purge evaluate the same rule, so content disappears from every
+ * surface the moment the tombstone commits.
+ *
  * Rows carry their ENCODED (wire) value shapes, exactly like
  * readCurrentFindings: BigDecimal and friends are not Convex-serializable,
  * and the public query returns the wire form for client-side decoding
@@ -21,8 +31,15 @@
 import { type ClosedError } from "@kiero/contracts";
 import { forbiddenError, notFoundError, type RequestContext } from "@kiero/runtime";
 import type { QueryCtx } from "../../_generated/server";
-import type { Doc, Id } from "../../_generated/dataModel";
-import { normalizedCompany, requireFinding, requireProject } from "./references";
+import type { Id } from "../../_generated/dataModel";
+import {
+  clarificationContentRuleOf,
+  normalizedCompany,
+  requireFinding,
+  requireProject,
+  REDACTED_CLARIFICATION_QUESTION_COPY,
+  REDACTED_CLARIFICATION_RESOLUTION_COPY,
+} from "./references";
 import type { ReadClarificationsInput, ReadFindingHistoryInput } from "./semantics";
 
 /** How many revisions one history read keeps (bounded read). */
@@ -31,6 +48,10 @@ const MAX_REVISION_ROWS = 200;
 /** How many clarifications one scope read keeps (bounded read). */
 const MAX_CLARIFICATION_ROWS = 100;
 
+// R2 (issue #127): the shared purge-redaction rule (`clarificationContentRuleOf`)
+// and the two redaction constants live in ./references, the lane's one rule
+// home beside `requireSource` and R1's `checkResolutionEvidenceReference`, so
+// this read, the agent context loader and the stored purge never drift apart.
 /** One revision row in its wire form (value/knowledgeState encoded). */
 export interface RevisionWireRow {
   readonly revisionId: string;
@@ -95,6 +116,14 @@ export interface ClarificationWireRow {
     readonly sourceId: string;
     readonly fragmentId: string | null;
   }[];
+  /**
+   * R2 amendment (additive, flagged): whether the question (or resolution
+   * note) text is redacted to the fixed copy because a source it possibly
+   * derived from was permanently deleted (or its link is otherwise dead).
+   */
+  readonly questionRedacted: boolean;
+  /** R2: same, for the resolution note of resolved rows. */
+  readonly resolutionNoteRedacted: boolean;
 }
 
 type ReadResult<T> =
@@ -182,28 +211,19 @@ export async function readFindingHistoryRows(
   };
 }
 
-/** Dereferences a clarification's conflicting fragments to canonical sources. */
-async function conflictingEvidenceOf(
-  db: QueryCtx["db"],
-  clarification: Doc<"clarifications">,
-): Promise<ClarificationWireRow["conflictingEvidence"]> {
-  const evidence: { fragmentId: string; sourceId: string }[] = [];
-  for (const fragmentId of clarification.conflictingFragmentIds) {
-    const fragment = await db.get(fragmentId);
-    if (fragment === null) {
-      continue;
-    }
-    evidence.push({ fragmentId, sourceId: fragment.sourceId });
-  }
-  return evidence;
-}
-
 /**
  * The clarifications of one scope (open and resolved, oldest first): the
  * shared open questions a boss may answer, with the sourced contradiction
  * each one is about. Resolved rows keep their author, note and time, plus
  * the R1 basis and the persisted evidence references of a source-backed
  * resolution (pre-repair rows read as `legacy_unknown`).
+ *
+ * R2 (issue #127): every row rides the ONE shared content rule, so the
+ * read redacts from the tombstone on — question and note text that
+ * possibly derived from PERMANENTLY DELETED content reads as the fixed
+ * Polish copy (never a summary), content-dead references are absent, and
+ * an OPEN redacted case leaves
+ * the list entirely (it is not actionable and Co teraz must not show it).
  */
 export async function readClarificationRows(
   db: QueryCtx["db"],
@@ -244,19 +264,35 @@ export async function readClarificationRows(
         ? row.scopeKind === "company" && row.scopeProjectId === undefined
         : row.scopeKind === "project" && row.scopeProjectId === scopeProjectId,
     )
-    .sort((a, b) => a.raisedAtMs - b.raisedAtMs)
-    .slice(0, MAX_CLARIFICATION_ROWS);
+    .sort((a, b) => a.raisedAtMs - b.raisedAtMs);
   const out: ClarificationWireRow[] = [];
   for (const clarification of scoped) {
+    const rule = await clarificationContentRuleOf(db, clarification);
+    if (!rule.actionable) {
+      // A redacted open case is not actionable: Pamięć and Co teraz must
+      // not list it (R2).
+      continue;
+    }
+    if (out.length >= MAX_CLARIFICATION_ROWS) {
+      break;
+    }
     out.push({
       clarificationId: clarification._id,
-      question: clarification.question,
+      question: rule.questionRedacted
+        ? REDACTED_CLARIFICATION_QUESTION_COPY
+        : clarification.question,
       state: clarification.state,
       raisedAtMs: clarification.raisedAtMs,
       resolvedByUserId: clarification.resolvedByUserId ?? null,
-      resolutionNote: clarification.resolutionNote ?? null,
+      resolutionNote:
+        rule.resolutionNoteRedacted && clarification.resolutionNote !== undefined
+          ? REDACTED_CLARIFICATION_RESOLUTION_COPY
+          : (clarification.resolutionNote ?? null),
       resolvedAtMs: clarification.resolvedAtMs ?? null,
-      conflictingEvidence: await conflictingEvidenceOf(db, clarification),
+      conflictingEvidence: rule.activeConflictingEvidence.map((entry) => ({
+        fragmentId: entry.fragmentId,
+        sourceId: entry.sourceId,
+      })),
       // R1: an open row has no basis; a resolved row carries its stored
       // basis, and a PRE-REPAIR row (basis never stored) reads as the
       // explicit `legacy_unknown` — an unknown historical agent resolution
@@ -265,12 +301,13 @@ export async function readClarificationRows(
         clarification.state === "open"
           ? null
           : (clarification.resolutionBasis ?? "legacy_unknown"),
-      resolutionEvidence: (clarification.resolutionEvidence ?? []).map(
-        (reference) => ({
-          sourceId: reference.sourceId,
-          fragmentId: reference.sourceFragmentId ?? null,
-        }),
-      ),
+      resolutionEvidence: rule.activeResolutionEvidence.map((reference) => ({
+        sourceId: reference.sourceId,
+        fragmentId: reference.fragmentId,
+      })),
+      // R2: the honest redaction flags of this row's text.
+      questionRedacted: rule.questionRedacted,
+      resolutionNoteRedacted: rule.resolutionNoteRedacted,
     });
   }
   return { ok: true, rows: out };

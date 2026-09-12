@@ -264,6 +264,23 @@ export const findingsTables = {
         }),
       ),
     ),
+    /**
+     * R2 amendment (additive, flagged on the R1 precedent): the content-free
+     * audit trail of one row's purge redaction (issue #127) — WHICH source
+     * deletions contributed and WHEN each text was replaced. Never carries
+     * any text of the removed content. Absent on rows no purge touched;
+     * pre-existing rows read as un-redacted until a purge reaches them.
+     */
+    purgeAudit: v.optional(
+      v.object({
+        /** Every permanently deleted source this row was redacted for. */
+        redactedSourceIds: v.array(shared.sourceId),
+        /** Set when the stored question text was replaced by the fixed copy. */
+        questionRedactedAtMs: v.optional(shared.tsMs),
+        /** Set when the stored resolution note was replaced by the fixed copy. */
+        resolutionNoteRedactedAtMs: v.optional(shared.tsMs),
+      }),
+    ),
   })
     .index("by_company_state", ["companyId", "state"])
     .index("by_project", ["companyId", "scopeProjectId"]),

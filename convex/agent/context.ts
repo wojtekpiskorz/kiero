@@ -14,6 +14,15 @@
  * reducer never has to re-derive it and the model sees updating findings
  * marked from the first message.
  *
+ * R2 (issue #127): the same loader drops dead references — an evidence
+ * WITNESS must pass the GROUNDING predicate (`requireActiveSource`: a
+ * withdrawn source "przestała stanowić podstawę aktualnych ustaleń" and a
+ * tombstone grounds nothing, so neither may enter the ledger the model
+ * cites for statements and resolves), while the open-clarification list
+ * rides the CONTENT rule in ../memory/findings/references (only permanent
+ * deletion removes content): a redacted case is not actionable and stays
+ * out of the model's list, a withdrawn-anchored case stays answerable.
+ *
  * No vector search yet (E5 owns it): retrieval stays bounded tenant-filtered
  * text work, and similarity would anyway never establish truth.
  */
@@ -42,6 +51,10 @@ import {
 } from "@kiero/agent/tools";
 import type { QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import {
+  clarificationContentRuleOf,
+  requireActiveSource,
+} from "../memory/findings/references";
 
 /** The DB reader surface the loader needs (mutation or query context). */
 export type AnswerLoaderDb = QueryCtx["db"];
@@ -140,8 +153,14 @@ async function loadFindingsAndEvidence(
       if (evidence.length >= MAX_ANSWER_CONTEXT_FINDINGS * 2) {
         break;
       }
-      const source = await db.get(witness.sourceId);
-      if (source === null || source.companyId !== companyId) {
+      // R2 (issue #127): the GROUNDING predicate decides here, not the
+      // content one — the ledger's handles are what the model cites to
+      // ground statements and resolves, and neither a withdrawn source
+      // (no longer a basis of current agreements) nor a tombstone may
+      // ground new work. (Whether the source's CONTENT stays readable is
+      // a different question, asked by the clarification content rule.)
+      const source = await requireActiveSource(db, witness.sourceId, companyId);
+      if (source === null) {
         continue;
       }
       let startOffset: number | null = null;
@@ -259,12 +278,26 @@ async function loadClarifications(
     .query("clarifications")
     .withIndex("by_company_state", (q) => q.eq("companyId", companyId).eq("state", "open"))
     .take(MAX_ANSWER_CONTEXT_WORK);
-  return rows.map((row) => ({
-    clarificationId: row._id,
-    question: row.question,
-    scopeKind: row.scopeKind,
-    scopeProjectId: row.scopeProjectId ?? null,
-  }));
+  // R2 (issue #127): a redacted open case is not actionable — the model
+  // must not see (let alone answer) a question whose content derived from
+  // a permanently deleted source. The ONE shared content rule decides
+  // (content question: a withdrawn source's case stays visible here).
+  const actionable: AnswerClarification[] = [];
+  for (const row of rows) {
+    const rule = await clarificationContentRuleOf(db, row);
+    if (!rule.actionable) {
+      continue;
+    }
+    actionable.push({
+      clarificationId: row._id,
+      // Open plus actionable implies the question is not redacted; the rule
+      // keeps redacted cases out of the actionable set entirely.
+      question: row.question,
+      scopeKind: row.scopeKind,
+      scopeProjectId: row.scopeProjectId ?? null,
+    });
+  }
+  return actionable;
 }
 
 /** Loads the catalog contacts (executor candidates), bounded. */

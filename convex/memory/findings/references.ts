@@ -14,6 +14,16 @@
  * agent executor and the resolution transaction validate through it — each
  * layer still runs its own end-to-end check; only the rule text lives
  * here, so the two can never drift apart.
+ *
+ * R2 (issue #127) additions: `requireActiveSource` (GROUNDING: may this
+ * source ground new work? withdrawn/tombstoned do not) and
+ * `requireContentAliveSource` (CONTENT: is this source's content still
+ * readable? only `purged` content is gone — withdrawal keeps history),
+ * plus `clarificationContentRuleOf` with the two redaction constants (the
+ * ONE shared content rule of the clarification purge, built on the
+ * CONTENT predicate) — the boss-facing read (./exposition), the agent
+ * context loader and the stored purge (./corrections) all evaluate them,
+ * so reads, context and storage can never drift apart either.
  */
 
 import type { RequestContext } from "@kiero/runtime";
@@ -55,6 +65,45 @@ export async function requireSource(
     return null;
   }
   return source;
+}
+
+/**
+ * R2 (issue #127): the GROUNDING predicate — "may this source ground NEW
+ * work?" (raising a case, resolving on new evidence, anchoring a citation).
+ * It must exist, belong to the resolved company and be `active`: a
+ * withdrawn source "przestała stanowić podstawę aktualnych ustaleń"
+ * (CONTEXT.md, Źródło wycofane) and a retained tombstone grounds nothing.
+ * R1's `checkResolutionEvidenceReference` and the agent write paths
+ * evaluate this stance; every grounding call site uses this predicate,
+ * never a private copy.
+ */
+export async function requireActiveSource(
+  db: Db,
+  sourceRef: string,
+  companyId: Id<"companies">,
+): Promise<Doc<"sources"> | null> {
+  const source = await requireSource(db, sourceRef, companyId);
+  return source !== null && source.lifecycle === "active" ? source : null;
+}
+
+/**
+ * R2 round 3 (issue #127): the CONTENT predicate — "is this source's
+ * CONTENT still readable?" Withdrawal deletes nothing ("Jej wcześniejsza
+ * rola i przyczyna korekty pozostają częścią historii", CONTEXT.md): the
+ * row, text and fragments stay, so a withdrawn source is content-alive.
+ * Only a missing, cross-company or `purged` source is content-dead —
+ * permanent deletion is the one lifecycle whose content must disappear.
+ * The shared clarification content rule (`clarificationContentRuleOf`)
+ * evaluates THIS question; grounding paths evaluate `requireActiveSource`.
+ * The two predicates answer two different questions and must not merge.
+ */
+export async function requireContentAliveSource(
+  db: Db,
+  sourceRef: string,
+  companyId: Id<"companies">,
+): Promise<Doc<"sources"> | null> {
+  const source = await requireSource(db, sourceRef, companyId);
+  return source !== null && source.lifecycle !== "purged" ? source : null;
 }
 
 /** One project of this company (id only), or null when missing/foreign. */
@@ -163,4 +212,134 @@ export async function checkResolutionEvidenceReference(
     }
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// R2 (issue #127): the shared clarification purge-redaction rule.
+// ---------------------------------------------------------------------------
+
+/**
+ * The fixed Polish redaction copy (product text): replaces stored question
+ * or resolution text that possibly derived from a permanently deleted
+ * source. Never a summary — deleted content is never paraphrased back.
+ */
+export const REDACTED_CLARIFICATION_QUESTION_COPY =
+  "Pytanie zostało trwale usunięte wraz z wiadomością źródłową.";
+export const REDACTED_CLARIFICATION_RESOLUTION_COPY =
+  "Rozstrzygnięcie zostało trwale usunięte wraz z wiadomością źródłową.";
+
+/**
+ * The effective content state of one clarification row under the CURRENT
+ * source lifecycle (R2): which links still point at sources whose CONTENT
+ * is alive, and which text is therefore redacted to the fixed copy. This
+ * is the ONE rule every consumer evaluates — the boss-facing read, the
+ * agent context loader and the stored purge — so the immediate window
+ * (tombstone committed, asynchronous purge not yet run) already redacts
+ * exactly what the purge will freeze.
+ */
+export interface ClarificationContentRule {
+  /**
+   * True when any conflicting-evidence link is content-dead (its source is
+   * missing, cross-company or `purged`): the question possibly derived
+   * from permanently deleted content and reads as the fixed copy. A
+   * withdrawn source's content stays, so its links stay alive.
+   */
+  readonly questionRedacted: boolean;
+  /**
+   * True (resolved rows) when the stored note possibly derived from
+   * permanently deleted content: a stored basis that cited a purged
+   * source, or a legacy basis on a redacted case (the basis is unknown;
+   * never guess it safe).
+   */
+  readonly resolutionNoteRedacted: boolean;
+  /** The conflicting fragments whose source is content-alive, in stored order. */
+  readonly activeConflictingEvidence: readonly {
+    readonly fragmentId: Id<"sourceFragments">;
+    readonly sourceId: Id<"sources">;
+  }[];
+  /** The resolution evidence whose source is content-alive, in stored order. */
+  readonly activeResolutionEvidence: readonly {
+    readonly sourceId: Id<"sources">;
+    readonly fragmentId: Id<"sourceFragments"> | null;
+  }[];
+  /** False only for OPEN redacted rows: they leave every actionable list. */
+  readonly actionable: boolean;
+}
+
+/**
+ * R2: evaluates one clarification row against the current state. A dead
+ * link is a conflicting fragment (or resolution-evidence reference) whose
+ * source is missing, cross-company or `purged`
+ * (`requireContentAliveSource` — permanent deletion is the one lifecycle
+ * whose content must disappear; a WITHDRAWN source keeps its content, so
+ * its links stay alive and its cases stay answerable). The stored purge
+ * audit keeps redaction sticky after the associations themselves were
+ * removed.
+ */
+export async function clarificationContentRuleOf(
+  db: Db,
+  clarification: Doc<"clarifications">,
+): Promise<ClarificationContentRule> {
+  const activeConflictingEvidence: {
+    fragmentId: Id<"sourceFragments">;
+    sourceId: Id<"sources">;
+  }[] = [];
+  let questionRedacted = clarification.purgeAudit?.questionRedactedAtMs !== undefined;
+  for (const fragmentId of clarification.conflictingFragmentIds) {
+    const fragment = await db.get(fragmentId);
+    if (fragment === null) {
+      questionRedacted = true;
+      continue;
+    }
+    const source = await requireContentAliveSource(
+      db,
+      fragment.sourceId,
+      clarification.companyId,
+    );
+    if (source === null) {
+      questionRedacted = true;
+      continue;
+    }
+    activeConflictingEvidence.push({
+      fragmentId,
+      sourceId: source._id,
+    });
+  }
+  const activeResolutionEvidence: {
+    sourceId: Id<"sources">;
+    fragmentId: Id<"sourceFragments"> | null;
+  }[] = [];
+  let storedBasisHasDeadSource = false;
+  for (const reference of clarification.resolutionEvidence ?? []) {
+    const source = await requireContentAliveSource(
+      db,
+      reference.sourceId,
+      clarification.companyId,
+    );
+    if (source === null) {
+      storedBasisHasDeadSource = true;
+      continue;
+    }
+    activeResolutionEvidence.push({
+      sourceId: source._id,
+      fragmentId: reference.sourceFragmentId ?? null,
+    });
+  }
+  // The stored basis decides the note: a source-backed basis redacts when
+  // any cited source was purged; a legacy basis (never stored, pre-R1) redacts
+  // with a redacted question — its basis is unknown and never guessed safe;
+  // a manual boss decision rested on no source and keeps its note.
+  const noteRedactedByBasis =
+    clarification.state === "resolved" &&
+    (storedBasisHasDeadSource ||
+      (clarification.resolutionBasis === undefined && questionRedacted));
+  const resolutionNoteRedacted =
+    clarification.purgeAudit?.resolutionNoteRedactedAtMs !== undefined || noteRedactedByBasis;
+  return {
+    questionRedacted,
+    resolutionNoteRedacted,
+    activeConflictingEvidence,
+    activeResolutionEvidence,
+    actionable: clarification.state !== "open" || !questionRedacted,
+  };
 }
