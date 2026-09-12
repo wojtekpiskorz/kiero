@@ -31,12 +31,13 @@
 import { v } from "convex/values";
 import { Schema } from "effect";
 import { errorResult, okResult, type ResultEnvelope } from "@kiero/contracts";
-import { unsupportedError } from "@kiero/runtime";
+import { forbiddenError, unauthenticatedError, unsupportedError } from "@kiero/runtime";
 import { resolveRelativeDay } from "@kiero/domain";
 import { action, internalMutation, internalQuery } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
+import { resolveAccessContextFromConvexAuth } from "../../access/identity/resolution";
 import { bridgeIdentity, resolveRequestContext } from "../../platform/context";
 import {
   ISOLATION_COMPANY,
@@ -580,5 +581,59 @@ export const probeMemoryState = action({
     return ctx.runQuery(internal.memory.findings.probe.memoryState, {
       serviceSessionId: sessionId,
     });
+  },
+});
+
+// --- R2 storage inspection (issue #127) ------------------------------------------
+
+/**
+ * The guarded STORED clarification rows for the CALLER's company (the
+ * storage-freeze half of the R2 purge evidence): the boss-facing reads
+ * already prove redaction from the tombstone on; this surface proves the
+ * durable purge actually converged the stored text to the fixed copy and
+ * recorded the content-free purge audit. The caller resolves from their own
+ * verified Convex Auth credential (the deletion-probe pattern); row content
+ * is exposed because this is the deletion evidence surface.
+ */
+export const clarificationStorage = internalQuery({
+  args: {},
+  handler: async (ctx): Promise<ResultEnvelope> => {
+    const context = await resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
+    if (context === null) {
+      return errorResult(unauthenticatedError());
+    }
+    const companyId = ctx.db.normalizeId("companies", context.actor.companyId);
+    if (companyId === null) {
+      return errorResult(forbiddenError("company_scope_unresolved", "companies"));
+    }
+    const rows = await ctx.db
+      .query("clarifications")
+      .withIndex("by_company_state", (q) => q.eq("companyId", companyId))
+      .collect();
+    return okResult({
+      rows: rows.map((row) => ({
+        clarificationId: row._id,
+        question: row.question,
+        resolutionNote: row.resolutionNote ?? null,
+        state: row.state,
+        raisedAtMs: row.raisedAtMs,
+        resolvedByUserId: row.resolvedByUserId ?? null,
+        resolvedAtMs: row.resolvedAtMs ?? null,
+        resolutionBasis: row.resolutionBasis ?? null,
+        conflictingFragmentIds: row.conflictingFragmentIds,
+        resolutionEvidence: row.resolutionEvidence ?? null,
+        purgeAudit: row.purgeAudit ?? null,
+      })),
+    });
+  },
+});
+
+export const probeClarificationStorage = action({
+  args: {},
+  handler: async (ctx): Promise<ResultEnvelope> => {
+    if (!probeGuardEnabled()) {
+      return probeDisabled();
+    }
+    return ctx.runQuery(internal.memory.findings.probe.clarificationStorage, {});
   },
 });
