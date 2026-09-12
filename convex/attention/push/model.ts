@@ -34,20 +34,6 @@
 
 import type { PushLegReport } from "./protocol";
 
-/** One collapsed delivery summary as F2's evaluator records it (deliveryJson). */
-export interface DeliveredSummary {
-  readonly semanticKind: "source_entry" | "clarification" | "task_reminder" | "confirmation";
-  readonly bucket: string;
-  /** Absent on task-reminder summaries (F4's shape has no scope). */
-  readonly scope?: { readonly kind: "company" | "project"; readonly projectIds: readonly string[] };
-  readonly sourceIds?: readonly string[];
-  readonly clarificationIds?: readonly string[];
-  /** F4's collapsed reminder batch: the tasks this one summary covers. */
-  readonly taskIds?: readonly string[];
-  readonly reminderKinds?: readonly string[];
-  readonly deliveredAtMs: number;
-}
-
 /** The F2-shaped summary of one source-entry or clarification batch. */
 export interface EntrySummary {
   readonly semanticKind: "source_entry" | "clarification";
@@ -214,10 +200,12 @@ export interface TaskPreview {
 
 /** The inputs the payload composer needs, re-read at delivery time. */
 export interface PayloadInputs {
-  readonly summary: DeliveredSummary;
-  readonly scope: ScopeView;
-  readonly sources: readonly SourcePreview[];
-  readonly clarifications: readonly ClarificationPreview[];
+  /** The runtime-decoded summary; the loose wire record never reaches here. */
+  readonly summary: DecodedSummary;
+  /** Entry summaries only: the rendered scope. */
+  readonly scope?: ScopeView;
+  readonly sources?: readonly SourcePreview[];
+  readonly clarifications?: readonly ClarificationPreview[];
   /** The F4 adapter's re-read task rows (absent for entry summaries). */
   readonly tasks?: readonly TaskPreview[];
   readonly hidePreview: boolean;
@@ -285,6 +273,9 @@ export function fragmentOf(text: string): string {
 }
 
 /** The scope name a title shows: project names, or Firma for the company. */
+/** The company scope name only: satisfies the optional input when absent. */
+const FALLBACK_SCOPE: ScopeView = { kind: "company", projectNames: [] };
+
 export function scopeNameOf(scope: ScopeView): string {
   if (scope.kind === "company" || scope.projectNames.length === 0) {
     return "Firma";
@@ -320,30 +311,68 @@ function orderedOpenTasksOf(inputs: PayloadInputs): readonly TaskPreview[] {
 
 /** The live sources of the batch, ordered by id (one order, one place). */
 function orderedLiveSourcesOf(inputs: PayloadInputs): readonly SourcePreview[] {
-  return [...inputs.sources]
+  return [...(inputs.sources ?? [])]
     .filter((source) => source.stillActive)
     .sort((left, right) => left.sourceId.localeCompare(right.sourceId));
 }
 
 /**
- * The routing target of the FIRST live record of the summary's own kind,
- * ordered by id: the click lands on current content even when other
- * members of the batch died. Empty when nothing is live (the pure neutral
- * paths; the transaction denies before composing when that happens).
+ * The ONE ordered-live computation the composer, the routing data and the
+ * nothing-live predicate share: the summary-kind's live rows in payload
+ * order, plus the click target of the FIRST live record (the click lands
+ * on current content even when other members of the batch died). The
+ * target is empty exactly when nothing of the summary's kind is live.
  */
-function liveTargetOf(inputs: PayloadInputs): string {
+interface LiveWorkOf {
+  readonly target: string;
+  readonly tasks: readonly TaskPreview[];
+  readonly clarifications: readonly ClarificationPreview[];
+  readonly sources: readonly SourcePreview[];
+}
+
+function liveWorkOf(inputs: PayloadInputs): LiveWorkOf {
   const summary = inputs.summary;
   if (summary.semanticKind === "task_reminder") {
     const open = orderedOpenTasksOf(inputs);
-    return open.length > 0 ? taskTargetOf(open[0]!.taskId) : "";
+    return {
+      target: open.length > 0 ? taskTargetOf(open[0]!.taskId) : "",
+      tasks: open,
+      clarifications: [],
+      sources: [],
+    };
   }
   if (summary.semanticKind === "clarification") {
-    return inputs.clarifications.some((entry) => entry.stillOpen)
-      ? CLARIFICATION_ROUTE_PATH
-      : "";
+    const open = (inputs.clarifications ?? []).filter((entry) => entry.stillOpen);
+    return {
+      target: open.length > 0 ? CLARIFICATION_ROUTE_PATH : "",
+      tasks: [],
+      clarifications: open,
+      sources: [],
+    };
   }
   const live = orderedLiveSourcesOf(inputs);
-  return live.length > 0 ? sourceTargetOf(live[0]!.sourceId) : "";
+  return {
+    target: live.length > 0 ? sourceTargetOf(live[0]!.sourceId) : "",
+    tasks: [],
+    clarifications: [],
+    sources: live,
+  };
+}
+
+/** The routing data from the same one live computation (no re-filtering). */
+function payloadDataOf(work: LiveWorkOf): PushNotificationPayload["data"] {
+  return {
+    ...(work.tasks.length > 0
+      ? { taskIds: work.tasks.map((task) => task.taskId) }
+      : {}),
+    ...(work.clarifications.length > 0
+      ? { clarificationIds: work.clarifications.map((entry) => entry.clarificationId) }
+      : {}),
+    ...(work.sources.length > 0
+      ? { sourceIds: work.sources.map((source) => source.sourceId) }
+      : {}),
+    target: work.target,
+  };
 }
 
 /**
@@ -357,29 +386,24 @@ export function composePushPayload(
   inputs: PayloadInputs,
 ): PushNotificationPayload {
   const summary = inputs.summary;
-  if (inputs.hidePreview) {
+  // One live computation feeds every branch: the target is empty exactly
+  // when nothing of the summary's kind is live, so the neutral copy and
+  // the routing data need no second derivation.
+  const work = liveWorkOf(inputs);
+  if (inputs.hidePreview || work.target === "") {
     return {
       v: 1,
       kind: kindOf(summary),
       title: "Nowe powiadomienie",
       body: "Otwórz Kiero, żeby zobaczyć.",
-      data: routingDataOf(inputs, liveTargetOf(inputs)),
+      data: payloadDataOf(work),
     };
   }
   if (summary.semanticKind === "task_reminder") {
     // The F4 adapter's rendering (R3): the CURRENT open tasks of the
     // collapsed batch. The reminder kinds are delivery metadata; the copy
     // carries the task titles only, bounded by the shared fragment limit.
-    const ordered = orderedOpenTasksOf(inputs);
-    if (ordered.length === 0) {
-      return {
-        v: 1,
-        kind: "task_reminder",
-        title: "Nowe powiadomienie",
-        body: "Otwórz Kiero, żeby zobaczyć.",
-        data: routingDataOf(inputs, ""),
-      };
-    }
+    const ordered = work.tasks;
     const first = ordered[0]!;
     return {
       v: 1,
@@ -393,56 +417,38 @@ export function composePushPayload(
         ordered.length === 1
           ? fragmentOf(first.title)
           : `${fragmentOf(first.title)} (i ${ordered.length - 1} więcej)`,
-      data: routingDataOf(inputs, taskTargetOf(first.taskId)),
+      data: payloadDataOf(work),
     };
   }
+  const scope = inputs.scope ?? FALLBACK_SCOPE;
   if (summary.semanticKind === "clarification") {
-    const open = inputs.clarifications.filter((entry) => entry.stillOpen);
-    const first = open[0];
-    if (first === undefined) {
-      return {
-        v: 1,
-        kind: "clarification",
-        title: "Nowe powiadomienie",
-        body: "Otwórz Kiero, żeby zobaczyć.",
-        data: routingDataOf(inputs, ""),
-      };
-    }
+    const open = work.clarifications;
+    const first = open[0]!;
     const more = open.length > 1 ? ` (i ${open.length - 1} więcej)` : "";
     return {
       v: 1,
       kind: "clarification",
       // The glossary and H1's surface name this concept "Sprawa do
       // wyjaśnienia"; the notification voice uses the same name.
-      title: `Sprawa do wyjaśnienia: ${scopeNameOf(inputs.scope)}`,
+      title: `Sprawa do wyjaśnienia: ${scopeNameOf(scope)}`,
       body: `${fragmentOf(first.question)}${more}`,
       // The authenticated route whose live read reloads the current open
       // cases (the app resolves access after the click).
-      data: routingDataOf(inputs, CLARIFICATION_ROUTE_PATH),
+      data: payloadDataOf(work),
     };
   }
   // source_entry: the collapsed current batch of entries. The payload kind
   // mirrors the summary's semantic kind on every path (kindOf), so
   // hide-preview and normal previews never disagree about what the
   // notification is.
-  const ordered = orderedLiveSourcesOf(inputs);
-  if (ordered.length === 0) {
-    return {
-      v: 1,
-      kind: kindOf(summary),
-      title: "Nowe powiadomienie",
-      body: "Otwórz Kiero, żeby zobaczyć.",
-      data: routingDataOf(inputs, ""),
-    };
-  }
-  const target = sourceTargetOf(ordered[0]!.sourceId);
+  const ordered = work.sources;
   if (ordered.length === 1) {
     return {
       v: 1,
       kind: kindOf(summary),
-      title: `Nowy wpis: ${scopeNameOf(inputs.scope)}`,
+      title: `Nowy wpis: ${scopeNameOf(scope)}`,
       body: sourcePreviewLine(ordered[0]!),
-      data: routingDataOf(inputs, target),
+      data: payloadDataOf(work),
     };
   }
   const authors = [...new Set(ordered.map((source) => source.authorName))];
@@ -450,16 +456,16 @@ export function composePushPayload(
   return {
     v: 1,
     kind: kindOf(summary),
-    title: `Nowe wpisy (${ordered.length}): ${scopeNameOf(inputs.scope)}`,
+    title: `Nowe wpisy (${ordered.length}): ${scopeNameOf(scope)}`,
     body:
       authors.length === 1
         ? `${authorsLabel}: pierwszy z ${ordered.length} nowych wpisów`
         : `${ordered.length} nowych wpisów: ${authorsLabel}`,
-    data: routingDataOf(inputs, target),
+    data: payloadDataOf(work),
   };
 }
 
-function kindOf(summary: DeliveredSummary): PushNotificationPayload["kind"] {
+function kindOf(summary: DecodedSummary): PushNotificationPayload["kind"] {
   return payloadKindOf(summary.semanticKind);
 }
 
@@ -481,36 +487,6 @@ export function payloadKindOf(
  * (the transaction denies before composing when nothing is live); the
  * service worker treats it like any absent target and opens its own scope.
  */
-function routingDataOf(
-  inputs: PayloadInputs,
-  target: string,
-): PushNotificationPayload["data"] {
-  const summary = inputs.summary;
-  if (summary.semanticKind === "task_reminder") {
-    const open = orderedOpenTasksOf(inputs);
-    return {
-      ...(open.length > 0 ? { taskIds: open.map((task) => task.taskId) } : {}),
-      target,
-    };
-  }
-  if (summary.semanticKind === "clarification") {
-    const open = inputs.clarifications.filter((entry) => entry.stillOpen);
-    return {
-      ...(open.length > 0
-        ? { clarificationIds: open.map((entry) => entry.clarificationId) }
-        : {}),
-      target,
-    };
-  }
-  const live = orderedLiveSourcesOf(inputs);
-  return {
-    ...(live.length > 0
-      ? { sourceIds: live.map((source) => source.sourceId) }
-      : {}),
-    target,
-  };
-}
-
 /** Delivery TTL: every notification kind stays meaningful for a working day. */
 export function ttlSecondsOf(): number {
   return 24 * 60 * 60;

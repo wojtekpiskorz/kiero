@@ -335,9 +335,6 @@ async function payloadInputsOf(
     }
     return composePushPayload({
       summary,
-      scope: { kind: "company", projectNames: [] },
-      sources: [],
-      clarifications: [],
       tasks,
       hidePreview,
     });
