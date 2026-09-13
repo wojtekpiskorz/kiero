@@ -121,13 +121,13 @@ describe("M1 audit: derived map table content", () => {
           file: "dependency-graph.md",
           mutate: content =>
             content.replace(
-              "| [R5 #130](https://github.com/wojtekpiskorz/kiero/issues/130) | OPEN |",
-              "| [R5 #130](https://github.com/wojtekpiskorz/kiero/issues/130) | CLOSED |",
+              "| [I8 #133](https://github.com/wojtekpiskorz/kiero/issues/133) | OPEN |",
+              "| [I8 #133](https://github.com/wojtekpiskorz/kiero/issues/133) | CLOSED |",
             ),
         },
       ],
     });
-    expectFail(run, "R5: graph table state CLOSED differs from cached OPEN");
+    expectFail(run, "I8: graph table state CLOSED differs from cached OPEN");
   });
 
   it("fails on a stale integrated-table remaining owner (M1-P1)", () => {
@@ -151,7 +151,7 @@ describe("M1 audit: derived map table content", () => {
       tables: [
         {
           file: "dependency-graph.md",
-          mutate: content => content.replace('  R5["R5 #130"]\n', '  R5["R5 #130"]\n  R1["R1 #126"]\n'),
+          mutate: content => content.replace('  I8["I8 #133"]\n', '  I8["I8 #133"]\n  R5["R5 #130"]\n'),
         },
       ],
     });
@@ -197,12 +197,12 @@ describe("M1 audit: derived map table content", () => {
           file: "ux-coverage.md",
           mutate: content =>
             content
-              .split("[R5 #130](https://github.com/wojtekpiskorz/kiero/issues/130)")
+              .split("[J6 #139](https://github.com/wojtekpiskorz/kiero/issues/139)")
               .join(""),
         },
       ],
     });
-    expectFail(run, "UX coverage never references open product-path owner R5");
+    expectFail(run, "UX coverage never references open product-path owner J6");
   });
 
   it("fails on the observed P06 owner drift replayed as a fixture (M1-P1)", () => {
@@ -212,7 +212,7 @@ describe("M1 audit: derived map table content", () => {
           file: "proof-ownership.md",
           mutate: content =>
             content.replace(
-              /(\| P06 [^\n]*?)\[R5 #130\]\(https:\/\/github\.com\/wojtekpiskorz\/kiero\/issues\/130\)/,
+              /(\| P06 [^\n]*?)\[J6 #139\]\(https:\/\/github\.com\/wojtekpiskorz\/kiero\/issues\/139\)/,
               "$1[J3 #62](https://github.com/wojtekpiskorz/kiero/issues/62)",
             ),
         },

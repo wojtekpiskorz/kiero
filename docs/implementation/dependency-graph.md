@@ -12,7 +12,6 @@ flowchart TD
   J3["J3 #62"]
   J4["J4 #63"]
   J5["J5 #64"]
-  R5["R5 #130"]
   I8["I8 #133"]
   B5["B5 #134"]
   D7["D7 #135"]
@@ -31,17 +30,15 @@ flowchart TD
   I8 --> B5
   I8 --> D7
   D7 --> I9
-  R5 --> I9
   D7 --> I10
   I8 --> I11
-  R5 --> J6
   D7 --> J6
   B5 --> J6
 ```
 
 ## Scheduling and ownership
 
-The repaired clarification lane is ordered by ownership: R2 follows the closed R1 because both own clarification persistence; R3 follows R2 because both change deletion execution; R5 (in flight) consumed R1's resolution evidence for in-app links and export targets. R3 owns push/service-worker routes.
+The repaired clarification lane is ordered by ownership: R2 follows the closed R1 because both own clarification persistence; R3 follows R2 because both change deletion execution; R5 consumed R1's resolution evidence for in-app links and export targets and closed with its live-leg record (the 121-newer-messages direct open, the legacy redirect and the refusal screens on the dev/i4 lease). R3 owns push/service-worker routes.
 
 R6 supplies executable release tooling before I8 provisions and proves its real target. B5, D7 and I11 can run independently after I8, with separate fixtures and resource reservations. I9 waits for R5 because the export format gains source targets. I10 waits for R3 so backups contain the repaired lifecycle state. I6 consumes complete backup manifests, not business export archives, and therefore does not wait for I9.
 
@@ -107,7 +104,7 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [R2 #127](https://github.com/wojtekpiskorz/kiero/issues/127) | CLOSED | [R1 #126](https://github.com/wojtekpiskorz/kiero/issues/126), [I4 #56](https://github.com/wojtekpiskorz/kiero/issues/56) | Remaining execution |
 | [R3 #128](https://github.com/wojtekpiskorz/kiero/issues/128) | CLOSED | [R2 #127](https://github.com/wojtekpiskorz/kiero/issues/127), [F3 #43](https://github.com/wojtekpiskorz/kiero/issues/43), [F4 #44](https://github.com/wojtekpiskorz/kiero/issues/44) | Remaining execution |
 | [R4 #129](https://github.com/wojtekpiskorz/kiero/issues/129) | CLOSED | [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125), [E7 #115](https://github.com/wojtekpiskorz/kiero/issues/115) | Remaining execution |
-| [R5 #130](https://github.com/wojtekpiskorz/kiero/issues/130) | OPEN | [R1 #126](https://github.com/wojtekpiskorz/kiero/issues/126), [H3 #51](https://github.com/wojtekpiskorz/kiero/issues/51) | Remaining execution |
+| [R5 #130](https://github.com/wojtekpiskorz/kiero/issues/130) | CLOSED | [R1 #126](https://github.com/wojtekpiskorz/kiero/issues/126), [H3 #51](https://github.com/wojtekpiskorz/kiero/issues/51) | Remaining execution |
 | [R6 #131](https://github.com/wojtekpiskorz/kiero/issues/131) | CLOSED | [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125), [I7 #59](https://github.com/wojtekpiskorz/kiero/issues/59) | Remaining execution |
 | [R7 #132](https://github.com/wojtekpiskorz/kiero/issues/132) | CLOSED | [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125), [G3 #47](https://github.com/wojtekpiskorz/kiero/issues/47) | Remaining execution |
 | [I8 #133](https://github.com/wojtekpiskorz/kiero/issues/133) | OPEN | [R6 #131](https://github.com/wojtekpiskorz/kiero/issues/131), [I1 #53](https://github.com/wojtekpiskorz/kiero/issues/53), [I2 #54](https://github.com/wojtekpiskorz/kiero/issues/54) | Remaining execution |
