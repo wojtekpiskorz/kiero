@@ -256,6 +256,7 @@ import type * as sources_read_rows from "../sources/read/rows.js";
 import type * as sources_read_views from "../sources/read/views.js";
 import type * as sources_reassign_probe from "../sources/reassign/probe.js";
 import type * as sources_reassign_reassignment from "../sources/reassign/reassignment.js";
+import type * as sources_target from "../sources/target.js";
 import type * as sources_uploads_acceptance_gate from "../sources/uploads/acceptance_gate.js";
 import type * as sources_uploads_commands from "../sources/uploads/commands.js";
 import type * as sources_uploads_dispatch from "../sources/uploads/dispatch.js";
@@ -526,6 +527,7 @@ declare const fullApi: ApiFromModules<{
   "sources/read/views": typeof sources_read_views;
   "sources/reassign/probe": typeof sources_reassign_probe;
   "sources/reassign/reassignment": typeof sources_reassign_reassignment;
+  "sources/target": typeof sources_target;
   "sources/uploads/acceptance_gate": typeof sources_uploads_acceptance_gate;
   "sources/uploads/commands": typeof sources_uploads_commands;
   "sources/uploads/dispatch": typeof sources_uploads_dispatch;
