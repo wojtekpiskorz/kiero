@@ -24,10 +24,14 @@
  *      id both render the truthful uniform Polish refusal and leak no
  *      content; a malformed canonical value refuses too.
  *
- * Seeding is bounded and honest: one old source with a distinctive
- * marker, 121 real text-only filler messages (the real composer path),
- * a foreign company's source, and one source purged through the real
- * public command before the browser phase.
+ * Seeding is bounded and honest: one old source whose interpretation is
+ * allowed to FINISH before the storm (so the fragment leg can use a real
+ * matched fragment), 121 real text-only filler messages (the real
+ * composer path), a foreign company's source, and one source purged
+ * through the real public command before the browser phase. The purge is
+ * firm A's NEWEST row and the view filters purged rows after pagination,
+ * so every raw feed window carries exactly one invisible purged slot
+ * (initial 30-row page renders 29 articles; the 120-row cap renders 119).
  *
  * Run (repo root). Two processes, two env sets:
  *  1. the web dev server (serves the app the browser drives; VITE_* vars):
@@ -173,48 +177,16 @@ async function sendTextOnly(persona, { text, hints = [] }) {
   return accepted.value.sourceId;
 }
 
-// The OLD source first (oldest row), then 121 NEWER real messages so the
-// old one lands beyond the feed's 120-row cap.
+// The OLD source first (oldest row): its interpretation runs BEFORE the
+// 121-message storm queues behind it, so the fragment leg gets a real
+// matched fragment without competing for the provider window. Only then
+// come the NEWER messages that push it beyond the feed's 120-row cap.
 const OLD_ID = await sendTextOnly(boss, {
   text: `Banan: zaliczka od klienta wynosi 5000 złotych (marker: ${OLD_MARKER}).`,
   hints: [BANAN],
 });
 record("S1/old-source-accepted", "PASS", `sourceId=${OLD_ID}`);
 
-for (let i = 1; i <= FILLERS; i += 1) {
-  await sendTextOnly(boss, { text: `Wpis porządkowy ${i} z ${FILLERS} w rozmowie firmy.` });
-  if (i % 20 === 0) note(`seeded ${i}/${FILLERS} newer messages`);
-}
-record("S2/fillers-accepted", "PASS", `count=${FILLERS}`);
-
-// The source A will purge for real before the browser phase.
-const PURGED_ID = await sendTextOnly(boss, { text: `Wiadomość przeznaczona do trwałego usunięcia (marker: ${PURGED_MARKER}).` });
-const purged = await boss.client.mutation("sources/accept/commands:acceptSourceCommand", {
-  envelope: envelope("sources.purgeSource", { sourceId: PURGED_ID, confirmation: "USUŃ TRWALE" }),
-});
-record(
-  "S3/purge-command-accepted",
-  isOk(purged) ? "PASS" : "FAIL",
-  isOk(purged) ? "sources.purgeSource ok" : errCode(purged),
-);
-
-// The foreign source (company B), after the fillers so it cannot pollute A's feed order.
-const FOREIGN_ID = await sendTextOnly(foreign, { text: `Tajne ustalenie obcej firmy (marker: ${FOREIGN_MARKER}).` });
-record("S4/foreign-source-accepted", "PASS", `sourceId=${FOREIGN_ID}`);
-
-// The purged read must already refuse (the tombstone commits atomically).
-const purgedRead = await boss.client.query("sources/read/views:sourceExposition", { sourceId: PURGED_ID });
-record(
-  "S5/purged-read-refuses-before-browser",
-  purgedRead?._tag === "error" && purgedRead.error.code === "source_not_in_company" ? "PASS" : "FAIL",
-  `code=${errCode(purgedRead)}`,
-);
-
-// Wait (bounded) for the old source's interpretation so the fragment leg
-// can use a REAL matched fragment when one exists. A FAILED run (the
-// honest provider window under the 121-message load) gets ONE bounded
-// model-stage restart — the J1/E3 sanctioned recovery live-proof.mjs
-// established; never retried into fake success.
 const anonConvex = () => new ConvexHttpClient(CONVEX_URL, { logger: false });
 async function oldSourceState() {
   const exposition = await boss.client.query("sources/read/views:sourceExposition", { sourceId: OLD_ID });
@@ -254,6 +226,35 @@ record(
   "S6/old-source-terminal",
   oldState === "processed" || oldState === "failed" ? "PASS" : "FAIL",
   `state=${oldState}`,
+);
+
+for (let i = 1; i <= FILLERS; i += 1) {
+  await sendTextOnly(boss, { text: `Wpis porządkowy ${i} z ${FILLERS} w rozmowie firmy.` });
+  if (i % 20 === 0) note(`seeded ${i}/${FILLERS} newer messages`);
+}
+record("S2/fillers-accepted", "PASS", `count=${FILLERS}`);
+
+// The source A will purge for real before the browser phase.
+const PURGED_ID = await sendTextOnly(boss, { text: `Wiadomość przeznaczona do trwałego usunięcia (marker: ${PURGED_MARKER}).` });
+const purged = await boss.client.mutation("sources/accept/commands:acceptSourceCommand", {
+  envelope: envelope("sources.purgeSource", { sourceId: PURGED_ID, confirmation: "USUŃ TRWALE" }),
+});
+record(
+  "S3/purge-command-accepted",
+  isOk(purged) ? "PASS" : "FAIL",
+  isOk(purged) ? "sources.purgeSource ok" : errCode(purged),
+);
+
+// The foreign source (company B), after the fillers so it cannot pollute A's feed order.
+const FOREIGN_ID = await sendTextOnly(foreign, { text: `Tajne ustalenie obcej firmy (marker: ${FOREIGN_MARKER}).` });
+record("S4/foreign-source-accepted", "PASS", `sourceId=${FOREIGN_ID}`);
+
+// The purged read must already refuse (the tombstone commits atomically).
+const purgedRead = await boss.client.query("sources/read/views:sourceExposition", { sourceId: PURGED_ID });
+record(
+  "S5/purged-read-refuses-before-browser",
+  purgedRead?._tag === "error" && purgedRead.error.code === "source_not_in_company" ? "PASS" : "FAIL",
+  `code=${errCode(purgedRead)}`,
 );
 
 // --- the browser (the shared authenticated bootstrap) -----------------------
@@ -309,16 +310,27 @@ const plateauCount = async () => {
 await page.waitForSelector("#capture-text", { timeout: 30_000 });
 await page.waitForSelector("main article", { timeout: 30_000 });
 const initialCount = await plateauCount();
-record("L1/feed-initial-page-renders", initialCount > 0 ? "PASS" : "FAIL", `articles=${initialCount} (page size 30)`);
+// Page-size arithmetic (D1's documented purged-slot rule): the view
+// filters purged rows AFTER pagination, and the seeded purge is firm A's
+// NEWEST row, so every raw window of N carries one invisible purged slot —
+// the initial 30-row page renders 29 articles.
+record(
+  "L1/feed-initial-page-renders",
+  initialCount === 29 ? "PASS" : "FAIL",
+  `articles=${initialCount} (30-row page minus the 1 purged slot)`,
+);
 let feedText = (await page.textContent("main")) ?? "";
 record("L1/old-marker-absent-from-first-page", !feedText.includes(OLD_MARKER) ? "PASS" : "FAIL", "marker not in the rendered rows");
 
 // Grow the feed to its cap: the old source must stay unreachable in the
 // feed itself (the reason the canonical dossier exists). The cap proof is
-// the load-older button DISAPPEARING (MAX_PAGE_SIZE reached), not an exact
-// article count racing the subscription.
+// the load-older button DISAPPEARING (MAX_PAGE_SIZE reached), and each
+// click first WAITS for the button to be visible: React unmounts it
+// briefly while the page grows, and an instantaneous count() once broke
+// the loop on that transient (official run 1 stopped at 89).
 const loadMore = page.locator('button:has-text("Pokaż starsze wiadomości")');
 for (let click = 0; click < 4; click += 1) {
+  await loadMore.waitFor({ state: "visible", timeout: 10_000 }).catch(() => null);
   if ((await loadMore.count()) === 0) break;
   await loadMore.click();
   await sleep(2_500);
@@ -327,12 +339,14 @@ const cappedCount = await plateauCount();
 const buttonGone = (await loadMore.count()) === 0;
 feedText = (await page.textContent("main")) ?? "";
 // With the official 121 fillers the button can only disappear through
-// MAX_PAGE_SIZE (isDone needs numItems >= 122 > 120), so the strict
-// article count applies; a FILLERS dry run may legitimately end on isDone.
+// MAX_PAGE_SIZE (isDone needs the raw page to cover all 123 rows, and
+// numItems never exceeds 120), so the strict article count applies: the
+// 120-row window still carries the one purged slot, hence 119 articles.
+// A FILLERS dry run may legitimately end on isDone instead.
 const strictCapCount = FILLERS >= 121;
 record(
   "L1/old-source-beyond-the-120-cap",
-  buttonGone && !feedText.includes(OLD_MARKER) && (!strictCapCount || cappedCount >= 120) ? "PASS" : "FAIL",
+  buttonGone && !feedText.includes(OLD_MARKER) && (!strictCapCount || cappedCount >= 119) ? "PASS" : "FAIL",
   `articles=${cappedCount}; load-older hidden=${buttonGone}; marker present=${feedText.includes(OLD_MARKER)}; strict=${strictCapCount}`,
 );
 
