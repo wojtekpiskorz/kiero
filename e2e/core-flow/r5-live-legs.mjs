@@ -29,9 +29,11 @@
  * matched fragment), 121 real text-only filler messages (the real
  * composer path), a foreign company's source, and one source purged
  * through the real public command before the browser phase. The purge is
- * firm A's NEWEST row and the view filters purged rows after pagination,
- * so every raw feed window carries exactly one invisible purged slot
- * (initial 30-row page renders 29 articles; the 120-row cap renders 119).
+ * firm A's NEWEST row, the view filters purged rows after pagination, and
+ * every load-older refetches from cursor null with a larger numItems, so
+ * every raw window includes the newest row: each carries exactly one
+ * invisible purged slot (initial 30-row page renders 29 articles; the
+ * 120-row cap renders 119).
  *
  * Run (repo root). Two processes, two env sets:
  *  1. the web dev server (serves the app the browser drives; VITE_* vars):
@@ -312,7 +314,7 @@ await page.waitForSelector("main article", { timeout: 30_000 });
 const initialCount = await plateauCount();
 // Page-size arithmetic (D1's documented purged-slot rule): the view
 // filters purged rows AFTER pagination, and the seeded purge is firm A's
-// NEWEST row, so every raw window of N carries one invisible purged slot —
+// NEWEST row, so every raw window of N carries one invisible purged slot;
 // the initial 30-row page renders 29 articles.
 record(
   "L1/feed-initial-page-renders",
@@ -346,7 +348,7 @@ feedText = (await page.textContent("main")) ?? "";
 const strictCapCount = FILLERS >= 121;
 record(
   "L1/old-source-beyond-the-120-cap",
-  buttonGone && !feedText.includes(OLD_MARKER) && (!strictCapCount || cappedCount >= 119) ? "PASS" : "FAIL",
+  buttonGone && !feedText.includes(OLD_MARKER) && (!strictCapCount || cappedCount === 119) ? "PASS" : "FAIL",
   `articles=${cappedCount}; load-older hidden=${buttonGone}; marker present=${feedText.includes(OLD_MARKER)}; strict=${strictCapCount}`,
 );
 
