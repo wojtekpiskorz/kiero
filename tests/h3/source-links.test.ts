@@ -28,6 +28,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import ts from "typescript";
 import {
   FRAGMENT_PARAM,
   SOURCE_ROUTE_PATH,
@@ -212,5 +213,84 @@ describe("no listed consumer hand-builds a source route", () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+});
+
+describe("the dossier's hooks never sit below an early return", () => {
+  // The live /zrodlo crash R5's browser leg caught: SourceDetailBody ran
+  // its evidence-accumulation useEffect BELOW the pending-state early
+  // returns, so the loading -> success transition changed the hook count
+  // and React unmounted the route into the error boundary. renderToString
+  // tests cannot see it (one pass, one state); this guard can: in the
+  // feature file, every hook call must precede the first return of its
+  // function. Parsed through the TypeScript AST (the pinned compiler is
+  // already a devDependency): regex literals, generics, const-arrow
+  // components and nested declarations are handled by construction, which
+  // two rounds of hand-rolled scanning each got wrong in a new way.
+  it("calls every hook before the first return of every function in the feature file", () => {
+    const file = join(
+      import.meta.dirname,
+      "..",
+      "..",
+      "apps/web/src/features/source-detail/SourceDetailFeature.ts",
+    );
+    const sourceFile = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
+    const offenders: string[] = [];
+    const isHookCall = (node: ts.CallExpression) =>
+      ts.isIdentifier(node.expression) && /^use[A-Z]/.test(node.expression.text);
+    const lineOf = (position: number) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
+    // Check EVERY function-like node against its own body: a hook call or
+    // a return statement belongs to it only while no other function-like
+    // node is open in between (statement nesting is irrelevant).
+    const checkFunction = (name: string, body: ts.ConciseBody): void => {
+      let firstReturn: number | null = null;
+      const hooks: number[] = [];
+      const visit = (node: ts.Node): void => {
+        if (ts.isReturnStatement(node) && firstReturn === null) {
+          firstReturn = lineOf(node.getStart(sourceFile));
+        }
+        if (ts.isCallExpression(node) && isHookCall(node)) {
+          hooks.push(lineOf(node.getStart(sourceFile)));
+        }
+        node.forEachChild((child) => {
+          if (ts.isFunctionDeclaration(child) || ts.isFunctionExpression(child) || ts.isArrowFunction(child)) {
+            // nested function-like nodes get their own check instead
+            return;
+          }
+          visit(child);
+        });
+      };
+      visit(body);
+      for (const hook of hooks) {
+        if (firstReturn !== null && hook > firstReturn) {
+          offenders.push(`${name}: hook at line ${hook} after the first component return at line ${firstReturn}`);
+        }
+      }
+    };
+    const nameOf = (node: ts.Node): string => {
+      const identifier = node.getChildren(sourceFile).find(ts.isIdentifier);
+      return identifier === undefined ? "<anonymous>" : identifier.text;
+    };
+    const visitModule = (node: ts.Node): void => {
+      if (ts.isFunctionDeclaration(node) && node.body !== undefined) {
+        checkFunction(nameOf(node), node.body);
+      } else if (
+        ts.isVariableStatement(node) &&
+        node.declarationList.declarations.some((declaration) => declaration.initializer !== undefined)
+      ) {
+        for (const declaration of node.declarationList.declarations) {
+          const initializer = declaration.initializer;
+          if (
+            initializer !== undefined &&
+            (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer))
+          ) {
+            checkFunction(ts.isIdentifier(declaration.name) ? declaration.name.text : "<anonymous>", initializer.body);
+          }
+        }
+      }
+      node.forEachChild(visitModule);
+    };
+    visitModule(sourceFile);
+    expect(offenders).toEqual([]);
   });
 });
