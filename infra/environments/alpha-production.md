@@ -62,7 +62,7 @@ runtime reads `RESEND_API_KEY`/`RESEND_FROM`.)
 bundle; declared by `apps/web/wrangler.jsonc` `--env alpha-production`,
 mirroring R8's staging shape; NOTE: `infra/release/targets/production.json`
 still names a `wrangler-pages` transport for this component and must be
-reconciled by its owning lane before the first alpha release — no Pages
+reconciled by its owning lane before the first alpha release; no Pages
 project may be created meanwhile), Convex project `kiero-alpha-core`.
 
 ## EU requirements (hard constraints from the accepted architecture)
