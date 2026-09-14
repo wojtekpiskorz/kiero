@@ -2,10 +2,11 @@
  * R13 focused verification, part 1: the ONE shared deployment environment
  * label rule (`packages/runtime/src/deployment.ts`).
  *
- * The closed read previously lived in four runtime copies (the telemetry
- * cron, the backups HTTP boundary, the redaction label set and the
- * Calendar return resolver). These tests pin the consolidated helper's
- * classification matrix EXACTLY as accepted, so no later copy can drift:
+ * The closed read previously lived in five runtime copies (the telemetry
+ * cron, the backups HTTP boundary, the redaction label set, the Calendar
+ * return resolver and the gateway telemetry tag). These tests pin the
+ * consolidated helper's classification matrix EXACTLY as accepted, so no
+ * later copy can drift:
  *
  * - the closed label set is exactly dev, staging, alpha-production;
  * - absent (undefined), null and empty all honestly mean dev;

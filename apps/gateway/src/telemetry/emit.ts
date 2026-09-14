@@ -10,6 +10,10 @@
  * - The Axiom client is the ONE shipped sink (`convex/operations/telemetry/
  *   sink.ts`: ingest POST, metadata flattening, redactionsApplied injection,
  *   injectable fetch) - this module no longer reimplements any of it.
+ * - The environment tag is the ONE shared closed-label rule
+ *   (`@kiero/runtime`'s `deploymentEnvironment`, R13): the Worker's
+ *   `ENVIRONMENT` binding classifies exactly like `KIERO_ENVIRONMENT`
+ *   everywhere else (absent/unknown honestly means dev).
  *
  * Delivery remains two-path and best effort: Axiom direct when the Worker
  * holds `AXIOM_API_TOKEN` + `AXIOM_DATASET`, otherwise the verified Convex
@@ -25,6 +29,7 @@ import {
   sanitizeDiagnosticEvent,
   type SanitizedDiagnosticEvent,
 } from "../../../../convex/operations/telemetry/redact";
+import { deploymentEnvironment } from "@kiero/runtime";
 
 /** The telemetry bindings this surface consumes (names only; secrets injected). */
 export interface TelemetryEnv {
@@ -54,12 +59,6 @@ export type TelemetryDelivery =
   | { readonly delivered: true; readonly via: "axiom" | "convex"; readonly accepted: number }
   | { readonly delivered: false; readonly via: "dropped"; readonly reason: string };
 
-function environmentTag(env: TelemetryEnv): string {
-  return env.ENVIRONMENT === "staging" || env.ENVIRONMENT === "alpha-production"
-    ? env.ENVIRONMENT
-    : "dev";
-}
-
 /** Sanitizes events locally first: the sink must never see unsanitized shapes. */
 export function sanitizeGatewayEvents(
   env: TelemetryEnv,
@@ -72,7 +71,7 @@ export function sanitizeGatewayEvents(
       kind: event.kind,
       metadata: event.metadata,
       serviceName: "gateway.worker",
-      environment: environmentTag(env),
+      environment: deploymentEnvironment(env.ENVIRONMENT),
     });
     if (result.status === "ok") {
       sanitized.push(result.event);
@@ -91,7 +90,7 @@ async function postAxiom(
   }
   const sink = axiomHttpSink({ apiToken: env.AXIOM_API_TOKEN ?? "", dataset });
   const sinkEvents = events.map((event) =>
-    toSinkEvent(event, Date.now(), "gateway.worker", environmentTag(env)),
+    toSinkEvent(event, Date.now(), "gateway.worker", deploymentEnvironment(env.ENVIRONMENT)),
   );
   const result = await sink.ingest(sinkEvents);
   return result.ok
@@ -163,7 +162,7 @@ export async function withGatewayTelemetry(
       { key: "route", value: pathname.slice(0, 120) },
       { key: "httpStatus", value: httpStatus },
       { key: "latencyMs", value: String(Date.now() - startedAtMs) },
-      { key: "environment", value: environmentTag(env) },
+      { key: "environment", value: deploymentEnvironment(env.ENVIRONMENT) },
     ],
   });
   const emit = (httpStatus: string) =>

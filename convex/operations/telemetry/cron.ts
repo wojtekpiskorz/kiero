@@ -43,7 +43,7 @@ async function forwardRecentToSink(
       : nullSink("axiom_not_configured");
 
   // The deployment's closed environment label through the ONE shared rule
-  // (R13: this read previously lived as four drifting copies).
+  // (R13: this read previously lived as one of five drifting copies).
   const environment = deploymentEnvironment(process.env.KIERO_ENVIRONMENT);
 
   const nowMs = Date.now();

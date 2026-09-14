@@ -4,12 +4,15 @@
  * `KIERO_ENVIRONMENT` is the deployment's closed self-description: exactly
  * one of three labels (dev, staging, alpha-production) read from
  * server-side configuration only. Before R13 the closed-label read existed
- * in four runtime copies (the telemetry cron, the backups HTTP boundary,
- * the redaction format set and the Calendar return resolver); a label
- * added in one copy but not another silently classified that deployment as
- * dev, and dev is exactly what re-allows a plain-http return link. Every
- * runtime reader now routes through THIS definition (the repo's
- * mirror-is-a-hazard ruling).
+ * in five runtime copies (the telemetry cron, the backups HTTP boundary,
+ * the redaction format set, the Calendar return resolver and the gateway
+ * telemetry tag, which classified the Worker's `ENVIRONMENT` binding); a
+ * label added in one copy but not another silently classified that
+ * deployment as dev, and dev is exactly what re-allows a plain-http
+ * return link. Every runtime classifier now routes through THIS
+ * definition (the repo's mirror-is-a-hazard ruling); release tooling that
+ * only NAMES the label (`infra/release`) reads it as a deployment
+ * descriptor, not a classification.
  *
  * Pure like the rest of this package: no Convex, no Node, so the Convex
  * functions and the gateway Worker share it freely.
@@ -43,7 +46,7 @@ export const DEPLOYMENT_ENVIRONMENT_PATTERN = new RegExp(
  * Classifies a deployment's environment self-description (R13's one
  * canonical read).
  *
- * The accepted rule, unchanged from the four copies this replaces: an
+ * The accepted rule, unchanged from the five copies this replaces: an
  * absent (or null) value reads as dev; an unknown, empty or malformed
  * label honestly reads as dev rather than guessing; only the exact closed
  * labels survive. A non-string value (unreachable through the typed

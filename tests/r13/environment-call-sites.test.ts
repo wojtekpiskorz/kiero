@@ -3,10 +3,10 @@
  * the ONE shared deployment environment rule
  * (`packages/runtime/src/deployment.ts`).
  *
- * Four runtime readers existed before R13; each is driven here through its
- * REAL seam with a matrix of `KIERO_ENVIRONMENT` values, asserting the
- * module's observable classification EQUALS the shared helper's answer for
- * every input (one shared failure the moment any copy drifts):
+ * Five runtime readers existed before R13; each is driven here through its
+ * REAL seam with a matrix of environment values, asserting the module's
+ * observable classification EQUALS the shared helper's answer for every
+ * input (one shared failure the moment any copy drifts):
  *
  * - `convex/operations/telemetry/cron.ts`: the every-minute tick, invoked
  *   through the internalAction `_handler` seam with a stub action context
@@ -22,6 +22,10 @@
  * - `convex/calendar/connection/return.ts`: a plain-http return origin
  *   survives exactly when the helper classifies the environment as dev
  *   (the security property that motivated the consolidation).
+ * - `apps/gateway/src/telemetry/emit.ts` (the review's fifth copy): the
+ *   Worker's `ENVIRONMENT` binding, observed both in the sanitized event
+ *   and in the emitted telemetry payload the wrapped request handler
+ *   delivers through the REAL axiom sink.
  *
  * The @kiero/runtime barrel is wrapped with a pass-through spy, so each
  * test ALSO asserts the call site invoked the shared helper with the exact
@@ -50,6 +54,11 @@ import {
   CALENDAR_APP_BASE_URL_ENV,
   calendarAppReturnHref,
 } from "../../convex/calendar/connection/return";
+import {
+  sanitizeGatewayEvents,
+  withGatewayTelemetry,
+  type TelemetryEnv,
+} from "../../apps/gateway/src/telemetry/emit";
 
 // Pass-through spy over the shared helper: behavior is unchanged, but the
 // tests can assert the call sites really route through it.
@@ -360,6 +369,86 @@ describe("return.ts routes its environment read through the shared helper", () =
           KIERO_ENVIRONMENT: row.value,
         }),
       ).toBe(HTTPS_PWA);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The gateway telemetry surface: the Worker's ENVIRONMENT tag.
+// ---------------------------------------------------------------------------
+
+/** The gateway telemetry bindings for one matrix row (ENVIRONMENT optional). */
+function gatewayEnv(row: MatrixRow): TelemetryEnv {
+  return { ...(row.value === undefined ? {} : { ENVIRONMENT: row.value }) };
+}
+
+describe("emit.ts routes its ENVIRONMENT tag through the shared helper", () => {
+  for (const row of CALL_SITE_MATRIX) {
+    it(`tags sanitized gateway events ${show(row.value)} as ${row.expected}`, () => {
+      const sanitized = sanitizeGatewayEvents(gatewayEnv(row), [
+        {
+          kind: "ops.gateway.request",
+          metadata: [
+            { key: "route", value: "/platform/health" },
+            { key: "httpStatus", value: "200" },
+          ],
+        },
+      ]);
+      expect(sanitized.length).toBe(1);
+      expect(sanitized[0]?.environment).toBe(row.expected);
+      expect(helperSpy).toHaveBeenCalledWith(row.value);
+    });
+
+    it(`lands the tag for ${show(row.value)} in the emitted telemetry payload`, async () => {
+      const captured: {
+        url: string;
+        events: readonly { readonly environment: string; readonly metadata: Record<string, string> }[];
+      }[] = [];
+      vi.stubGlobal(
+        "fetch",
+        (async (input: RequestInfo | URL, init?: RequestInit) => {
+          captured.push({
+            url: String(input),
+            events: JSON.parse(String(init?.body)) as {
+              environment: string;
+              metadata: Record<string, string>;
+            }[],
+          });
+          return new Response("{}", { status: 200 });
+        }) as typeof fetch,
+      );
+      // Generated fixtures (never real credentials) so the emit takes the
+      // REAL axiom delivery path.
+      const env = {
+        AXIOM_API_TOKEN: `test-token-${crypto.randomUUID()}`,
+        AXIOM_DATASET: `test-dataset-${crypto.randomUUID().slice(0, 8)}`,
+        ...gatewayEnv(row),
+      };
+      const pending: Promise<unknown>[] = [];
+      const response = await withGatewayTelemetry(
+        env,
+        { waitUntil: (promise) => pending.push(promise) },
+        "/platform/health",
+        async () => new Response("ok", { status: 200 }),
+      );
+      // The response is off the telemetry critical path; then delivery runs.
+      expect(await response.text()).toBe("ok");
+      await Promise.all(pending);
+
+      const [ingest] = captured;
+      if (ingest === undefined) {
+        throw new Error("the telemetry POST was not intercepted");
+      }
+      const [event] = ingest.events;
+      if (event === undefined) {
+        throw new Error("no event in the captured telemetry payload");
+      }
+      expect(ingest.url).toContain(`datasets/${env.AXIOM_DATASET}/ingest`);
+      // Both observable uses of the tag: the sink event's environment field
+      // and the flattened request metadata entry.
+      expect(event.environment).toBe(row.expected);
+      expect(event.metadata.environment).toBe(row.expected);
+      expect(helperSpy).toHaveBeenCalledWith(row.value);
     });
   }
 });

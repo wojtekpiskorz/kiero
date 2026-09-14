@@ -21,7 +21,8 @@
  *   `DEPLOYMENT_ENVIRONMENT_PATTERN`: the single closed deployment
  *   environment label rule (the set, and the absent/unknown/empty-means-dev
  *   classification) the telemetry cron, the backups boundary, the redaction
- *   format set and the Calendar return resolver all route through (R13).
+ *   format set, the Calendar return resolver and the gateway telemetry
+ *   surface all route through (R13).
  * - `runDomainEffect`: Effect 4 RC execution inside Convex functions with a
  *   bounded deadline and defect sanitization.
  * - `toolJsonSchema`: the TanStack AI standard-schema -> JSON-schema
