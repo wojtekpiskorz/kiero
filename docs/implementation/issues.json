@@ -5673,7 +5673,7 @@
       "body": "## Parent\n\nImplementation map #15; post-integration cache flip.\n\n## What to build\n\nR9 #168 (PR #186), E8 #170 (PR #188) and R13 #182 (PR #189) are merged and closed. Synchronize the cached manifest and derived tables with those closures, register R14 #187 (the E8 integration follow-ups) as an open child blocking J6, and reconcile R13's cached ownership with its review-driven extension (tests/g6 renamed tests/r13; the gateway telemetry file added; the amended body re-cached).\n\n## Acceptance criteria\n\n- [ ] Flip R9, E8 and R13 to CLOSED with merged PRs, merge commits, implemented behavior and remaining owners; move their rows to the integrated table and update proof/UX owner cells.\n- [ ] Register R14 #187 as an open child blocked by E8, blocking J6, with graph, inventory and mermaid rows.\n- [ ] Re-cache R13's amended body and corrected ownedPaths; refresh the cached map body, README frontier and m1 graph-count fixtures. Offline and remote map audits pass after merge.\n\n## Blocked by\n\n- M4 #183, closed. Recheck live state before starting.\n\n## Ownership\n\nMap tracker administration, docs/implementation/** and tests/m1/**.\n\n## Audit fixture ownership\n\nM5 owns tests/m1/** to refresh the graph-count specimens. Preserve the same negative assertions and coverage.\n",
       "bodySha256": "4a9a4234fdc427b0c66cae56fa1c6e0fd7c3c8b0dcccf5c5cfd57ad4e80cc047",
       "audit": {
-        "mergedPr": null,
+        "mergedPr": 191,
         "mergeCommit": null,
         "implemented": "Cache-flip of the R9/E8/R13 closures, R14 registration and R13 ownership reconciliation. The PR number is recorded on merge.",
         "evidence": [
