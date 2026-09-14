@@ -12,6 +12,7 @@ observed behavior for the staging candidate live in
 | --- | --- | --- |
 | [convex-functions.md](convex-functions.md) | Convex functions (server actions) | `OPENROUTER_API_KEY`, `RESEND_API_KEY`/`RESEND_FROM`, `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`, Web Push VAPID keys, service/media tokens, calendar key, telemetry, executor URLs |
 | [gateway-worker.md](gateway-worker.md) | `apps/gateway` Cloudflare Worker | R2 binding (non-secret), `CONVEX_SITE_URL`/`ALLOWED_APP_ORIGINS` vars, `IMAGES`/normalizer config, telemetry secret |
+| [web-static-assets.md](web-static-assets.md) | `apps/web` static-assets Worker | no runtime bindings; build-time `VITE_CONVEX_URL`/`VITE_GATEWAY_URL` baked into the assets |
 | [media-export-workers.md](media-export-workers.md) | `apps/media-worker`, `apps/export-worker` EU Containers | media-bucket S3 credentials, segment/service tokens, telemetry secret |
 | [backup-worker.md](backup-worker.md) | `apps/backup-worker` EU Container | backup-bucket-only S3 credentials, read-only media credentials, Convex export key |
 

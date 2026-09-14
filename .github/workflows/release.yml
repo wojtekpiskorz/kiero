@@ -95,6 +95,10 @@ jobs:
       # NAMES this job references against the descriptor's prefix).
       RELEASE_NOTES: ${{ github.event.inputs.notes }}
       VITE_CONVEX_URL: ${{ vars.STAGING_CONVEX_URL }}
+      # R8: the public gateway Worker URL is a named build INPUT (never a
+      # secret); the adapter's requiredConfig blocks the web build without
+      # it, so no transport starts on a half-wired bundle.
+      VITE_GATEWAY_URL: ${{ vars.STAGING_GATEWAY_URL }}
       CONVEX_DEPLOYMENT: ${{ secrets.STAGING_CONVEX_DEPLOYMENT }}
       # The deployment-scoped key is the authoritative CI target; without
       # it `convex deploy` fails 401 MissingAccessToken even with a valid

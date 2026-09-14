@@ -50,7 +50,16 @@ the dev-environment subset only.
 `kiero-dev-<role>`: `kiero-dev-media` (R2, eu jurisdiction, weur location),
 `kiero-dev-backup` (R2, eu jurisdiction, separate token), workers
 `kiero-dev-gateway`, `kiero-dev-media-worker`, `kiero-dev-export-worker`,
-`kiero-dev-backup-worker`. The Convex project itself is `kiero-dev-core`.
+`kiero-dev-backup-worker`, and since R8 the static-assets web Worker
+`kiero-dev-web` (the local PWA host: Vite's `dist/` output with
+single-page-application fallback, no main, no bindings, no Container).
+The Convex project itself is `kiero-dev-core`.
+
+Dev leases stay separate from the web Worker: the Convex dev deployments
+under `kiero-dev-core` (`steady-basilisk-613` and the other existing
+leases) are preserved until their ownership is resolved, and the web
+static-assets Worker owns none of them and no gateway resource; it only
+consumes the public URLs baked into the bundle at build time.
 
 ## EU requirements
 
@@ -76,7 +85,10 @@ Default commands in this repository target `dev` ONLY:
   resolves to the project's default production deployment if one exists, a
   dev-scope resource, never the `staging` reference and never alpha.
 - `wrangler deploy` inside `apps/*` uses the top-level env block of each
-  `wrangler.jsonc`, whose names all start with `kiero-dev-`.
+  `wrangler.jsonc`, whose names all start with `kiero-dev-`; in `apps/web`
+  that bare command (and `wrangler dev`, which serves `dist/` with the
+  single-page-application fallback on localhost) targets `kiero-dev-web`
+  only, purely local.
 - Any staging/alpha operation must spell the environment:
   `--env staging` / `--env alpha-production` for wrangler, and for Convex the
   explicit reference `wojtek-piskorz-jr:kiero-dev-core:staging` (staging) or

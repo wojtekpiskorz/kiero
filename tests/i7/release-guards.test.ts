@@ -155,6 +155,9 @@ describe("R6-P1: every deploy step is a committed executable (no placeholders)",
 
   it("the deploy jobs map only correctly-prefixed secrets and a named vars input", () => {
     expect(stagingBlock).toContain("VITE_CONVEX_URL: ${{ vars.STAGING_CONVEX_URL }}");
+    // R8: the public gateway URL is a second named build input (vars, never
+    // secrets), required by the descriptor before any web transport.
+    expect(stagingBlock).toContain("VITE_GATEWAY_URL: ${{ vars.STAGING_GATEWAY_URL }}");
     expect(stagingBlock).toContain("CONVEX_DEPLOYMENT: ${{ secrets.STAGING_CONVEX_DEPLOYMENT }}");
     expect(stagingBlock).toContain("CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}");
     expect(stagingBlock).toContain("CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}");

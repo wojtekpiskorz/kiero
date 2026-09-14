@@ -11,7 +11,7 @@ media upload/playback/export routes). Configuration skeleton:
 | `MEDIA_BUCKET` | R2 bucket binding (jurisdiction `eu`) | Authorized read/write path to the environment's media bucket; binding name is fixed, bucket name varies per environment (`kiero-<env>-media`) |
 | `ENVIRONMENT` | worker var | Literal environment name (`dev` / `staging` / `alpha-production`) for telemetry tagging |
 | `CONVEX_SITE_URL` | worker var | Convex HTTP actions URL of the matching environment's deployment, used for current-access checks during uploads/reads |
-| `ALLOWED_APP_ORIGINS` | worker var (`apps/gateway/src/index.ts`) | CORS origin allow-list; media routes authorize cross-origin calls only from the listed web origins (staging: the `kiero-staging-web.pages.dev` origin) |
+| `ALLOWED_APP_ORIGINS` | worker var (`apps/gateway/src/index.ts`) | CORS origin allow-list; media routes authorize cross-origin calls only from the listed web origins (staging since R8: the `https://kiero-staging-web.wojtek-524.workers.dev` static-assets Worker origin) |
 | `IMAGES` | Cloudflare Images binding (optional) | preferred photo-normalization path when bound; absent on staging until the owner provisions Images |
 | `KIERO_NORMALIZER_URL` | worker var (`apps/gateway/src/images/normalizer.ts`) | fallback remote photo-normalizer endpoint used when the `IMAGES` binding is absent; per-environment executor URL |
 

@@ -61,7 +61,12 @@ const expectedApps = {
   "media-worker": ["kiero-dev-media-worker", "kiero-staging-media-worker", "kiero-alpha-media-worker"],
   "export-worker": ["kiero-dev-export-worker", "kiero-staging-export-worker", "kiero-alpha-export-worker"],
   "backup-worker": ["kiero-dev-backup-worker", "kiero-staging-backup-worker", "kiero-alpha-backup-worker"],
+  // R8: the qualification PWA is a Workers Static Assets Worker (owner
+  // decision 2026-09-14): static assets + SPA fallback, nothing else.
+  web: ["kiero-dev-web", "kiero-staging-web", "kiero-alpha-web"],
 };
+/** The container-running apps (S3-credential executors); gateway and web are not among them. */
+const containerApps = new Set(["media-worker", "export-worker", "backup-worker"]);
 for (const [app, names] of Object.entries(expectedApps)) {
   const file = path.join(ROOT, "apps", app, "wrangler.jsonc");
   if (!fs.existsSync(file)) {
@@ -110,7 +115,32 @@ for (const [app, names] of Object.entries(expectedApps)) {
     ...(cfg.containers ?? []),
     ...Object.values(envs).flatMap((e) => e.containers ?? []),
   ];
-  if (app !== "gateway") {
+  // R8: the web app is STATIC ASSETS ONLY: no main script, and the Vite
+  // dist served with single-page-application fallback in EVERY scope, so
+  // direct links to client routes (/zrodlo, /praca, /co-teraz) resolve and
+  // /sw.js is served byte-for-byte. (No containers and no R2 bindings are
+  // already enforced by the generic non-container/non-gateway branches.)
+  if (app === "web") {
+    if (cfg.main) fail(`${file}: the static-assets web Worker must not declare main`);
+    const assetScopes = [
+      ["top-level", cfg.assets],
+      ...Object.entries(envs).map(([envName, e]) => [`env.${envName}`, e.assets]),
+    ];
+    for (const [scope, assets] of assetScopes) {
+      if (assets === undefined) continue; // inherited from the top-level block
+      if (typeof assets !== "object")
+        fail(`${file}: ${scope} assets must be an object`);
+      else {
+        if (assets.directory !== "./dist")
+          fail(`${file}: ${scope} assets.directory must be "./dist" (the pinned Vite output), got ${String(assets.directory)}`);
+        if (assets.not_found_handling !== "single-page-application")
+          fail(`${file}: ${scope} assets.not_found_handling must be "single-page-application" (SPA fallback), got ${String(assets.not_found_handling)}`);
+      }
+    }
+    if (cfg.assets === undefined)
+      fail(`${file}: missing top-level assets block (the named envs inherit it)`);
+  }
+  if (containerApps.has(app)) {
     if (!(cfg.containers?.length)) fail(`${file}: missing top-level containers block`);
     for (const c of containerBlocks) {
       if (!c.image || !c.class_name) fail(`${file}: container ${c.name} needs image and class_name`);
@@ -120,7 +150,7 @@ for (const [app, names] of Object.entries(expectedApps)) {
         fail(`${file}: container ${c.name} constraints.jurisdiction must be "eu"`);
     }
   } else if (containerBlocks.length) {
-    fail(`${file}: gateway must not run containers`);
+    fail(`${file}: ${app} must not run containers`);
   }
   ok(`${file}: names, EU jurisdiction and container shape valid`);
 }
@@ -134,6 +164,7 @@ const requiredDocs = [
   "infra/bindings/README.md",
   "infra/bindings/convex-functions.md",
   "infra/bindings/gateway-worker.md",
+  "infra/bindings/web-static-assets.md",
   "infra/bindings/media-export-workers.md",
   "infra/bindings/backup-worker.md",
   "docs/evidence/environment/preflight-2026-09.md",
@@ -172,7 +203,11 @@ const suspicious = /(sk-[A-Za-z0-9]{16,}|(?=[A-Za-z0-9_-]{40,})(?=[A-Za-z0-9_-]*
 function walk(p) {
   const st = fs.statSync(p);
   if (st.isDirectory()) {
-    if (path.basename(p) === "node_modules") return;
+    // node_modules and .wrangler are local machine state, gitignored by the
+    // root .gitignore: they can never be committed, and any local wrangler
+    // run (dev/dry-run cache under apps/*/.wrangler) would otherwise fail
+    // this committed-hygiene check with machine-local literals.
+    if (path.basename(p) === "node_modules" || path.basename(p) === ".wrangler") return;
     return fs.readdirSync(p).forEach((c) => walk(path.join(p, c)));
   }
   if (!/\.(md|jsonc|json|mjs)$/.test(p)) return;

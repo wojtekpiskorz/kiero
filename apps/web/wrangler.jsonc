@@ -1,0 +1,45 @@
+// apps/web/wrangler.jsonc: the qualification PWA as a Workers Static
+// Assets Worker (issue R8 #167; owner decision 2026-09-14 selecting static
+// assets over Cloudflare Pages).
+//
+// The TOP-LEVEL block is the default environment and targets the LOCAL DEV
+// name only (kiero-dev-web), the same wrong-environment guardrail every
+// apps/* skeleton uses: a bare `wrangler deploy` here can never touch
+// staging or alpha. Staging and alpha exist solely as named environments
+// selected with `--env staging` / `--env alpha-production`.
+//
+// STATIC ASSETS ONLY: this Worker has NO main, NO containers and NO
+// bindings. It serves exactly the existing Vite output (`dist/`, produced
+// by `npm run build --workspace @kiero/web`) with single-page-application
+// fallback, so direct links to client routes (/zrodlo, /praca, /co-teraz)
+// receive index.html while real files (/sw.js, hashed assets) are served
+// byte-for-byte. All backend wiring (VITE_CONVEX_URL, VITE_GATEWAY_URL)
+// is baked into the bundle at BUILD time by the release adapter; no secret
+// ever enters this config or the assets.
+//
+// The staging workers.dev origin is https://kiero-staging-web.wojtek-524.workers.dev
+// (the gateway's staging CORS allow-list pins exactly that origin).
+//
+// No account_id is committed: wrangler resolves the account from the
+// logged-in user / CLOUDFLARE_ACCOUNT_ID; see infra/environments/preflight.mjs.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kiero-dev-web",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    // The existing Vite output; relative to this config file.
+    "directory": "./dist",
+    // SPA fallback: unknown paths serve index.html (direct links to
+    // /zrodlo, /praca, /co-teraz work); existing files such as /sw.js are
+    // served as themselves.
+    "not_found_handling": "single-page-application"
+  },
+  "env": {
+    "staging": {
+      "name": "kiero-staging-web"
+    },
+    "alpha-production": {
+      "name": "kiero-alpha-web"
+    }
+  }
+}
