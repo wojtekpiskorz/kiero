@@ -69,6 +69,8 @@ The UX/UI team receives stable operation names, states, permission rules, source
 
 Final visual design and its implementation, public billing, Telegram, live voice conversations, full offline operation, marketing publication, accounting, profitability ranking and additional end-user tiers remain outside this core charter. The ordinary v1 user belongs to one company; the model supports future multiple memberships. GM is explicit and audited. Formal privacy work deferred under Q195 remains deferred.
 
+**Owner amendment, 2026-09-14**: the entire Google Calendar integration is deferred beyond the v1 core per [the deferral ADR](../adr/calendar-deferral-2026-09.md). The G-series code base stays integrated and tested; the v1 PWA does not expose the Calendar entry (R16); the Calendar qualification (two Google accounts, more than seven elapsed days, the publishing decision) moves from J4 to C6 #197, which starts after the core handoff. Push notifications stay in v1. No other accepted requirement is removed.
+
 
 ## Reconciled execution after the 2026-09-12 review
 

@@ -87,8 +87,8 @@ describe("M1 audit: derived map table content", () => {
     expect(run.status).toBe(0);
     expect(run.report.result).toBe("PASS");
     expect(run.report.errors).toEqual([]);
-    expect(run.report.entries).toBe(82);
-    expect(run.report.coreEdges).toBe(195);
+    expect(run.report.entries).toBe(85);
+    expect(run.report.coreEdges).toBe(199);
     expect(run.report.uxRows).toBe(61);
   });
 
@@ -312,6 +312,30 @@ describe("M1 audit: derived map table content", () => {
       },
     });
     expectFail(run, "core edge count mismatch");
+  });
+
+  it("rejects an open task that neither blocks J5 nor is deferred behind it (M7 post-core rule)", () => {
+    const run = auditFixture({
+      manifest: manifest => {
+        // An orphan lane: M6 is closed, so this entry sits behind no open
+        // chain to J5 and gates nothing. The M7 amendment must reject it.
+        manifest.entries.push({
+          key: "X9",
+          title: "[X9] Orphan lane",
+          blockedBy: ["M6"],
+          declaredPrerequisites: ["M6"],
+          ownedPaths: ["docs/evidence/orphan/**"],
+          proofs: [],
+          issueNumber: 9999,
+          issueUrl: "https://github.com/wojtekpiskorz/kiero/issues/9999",
+          state: "OPEN",
+          body: "orphan",
+          bodySha256: "0".repeat(64),
+        });
+        manifest.nativeCoreEdges = (manifest.nativeCoreEdges as number) + 1;
+      },
+    });
+    expectFail(run, "X9: remaining task neither blocks J5 nor is deferred behind it");
   });
 
   it("still detects dependency cycles (M1-P3)", () => {
