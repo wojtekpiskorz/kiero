@@ -58,13 +58,13 @@ fields only).
 
 | # | Probe | Command shape | Result (non-secret identity fields) |
 | --- | --- | --- | --- |
-| P1 | Flag surface | `convex deploy --help`, `convex env --help`, `convex env list --help`, `convex logs --help`, `convex function-spec --help`, `convex deployment --help` | `deploy` has `--dry-run`, `--typecheck`, `--codegen`, `--env-file` — and NO `--deployment` flag; `env`/`logs`/`function-spec` have `--deployment` accepting `team:project:reference`; `env list --names-only` exists |
-| P2 | Names-only env read | `convex env list --names-only --deployment wojtek-piskorz-jr:kiero-dev-core:staging` | exit 0; stdout lists variable NAMES alphabetically; stderr EMPTY — no identity announcement at all |
+| P1 | Flag surface | `convex deploy --help`, `convex env --help`, `convex env list --help`, `convex logs --help`, `convex function-spec --help`, `convex deployment --help` | `deploy` has `--dry-run`, `--typecheck`, `--codegen`, `--env-file`, and NO `--deployment` flag; `env`/`logs`/`function-spec` have `--deployment` accepting `team:project:reference`; `env list --names-only` exists |
+| P2 | Names-only env read | `convex env list --names-only --deployment wojtek-piskorz-jr:kiero-dev-core:staging` | exit 0; stdout lists variable NAMES alphabetically; stderr EMPTY: no identity announcement at all |
 | P3 | Announcement shape | `convex logs --history 1 --deployment wojtek-piskorz-jr:kiero-dev-core:staging` (killed by a 60 s timeout) | stderr carries the identity block; `logs` never self-terminates (infinite tail loop in the CLI source), so it cannot gate a release |
-| P4 | Full-reference deploy selection | `CONVEX_DEPLOYMENT=wojtek-piskorz-jr:kiero-dev-core:staging convex deploy --dry-run --typecheck disable --codegen disable` | exit 1: `✖ Error fetching GET https://api.convex.dev/api/deployment/staging/team_and_project 400 Bad Request: InvalidDeploymentName: Couldn't parse deployment name staging` — the env path reads the reference TAIL as a deployment NAME |
+| P4 | Full-reference deploy selection | `CONVEX_DEPLOYMENT=wojtek-piskorz-jr:kiero-dev-core:staging convex deploy --dry-run --typecheck disable --codegen disable` | exit 1: `✖ Error fetching GET https://api.convex.dev/api/deployment/staging/team_and_project 400 Bad Request: InvalidDeploymentName: Couldn't parse deployment name staging` ; the env path reads the reference TAIL as a deployment NAME |
 | P5 | Type-prefixed label | `CONVEX_DEPLOYMENT=prod:fiery-raven-417 … deploy --dry-run …` | the CLI announced and would push to the PROJECT'S DEFAULT PRODUCTION deployment: `▌ [Production] wojtek-piskorz-jr:kiero-dev-core:production (prod) … wary-coyote-511 … https://wary-coyote-511.convex.cloud`, noting `fiery-raven-417 (set in CONVEX_DEPLOYMENT)`; aborted at the non-interactive push confirmation (exit 1), `--dry-run` regardless |
 | P6 | Bare-slug label | `CONVEX_DEPLOYMENT=fiery-raven-417 … deploy --dry-run …` | identical to P5: target = default production `wary-coyote-511`; the label is only a notice |
-| P7 | Invalid key | `CONVEX_DEPLOY_KEY='prod:definitely-fake-000000|deadbeef-not-a-real-key' CONVEX_DEPLOYMENT=<staging ref> … deploy --dry-run …` | exit 1: `✖ Error fetching POST https://api.convex.dev/api/deployment/url_for_key 401 Unauthorized: AuthenticationFailed: Invalid Convex deploy key` — the KEY branch runs (label ignored) and the provider resolves the URL through `deployment/url_for_key` |
+| P7 | Invalid key | `CONVEX_DEPLOY_KEY='prod:definitely-fake-000000|deadbeef-not-a-real-key' CONVEX_DEPLOYMENT=<staging ref> … deploy --dry-run …` | exit 1: `✖ Error fetching POST https://api.convex.dev/api/deployment/url_for_key 401 Unauthorized: AuthenticationFailed: Invalid Convex deploy key` ; the KEY branch runs (label ignored) and the provider resolves the URL through `deployment/url_for_key` |
 | P8 | Mutation guard | `convex function-spec --deployment <staging ref>` before and after every probe | `{"url": "https://fiery-raven-417.eu-west-1.convex.cloud", "functions": []}` both times: staging held ZERO functions before and after all probes; `git status` stayed clean (probes used `--codegen disable`) |
 | P9 | CLI source reading | `node_modules/convex/dist/cli.bundle.cjs` | selection order, key decoding and announcement rendering pinned exactly (below) |
 
@@ -121,7 +121,7 @@ doing anything else (`announceDeploymentTarget`). Non-TTY shape (P3/P5):
 | Cloud account id / project uuid / deployment uuid / created-at | NO | not exposed by any read-only command probed |
 
 `env list --names-only` authenticates the credential but prints variable
-names only (P2) — no identity. `logs` announces but never terminates (P3).
+names only (P2), no identity. `logs` announces but never terminates (P3).
 The one terminating read-only command that resolves and prints the
 credential-selected identity is therefore `deploy --dry-run`.
 
@@ -178,9 +178,9 @@ deploy is an argv containing `deploy` without `--dry-run`.
 | Wrong key target (credential resolves the project's default production) | `default-production-announcement.txt` (the real P5 capture) | `identity-mismatch` (observed `production`/`wary-coyote-511`/default vs pinned staging) | ZERO (only the probe ran) |
 | Missing identity (probe completes with no announcement) | `no-announcement.txt` (P2 shape) | `identity-lookup-failed` ("without a deployment announcement") | ZERO |
 | Lookup failure (invalid key) | `invalid-key-401.txt` (the real P7 capture), probe exit 1 | `identity-lookup-failed` (`probeExitCode: 1`, sanitized tail names the 401) | ZERO |
-| Unsupported key type | `project:…|…` and `preview:…|…` fixture keys | `unsupported-credential` | ZERO — no command spawned at all |
-| Missing credential | no `CONVEX_DEPLOY_KEY` | `missing-credential` | ZERO — no command spawned |
-| Unpinned identity | descriptor without `expectedIdentity` | `expected-identity-unpinned` | ZERO — no command spawned |
+| Unsupported key type | `project:…|…` and `preview:…|…` fixture keys | `unsupported-credential` | ZERO, no command spawned at all |
+| Missing credential | no `CONVEX_DEPLOY_KEY` | `missing-credential` | ZERO, no command spawned |
+| Unpinned identity | descriptor without `expectedIdentity` | `expected-identity-unpinned` | ZERO, no command spawned |
 | Success | `staging-announcement.txt` (the real P3 capture, staging) | pass | the probe, then EXACTLY ONE deploy; outcome `deployed` with the provider-observed identity (`slug fiery-raven-417`, `identitySource: "provider-observed"`) |
 | Post-deploy divergence (defense in depth) | probe = staging, deploy output = default production | `transport-failed` ("not the pinned target") | one (honest: the transport caught a wrong landing after the fact) |
 
@@ -219,7 +219,7 @@ workflow's name-only credential mappings.
    `InvalidDeploymentName`), and the type-prefixed and bare-slug forms
    that DO parse select the DEFAULT PRODUCTION deployment (P5, P6). The
    pre-R9 local runbook line ("deploy --env-file setting CONVEX_DEPLOYMENT
-   to the staging reference") was therefore not just unverifiable —
+   to the staging reference") was therefore not just unverifiable;
    followed literally it reaches the default production deployment. Both
    probe runs aborted at the non-interactive confirmation and were
    `--dry-run` anyway; `function-spec` confirmed nothing landed. The
@@ -229,7 +229,7 @@ workflow's name-only credential mappings.
    at the 60 s timeout, exit 124). The probe moved to
    `deploy --dry-run`, which terminates.
 4. **`env list --names-only` has no identity surface.** Verified empty
-   stderr on success (P2) — it can prove a credential authenticates, but
+   stderr on success (P2): it can prove a credential authenticates, but
    not WHICH deployment it addresses, so it cannot anchor the gate alone.
 5. **First test run had 7 failures.** The announcement parser picked the
    dashboard URL from the reference line instead of the `└─` deployment

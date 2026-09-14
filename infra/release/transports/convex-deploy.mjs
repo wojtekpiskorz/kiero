@@ -5,8 +5,8 @@
  * that was actually targeted.
  *
  * R9 contract (issue #168): the target of `convex deploy` is selected by
- * the credential — a deployment-scoped CONVEX_DEPLOY_KEY resolves to its
- * own deployment and makes the CLI ignore CONVEX_DEPLOYMENT entirely — so
+ * the credential: a deployment-scoped CONVEX_DEPLOY_KEY resolves to its
+ * own deployment and makes the CLI ignore CONVEX_DEPLOYMENT entirely, so
  * the caller-provided CONVEX_DEPLOYMENT label can never serve as remote
  * identity. The adapter runs the pre-mutation identity gate
  * (verify-convex-target.mjs) before this transport; as defense in depth

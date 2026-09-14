@@ -293,7 +293,7 @@ export function verifyConvexTarget({ env, cwd, expectedIdentity }) {
     return {
       decision: "refuse",
       refusalCode: "unsupported-credential",
-      reason: `CONVEX_DEPLOY_KEY is a ${classification.kind} key; only a deployment-scoped key resolves one pinned deployment`,
+      reason: `CONVEX_DEPLOY_KEY is ${classification.kind === "unparseable" ? "an" : "a"} ${classification.kind} key; only a deployment-scoped key resolves one pinned deployment`,
       expected: expectedIdentity,
     };
   }

@@ -4,8 +4,8 @@
  * provider responses (tests/i7/fixtures/convex-identity) and records every
  * invocation it receives. That recording boundary is the proof of the
  * issue's core acceptance: on every refusal the ONLY Convex command that
- * ran is the read-only `deploy --dry-run` identity probe — zero mutating
- * deploy commands — and on success the recorded remote identity is the
+ * ran is the read-only `deploy --dry-run` identity probe (zero mutating
+ * deploy commands), and on success the recorded remote identity is the
  * provider-observed one, never the caller-provided CONVEX_DEPLOYMENT label.
  *
  * The fixture keys are fabricated strings (never real credentials); the

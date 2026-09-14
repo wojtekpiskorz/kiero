@@ -189,7 +189,7 @@ and no Pages provisioning step remains for staging.
     a bare or type-prefixed slug resolves to the default production
     deployment (`wary-coyote-511`) while merely noting the value. A local
     "deploy staging by reference" run can therefore only ever reach the
-    default production deployment — never staging.
+    default production deployment, never staging.
   - Read-only commands that DO accept the full reference through their own
     `--deployment` flag are safe for local staging inspection:
     `npx --yes convex@1.45.0 env list --names-only --deployment

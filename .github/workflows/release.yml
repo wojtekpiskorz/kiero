@@ -103,7 +103,7 @@ jobs:
       # The deployment-scoped key is the authoritative CI target; without
       # it `convex deploy` fails 401 MissingAccessToken even with a valid
       # CONVEX_DEPLOYMENT reference (I8 probe P7; runbook R4). R9: the key
-      # is also the authoritative IDENTITY — the adapter resolves the
+      # is also the authoritative IDENTITY: the adapter resolves the
       # credential-selected deployment read-only and refuses unless it is
       # the identity pinned in the descriptor (fiery-raven-417), so the
       # CONVEX_DEPLOYMENT label above can never be recorded as evidence.
@@ -180,7 +180,7 @@ jobs:
       RELEASE_NOTES: ${{ github.event.inputs.notes }}
       VITE_CONVEX_URL: ${{ vars.PRODUCTION_CONVEX_URL }}
       CONVEX_DEPLOYMENT: ${{ secrets.PRODUCTION_CONVEX_DEPLOYMENT }}
-      # R9: alpha production gets the same credential rule as staging — a
+      # R9: alpha production gets the same credential rule as staging: a
       # deployment-scoped deploy key is required, and the descriptor must
       # pin the deployment's identity before any Convex deploy may run
       # (the production descriptor ships unpinned until alpha provisions,

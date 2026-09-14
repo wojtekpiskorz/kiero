@@ -70,7 +70,7 @@ only; presence is checked at deploy time, values are never read here.
    identity (type, team, project, reference, slug, URL, default-ness) is
    the identity pinned in the descriptor. A mismatched, missing,
    unsupported or unresolvable credential blocks as
-   `target-verification-failed` with zero mutating commands spawned —
+   `target-verification-failed` with zero mutating commands spawned;
    the caller-provided CONVEX_DEPLOYMENT label is never trusted as
    identity (the pinned CLI ignores it entirely when a deployment-scoped
    key is set). The adapter then builds the checked-out tree, digests the
