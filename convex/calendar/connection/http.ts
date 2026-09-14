@@ -41,6 +41,9 @@ import type { Id } from "../../_generated/dataModel";
 import { errorResult, okResult } from "@kiero/contracts";
 import { unauthenticatedError, forbiddenError, unsupportedError } from "@kiero/runtime";
 import { verifyServiceBearerToken } from "../../operations/telemetry/serviceToken";
+// Canonical HTML escape (the exports protocol helper): one definition of
+// which characters get escaped, shared with the export renderer.
+import { escapeHtml } from "../../operations/exports/protocol";
 import {
   decideCalendarCreateOutcome,
   decideCalendarReadOutcome,
@@ -158,16 +161,6 @@ export function calendarAppReturnHref(env: {
   // same application entry. Components come from URL parsing, never from
   // string concatenation of the raw configuration.
   return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
-}
-
-/** Escapes a value crossing from configuration into HTML (attribute-safe). */
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 }
 
 // ---------------------------------------------------------------------------
