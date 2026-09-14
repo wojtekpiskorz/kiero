@@ -128,10 +128,34 @@ function stripAnsi(text) {
 }
 
 /**
+ * The pinned CLI's non-TTY progress line (deploy2.ts:458): the deploy
+ * pipeline shows the spinner message "Deploying to <url>..." plus
+ * " [dry run]" under --dry-run. On a TTY that text is spinner frames; in CI
+ * (no TTY) it reaches stderr verbatim AFTER the announcement block, with a
+ * trailing "..." that URL regexes swallow. The staging release run
+ * 34874172423 false-mismatched an exactly matching pinned identity because
+ * the parser preferred this line over the announcement's own URL line
+ * (observed url ".../convex.cloud...", region null), so a progress line is
+ * never an announcement line.
+ */
+const PROGRESS_LINE_PATTERN = /^Deploying to \S+\.\.\.(?: ?\[dry run\])?$/;
+
+/** True for the CLI's non-TTY progress lines; never announcement lines. */
+function isProgressLine(line) {
+  return PROGRESS_LINE_PATTERN.test(line.trim());
+}
+
+/**
  * Parses the CLI's deployment announcement (the "Deploying code to
  * deployment:" block) into the observed identity. Returns null when the
  * announcement is absent. Fields not present in the announcement are null,
  * never guessed.
+ *
+ * Progress lines are dropped from the announcement window before any field
+ * is selected, and the URL carrier is the announcement's own tree-drawing
+ * "└─ <url>" line: a generic URL-bearing line backs it up only when no
+ * tree line exists. Spinner-only output carries no announcement header at
+ * all, so it still parses to null (missing identity, refused).
  */
 export function parseConvexAnnouncement(rawText) {
   const lines = stripAnsi(String(rawText ?? "")).split("\n");
@@ -139,7 +163,9 @@ export function parseConvexAnnouncement(rawText) {
   if (headerIndex === -1) {
     return null;
   }
-  const window = lines.slice(headerIndex + 1, headerIndex + 6);
+  const window = lines
+    .slice(headerIndex + 1, headerIndex + 6)
+    .filter((line) => !isProgressLine(line));
   const refLine = window.find((line) => /\[[A-Za-z]+\]/.test(line));
   if (refLine === undefined) {
     return null;
@@ -153,14 +179,20 @@ export function parseConvexAnnouncement(rawText) {
   const isDefault = /\((dev|prod)\)/.test(refLine);
   // The deployment URL is the tree-drawing "└─ <url>" line below the
   // reference line; the reference line itself carries the DASHBOARD url,
-  // which is not the deployment URL.
-  const deploymentUrlLines = window.filter(
+  // which is not the deployment URL. A tree-drawing line is the
+  // announcement's own URL carrier and wins over every other URL-bearing
+  // line (run 34874172423: the non-TTY spinner line carried a convex.cloud
+  // URL with a trailing "..." and beat the real announcement line under a
+  // last-match selection); the generic fallback takes the FIRST match
+  // because the announcement block leads the output and trailing lines are
+  // more likely noise.
+  const urlBearingLines = window.filter(
     (line) => /https?:\/\/\S*convex\.cloud/.test(line) && !line.includes("dashboard.convex.dev"),
   );
   const urlLine =
-    deploymentUrlLines.length > 0
-      ? deploymentUrlLines[deploymentUrlLines.length - 1]
-      : window.find((line) => /└|┌/.test(line) && /https?:\/\//.test(line));
+    urlBearingLines.find((line) => /└|┌/.test(line)) ??
+    urlBearingLines[0] ??
+    window.find((line) => /└|┌/.test(line) && /https?:\/\//.test(line));
   const url = urlLine === undefined ? null : /https?:\/\/[^\s)]+/.exec(urlLine)?.[0] ?? null;
   let slug = null;
   let region = null;

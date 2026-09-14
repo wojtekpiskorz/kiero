@@ -7,6 +7,11 @@ credential-selected Convex target was investigated and gated before
 mutation, with every command reproducible from a clean checkout
 (`rtk npm ci`, then the commands below).
 
+R15 addendum (2026-09-14): the first real staging release exposed a parser
+defect under non-TTY CI; [section 10](#10-repair-record-the-non-tty-ci-spinner-line-r15-192-2026-09-14)
+is the dated repair record, and it extends this document without rewriting
+the R9 observations below.
+
 No mutating deploy command ran anywhere in this work, and no credential
 value was read, printed or written. The only Convex CLI invocations
 against the live account were READ-ONLY (`--help`, `env list --names-only`,
@@ -291,3 +296,97 @@ No secret value appears in any file, command output, fixture or ledger row
 above: fixtures carry fabricated key strings and recorded non-secret
 identity blocks; probe tails are sanitized against secret-bearing
 environment values before capture.
+
+## 10. Repair record: the non-TTY CI spinner line (R15 #192, 2026-09-14)
+
+Status date: 2026-09-14. Worktree `r15-parser` from `main` at
+`f1ac8d45a5f75bc8b6cf17467d0682c8231273a9` (uncommitted changes; the
+coordinator owns the Git lifecycle). Owned paths only: the parser in
+`infra/release/verify-convex-target.mjs`, the refusal matrix in
+`tests/i7/verify-convex-target.test.ts`, the fixtures in
+`tests/i7/fixtures/convex-identity/` and this document.
+
+### 10.1 What the live release run proved
+
+The first real staging release ([run 34874172423](https://github.com/wojtekpiskorz/kiero/actions/runs/34874172423),
+I8 #133, main `3cf9f6e`, dispatched 2026-09-14T17:20:41Z) passed every gate
+and then honestly refused the `convex-functions` leg with
+`target-verification-failed` although the credential-selected identity
+matched the pinned target on every field except `url`: observed
+`https://fiery-raven-417.eu-west-1.convex.cloud...` with the trailing
+ellipsis (and `region` parsed null for the same reason) against the pinned
+exact URL. Zero mutations ran; `convex function-spec --deployment
+wojtek-piskorz-jr:kiero-dev-core:staging` after the run reported
+`functions: []`. The refusal was the gate working on bad input; the defect
+was that the gate could never PASS in CI against the correct target.
+
+### 10.2 Mechanism (provider CLI 1.45.0 source)
+
+The deploy pipeline starts a progress spinner whose message is
+`Deploying to ${url}...` plus ` [dry run]` under `--dry-run`
+(`node_modules/convex/src/cli/lib/deploy2.ts:458`). On a TTY that text is
+spinner frames and never pollutes captured output, which is why every R9
+probe (section 2, all run on a TTY) missed it. In non-TTY CI the spinner
+text reaches stderr verbatim AFTER the announcement block, inside
+`parseConvexAnnouncement`'s 5-line window below the header, and the pre-fix
+URL selection took the LAST window line matching `convex.cloud`: the
+spinner line beat the announcement's own `└─ <url>` line and the URL regex
+captured the trailing `...`.
+
+### 10.3 The repair
+
+1. Progress lines (the `Deploying to <url>...` shape, with or without the
+   ` [dry run]` marker) are dropped from the announcement window before any
+   field is selected: a progress line is never an announcement line, for
+   the reference line or the URL line.
+2. The URL carrier is the announcement's own tree-drawing `└─`/`┌` line; a
+   generic URL-bearing line backs it up only when no tree line exists (and
+   takes the first match, because the announcement block leads the output
+   and trailing lines are more likely noise).
+3. Spinner-only output carries no announcement header at all, so it still
+   parses to null and the gate still refuses `identity-lookup-failed`
+   (missing identity), never minting an observed identity from progress.
+
+Because `infra/release/transports/convex-deploy.mjs` (not edited; outside
+this issue's ownership) reuses `parseConvexAnnouncement` for its
+defense-in-depth re-parse, the same repair covers the REAL deploy leg,
+whose progress line carries no dry-run marker; that marker-less shape is
+pinned by a dedicated parser test.
+
+### 10.4 The recorded CI shape (new fixtures)
+
+- `staging-announcement-ci-spinner.txt`: the exact CI stderr shape of run
+  34874172423, the recorded staging announcement block followed by the
+  spinner line `Deploying to https://fiery-raven-417.eu-west-1.convex.cloud... [dry run]`.
+- `spinner-progress-only.txt`: the progress line alone.
+
+Pre-fix selection reproduced on the new fixture locally (names-only check,
+no network, no command spawned): the last-match rule picks the spinner line
+and the URL regex captures `https://fiery-raven-417.eu-west-1.convex.cloud...`,
+exactly the observed false mismatch. Post-fix the same fixture parses to
+the announced identity with ZERO differences against the pinned
+`PINNED_STAGING_IDENTITY`.
+
+### 10.5 New refusal-matrix rows (all deterministic, same PATH-shim boundary)
+
+| Scenario | Recorded fixture / input | Decision | Mutating deploy commands |
+| --- | --- | --- | --- |
+| CI stderr: announcement plus spinner line | `staging-announcement-ci-spinner.txt` | parser: announced identity, zero differences vs the pin; gate: `pass` | ZERO (only the probe ran) |
+| Real-deploy spinner (no dry-run marker) | CI fixture with the marker stripped | parser: exact `└─` URL and region `eu-west-1` | n/a (parser unit row) |
+| Spinner-only output | `spinner-progress-only.txt` | parser `null`; gate refuses `identity-lookup-failed` ("without a deployment announcement") | ZERO |
+| Adapter end to end with the CI shape | CI fixture as probe AND deploy output | `deployed`; ledger row records the exact pinned URL (no trailing ellipsis) | the probe, then EXACTLY ONE deploy |
+
+Every pre-existing row and fixture passes unchanged (the recorded R9
+captures parse to the same identities as before).
+
+### 10.6 Commands and results (all run 2026-09-14 in this worktree)
+
+| # | Check | Command | Result |
+| --- | --- | --- | --- |
+| C1 | Clean install | `rtk npm ci` | exit 0 |
+| C2 | Typecheck (root + workspaces) | `rtk npm run typecheck` | exit 0, no errors |
+| C3 | Focused deterministic suite | `rtk npx vitest run tests/i7` | 12 files, 180 tests passed (6 new; was 174) |
+| C4 | Full repository suite | `rtk npm test` | 178 files passed, 1 skipped; 2531 tests passed, 6 skipped; exit 0 |
+
+No secret value appears in this section: the run reference, the CLI source
+line and the recorded non-secret identity block are names and URLs only.

@@ -333,6 +333,45 @@ describe("the recorded provider announcements parse to observed identity", () =>
     expect(parseConvexAnnouncement("")).toBeNull();
   });
 
+  it("parses the CI stderr shape of release run 34874172423 with no false mismatch", () => {
+    // In non-TTY CI the pinned CLI's progress line (deploy2.ts:458,
+    // "Deploying to <url>..." plus " [dry run]") reaches stderr after the
+    // announcement block. The pre-fix parser preferred it over the
+    // announcement's own URL line and false-mismatched the exact pin.
+    const identity = parseConvexAnnouncement(fixtureText("staging-announcement-ci-spinner.txt"));
+    expect(identity).toMatchObject({
+      type: "prod",
+      teamSlug: "wojtek-piskorz-jr",
+      projectSlug: "kiero-dev-core",
+      reference: "staging",
+      slug: "fiery-raven-417",
+      url: "https://fiery-raven-417.eu-west-1.convex.cloud",
+      region: "eu-west-1",
+      isDefault: false,
+    });
+    if (identity === null) {
+      throw new Error("the CI-shape fixture must parse");
+    }
+    // The comparison the live run failed now comes out clean: the
+    // spinner's trailing "..." never reaches the url field.
+    expect(compareConvexIdentity(identity, PINNED_STAGING_IDENTITY)).toEqual([]);
+  });
+
+  it("never prefers a progress line without the dry-run marker (the real-deploy shape)", () => {
+    // The transport's mutating deploy re-parses the same announcement, and
+    // its progress line carries no "[dry run]" marker.
+    const realDeployShape = fixtureText("staging-announcement-ci-spinner.txt").replace(" [dry run]", "");
+    expect(parseConvexAnnouncement(realDeployShape)).toMatchObject({
+      slug: "fiery-raven-417",
+      url: "https://fiery-raven-417.eu-west-1.convex.cloud",
+      region: "eu-west-1",
+    });
+  });
+
+  it("returns null for spinner-only output: a progress line is never an announcement", () => {
+    expect(parseConvexAnnouncement(fixtureText("spinner-progress-only.txt"))).toBeNull();
+  });
+
   it("the comparison names every differing field with both values", () => {
     const observed = parseConvexAnnouncement(fixtureText("default-production-announcement.txt"));
     if (observed === null) {
@@ -376,6 +415,46 @@ describe("the gate against the recorded provider responses (recording boundary)"
     expect(mutatingDeployInvocations(workspace.record)).toEqual([]);
     expect(recordedInvocations(workspace.record)).toHaveLength(1);
     expect(recordedInvocations(workspace.record)[0]).toContain("--dry-run");
+  });
+
+  it("passes the pinned staging target when CI stderr carries the non-TTY spinner line", () => {
+    // The exact probe output of release run 34874172423: the announcement
+    // block followed by the CLI's progress line. Pre-fix, this very input
+    // refused identity-mismatch on the url field alone.
+    const workspace = gateWorkspace();
+    const verification = runGate(workspace, {
+      probeOut: join(fixturesDir, "staging-announcement-ci-spinner.txt"),
+    });
+    expect(verification.decision).toBe("pass");
+    if (verification.decision !== "pass") {
+      throw new Error("unreachable");
+    }
+    expect(verification.identity).toMatchObject({
+      slug: "fiery-raven-417",
+      url: "https://fiery-raven-417.eu-west-1.convex.cloud",
+      region: "eu-west-1",
+      isDefault: false,
+    });
+    // The only command the boundary saw is the read-only probe.
+    expect(mutatingDeployInvocations(workspace.record)).toEqual([]);
+    expect(recordedInvocations(workspace.record)).toHaveLength(1);
+  });
+
+  it("refuses spinner-only probe output as a failed identity lookup", () => {
+    // Progress without an announcement block is still missing identity: the
+    // gate must not mint an observed identity from a progress line.
+    const workspace = gateWorkspace();
+    const verification = runGate(workspace, {
+      probeOut: join(fixturesDir, "spinner-progress-only.txt"),
+    });
+    expect(verification).toMatchObject({
+      decision: "refuse",
+      refusalCode: "identity-lookup-failed",
+    });
+    if (verification.decision === "refuse") {
+      expect(verification.reason).toContain("without a deployment announcement");
+    }
+    expect(mutatingDeployInvocations(workspace.record)).toEqual([]);
   });
 
   it("refuses a wrong key target with zero mutating deploy commands", () => {
@@ -551,6 +630,37 @@ describe("the deploy adapter gates the Convex component before any mutating comm
       identitySource: "provider-observed",
     });
     // The boundary saw the probe first, then exactly one mutating deploy.
+    const invocations = recordedInvocations(result.record);
+    expect(invocations).toHaveLength(2);
+    expect(invocations[0]).toContain("--dry-run");
+    expect(mutatingDeployInvocations(result.record)).toHaveLength(1);
+  });
+
+  it("deploys end to end when both the probe and the deploy output carry the CI spinner line", () => {
+    // The shape the real CI run produces on every leg: the announcement
+    // block plus the non-TTY progress line, on the gate probe AND on the
+    // transport's deploy output (the marker-less progress line the real
+    // deploy prints is pinned by the parser test above).
+    const ciShape = join(fixturesDir, "staging-announcement-ci-spinner.txt");
+    const result = runAdapterWithConvexComponent(
+      { probeOut: ciShape, deployOut: ciShape },
+      PINNED_STAGING_IDENTITY,
+    );
+    expect(result.run.status).toBe(0);
+    expect(result.run.stdout).toContain("[deployed] convex-functions");
+    const rows = readReleaseRecords(result.ledger) as { outcome?: string; remoteIdentity?: Record<string, unknown> }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.outcome).toBe("deployed");
+    // The recorded remote identity is the exact pinned URL: no trailing
+    // spinner ellipsis anywhere in the ledger row.
+    expect(rows[0]?.remoteIdentity).toMatchObject({
+      kind: "convex-deployment",
+      slug: "fiery-raven-417",
+      url: "https://fiery-raven-417.eu-west-1.convex.cloud",
+      region: "eu-west-1",
+      identitySource: "provider-observed",
+    });
+    expect(JSON.stringify(rows[0]?.remoteIdentity)).not.toContain("...");
     const invocations = recordedInvocations(result.record);
     expect(invocations).toHaveLength(2);
     expect(invocations[0]).toContain("--dry-run");
