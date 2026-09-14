@@ -188,6 +188,9 @@ describe("digests and command execution (adapter primitives)", () => {
       "checks-missing",
       "checks-refused",
       "missing-configuration",
+      // R9: a Convex component whose credential-selected deployment is not
+      // the descriptor's pinned target blocks before any mutating command.
+      "target-verification-failed",
       "build-failed",
       "missing-artifact",
       "transport-failed",

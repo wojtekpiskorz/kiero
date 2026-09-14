@@ -29,7 +29,16 @@
       "build": null,
       "artifact": "convex",
       "transport": {
-        "kind": "convex-deploy"
+        "kind": "convex-deploy",
+        "expectedIdentity": {
+          "teamSlug": "wojtek-piskorz-jr",
+          "projectSlug": "kiero-dev-core",
+          "reference": "staging",
+          "type": "prod",
+          "slug": "fiery-raven-417",
+          "url": "https://fiery-raven-417.eu-west-1.convex.cloud",
+          "isDefault": false
+        }
       },
       "requiredConfig": ["CONVEX_DEPLOYMENT", "CONVEX_DEPLOY_KEY"]
     },

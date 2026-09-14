@@ -13,14 +13,19 @@
  *   2. requires the runtime environment label (KIERO_ENVIRONMENT) to
  *      equal the descriptor target (authorization);
  *   3. validates configuration NAMES (presence only, never values);
- *   4. builds the checked-out tree and records the artifact digest;
- *   5. hands REAL artifact paths and the validated descriptor to the
- *      component's transport, which returns the remote identity;
- *   6. appends one truthful terminal outcome per component to the
+ *   4. for Convex components, resolves the CREDENTIAL-selected deployment
+ *      through a read-only probe and requires it to be the identity pinned
+ *      in the descriptor before anything else runs (R9; the caller label
+ *      CONVEX_DEPLOYMENT is never trusted as identity);
+ *   5. builds the checked-out tree and records the artifact digest;
+ *   6. hands REAL artifact paths and the validated descriptor to the
+ *      component's transport, which returns the remote identity
+ *      (provider-observed, never a caller label);
+ *   7. appends one truthful terminal outcome per component to the
  *      evidence ledger: deployed (digest + remote identity), skipped
  *      (only when the descriptor excludes the component) or blocked
  *      (missing/unauthorized configuration, refused Checks, failed
- *      build/transport: names only).
+ *      target verification, failed build/transport: names only).
  *
  * Exit code is non-zero when ANY component is blocked; outcomes and the
  * ledger are still written, so a blocked run fails while uploading
@@ -37,6 +42,7 @@ import { fileURLToPath } from "node:url";
 import { loadTargetDescriptor, committedDescriptorViolations, isCommittedDescriptorPath } from "./target-descriptor.mjs";
 import { parseCliFlags } from "./cli-flags.mjs";
 import { evaluateChecksGate } from "./verify-checks.mjs";
+import { verifyConvexTarget } from "./verify-convex-target.mjs";
 import {
   appendReleaseRecord,
   buildComponentOutcomeRecord,
@@ -59,6 +65,7 @@ export const BLOCKED_REASONS = [
   "checks-missing",
   "checks-refused",
   "missing-configuration",
+  "target-verification-failed",
   "build-failed",
   "missing-artifact",
   "transport-failed",
@@ -263,6 +270,22 @@ export async function deployComponents({
     if (missing.length > 0) {
       record(blocked(component.id, "missing-configuration", { missingConfigNames: missing }));
       continue;
+    }
+    // R9 pre-mutation gate: before any build or transport command runs for
+    // a Convex component, resolve the credential-selected deployment
+    // (read-only) and require it to be the descriptor's pinned target. A
+    // mismatched, missing, unsupported or unresolvable credential blocks
+    // here, with zero mutating commands spawned.
+    if (component.transport.kind === "convex-deploy") {
+      const verification = verifyConvexTarget({
+        env,
+        cwd,
+        expectedIdentity: component.transport.expectedIdentity,
+      });
+      if (verification.decision === "refuse") {
+        record(blocked(component.id, "target-verification-failed", { targetVerification: verification }));
+        continue;
+      }
     }
     if (component.build !== null) {
       const build = runCommand(component.build, { cwd, env });
