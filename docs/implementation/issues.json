@@ -5197,9 +5197,21 @@
       "solution": "## Parent\n\nImplementation map #15.\n\n## What to build\n\nReconcile the map with the owner's 2026-09-14 provisioning and provider decisions. Publish bounded release, provider and authentication prerequisites with native dependencies; update existing qualification briefs and the local manifest, derived tables and coordinator handoff. Preserve I8's uncommitted provisioning work in its own worktree.\n\n## Acceptance criteria\n\n- [ ] Register Workers Static Assets hosting, actual Convex target verification, direct DeepSeek chat/vision with retained OpenRouter audio/embeddings, Calendar callback return repair and the observed Auth dependency advisories with explicit owners.\n- [ ] Record verified configuration names and provisioned resources, distinguish them from live service proof, and carry unresolved owner decisions forward.\n- [ ] Synchronize native sub-issues, native blockers, cached bodies, inventory, graph, proof ownership and the coordinator prompt. Offline and remote map audits pass.\n- [ ] Preserve all accepted qualification thresholds and current I8 work. Publish one administration PR with a resumption prompt.\n\n## Blocked by\n\n- M1 #141, closed. Recheck live state before starting.\n\n## Ownership\n\nMap tracker administration, docs/implementation/** and docs/research/deepseek-direct-api-facts.md. Application and I8 provisioning changes belong to their issue-specific lanes.\n",
       "issueNumber": 166,
       "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/166",
-      "state": "OPEN",
+      "state": "CLOSED",
       "body": "## Parent\n\nImplementation map #15.\n\n## What to build\n\nReconcile the map with the owner's 2026-09-14 provisioning and provider decisions. Publish bounded release, provider and authentication prerequisites with native dependencies; update existing qualification briefs and the local manifest, derived tables and coordinator handoff. Preserve I8's uncommitted provisioning work in its own worktree.\n\n## Acceptance criteria\n\n- [ ] Register Workers Static Assets hosting, actual Convex target verification, direct DeepSeek chat/vision with retained OpenRouter audio/embeddings, Calendar callback return repair and the observed Auth dependency advisories with explicit owners.\n- [ ] Record verified configuration names and provisioned resources, distinguish them from live service proof, and carry unresolved owner decisions forward.\n- [ ] Synchronize native sub-issues, native blockers, cached bodies, inventory, graph, proof ownership and the coordinator prompt. Offline and remote map audits pass.\n- [ ] Preserve all accepted qualification thresholds and current I8 work. Publish one administration PR with a resumption prompt.\n\n## Blocked by\n\n- M1 #141, closed. Recheck live state before starting.\n\n## Ownership\n\nMap tracker administration, docs/implementation/** and docs/research/deepseek-direct-api-facts.md. Application and I8 provisioning changes belong to their issue-specific lanes.\n\n## Audit fixture ownership\n\nM2 also owns tests/m1/** to refresh the existing graph-count and J5-row mutation specimens after adding this prerequisite graph. Preserve the same negative assertions and coverage.\n",
-      "bodySha256": "4d2a47a8d139037fa3f6dd122f010fde43c59cfdf2ae398f08c794d40de652de"
+      "bodySha256": "4d2a47a8d139037fa3f6dd122f010fde43c59cfdf2ae398f08c794d40de652de",
+      "audit": {
+        "mergedPr": 172,
+        "mergeCommit": null,
+        "implemented": "Map reconciliation, native prerequisites and VPS coordinator handoff. PR #172 carries the closure-state cache; the merge SHA is available on that PR.",
+        "evidence": [
+          "https://github.com/wojtekpiskorz/kiero/pull/172",
+          "docs/implementation/vps-resumption-2026-09-14.md"
+        ],
+        "remaining": [
+          "Execute the registered implementation and qualification issues; this administration closure supplies no application/service proof."
+        ]
+      }
     },
     {
       "key": "R8",
