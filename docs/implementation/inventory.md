@@ -20,7 +20,7 @@ Audited application `4aa1cc64b3ecab669c76ffa672832d4c5638ac68`, 2026-09-12. All 
 | [R9 #168](https://github.com/wojtekpiskorz/kiero/issues/168) | Verify the credential-selected Convex target before deployment | [R8 #167](https://github.com/wojtekpiskorz/kiero/issues/167), [R6 #131](https://github.com/wojtekpiskorz/kiero/issues/131) |
 | [E8 #170](https://github.com/wojtekpiskorz/kiero/issues/170) | Use direct DeepSeek chat and vision while retaining OpenRouter audio and embeddings | [M2 #166](https://github.com/wojtekpiskorz/kiero/issues/166), [E2 #36](https://github.com/wojtekpiskorz/kiero/issues/36), [R11 #169](https://github.com/wojtekpiskorz/kiero/issues/169) |
 | [R12 #181](https://github.com/wojtekpiskorz/kiero/issues/181) | Return from the gateway Calendar callback to the configured PWA origin | [R10 #171](https://github.com/wojtekpiskorz/kiero/issues/171) |
-| [R13 #182](https://github.com/wojtekpiskorz/kiero/issues/182) | Consolidate the deployment environment label reading | [R10 #171](https://github.com/wojtekpiskorz/kiero/issues/171) |
+| [R13 #182](https://github.com/wojtekpiskorz/kiero/issues/182) | Consolidate the deployment environment label reading | [R10 #171](https://github.com/wojtekpiskorz/kiero/issues/171), [R12 #181](https://github.com/wojtekpiskorz/kiero/issues/181) |
 
 ## Integrated implementation
 

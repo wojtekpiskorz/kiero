@@ -1,6 +1,6 @@
 # Core dependency graph
 
-Snapshot reconciled on 2026-09-14. Historical reviewed application `4aa1cc64b3ecab669c76ffa672832d4c5638ac68`. Native GitHub blockers determine current readiness. There are 186 core edges and one external planning edge, A0 blocked by completed #13.
+Snapshot reconciled on 2026-09-14. Historical reviewed application `4aa1cc64b3ecab669c76ffa672832d4c5638ac68`. Native GitHub blockers determine current readiness. There are 187 core edges and one external planning edge, A0 blocked by completed #13.
 
 ## Remaining work
 
@@ -42,6 +42,7 @@ flowchart TD
   B5 --> J6
   R12 --> J6
   R13 --> J6
+  R12 --> R13
 ```
 
 ## Scheduling and ownership
@@ -133,6 +134,6 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [E8 #170](https://github.com/wojtekpiskorz/kiero/issues/170) | OPEN | [M2 #166](https://github.com/wojtekpiskorz/kiero/issues/166), [E2 #36](https://github.com/wojtekpiskorz/kiero/issues/36), [R11 #169](https://github.com/wojtekpiskorz/kiero/issues/169) | Remaining execution |
 | [R10 #171](https://github.com/wojtekpiskorz/kiero/issues/171) | CLOSED | [M2 #166](https://github.com/wojtekpiskorz/kiero/issues/166), [G1 #45](https://github.com/wojtekpiskorz/kiero/issues/45) | Remaining execution |
 | [R12 #181](https://github.com/wojtekpiskorz/kiero/issues/181) | OPEN | [R10 #171](https://github.com/wojtekpiskorz/kiero/issues/171) | Remaining execution |
-| [R13 #182](https://github.com/wojtekpiskorz/kiero/issues/182) | OPEN | [R10 #171](https://github.com/wojtekpiskorz/kiero/issues/171) | Remaining execution |
+| [R13 #182](https://github.com/wojtekpiskorz/kiero/issues/182) | OPEN | [R10 #171](https://github.com/wojtekpiskorz/kiero/issues/171), [R12 #181](https://github.com/wojtekpiskorz/kiero/issues/181) | Remaining execution |
 
 Administration rows are documentation work, not core features. Their cached states change only through bounded administration PRs that rerun the audit and keep every derived cell equal to the manifest.
