@@ -55,10 +55,11 @@
       ],
       "vars": {
         "ENVIRONMENT": "staging",
-        // I8: the staging CORS allow-list pins the one synthetic web origin
-        // (the Pages project the release adapter deploys); dev/company
-        // origins are intentionally absent.
-        "ALLOWED_APP_ORIGINS": "https://kiero-staging-web.pages.dev",
+        // R8: the staging CORS allow-list pins the one synthetic web origin
+        // (the Workers Static Assets Worker that serves the PWA; owner
+        // decision 2026-09-14, replacing the former Pages project); dev and
+        // company origins are intentionally absent.
+        "ALLOWED_APP_ORIGINS": "https://kiero-staging-web.wojtek-524.workers.dev",
         // Fill when the staging Convex deployment exists (empty = not yet set).
         "CONVEX_SITE_URL": ""
       }

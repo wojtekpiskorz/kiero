@@ -1,7 +1,7 @@
 # Environment: synthetic staging (`staging`)
 
-Status: PENDING PROVISIONING. No staging Convex deployment, buckets, workers
-or Pages project exist yet; this descriptor is the contract GitHub Actions
+Status: PENDING PROVISIONING. No staging Convex deployment, buckets or
+workers exist yet; this descriptor is the contract GitHub Actions
 uses when it begins deploying synthetic staging (per the accepted release
 flow). Nothing in this file was executed against a provider. The R6
 release adapter consumes the same names through
@@ -55,7 +55,7 @@ provides:
 | Scheduler | separate per-deployment cron/scheduler queue and durable workflow state |
 | Storage | separate per-deployment file storage namespace |
 | Project-level env defaults | prohibited: `convex env default` values apply per deployment TYPE, and staging is prod-type, so any prod-type default would silently inject variables into the staging deployment; every staging variable is set per-deployment only, and the prod-type default list must stay empty (runbook R9 success check) |
-| Web origin | the staging PWA is served only from `kiero-staging-web.pages.dev`; OAuth redirect URIs are pinned to that origin (see candidate.json) |
+| Web origin | the staging PWA is served only from the Workers Static Assets Worker `kiero-staging-web` at `https://kiero-staging-web.wojtek-524.workers.dev` (owner decision 2026-09-14, issue R8 #167; no Pages project exists); OAuth redirect URIs are pinned to that origin (see candidate.json) |
 | Environment labels | `ENVIRONMENT=staging` / `KIERO_ENVIRONMENT=staging` stamped by workers and functions |
 | Fixture authorization | proof/fixture flags and proof override variables must stay unset on the staging deployment; the exact enumerated list is maintained in [infra/bindings/convex-functions.md](../bindings/convex-functions.md), and the qualification user path may not be authorized through fixtures or probes (issue #133 acceptance) |
 
@@ -122,26 +122,32 @@ GitHub Actions secret names for staging follow `STAGING_<NAME>` (for example
 release workflow also references `STAGING_CONVEX_DEPLOYMENT` (the staging
 deployment reference, consumed as `CONVEX_DEPLOYMENT`),
 `STAGING_CLOUDFLARE_API_TOKEN` and `STAGING_CLOUDFLARE_ACCOUNT_ID` (wrangler
-deploy credentials for the Pages web host and the four workers, consumed
-under wrangler's own names), and `STAGING_CONVEX_DEPLOY_KEY`
+deploy credentials for the static-assets web Worker and the four workers,
+consumed under wrangler's own names), and `STAGING_CONVEX_DEPLOY_KEY`
 (deployment-scoped Convex deploy key, consumed as `CONVEX_DEPLOY_KEY`; see
 the evidence snapshot's runbook R4 for the workflow mapping status). The
-non-secret `VITE_CONVEX_URL` build input is mapped from the `staging`
-GitHub environment variable `STAGING_CONVEX_URL` (`vars` context), created
-at provisioning time.
+non-secret build inputs are mapped from `staging` GitHub environment
+variables (`vars` context), created at provisioning time: `VITE_CONVEX_URL`
+from `STAGING_CONVEX_URL` (the deployment URL) and, since R8,
+`VITE_GATEWAY_URL` from `STAGING_GATEWAY_URL` (the staging gateway Worker's
+public URL). Both are required by name in the descriptor's `requiredConfig`
+before any web transport starts; neither is a credential.
 
 ## Resource naming convention
 
 `kiero-staging-<role>`: `kiero-staging-media`, `kiero-staging-backup`,
 `kiero-staging-gateway`, `kiero-staging-media-worker`,
 `kiero-staging-export-worker`, `kiero-staging-backup-worker`,
-`kiero-staging-web` (the Cloudflare Pages project serving the built PWA
-bundle; named by the R6 release adapter's `wrangler-pages` transport),
-Convex deployment reference `staging` inside project `kiero-dev-core`.
+`kiero-staging-web` (the Workers Static Assets Worker serving the built
+PWA bundle with single-page-application fallback; declared by
+`apps/web/wrangler.jsonc` `--env staging` and deployed by the release
+adapter's `wrangler-deploy` transport; workers.dev origin
+`https://kiero-staging-web.wojtek-524.workers.dev`), Convex deployment
+reference `staging` inside project `kiero-dev-core`.
 
-Workers static assets remain the recorded advisory-review alternative to
-Pages for the web host; the descriptor keeps the Pages default until the
-owner decides otherwise.
+Workers static assets replaced the former Pages web host by the owner's
+decision of 2026-09-14 (issue R8 #167); the Pages project is not created
+and no Pages provisioning step remains for staging.
 
 ## EU requirements
 
@@ -182,16 +188,22 @@ before any deletion request (owners + evidence first).
 npx --yes convex@1.45.0 deployment create wojtek-piskorz-jr:kiero-dev-core:staging --type prod --region eu
 wrangler r2 bucket create kiero-staging-media  --jurisdiction eu --location weur
 wrangler r2 bucket create kiero-staging-backup  --jurisdiction eu --location weur
-npx wrangler pages project create kiero-staging-web --production-branch main
 ```
+
+No web-host provisioning command exists: the `kiero-staging-web` Workers
+Static Assets Worker is created by the first `wrangler deploy --env staging`
+from `apps/web/wrangler.jsonc` (no Pages project, no dashboard step), and
+its workers.dev origin is
+`https://kiero-staging-web.wojtek-524.workers.dev`.
 
 Record the generated deployment slug and `<slug>.eu-west-1.convex.cloud` URL
 in the staging evidence. GitHub-side owner actions (exact procedure in
 [docs/evidence/staging/README.md](../../docs/evidence/staging/README.md)):
-create the `staging` environment, set its variable `STAGING_CONVEX_URL` and
-its secrets `STAGING_CONVEX_DEPLOYMENT`, `STAGING_CONVEX_DEPLOY_KEY`,
-`STAGING_CLOUDFLARE_API_TOKEN`, `STAGING_CLOUDFLARE_ACCOUNT_ID` (plus the
-`STAGING_<NAME>` runtime credentials above as provisioning proceeds).
+create the `staging` environment, set its variables `STAGING_CONVEX_URL`
+and `STAGING_GATEWAY_URL` and its secrets `STAGING_CONVEX_DEPLOYMENT`,
+`STAGING_CONVEX_DEPLOY_KEY`, `STAGING_CLOUDFLARE_API_TOKEN`,
+`STAGING_CLOUDFLARE_ACCOUNT_ID` (plus the `STAGING_<NAME>` runtime
+credentials above as provisioning proceeds).
 
 Owner: I8 #133 (this ticket) defines the contract; the owner/coordinator
 executes the authenticated provisioning and the first real staging release

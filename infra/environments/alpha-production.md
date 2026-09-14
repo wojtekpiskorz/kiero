@@ -58,9 +58,12 @@ runtime reads `RESEND_API_KEY`/`RESEND_FROM`.)
 `kiero-alpha-<role>`: `kiero-alpha-media`, `kiero-alpha-backup`,
 `kiero-alpha-gateway`, `kiero-alpha-media-worker`,
 `kiero-alpha-export-worker`, `kiero-alpha-backup-worker`,
-`kiero-alpha-web` (the Cloudflare Pages project serving the built PWA
-bundle; named by the R6 release adapter's `wrangler-pages` transport),
-Convex project `kiero-alpha-core`.
+`kiero-alpha-web` (the Workers Static Assets Worker serving the built PWA
+bundle; declared by `apps/web/wrangler.jsonc` `--env alpha-production`,
+mirroring R8's staging shape; NOTE: `infra/release/targets/production.json`
+still names a `wrangler-pages` transport for this component and must be
+reconciled by its owning lane before the first alpha release — no Pages
+project may be created meanwhile), Convex project `kiero-alpha-core`.
 
 ## EU requirements (hard constraints from the accepted architecture)
 
@@ -93,8 +96,11 @@ npx --yes convex@1.45.0 project create kiero-alpha-core
 npx --yes convex@1.45.0 deployment create wojtek-piskorz-jr:kiero-alpha-core:main --type prod --region eu --default
 wrangler r2 bucket create kiero-alpha-media  --jurisdiction eu --location weur
 wrangler r2 bucket create kiero-alpha-backup  --jurisdiction eu --location weur
-npx wrangler pages project create kiero-alpha-web --production-branch main
 ```
+
+No web-host provisioning command: `kiero-alpha-web` is a Workers Static
+Assets Worker created by its first `wrangler deploy --env alpha-production`
+from `apps/web/wrangler.jsonc` (R8 shape; no Pages project).
 
 GitHub-side owner actions: create the `alpha-production` environment,
 configure its protection (required reviewers, an owner action this YAML

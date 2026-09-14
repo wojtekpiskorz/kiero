@@ -516,7 +516,14 @@ describe("the exact workflow command against the committed descriptor (local tru
       expect(row.outcome).toBe("blocked");
       expect(row.blockedReason).toBe("missing-configuration");
       if (row.component === "web") {
-        expect(row.missingConfigNames).toEqual(["VITE_CONVEX_URL", "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]);
+        // R8: the web build also requires the public gateway URL by name
+        // (no half-wired bundle may reach a transport).
+        expect(row.missingConfigNames).toEqual([
+          "VITE_CONVEX_URL",
+          "VITE_GATEWAY_URL",
+          "CLOUDFLARE_API_TOKEN",
+          "CLOUDFLARE_ACCOUNT_ID",
+        ]);
       }
       if (row.component === "convex-functions") {
         // I8 runbook R4: the deployment-scoped key is required by name too
