@@ -1,6 +1,6 @@
 /**
  * R8 focused tests (#167): serving the qualification PWA through Workers
- * Static Assets. Deterministic only — no cloud is contacted, nothing is
+ * Static Assets. Deterministic only: no cloud is contacted, nothing is
  * deployed, no credentials are read. The suite proves:
  *
  * - the web Worker config (apps/web/wrangler.jsonc) declares explicit
@@ -158,7 +158,17 @@ async function startDevServer() {
     stdio: ["ignore", log, log],
     detached: true, // own process group: kill takes workerd down with wrangler
   });
-  await fetchUntilReady(`http://127.0.0.1:${String(port)}/`);
+  await fetchUntilReady(`http://127.0.0.1:${String(port)}/`).catch((cause: unknown) => {
+    // Readiness failed: the child is still detached and unowned (devServer
+    // is only assigned after this resolves), so kill the process group HERE
+    // or a failed startup leaks wrangler + workerd holding the port.
+    try {
+      if (child.pid !== undefined) process.kill(-child.pid, "SIGKILL");
+    } catch {
+      child.kill("SIGKILL");
+    }
+    throw cause;
+  });
   return { process: child, port };
 }
 

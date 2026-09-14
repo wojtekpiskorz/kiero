@@ -115,16 +115,13 @@ for (const [app, names] of Object.entries(expectedApps)) {
     ...(cfg.containers ?? []),
     ...Object.values(envs).flatMap((e) => e.containers ?? []),
   ];
-  // R8: the web app is STATIC ASSETS ONLY. It must validate (and deploy)
-  // without a Container and without a main script, serving the existing
-  // Vite output with single-page-application fallback in EVERY scope, so
+  // R8: the web app is STATIC ASSETS ONLY: no main script, and the Vite
+  // dist served with single-page-application fallback in EVERY scope, so
   // direct links to client routes (/zrodlo, /praca, /co-teraz) resolve and
-  // /sw.js is served byte-for-byte.
+  // /sw.js is served byte-for-byte. (No containers and no R2 bindings are
+  // already enforced by the generic non-container/non-gateway branches.)
   if (app === "web") {
     if (cfg.main) fail(`${file}: the static-assets web Worker must not declare main`);
-    if (containerBlocks.length) fail(`${file}: the web Worker must not run containers`);
-    for (const [scope, blocks] of r2Scopes)
-      if (blocks.length > 0) fail(`${file}: ${scope} must not bind R2 (static assets only)`);
     const assetScopes = [
       ["top-level", cfg.assets],
       ...Object.entries(envs).map(([envName, e]) => [`env.${envName}`, e.assets]),

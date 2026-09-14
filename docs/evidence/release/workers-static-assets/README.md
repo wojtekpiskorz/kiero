@@ -52,8 +52,8 @@ Pages transport.
 ## 3. Artifact digest behavior
 
 The deploy adapter digests `apps/web/dist` (the component's `artifact`)
-with `digestArtifactPath` — a sorted manifest of per-file SHA-256 lines,
-hashed again — and records it in the append-only ledger with the deployed
+with `digestArtifactPath`, a sorted manifest of per-file SHA-256 lines,
+hashed again, and records it in the append-only ledger with the deployed
 outcome. Because the `wrangler-deploy` transport uploads exactly that
 directory (`assets.directory: "./dist"` in `apps/web/wrangler.jsonc`), the
 recorded digest covers the exact bytes served. Observed on the real build:
@@ -75,15 +75,15 @@ recorded digest covers the exact bytes served. Observed on the real build:
    mid-run, so the local-serving test's fixture asset vanished under it
    and `/r8-fixture-asset.txt` fell through to the SPA shell (the
    assertion diff showed the REAL `index.html` with the hashed asset
-   script tag — the fallback working exactly as designed, on the wrong
+   script tag: the fallback working exactly as designed, on the wrong
    bytes). Re-run serialized with no concurrent writers: 170 files /
    2309 tests pass, exit 0 (P10). The test itself is correct; CI cannot
    hit this because the rehearsal job runs vitest with nothing else
    writing the workspace.
 2. **Shape check failed on local wrangler state.** The first
    `verify:environments` run after the manual wrangler probes failed with
-   `apps/web/.wrangler/cache/cf.json: token-like literal` — local,
-   gitignored wrangler cache (never committed). Fixed in the check's own
+   `apps/web/.wrangler/cache/cf.json: token-like literal` (a local,
+   gitignored wrangler cache, never committed). Fixed in the check's own
    walk: `node_modules` and `.wrangler` are both skipped (both are
    gitignored machine state that can never be committed); the test suite
    also removes `apps/web/.wrangler` in its cleanup.
@@ -112,7 +112,7 @@ recorded digest covers the exact bytes served. Observed on the real build:
   component truthfully blocks `missing-configuration` (P4 proves the
   refusal by name).
 - **Live CORS verification** (an origin check against the deployed
-  gateway) and the secret-leak inspection of the deployed bundle — I8's
+  gateway) and the secret-leak inspection of the deployed bundle: I8's
   post-release verification cases.
 - **Production (alpha) descriptor**: `infra/release/targets/production.json`
   still deploys the web component through `wrangler-pages` (see section 6).
