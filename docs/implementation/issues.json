@@ -5762,7 +5762,7 @@
       "body": "## Parent\n\nImplementation map #15; post-integration cache flip.\n\n## What to build\n\nR14 #187 (PR #193) and R15 #192 (PR #194) are merged and closed. Synchronize the cached manifest and derived tables with those closures and register R15 (the CI parser repair found by I8's first release) as a native child that blocked I8.\n\n## Acceptance criteria\n\n- [ ] Flip R14 to CLOSED; register R15 as CLOSED with its merged PR, merge commit and evidence; move R14 to the integrated table and add R15's row.\n- [ ] Add the R15 to I8 edge (native relation already set) across graph, inventory and the cached map body; refresh the README frontier and m1 fixtures. Offline and remote map audits pass after merge.\n\n## Blocked by\n\n- M5 #190, closed. Recheck live state before starting.\n\n## Ownership\n\nMap tracker administration, docs/implementation/** and tests/m1/**.\n\n## Audit fixture ownership\n\nM6 owns tests/m1/** to refresh the graph-count specimens. Preserve the same negative assertions and coverage.\n",
       "bodySha256": "98cdde1ad79f5cfb13f6f04436aab215d05bebb284b215310459ebd778a0bc75",
       "audit": {
-        "mergedPr": null,
+        "mergedPr": 196,
         "mergeCommit": null,
         "implemented": "Cache-flip of the R14/R15 closures and R15 registration. The PR number is recorded on merge.",
         "evidence": [
