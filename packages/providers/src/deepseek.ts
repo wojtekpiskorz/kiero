@@ -260,7 +260,23 @@ export async function* deepSeekResponsesStream(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  const handleEvent = (event: unknown, emit: (chunk: AdapterYieldChunk) => void) => {
+  let malformedFrame = false;
+  /** The one RUN_FINISHED literal every terminal finish shares. */
+  const runFinished = (
+    model: unknown,
+    finishReason: "stop" | "tool_calls" | "length" | "content_filter",
+    usage: Record<string, number> | undefined,
+  ): AdapterYieldChunk => ({
+    type: EventType.RUN_FINISHED,
+    runId,
+    threadId,
+    timestamp: Date.now(),
+    ...(typeof model === "string" && model.length > 0 ? { model } : {}),
+    finishReason,
+    ...(usage === undefined ? {} : { usage }),
+  });
+  /** Maps one parsed wire event onto the AG-UI chunks the harvest consumes. */
+  function* mapEvent(event: unknown): Generator<AdapterYieldChunk> {
     if (typeof event !== "object" || event === null) {
       return;
     }
@@ -269,13 +285,13 @@ export async function* deepSeekResponsesStream(
       case "response.created":
       case "response.in_progress": {
         const model = (typed.response as Record<string, unknown> | undefined)?.model;
-        emit({
+        yield {
           type: EventType.RUN_STARTED,
           runId,
           threadId,
           timestamp: Date.now(),
           ...(typeof model === "string" && model.length > 0 ? { model } : {}),
-        });
+        };
         break;
       }
       case "response.output_item.added": {
@@ -287,13 +303,13 @@ export async function* deepSeekResponsesStream(
           const name = item.name;
           if (typeof itemId === "string" && typeof callId === "string" && typeof name === "string") {
             openCalls.set(itemId, { callId, name });
-            emit({
+            yield {
               type: EventType.TOOL_CALL_START,
               runId,
               timestamp: Date.now(),
               toolCallId: callId,
               toolCallName: name,
-            });
+            };
           }
         }
         break;
@@ -303,13 +319,13 @@ export async function* deepSeekResponsesStream(
         const delta = typed.delta;
         const open = typeof itemId === "string" ? openCalls.get(itemId) : undefined;
         if (open !== undefined && typeof delta === "string") {
-          emit({
+          yield {
             type: EventType.TOOL_CALL_ARGS,
             runId,
             timestamp: Date.now(),
             toolCallId: open.callId,
             delta,
-          });
+          };
         }
         break;
       }
@@ -321,17 +337,21 @@ export async function* deepSeekResponsesStream(
         }
         const itemId =
           typed.type === "response.function_call_arguments.done" ? typed.item_id : item?.id;
-        const open = typeof itemId === "string" ? openCalls.get(itemId) : undefined;
-        if (open !== undefined) {
-          openCalls.delete(typeof itemId === "string" ? itemId : "");
-          emit({
-            type: EventType.TOOL_CALL_END,
-            runId,
-            timestamp: Date.now(),
-            toolCallId: open.callId,
-            toolCallName: open.name,
-          });
+        if (typeof itemId !== "string") {
+          break;
         }
+        const open = openCalls.get(itemId);
+        if (open === undefined) {
+          break;
+        }
+        openCalls.delete(itemId);
+        yield {
+          type: EventType.TOOL_CALL_END,
+          runId,
+          timestamp: Date.now(),
+          toolCallId: open.callId,
+          toolCallName: open.name,
+        };
         break;
       }
       case "response.output_text.delta": {
@@ -339,22 +359,22 @@ export async function* deepSeekResponsesStream(
         if (typeof delta === "string" && delta.length > 0) {
           if (!textStarted) {
             textStarted = true;
-            emit({
+            yield {
               type: EventType.TEXT_MESSAGE_START,
               runId,
               threadId,
               messageId,
               timestamp: Date.now(),
               role: "assistant",
-            });
+            };
           }
-          emit({
+          yield {
             type: EventType.TEXT_MESSAGE_CONTENT,
             runId,
             messageId,
             timestamp: Date.now(),
             delta,
-          });
+          };
         }
         break;
       }
@@ -365,15 +385,7 @@ export async function* deepSeekResponsesStream(
         const model = finished?.model;
         const usage = mapUsage(finished?.usage);
         if (typed.type === "response.completed") {
-          emit({
-            type: EventType.RUN_FINISHED,
-            runId,
-            threadId,
-            timestamp: Date.now(),
-            ...(typeof model === "string" && model.length > 0 ? { model } : {}),
-            finishReason: sawFunctionCall ? "tool_calls" : "stop",
-            ...(usage === undefined ? {} : { usage }),
-          });
+          yield runFinished(model, sawFunctionCall ? "tool_calls" : "stop", usage);
           break;
         }
         // Incomplete: the generation stopped before a whole answer. Known
@@ -385,27 +397,11 @@ export async function* deepSeekResponsesStream(
         const details = finished?.incomplete_details as { reason?: unknown } | undefined;
         const reason = details?.reason;
         if (reason === "max_output_tokens") {
-          emit({
-            type: EventType.RUN_FINISHED,
-            runId,
-            threadId,
-            timestamp: Date.now(),
-            ...(typeof model === "string" && model.length > 0 ? { model } : {}),
-            finishReason: "length",
-            ...(usage === undefined ? {} : { usage }),
-          });
+          yield runFinished(model, "length", usage);
         } else if (reason === "content_filter") {
-          emit({
-            type: EventType.RUN_FINISHED,
-            runId,
-            threadId,
-            timestamp: Date.now(),
-            ...(typeof model === "string" && model.length > 0 ? { model } : {}),
-            finishReason: "content_filter",
-            ...(usage === undefined ? {} : { usage }),
-          });
+          yield runFinished(model, "content_filter", usage);
         } else {
-          emit(runError(runId, "incomplete"));
+          yield runError(runId, "incomplete");
         }
         break;
       }
@@ -415,7 +411,7 @@ export async function* deepSeekResponsesStream(
         const failed = typed.response as Record<string, unknown> | undefined;
         const error = (typed.error ?? failed?.error) as Record<string, unknown> | undefined;
         const code = error?.code;
-        emit(runError(runId, typeof code === "number" ? code : "response_failed"));
+        yield runError(runId, typeof code === "number" ? code : "response_failed");
         break;
       }
       default:
@@ -424,7 +420,29 @@ export async function* deepSeekResponsesStream(
         // and must never be surfaced as answer text.
         break;
     }
-  };
+  }
+  /** Parses one SSE line; sets the malformed flag when the frame is junk. */
+  function* processLine(rawLine: string): Generator<AdapterYieldChunk> {
+    const line = rawLine.trimEnd();
+    // SSE `data:` lines carry the JSON events; `event:` lines and
+    // `: keep-alive` comments carry nothing the mapping needs.
+    if (!line.startsWith("data:")) {
+      return;
+    }
+    const payload = line.slice(5).trim();
+    if (payload.length === 0 || payload === "[DONE]") {
+      return;
+    }
+    let event: unknown;
+    try {
+      event = JSON.parse(payload);
+    } catch {
+      malformedFrame = true;
+      yield runError(runId, "malformed_stream");
+      return;
+    }
+    yield* mapEvent(event);
+  }
   try {
     let done = false;
     while (!done) {
@@ -433,33 +451,19 @@ export async function* deepSeekResponsesStream(
       buffer += decoder.decode(read.value, { stream: !done });
       let newline = buffer.indexOf("\n");
       while (newline !== -1) {
-        const line = buffer.slice(0, newline).trimEnd();
+        const line = buffer.slice(0, newline);
         buffer = buffer.slice(newline + 1);
         newline = buffer.indexOf("\n");
-        // SSE `data:` lines carry the JSON events; `event:` lines and
-        // `: keep-alive` comments carry nothing the mapping needs.
-        if (!line.startsWith("data:")) {
-          continue;
-        }
-        const payload = line.slice(5).trim();
-        if (payload.length === 0 || payload === "[DONE]") {
-          continue;
-        }
-        let event: unknown;
-        try {
-          event = JSON.parse(payload);
-        } catch {
-          yield runError(runId, "malformed_stream");
+        yield* processLine(line);
+        if (malformedFrame) {
           return;
-        }
-        // The generator yields chunks as the frame reader maps them.
-        const pending: AdapterYieldChunk[] = [];
-        handleEvent(event, (chunk) => pending.push(chunk));
-        for (const chunk of pending) {
-          yield chunk;
         }
       }
     }
+    // A stream can close mid-frame: the final unterminated data line still
+    // belongs to the response, so a terminal event arriving without its
+    // trailing newline must not degrade to `stream_terminated`.
+    yield* processLine(buffer);
   } catch (cause) {
     if (cause instanceof Error && (cause.name === "AbortError" || cause.name === "TimeoutError")) {
       yield runError(runId, "aborted");

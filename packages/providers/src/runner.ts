@@ -41,7 +41,7 @@ import {
   type UsageObservation,
 } from "./callRecord";
 import { providerFailure, type ProviderFailure } from "./failures";
-import { normalizeRoutePosition, type ModelRoute, type RouteTarget } from "./routing";
+import type { ModelRoute, RouteTarget } from "./routing";
 
 /** Routing metadata an attempt can report for its record, when observed. */
 export interface AttemptObservation {
@@ -109,10 +109,7 @@ export async function runOrderedRoute<T>(
 ): Promise<RouteCallResult<T>> {
   const builder = newCallRecord(routeId);
   let lastFailure: ProviderFailure | undefined;
-  for (const position of route.order) {
-    // Legacy slug positions normalize to their (only possible) provider;
-    // the frozen production routes arrive already provider-qualified.
-    const target = normalizeRoutePosition(position);
+  for (const target of route.order) {
     const startedAtMs = Date.now();
     const attempt = await attemptRoute(target);
     const finishedAtMs = Date.now();

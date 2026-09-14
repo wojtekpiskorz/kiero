@@ -14,6 +14,7 @@ record: [ADR](../../../adr/provider-routing-2026-09.md). Research input:
 | [routing-and-models.md](./routing-and-models.md) | Routing version, frozen provider-qualified orders, model aliases with observation dates, fallback policy (owner decision citation), deadline/retry semantics |
 | [live-smoke-2026-09-14.md](./live-smoke-2026-09-14.md) | Bounded live verification against the dev-context credentials: protocol probes, model availability checks, the gated live smoke (chat, cross-provider fallback, multi-turn tools, vision, embedding, STT), sanitized records |
 | [adapter-selection.md](./adapter-selection.md) | Issue criterion 6: the exercised `@tanstack/ai-openai` 0.22.5 candidate (with preserved failed attempts) and the reasons the repository-owned transport was selected; zero dependency movement |
+| [integration-record.md](./integration-record.md) | PR #188 advisory review findings and their application: the attempt-skeleton extraction, the legacy slug-shim deletion (with the coordinated D6 literal qualification) and the transport cleanups |
 
 ## Verification commands (all run 2026-09-14 in this worktree)
 

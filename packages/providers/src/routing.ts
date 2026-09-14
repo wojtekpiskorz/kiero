@@ -134,33 +134,15 @@ export const STT_ATTEMPT_DEADLINE_MS = 55_000;
 export const EMBEDDING_ATTEMPT_DEADLINE_MS = 30_000;
 
 /**
- * A bare model slug: the legacy pre-split route form. A slug position means
- * an OPENROUTER target — the only transport the pre-split routes had. The
- * frozen production routes ({@link PROVIDER_ROUTING}) are fully
- * provider-qualified; the slug form exists so server-side verification
- * probes written against the pre-split seam (D6's STT pipeline probes) keep
- * their meaning unchanged. A direct DeepSeek position can never be
- * expressed as a slug: it must say `provider: "deepseek"` explicitly,
- * because a DeepSeek model name is not an OpenRouter slug.
- */
-export type RouteSlug = string;
-
-/** One position in an ordered route, before normalization. */
-export type RoutePosition = RouteTarget | RouteSlug;
-
-/** Normalizes a route position into its provider-qualified form. */
-export function normalizeRoutePosition(position: RoutePosition): RouteTarget {
-  return typeof position === "string" ? { provider: "openrouter", model: position } : position;
-}
-
-/**
- * One immutable route definition: an ordered target list. The tuple type
- * encodes non-emptiness, so the ordered-route runner's loop provably runs
- * at least one attempt and an empty route is a compile-time error here
- * rather than a silent runtime corner.
+ * One immutable route definition: an ordered provider-qualified target
+ * list. The tuple type encodes non-emptiness, so the ordered-route
+ * runner's loop provably runs at least one attempt, and an empty route
+ * or a bare model slug without its supplier is a compile-time error
+ * here rather than a silent runtime corner: every position must say
+ * which supplier serves it.
  */
 export interface ModelRoute {
-  readonly order: readonly [RoutePosition, ...RoutePosition[]];
+  readonly order: readonly [RouteTarget, ...RouteTarget[]];
 }
 
 /** The frozen routing table keyed by the A2 contract route ids. */

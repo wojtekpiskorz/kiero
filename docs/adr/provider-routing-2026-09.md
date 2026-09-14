@@ -32,12 +32,16 @@ recorded in docs/mvp/architecture-design.md ("Provider configuration").
    accepted orders are unchanged (`microsoft/mai-transcribe-2` with
    `openai/whisper-large-v3` backup; `qwen/qwen3-embedding-8b` at the
    4096-dimension baseline) and still use `OPENROUTER_API_KEY`.
-4. **The frozen route is provider-qualified.** Each route position is
-   `{ provider: "deepseek" | "openrouter", model }`; every recorded attempt
-   carries its provider, so usage/cost accounting distinguishes suppliers
-   even where model names alone would be ambiguous. The legacy bare-slug
-   route form (pre-split probe routes) normalizes to an OpenRouter target —
-   the only transport those positions ever had.
+4. **The frozen route is provider-qualified, and the type is closed.** Each
+   route position is `{ provider: "deepseek" | "openrouter", model }`;
+   every recorded attempt carries its provider, so usage/cost accounting
+   distinguishes suppliers even where model names alone would be ambiguous.
+   `ModelRoute.order` accepts ONLY provider-qualified targets: a bare model
+   slug is a compile-time error, not a silently normalized value. (A
+   temporary legacy slug-normalization shim carried D6's pre-split probe
+   routes through the first review round; the coordinated review lane
+   qualified those literals and deleted the shim; see the integration
+   record in docs/evidence/ai/provider-migration/.
 
 Frozen orders (routing version `e8.0`, `packages/providers/src/routing.ts`):
 
@@ -197,11 +201,11 @@ NOT adopted because:
 4. `docs/mvp/architecture-design.md` "Provider configuration" table: still
    describes the pre-split OpenRouter-only order; should reference this
    ADR.
-5. `tests/d6/pipeline.test.ts` (D6's seam fixtures, outside E8's owned
-   test directories): its `scriptedAttempt` fake keys scripted outcomes by
-   the bare model string, and the `as never` cast hid the contract change
-   from typecheck. With provider-qualified route targets the fake must
-   read `target.model` (the runner still accepts the legacy slug ROUTE
-   form, which normalizes to an OpenRouter target). Two tests fail until
-   its owner applies:
-   `async (_credentials: unknown, target: { model: string }) => { const script = scripts[target.model]; ... }`.
+
+Resolved in the coordinated review lane (recorded in the integration
+record, docs/evidence/ai/provider-migration/integration-record.md): the D6
+seam fixture follow-up formerly listed here. The coordinator applied the
+`scriptedAttempt` fixture fix (`target.model`) on the branch, and the same
+coordinated lane qualified the two `probeRoute` literals in
+`tests/d6/pipeline.test.ts` as provider-qualified targets and deleted the
+legacy slug-normalization shim from the routing layer.

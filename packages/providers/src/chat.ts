@@ -460,12 +460,51 @@ export type ChatAttemptResult =
   | { ok: false; failure: ProviderFailure; observation?: StreamObservation };
 
 /**
+ * The ONE bounded-attempt skeleton every chat transport reuses: the
+ * per-attempt deadline (AbortController + CHAT_ATTEMPT_DEADLINE_MS), the
+ * real harvest of the opened stream, the stream-level failure
+ * classification and the thrown-error classification (abort shapes are the
+ * deadline; anything else thrown on Kiero's side of the seam (adapter
+ * construction, request wiring, transport defect) is `internal_error`,
+ * terminal, so an internal defect never silently burns the accepted order)
+ * live here exactly once. `open` receives the deadline's controller: the
+ * TanStack adapter wants the controller itself, the direct transport
+ * wants its signal.
+ */
+async function boundedChatAttempt(
+  open: (abort: AbortController) => AsyncIterable<AdapterYieldChunk>,
+): Promise<ChatAttemptResult> {
+  const abort = new AbortController();
+  const deadline = setTimeout(() => abort.abort(), CHAT_ATTEMPT_DEADLINE_MS);
+  try {
+    // A stream-level failure still carries the observation's routing
+    // metadata (the model that served RUN_STARTED, any first-output time):
+    // recorded with the failure, not discarded.
+    const observation = await harvestStream(open(abort));
+    if (observation.failed) {
+      return {
+        ok: false,
+        failure: classifyChatFailure(observation.failureCode),
+        observation,
+      };
+    }
+    return { ok: true, observation };
+  } catch (cause) {
+    if (cause instanceof Error && (cause.name === "AbortError" || cause.name === "TimeoutError")) {
+      return { ok: false, failure: providerFailure("deadline_exceeded") };
+    }
+    return { ok: false, failure: providerFailure("internal_error") };
+  } finally {
+    clearTimeout(deadline);
+  }
+}
+
+/**
  * Runs ONE direct DeepSeek chat attempt against one model through the
- * repository-owned Responses transport: one bounded request, raw stream
- * harvested, no fallback decisions. The transport reports every failure as
+ * repository-owned Responses transport: pure request mapping over the
+ * shared bounded-attempt skeleton. The transport reports every failure as
  * a sanitized RUN_ERROR code; only a malformed request (our side of the
- * seam) throws, classifying as `internal_error` — terminal, so an internal
- * defect never silently burns the accepted order.
+ * seam) throws, which the skeleton classifies as `internal_error`.
  */
 async function deepSeekChatAttempt(
   credentials: DeepSeekCredentials,
@@ -473,10 +512,8 @@ async function deepSeekChatAttempt(
   request: ChatAttemptRequest,
 ): Promise<ChatAttemptResult> {
   const tools = declaredTools(request);
-  const abort = new AbortController();
-  const deadline = setTimeout(() => abort.abort(), CHAT_ATTEMPT_DEADLINE_MS);
-  try {
-    const stream = deepSeekResponsesStream(credentials, {
+  return boundedChatAttempt((abort) =>
+    deepSeekResponsesStream(credentials, {
       model,
       messages: request.messages,
       ...(request.systemPrompt === undefined ? {} : { systemPrompt: request.systemPrompt }),
@@ -499,30 +536,14 @@ async function deepSeekChatAttempt(
           }),
       maxOutputTokens: DEEPSEEK_MAX_OUTPUT_TOKENS,
       signal: abort.signal,
-    });
-    const observation = await harvestStream(stream);
-    if (observation.failed) {
-      return {
-        ok: false,
-        failure: classifyChatFailure(observation.failureCode),
-        observation,
-      };
-    }
-    return { ok: true, observation };
-  } catch (cause) {
-    if (cause instanceof Error && (cause.name === "AbortError" || cause.name === "TimeoutError")) {
-      return { ok: false, failure: providerFailure("deadline_exceeded") };
-    }
-    return { ok: false, failure: providerFailure("internal_error") };
-  } finally {
-    clearTimeout(deadline);
-  }
+    }),
+  );
 }
 
 /**
  * Runs ONE OpenRouter chat attempt against one model through the pinned
- * TanStack adapter: one bounded request, raw stream harvested, no fallback
- * decisions. Unchanged from E2 apart from the provider-qualified call
+ * TanStack adapter: pure request mapping over the shared bounded-attempt
+ * skeleton. Unchanged from E2 apart from the provider-qualified call
  * shape; it now serves the authorized fallback positions.
  */
 async function openRouterChatAttempt(
@@ -531,19 +552,6 @@ async function openRouterChatAttempt(
   request: ChatAttemptRequest,
 ): Promise<ChatAttemptResult> {
   const tools = declaredTools(request);
-  const adapter = createOpenRouterText(
-    // The frozen accepted order (and probe prefixes over its slugs) contains
-    // only catalogued OpenRouter identifiers; the live probes verify the
-    // current catalog during implementation. The cast is name-level only.
-    model as OpenRouterModelName,
-    credentials.apiKey,
-    {
-      timeoutMs: CHAT_ATTEMPT_DEADLINE_MS,
-      retryConfig: { strategy: "none" },
-    },
-  );
-  const abort = new AbortController();
-  const deadline = setTimeout(() => abort.abort(), CHAT_ATTEMPT_DEADLINE_MS);
   const responseFormat =
     request.outputSchema === undefined
       ? undefined
@@ -555,8 +563,19 @@ async function openRouterChatAttempt(
             schema: toolJsonSchemaForStructuredOutput(request.outputSchema) as JSONSchema,
           },
         };
-  try {
-    const stream = adapter.chatStream({
+  return boundedChatAttempt((abort) => {
+    const adapter = createOpenRouterText(
+      // The frozen accepted order (and probe prefixes over its slugs) contains
+      // only catalogued OpenRouter identifiers; the live probes verify the
+      // current catalog during implementation. The cast is name-level only.
+      model as OpenRouterModelName,
+      credentials.apiKey,
+      {
+        timeoutMs: CHAT_ATTEMPT_DEADLINE_MS,
+        retryConfig: { strategy: "none" },
+      },
+    );
+    return adapter.chatStream({
       model,
       messages: toModelMessages(request.messages),
       ...(request.systemPrompt === undefined ? {} : { systemPrompts: [request.systemPrompt] }),
@@ -592,28 +611,7 @@ async function openRouterChatAttempt(
         ...(responseFormat === undefined ? {} : { responseFormat }),
       },
     });
-    const observation = await harvestStream(stream);
-    if (observation.failed) {
-      // Stream-level failure: the observation still carries the model that
-      // served RUN_STARTED and any first-output time — recorded with the
-      // failure, not discarded.
-      return {
-        ok: false,
-        failure: classifyChatFailure(observation.failureCode),
-        observation,
-      };
-    }
-    return { ok: true, observation };
-  } catch (cause) {
-    if (cause instanceof Error && (cause.name === "AbortError" || cause.name === "TimeoutError")) {
-      return { ok: false, failure: providerFailure("deadline_exceeded") };
-    }
-    // Thrown before any stream existed (adapter construction, request
-    // wiring): our side of the seam, not a provider route failure.
-    return { ok: false, failure: providerFailure("internal_error") };
-  } finally {
-    clearTimeout(deadline);
-  }
+  });
 }
 
 /**

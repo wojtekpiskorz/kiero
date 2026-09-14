@@ -384,7 +384,12 @@ function scriptedAttempt(
 
 describe("per-segment STT route (E2 adapter seam)", () => {
   const credentials = { apiKey: "test-key-not-a-real-secret" };
-  const probeRoute = { order: ["kiero/nonexistent-probe-model", "openai/whisper-large-v3"] } as const;
+  const probeRoute = {
+    order: [
+      { provider: "openrouter", model: "kiero/nonexistent-probe-model" },
+      { provider: "openrouter", model: "openai/whisper-large-v3" },
+    ],
+  } as const;
 
   it("falls back per segment: an eligible first-model failure advances to the backup", async () => {
     const result: RouteCallResult<SttTranscription> = await transcriptionWithRoute(

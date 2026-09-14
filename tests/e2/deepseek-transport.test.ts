@@ -421,6 +421,37 @@ describe("terminal-state classification (never a silent success)", () => {
     expect(observation.failed).toBe(true);
     expect(observation.failureCode).toBe("stream_terminated");
   });
+
+  it("honors a terminal frame the stream closed without its trailing newline", async () => {
+    // The stream ends mid-frame: the completed event's data line never got
+    // its newline terminator. The unparsed tail must still be processed, so
+    // a RECEIVED terminal event is honored instead of degrading to
+    // stream_terminated.
+    const terminated = created() + completed();
+    const unterminated = terminated.slice(0, -2);
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(unterminated));
+        controller.close();
+      },
+    });
+    vi.stubGlobal("fetch", (async () =>
+      new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } })) as typeof fetch);
+    const chunks = [];
+    for await (const chunk of deepSeekResponsesStream({ apiKey: DEEPSEEK_KEY }, {
+      model: "deepseek-flash",
+      messages: [{ role: "user", content: [{ kind: "text", text: "pytanie" }] }],
+      maxOutputTokens: 8,
+    })) {
+      chunks.push(chunk);
+    }
+    const observation = await harvestStream(chunks as never);
+    expect(observation.failed).toBe(false);
+    expect(observation.observedModel).toBe("deepseek-flash");
+    expect(observation.finishReason).toBe("stop");
+    expect(observation.usage?.totalTokens).toBe(18);
+  });
 });
 
 describe("transport-level failure classification (HTTP, network, framing)", () => {

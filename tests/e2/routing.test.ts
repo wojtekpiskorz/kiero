@@ -23,9 +23,9 @@ import {
   VISION_MODEL_ORDER,
   classifySdkFailure,
   failureToClosedError,
-  normalizeRoutePosition,
   providerFailure,
 } from "@kiero/providers";
+import type { ModelRoute } from "@kiero/providers";
 
 describe("server-owned routing configuration (E8 provider split)", () => {
   it("pins the accepted chat order exactly: direct DeepSeek first, then two OpenRouter models", () => {
@@ -92,14 +92,12 @@ describe("server-owned routing configuration (E8 provider split)", () => {
     expect(ROUTING_CONFIG_VERSION).toMatch(/^e\d+\.\d+$/);
   });
 
-  it("legacy slug positions normalize to OpenRouter targets; qualified targets pass through", () => {
-    expect(normalizeRoutePosition("openai/whisper-large-v3")).toEqual({
-      provider: "openrouter",
-      model: "openai/whisper-large-v3",
-    });
-    expect(
-      normalizeRoutePosition({ provider: "deepseek", model: DEEPSEEK_CHAT_MODEL }),
-    ).toEqual({ provider: "deepseek", model: DEEPSEEK_CHAT_MODEL });
+  it("a bare model slug is a compile-time error: every position must name its supplier", () => {
+    // The route order type is closed to provider-qualified targets, so a
+    // slug route fails typecheck instead of being normalized silently.
+    // @ts-expect-error a bare slug carries no supplier qualifier
+    const slugRoute: ModelRoute = { order: ["openai/whisper-large-v3"] };
+    void slugRoute;
   });
 
   it("SDK classification is authoritative on the HTTP status, even when wrapped", () => {
