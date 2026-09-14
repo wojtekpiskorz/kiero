@@ -89,7 +89,7 @@ function openRouterCredentials(): OpenRouterCredentials | null {
 /**
  * Reads the server-held direct DeepSeek key; presence only, never its
  * value. Required configuration for every route whose frozen e8.0 order
- * starts at the direct DeepSeek primary (chat/vision;
+ * includes a direct DeepSeek position (chat/vision;
  * docs/adr/provider-routing-2026-09.md): without it the direct attempt is
  * doomed to a TERMINAL `unauthenticated` classification, so this guard
  * refuses up front instead of burning that provider attempt.
@@ -100,14 +100,16 @@ function directDeepSeekKeyPresent(): boolean {
 }
 
 /**
- * Whether one route's frozen order starts at a direct DeepSeek position
- * (so `DEEPSEEK_API_KEY` is required configuration for it). Derived from
- * `PROVIDER_ROUTING`, not a hardcoded route list: a future routing
- * version that moves a route off the direct primary changes this
+ * Whether one route's frozen order includes a direct DeepSeek position
+ * (so `DEEPSEEK_API_KEY` is required configuration for it). Any position,
+ * not only the primary: a future routing version that demotes DeepSeek to
+ * a later fallback slot still needs the key when that slot is reached.
+ * Derived from `PROVIDER_ROUTING`, not a hardcoded route list: a future
+ * routing version that removes the direct positions entirely changes this
  * requirement together with the route definition, not with this guard.
  */
-function routeStartsAtDirectDeepSeek(routeId: ProviderRoute): boolean {
-  return PROVIDER_ROUTING[routeId].order[0].provider === "deepseek";
+function routeIncludesDirectDeepSeek(routeId: ProviderRoute): boolean {
+  return PROVIDER_ROUTING[routeId].order.some((target) => target.provider === "deepseek");
 }
 
 /**
@@ -345,7 +347,7 @@ export async function dispatchAiCommand(
           // activated by a missing primary credential (the runner
           // classifies the direct attempt `unauthenticated`, terminal for
           // the whole call).
-          if (routeStartsAtDirectDeepSeek(decoded.routeId) && !directDeepSeekKeyPresent()) {
+          if (routeIncludesDirectDeepSeek(decoded.routeId) && !directDeepSeekKeyPresent()) {
             return errorResult(
               unavailableError(false, "provider_deepseek_key_not_configured"),
             );
