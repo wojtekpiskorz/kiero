@@ -67,7 +67,11 @@ for (let a = 0; a < remaining.length; a++) {
   }
 }
 for (const entry of entries.filter(entry => entry.state === 'OPEN' && entry.key !== 'J5')) {
-  require(finalAncestors.has(entry.key), `${entry.key}: remaining task does not block J5`);
+  // M7 (owner Calendar deferral, 2026-09-14): an open task must either gate
+  // the final qualification (transitively block J5) or be an explicitly
+  // deferred post-core lane sitting behind J5. Anything else is orphaned work.
+  const deferredBehindCore = ancestors(entry.key).has('J5');
+  require(finalAncestors.has(entry.key) || deferredBehindCore, `${entry.key}: remaining task neither blocks J5 nor is deferred behind it`);
 }
 const edges = entries.reduce((sum, entry) => sum + entry.blockedBy.length, 0);
 require(edges === manifest.nativeCoreEdges, 'core edge count mismatch');
