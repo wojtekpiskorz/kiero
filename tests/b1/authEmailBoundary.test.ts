@@ -23,8 +23,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { httpRouter } from "convex/server";
 import {
   callRoute,
+  fetchEnvelope,
+  freshPlatform,
   MemoryDb,
-  platformCtx,
+  registeredHandler,
   rsaFixture,
   verifyRs256,
   type PlatformCtx,
@@ -60,22 +62,12 @@ const sentEmails: SentEmail[] = [];
 
 /** Local Resend stand-in: records the request and accepts the send. */
 function resendStub(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const url =
-    typeof input === "string" ? new URL(input) : input instanceof URL ? input : new URL(input.url);
-  const request = typeof input === "string" || input instanceof URL ? null : input;
+  const { url, authorization, body } = fetchEnvelope(input, init);
   if (url.href !== "https://api.resend.com/emails") {
     throw new Error(`fixture fetch: unexpected request ${url.href}`);
   }
-  const authorization =
-    init?.headers instanceof Headers
-      ? init.headers.get("authorization")
-      : typeof init?.headers === "object" && init.headers !== null
-        ? ((init.headers as Record<string, string>)["authorization"] ?? (init.headers as Record<string, string>)["Authorization"] ?? null)
-        : (request?.headers.get("authorization") ?? null);
-  const raw =
-    typeof init?.body === "string" ? init.body : request !== null ? "" : String(init?.body ?? "");
-  return Promise.resolve(raw === "" ? request!.text() : raw).then((body) => {
-    const payload = JSON.parse(body) as { to: string[]; subject: string; text: string };
+  return Promise.resolve(body).then((raw) => {
+    const payload = JSON.parse(raw) as { to: string[]; subject: string; text: string };
     sentEmails.push({ ...payload, authorization });
     return Response.json({ id: "kiero-fixture-email-id" });
   });
@@ -84,15 +76,15 @@ function resendStub(input: RequestInfo | URL, init?: RequestInit): Promise<Respo
 // Import the app's real auth entry AFTER the fixture env is in place.
 const authEntry = await import("../../convex/access/identity/authEntry");
 
-type Handler = (ctx: unknown, args: unknown) => Promise<unknown>;
-const signInHandler = (authEntry as unknown as { signIn: { _handler: Handler } }).signIn._handler;
-const storeHandler = (authEntry as unknown as { store: { _handler: Handler } }).store._handler;
+// The registered-function handler seams (Convex attaches `_handler`;
+// the public type hides it — the harness extracts and checks it).
+const signInHandler = registeredHandler(authEntry.signIn, "signIn");
+const storeHandler = registeredHandler(authEntry.store, "store");
 const authRoutes = authEntry.auth;
 
-function freshPlatform(): { ctx: PlatformCtx; db: MemoryDb } {
-  const db = new MemoryDb();
-  return { ctx: platformCtx(db, (c, args) => storeHandler(c, args)), db };
-}
+/** The platform side each test drives: the shared harness fake with the
+ * app's real store handler behind the `"auth:store"` seam. */
+const platform = () => freshPlatform(storeHandler);
 
 /** Issues a code for `email` through the REAL flow and returns the code
  * extracted from the delivered email (the only place it appears in
@@ -128,7 +120,7 @@ describe("email-code issuance at the real package boundary", () => {
 
   beforeAll(() => {
     vi.stubGlobal("fetch", resendStub);
-    ({ ctx, db } = freshPlatform());
+    ({ ctx, db } = platform());
   });
   afterAll(() => {
     vi.unstubAllGlobals();
@@ -206,7 +198,7 @@ describe("email-code issuance at the real package boundary", () => {
 describe("explicit refusal to link accounts sharing an address (the app policy inside the real callback)", () => {
   it("rejects an email-code sign-in onto a Google person, without issuing or sending", async () => {
     vi.stubGlobal("fetch", resendStub);
-    const { ctx, db } = freshPlatform();
+    const { ctx, db } = platform();
 
     // A Google person already exists for the address (seeded rows — the
     // state a Google sign-in under the same config would have created).
@@ -244,7 +236,7 @@ describe("explicit refusal to link accounts sharing an address (the app policy i
 
   it("the rejection copy is the accepted Polish text with no identity detail", async () => {
     vi.stubGlobal("fetch", resendStub);
-    const { ctx, db } = freshPlatform();
+    const { ctx, db } = platform();
     const userId = db.insert("users", {
       email: "drugi@firma.pl",
       displayName: "Drugi",
@@ -274,7 +266,7 @@ describe("explicit refusal to link accounts sharing an address (the app policy i
 describe("unconfigured Google construction is honestly absent", () => {
   it("registers no OAuth routes (the browser-facing surface B1 proved live)", async () => {
     const router = httpRouter();
-    const { ctx } = freshPlatform();
+    const { ctx } = platform();
     authRoutes.addHttpRoutes(router);
     expect(
       await callRoute(router, "GET", `${FIXTURE_SITE}/api/auth/signin/google?code=x`, ctx),
@@ -286,7 +278,7 @@ describe("unconfigured Google construction is honestly absent", () => {
 
   it("still serves the session key/issuer surface (email-code deployments included)", async () => {
     const router = httpRouter();
-    const { ctx } = freshPlatform();
+    const { ctx } = platform();
     authRoutes.addHttpRoutes(router);
     const config = await callRoute(
       router,

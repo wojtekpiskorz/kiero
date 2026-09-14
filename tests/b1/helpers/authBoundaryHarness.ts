@@ -102,16 +102,17 @@ interface Constraint {
 }
 
 /** The convex filter-builder surface used by the library and the app
- * callback (q.field/q.eq/q.neq; callbacks return one predicate). */
+ * callback (q.field/q.eq/q.neq; predicates record themselves as side
+ * effects — the callback's return value is not read). */
 interface FilterApi {
   field(name: string): { field: string };
-  eq(ref: unknown, value: unknown): number;
-  neq(ref: unknown, value: unknown): number;
+  eq(ref: unknown, value: unknown): void;
+  neq(ref: unknown, value: unknown): void;
 }
 
 /** Scan-based stand-in for the indexed/filtered query surface the
  * library and the app callback use (withIndex chains eq; filter
- * callbacks return one q.eq/q.neq predicate). */
+ * predicates record themselves via the builder). */
 class MemoryQuery {
   private readonly constraints: Constraint[] = [];
 
@@ -127,17 +128,16 @@ class MemoryQuery {
     return this;
   }
 
-  filter(cb: (q: FilterApi) => unknown): MemoryQuery {
-    const predicate = cb({
+  filter(cb: (q: FilterApi) => void): MemoryQuery {
+    cb({
       field: (name: string) => ({ field: name }),
-      eq: (ref: unknown, value: unknown) =>
-        this.constraints.push({ field: fieldOf(ref), value, op: "eq" }),
-      neq: (ref: unknown, value: unknown) =>
-        this.constraints.push({ field: fieldOf(ref), value, op: "neq" }),
+      eq: (ref: unknown, value: unknown) => {
+        this.constraints.push({ field: fieldOf(ref), value, op: "eq" });
+      },
+      neq: (ref: unknown, value: unknown) => {
+        this.constraints.push({ field: fieldOf(ref), value, op: "neq" });
+      },
     });
-    if (predicate !== undefined && typeof predicate === "object") {
-      this.constraints.push(predicate as Constraint);
-    }
     return this;
   }
 
@@ -300,14 +300,98 @@ export function platformCtx(
   };
 }
 
+/** The MutationCtx-shaped view of the fake store (what storeImpl and
+ * the app's `createOrUpdateUser` callback see; the MemoryDb itself is
+ * the db api). */
 export function mutationCtx(db: MemoryDb): unknown {
-  return { db: dbApi(db), auth: { getUserIdentity: async () => null } };
+  return { db, auth: { getUserIdentity: async () => null } };
 }
 
-/** The MutationCtx-shaped view of the fake store (what storeImpl and the
- * app's `createOrUpdateUser` callback see). */
-export function dbApi(db: MemoryDb): unknown {
-  return db;
+/** The registered-function `handler` seam (Convex attaches it as
+ * `_handler`; the public type hides it). */
+export type RegisteredHandler = (ctx: unknown, args: unknown) => Promise<unknown>;
+
+/** Extracts the `_handler` seam of a Convex registered function. */
+export function registeredHandler(registered: unknown, name: string): RegisteredHandler {
+  const handler = (registered as { _handler?: unknown })._handler;
+  if (typeof handler !== "function") {
+    throw new Error(`fixture harness: ${name} exposes no _handler seam`);
+  }
+  return handler as RegisteredHandler;
+}
+
+/** A fresh platform side for one flow: an in-memory store plus the fake
+ * action ctx whose `"auth:store"` mutation calls run the REAL store
+ * handler of the app's auth entry. */
+export function freshPlatform(storeHandler: RegisteredHandler): {
+  ctx: PlatformCtx;
+  db: MemoryDb;
+} {
+  const db = new MemoryDb();
+  return { ctx: platformCtx(db, (c, args) => storeHandler(c, args)), db };
+}
+
+/** One header lookup across the shapes init.headers can take. */
+function headerValue(headers: unknown, name: string): string | null {
+  if (headers instanceof Headers) {
+    return headers.get(name);
+  }
+  if (Array.isArray(headers)) {
+    for (const entry of headers) {
+      if (Array.isArray(entry) && entry[0]?.toLowerCase() === name) {
+        return String(entry[1]);
+      }
+    }
+    return null;
+  }
+  if (typeof headers === "object" && headers !== null) {
+    for (const [key, value] of Object.entries(headers)) {
+      if (key.toLowerCase() === name) {
+        return String(value);
+      }
+    }
+  }
+  return null;
+}
+
+/** Normalized view of one fetch call, shared by the network stubs.
+ * oauth4webapi and the @auth/core customFetch wrapper may pass a raw
+ * (URL, init) pair or a Request; the body may be a string, serialized
+ * form data, or carried by the Request itself. */
+export interface FetchEnvelope {
+  readonly url: URL;
+  readonly method: string;
+  readonly authorization: string | null;
+  /** The request body as text (a promise when only the Request carries
+   * it). Empty for bodyless requests. */
+  readonly body: string | Promise<string>;
+}
+
+export function fetchEnvelope(input: RequestInfo | URL, init?: RequestInit): FetchEnvelope {
+  const request = typeof input === "string" || input instanceof URL ? null : input;
+  const url =
+    typeof input === "string"
+      ? new URL(input)
+      : input instanceof URL
+        ? input
+        : new URL(input.url);
+  const method = (init?.method ?? request?.method ?? "GET").toUpperCase();
+  const authorization =
+    headerValue(init?.headers, "authorization") ??
+    (request !== null ? request.headers.get("authorization") : null);
+  let body: string | Promise<string>;
+  if (typeof init?.body === "string") {
+    body = init.body;
+  } else if (init?.body instanceof URLSearchParams) {
+    body = init.body.toString();
+  } else if (init?.body !== undefined && init.body !== null) {
+    body = String(init.body);
+  } else if (request !== null) {
+    body = request.text();
+  } else {
+    body = "";
+  }
+  return { url, method, authorization, body };
 }
 
 /** Invokes one route of a real convex httpRouter in-process. Returns

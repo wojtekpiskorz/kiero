@@ -25,13 +25,14 @@ import { httpRouter } from "convex/server";
 import {
   callRoute,
   cookieHeaderFrom,
+  fetchEnvelope,
+  freshPlatform,
   MemoryDb,
-  platformCtx,
+  registeredHandler,
   rsaFixture,
   s256,
   signRs256,
   verifyRs256,
-  type PlatformCtx,
 } from "./helpers/authBoundaryHarness";
 
 /** Fixture env names/values — self-generated, never real credentials. */
@@ -101,23 +102,9 @@ function fixtureTokenResponse(): Response {
 /** Local Google stand-in: answers discovery, JWKS and the token endpoint,
  * enforcing the checks Google itself would (client_secret_basic
  * credentials, the exact redirect_uri, and the S256 PKCE challenge bound
- * at sign-in). Accepts raw (URL, init) fetch arguments, which is how
- * oauth4webapi and the @auth/core customFetch wrapper call it. */
+ * at sign-in). */
 function googleStub(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const url =
-    typeof input === "string"
-      ? new URL(input)
-      : input instanceof URL
-        ? input
-        : new URL(input.url);
-  const request = typeof input === "string" || input instanceof URL ? null : input;
-  const method = (init?.method ?? request?.method ?? "GET").toUpperCase();
-  const authorization =
-    init?.headers instanceof Headers
-      ? init.headers.get("authorization")
-      : typeof init?.headers === "object" && init.headers !== null
-        ? (init.headers as Record<string, string>)["authorization"] ?? null
-        : request?.headers.get("authorization") ?? null;
+  const { url, method, authorization, body } = fetchEnvelope(input, init);
 
   if (
     method === "GET" &&
@@ -129,14 +116,8 @@ function googleStub(input: RequestInfo | URL, init?: RequestInit): Promise<Respo
     return Promise.resolve(Response.json({ keys: [googleKey.publicJwk] }));
   }
   if (method === "POST" && url.href === GOOGLE_DISCOVERY.token_endpoint) {
-    const raw =
-      typeof init?.body === "string"
-        ? init.body
-        : request !== null
-          ? request.text()
-          : String(init?.body ?? "");
-    return Promise.resolve(raw).then((body) => {
-      const form = new URLSearchParams(body);
+    return Promise.resolve(body).then((raw) => {
+      const form = new URLSearchParams(raw);
       captured.tokenRequest = { form, authorization };
       const expectedBasic = `Basic ${Buffer.from(
         `${FIXTURE_GOOGLE_CLIENT_ID}:${FIXTURE_GOOGLE_CLIENT_SECRET}`,
@@ -164,20 +145,15 @@ function googleStub(input: RequestInfo | URL, init?: RequestInit): Promise<Respo
 // Import the app's real auth entry AFTER the fixture env is in place.
 const authEntry = await import("../../convex/access/identity/authEntry");
 
-/** The registered-function `handler` seam (Convex attaches it as
- * `_handler`; the public type hides it). */
-type Handler = (ctx: unknown, args: unknown) => Promise<unknown>;
-const signInHandler = (authEntry as unknown as { signIn: { _handler: Handler } }).signIn._handler;
-const storeHandler = (authEntry as unknown as { store: { _handler: Handler } }).store._handler;
+// The registered-function handler seams (Convex attaches `_handler`;
+// the public type hides it — the harness extracts and checks it).
+const signInHandler = registeredHandler(authEntry.signIn, "signIn");
+const storeHandler = registeredHandler(authEntry.store, "store");
 const authRoutes = authEntry.auth;
 
-/** The platform side each test drives: a fresh in-memory store, with the
- * library's `"auth:store"` mutation calls routed into the REAL store
- * handler of the app's auth entry. */
-function freshPlatform(): { ctx: PlatformCtx; db: MemoryDb } {
-  const db = new MemoryDb();
-  return { ctx: platformCtx(db, (c, args) => storeHandler(c, args)), db };
-}
+/** The platform side each test drives: the shared harness fake with the
+ * app's real store handler behind the `"auth:store"` seam. */
+const platform = () => freshPlatform(storeHandler);
 
 // --- one complete real flow, executed once, asserted facet by facet ------
 
@@ -209,7 +185,7 @@ function flowRowsOf(): {
 
 beforeAll(async () => {
   vi.stubGlobal("fetch", googleStub);
-  const { ctx, db } = freshPlatform();
+  const { ctx, db } = platform();
   const router = httpRouter();
   authRoutes.addHttpRoutes(router);
 
@@ -294,16 +270,30 @@ describe("resolved dependency pins (R11)", () => {
     expect(root.dependencies["@convex-dev/auth"]).toBe("0.0.95");
   });
 
-  it("0.41.3 satisfies @convex-dev/auth 0.0.95's declared @auth/core peer range", () => {
-    const peers = installedPackage("@convex-dev/auth").peerDependencies;
-    expect(peers["@auth/core"]).toBe("^0.41.1");
-    // ^0.41.1 means >=0.41.1 <0.42.0 for 0.x versions; 0.41.3 is inside.
-    const version = [0, 41, 3];
-    const lower = [0, 41, 1];
-    const upper = [0, 42, 0];
-    const aboveLower = version.join(".") >= lower.join(".");
-    const belowUpper = version.join(".") < upper.join(".");
-    expect(aboveLower && belowUpper).toBe(true);
+  it("the installed @auth/core satisfies @convex-dev/auth's declared peer range", () => {
+    const range = installedPackage("@convex-dev/auth").peerDependencies["@auth/core"];
+    if (typeof range !== "string") {
+      throw new Error("fixture: @convex-dev/auth declares no @auth/core peer range");
+    }
+    expect(range).toBe("^0.41.1");
+    // ^0.41.1 means >=0.41.1 <0.42.0 for 0.x versions. Compare the
+    // INSTALLED version's components numerically against those bounds,
+    // both parsed from the installed packages (nothing hardcoded here).
+    const components = (version: string): [number, number, number] => {
+      const parts = version.split(".").map(Number);
+      if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) {
+        throw new Error(`fixture: unparsable version ${version}`);
+      }
+      return parts as [number, number, number];
+    };
+    const [major, minor, patch] = components(installedPackage("@auth/core").version);
+    const [lowerMajor, lowerMinor, lowerPatch] = components(range.slice(1));
+    const upperMinor = lowerMinor + 1;
+    expect(major).toBe(lowerMajor); // same 0.x line
+    expect(minor > lowerMinor || (minor === lowerMinor && patch >= lowerPatch)).toBe(
+      true,
+    ); // >= lower bound
+    expect(minor < upperMinor).toBe(true); // < 0.42.0 upper bound
   });
 
   it("the lockfile resolves @auth/core exactly once, at 0.41.3 (deduped)", () => {
@@ -320,7 +310,7 @@ describe("resolved dependency pins (R11)", () => {
 
 describe("session key/issuer surface (real HTTP handlers)", () => {
   const router = httpRouter();
-  const { ctx } = freshPlatform();
+  const { ctx } = platform();
   authRoutes.addHttpRoutes(router);
 
   it("openid-configuration binds the issuer to the deployment site URL", async () => {
@@ -428,7 +418,7 @@ describe("Google sign-in at the real package boundary", () => {
 describe("Google callback refuses without the sign-in cookie (PKCE)", () => {
   it("redirects back without a verification code and creates nothing", async () => {
     vi.stubGlobal("fetch", googleStub);
-    const { ctx, db } = freshPlatform();
+    const { ctx, db } = platform();
     const router = httpRouter();
     authRoutes.addHttpRoutes(router);
 
