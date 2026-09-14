@@ -11,6 +11,8 @@
  * type graphs across the boundary. Mirrors are hazards, not copies.
  */
 
+import { deploymentEnvironment } from "@kiero/runtime";
+
 /** The deployment variable holding the PWA origin the callback returns to. */
 export const CALENDAR_APP_BASE_URL_ENV = "KIERO_CALENDAR_APP_BASE_URL";
 
@@ -54,13 +56,13 @@ export function calendarAppReturnHref(env: CalendarAppReturnEnv): string | null 
   } catch {
     return null;
   }
-  // The deployment's environment self-description, read the same way as
-  // the telemetry cron and the backups boundary: one closed label set,
-  // an unknown or absent label honestly means dev. Only dev may return
-  // over plain http (a local PWA); every labeled environment requires
-  // https for a link the browser will navigate to.
-  const rawEnvironment = env.KIERO_ENVIRONMENT ?? "dev";
-  const environment = /^(dev|staging|alpha-production)$/.test(rawEnvironment) ? rawEnvironment : "dev";
+  // The deployment's environment self-description through the ONE shared
+  // closed-label rule (packages/runtime, R13): the same read the telemetry
+  // cron and the backups boundary use, where an unknown or absent label
+  // honestly means dev. Only dev may return over plain http (a local PWA);
+  // every labeled environment requires https for a link the browser will
+  // navigate to.
+  const environment = deploymentEnvironment(env.KIERO_ENVIRONMENT);
   const schemeAllowed =
     url.protocol === "https:" || (url.protocol === "http:" && environment === "dev");
   const wellFormed =

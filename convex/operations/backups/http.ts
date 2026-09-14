@@ -18,7 +18,7 @@ import { httpAction } from "../../_generated/server";
 import type { ActionCtx } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { errorResult, okResult } from "@kiero/contracts";
-import { unauthenticatedError, validationError } from "@kiero/runtime";
+import { deploymentEnvironment, unauthenticatedError, validationError } from "@kiero/runtime";
 import { verifyServiceBearerToken } from "../telemetry/serviceToken";
 import { periodOf } from "../telemetry/costs";
 
@@ -94,10 +94,10 @@ export const backupsCompleteHandler = httpAction(async (ctx, request) => {
     return jsonResponse(200, okResult(complete));
   }
   // The deployment knows its own environment (KIERO_ENVIRONMENT, the same
-  // server-side read the telemetry cron uses); the container never sends
-  // the field, so a body-supplied value must not relabel cost entries.
-  const rawEnvironment = process.env.KIERO_ENVIRONMENT ?? "dev";
-  const environment = /^(dev|staging|alpha-production)$/.test(rawEnvironment) ? rawEnvironment : "dev";
+  // server-side read the telemetry cron uses through the ONE shared label
+  // rule); the container never sends the field, so a body-supplied value
+  // must not relabel cost entries.
+  const environment = deploymentEnvironment(process.env.KIERO_ENVIRONMENT);
   await recordCost(ctx, {
     category: "export",
     amountMinor: 0,

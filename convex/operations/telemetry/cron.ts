@@ -17,6 +17,7 @@ import { internal } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
 import { axiomHttpSink, nullSink, toSinkEvent, type SinkIngestResult } from "./sink";
 import { FORWARD_WINDOW_MS } from "./retention";
+import { deploymentEnvironment } from "@kiero/runtime";
 
 /** Summary of one telemetry tick. */
 export interface CronTickSummary {
@@ -41,10 +42,9 @@ async function forwardRecentToSink(
       ? axiomHttpSink({ apiToken, dataset })
       : nullSink("axiom_not_configured");
 
-  const rawEnvironment = process.env.KIERO_ENVIRONMENT ?? "dev";
-  const environment = /^(dev|staging|alpha-production)$/.test(rawEnvironment)
-    ? rawEnvironment
-    : "dev";
+  // The deployment's closed environment label through the ONE shared rule
+  // (R13: this read previously lived as one of five drifting copies).
+  const environment = deploymentEnvironment(process.env.KIERO_ENVIRONMENT);
 
   const nowMs = Date.now();
   const recent = await ctx.runQuery(internal.operations.telemetry.functions.unforwardedRecent, {

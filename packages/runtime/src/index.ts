@@ -17,6 +17,12 @@
  * - `envelopeHttpStatus`: the single envelope-to-HTTP-status mapping every
  *   transport boundary (Convex bridge endpoints, gateway routes) answers
  *   through.
+ * - `deploymentEnvironment`, `DEPLOYMENT_ENVIRONMENT_LABELS`/
+ *   `DEPLOYMENT_ENVIRONMENT_PATTERN`: the single closed deployment
+ *   environment label rule (the set, and the absent/unknown/empty-means-dev
+ *   classification) the telemetry cron, the backups boundary, the redaction
+ *   format set, the Calendar return resolver and the gateway telemetry
+ *   surface all route through (R13).
  * - `runDomainEffect`: Effect 4 RC execution inside Convex functions with a
  *   bounded deadline and defect sanitization.
  * - `toolJsonSchema`: the TanStack AI standard-schema -> JSON-schema
@@ -30,6 +36,7 @@
 
 export * from "./errors";
 export * from "./http";
+export * from "./deployment";
 export * from "./decode";
 export * from "./context";
 export * from "./command";
