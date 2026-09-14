@@ -21,7 +21,7 @@ The [2026-09-14 VPS resumption record](vps-resumption-2026-09-14.md) supersedes 
 
 ## Next implementation work
 
-M2 #166 through M5 #190, R8 #167, R9 #168, R10 #171, R11 #169, R12 #181, R13 #182 and E8 #170 are closed with their PRs. I8 #133 is unblocked (R9 and E8 done) and owns the first actual staging release; R14 #187 carries the E8 integration follow-ups. B5, D7 and I11 can follow I8 in parallel with separate resource reservations. J6 waits for R10, R12, R13 and R14. Recheck native blockers and active ownership before dispatch.
+M2 #166 through M5 #190, R8 #167, R9 #168, R10 #171, R11 #169, R12 #181, R13 #182 and E8 #170 are closed with their PRs. I8 #133 is unblocked (R9 and E8 done) and owns the first actual staging release; R14 #187 carries the E8 integration follow-ups. B5, D7 and I11 can follow I8 in parallel with separate resource reservations. J6's open blockers are D7, B5 and R14. Recheck native blockers and active ownership before dispatch.
 
 R1-R3 repair clarification provenance, purge and push delivery; R2 and R3 are closed with their evidence. R4 protects source reassignment against stale editors. R5 fixes old-source links and is closed with its live-leg evidence. R6 replaces the broken/placeholder release path with executable tooling. R7 removes the known Calendar test timing flake while preserving timeout assertions.
 
