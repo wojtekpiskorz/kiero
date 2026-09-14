@@ -28,8 +28,12 @@ tasks with reminders and push) does not depend on the Google connection.
 Defer the **entire Google Calendar integration** beyond the v1 core:
 
 1. The v1 PWA does not expose the Calendar entry. R16 #198 switches the
-   calendar host entry to the registry's pending state; the composition's
-   mounted filter excludes it from routes and navigation.
+   calendar host entry to the registry's pending state and amends the join
+   composition accordingly: the composed output mounts only mounted entries
+   (so the derived router and navigation never include the pending entry),
+   while the composition's drift check accepts an explicitly pending entry
+   as a recorded deferral and still fails a silently missing one. The A4
+   router and shell are untouched; they consume the composed list.
 2. The G-series code base stays integrated and tested. Nothing is deleted:
    the deterministic calendar suites keep gating the build, the Convex
    functions and callback legs remain deployed, and the shared modules
