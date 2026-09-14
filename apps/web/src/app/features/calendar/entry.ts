@@ -6,9 +6,10 @@
  * R16 (issue #198) withholds this surface from the v1 PWA composition: the
  * owner deferred the Google Calendar integration beyond v1 (ADR
  * docs/adr/calendar-deferral-2026-09.md). The entry switches to the
- * registry's pending state, so the composition's mounted filter drops it
- * from routes and navigation while the integrated G-series code (screen,
- * backend, contracts) stays intact for the future lane that remounts it.
+ * registry's pending state, and the composition withholds the recorded
+ * deferred entries (FULL_CORE_DEFERRED_FEATURE_IDS) from routes and
+ * navigation while the integrated G-series code (screen, backend,
+ * contracts) stays intact for the future lane that remounts it.
  */
 
 import { appFeatureEntry } from "../../registry";

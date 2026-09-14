@@ -68,3 +68,65 @@ describe("the v1 composition withholds the calendar surface", () => {
     expect(appFeatures[0]?.routePath).toBe("/");
   });
 });
+
+describe("the composition drift check names the deferral states (R16)", () => {
+  // The validator runs over the PRE-withhold composed list; rebuild it from
+  // the filtered output plus the pending entry exactly as fullCoreAppFeatures
+  // composes it, then break each invariant in the style of tests/j2.
+  const composedWithDeferred = async () => {
+    const { appFeatures } = await import("../../apps/web/src/app/app-features");
+    return [...appFeatures, calendarFeatureEntry];
+  };
+
+  it("accepts the recorded deferral: pending calendar present in the composed list", async () => {
+    const { validateFullCoreComposition } = await import("../../apps/web/src/composition/full");
+    const problems = validateFullCoreComposition(await composedWithDeferred()).problems;
+    expect(problems).toEqual([]);
+  });
+
+  it("bites when a listed deferral silently disappears from the composition", async () => {
+    const { appFeatures } = await import("../../apps/web/src/app/app-features");
+    const { validateFullCoreComposition } = await import("../../apps/web/src/composition/full");
+    const problems = validateFullCoreComposition(appFeatures).problems;
+    expect(
+      problems.some(
+        (problem) => problem.kind === "feature_missing" && problem.name === "calendar.connection",
+      ),
+    ).toBe(true);
+  });
+
+  it("bites when a deferred id remounts under a stale deferral record (deferred_not_pending)", async () => {
+    const list = await composedWithDeferred();
+    const { validateFullCoreComposition } = await import("../../apps/web/src/composition/full");
+    const remounted = list.map((entry) =>
+      entry.featureId === "calendar.connection"
+        ? { ...entry, implementation: "mounted" as const }
+        : entry,
+    ) as typeof list;
+    const problems = validateFullCoreComposition(remounted).problems;
+    expect(
+      problems.some(
+        (problem) => problem.kind === "deferred_not_pending" && problem.name === "calendar.connection",
+      ),
+    ).toBe(true);
+  });
+
+  it("bites when a core surface flips to pending without a recorded deferral (feature_not_mounted)", async () => {
+    const list = await composedWithDeferred();
+    const { validateFullCoreComposition } = await import("../../apps/web/src/composition/full");
+    // Deliberate shape violation (a mounted entry flipped pending without a
+    // pendingNote): the cast exists because the drift fixture breaks the
+    // union on purpose, exactly what the validator must name.
+    const quietlyUnshipped = list.map((entry) =>
+      entry.featureId === "memory.project"
+        ? { ...entry, implementation: "pending" as const }
+        : entry,
+    ) as typeof list;
+    const problems = validateFullCoreComposition(quietlyUnshipped).problems;
+    expect(
+      problems.some(
+        (problem) => problem.kind === "feature_not_mounted" && problem.name === "memory.project",
+      ),
+    ).toBe(true);
+  });
+});

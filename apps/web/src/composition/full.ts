@@ -96,6 +96,7 @@ export interface FullCoreProblem {
     | "conversation_not_first"
     | "feature_missing"
     | "feature_not_mounted"
+    | "deferred_not_pending"
     | "order_drift"
     | "retired_route_present"
     | "conversation_operations_drift";
@@ -178,11 +179,16 @@ function fullCoreProblems(entries: readonly AppFeatureEntry[]): FullCoreProblem[
     }
   }
   for (const id of FULL_CORE_DEFERRED_FEATURE_IDS) {
-    if (!entriesById.has(id)) {
+    const entry = entriesById.get(id);
+    if (entry === undefined) {
       problems.push({ kind: "feature_missing", name: id });
+    } else if (entry.implementation !== "pending") {
+      // A deferred id that remounts is a decision reversal flying under a
+      // stale deferral record: name it here (the mounted order check does
+      // NOT catch the half-done remount, because a stale deferred-list id
+      // plus a remounted entry still joins to the core list).
+      problems.push({ kind: "deferred_not_pending", name: id });
     }
-    // A deferred id that remounts surfaces through the mounted order
-    // check below: the owning lane must move it back to the core list.
   }
   const mountedIds: readonly string[] = entries
     .filter((entry) => entry.implementation === "mounted")
