@@ -25,6 +25,16 @@ section of [vps-2026-09-14.md](vps-2026-09-14.md) and `releaseAttempts` in
 yet; the two exact resumption triggers are the owner Cloudflare deploy
 credentials and the R9 parser repair.
 
+Follow-up update (2026-09-14 evening): R15 #194 repaired the parser defect,
+and the SECOND release run (34880906636, main `5780d80`) DEPLOYED the Convex
+functions to `fiery-raven-417` through the checked, identity-pinned pipeline
+(digest `ff07541bdb67…`, 301 files; `function-spec` went from 0 to 644
+functions; the public OIDC discovery and JWKS endpoints and the query API
+answer HTTPS — see the follow-up section of the checkpoint). The five
+wrangler components still block honestly on the owner-PENDING Cloudflare
+credentials, which remain the single resumption trigger for the web/gateway
+half of the release and the authenticated user-path smoke.
+
 Status date: 2026-09-12. Worktree branch `codex/kiero-i8` from `main` at
 `1ffb4dbc3966024270987da22893fb24f02b4df3`. The machine-readable candidate
 manifest is [candidate.json](candidate.json); the living contract for
