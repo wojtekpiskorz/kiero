@@ -204,79 +204,100 @@ export const recordModelCall = internalMutation({
     record: v.any(),
     companyId: v.string(),
   },
-  handler: async (ctx, args) => {
-    let step = await stepRow(ctx.db, args.runId, MODEL_ANALYSIS_SEQUENCE);
-    if (step === null) {
-      const stepId = await ctx.db.insert("processingSteps", {
-        runId: args.runId,
-        stepKind: "model_analysis",
-        sequence: MODEL_ANALYSIS_SEQUENCE,
-        state: "running",
-        startedAtMs: Date.now(),
-      });
-      step = (await ctx.db.get(stepId)) ?? null;
-    }
-    if (step === null) {
-      throw new Error("analysis: model step row missing");
-    }
-    const attempts = (args.record as { attempts: Record<string, unknown>[] }).attempts;
-    let index = 0;
-    let highestAttemptNumber = args.turn * 100;
-    for (const attempt of attempts) {
-      index += 1;
-      let attemptNumber = args.turn * 100 + index;
-      // A retried action re-executes with the same turn numbers: allocate
-      // the next free slot so every REAL provider call keeps its own row.
-      while (
-        (await ctx.db
-          .query("processingAttempts")
-          .withIndex("by_step_attempt", (q) =>
-            q.eq("stepId", step._id).eq("attempt", attemptNumber),
-          )
-          .first()) !== null
-      ) {
-        attemptNumber += 1_000;
-      }
-      highestAttemptNumber = Math.max(highestAttemptNumber, attemptNumber);
-      const outcome = attempt.outcome === "succeeded" ? "succeeded" : "failed";
-      const model =
-        typeof attempt.observedModel === "string"
-          ? attempt.observedModel
-          : typeof attempt.requestedModel === "string"
-            ? attempt.requestedModel
-            : null;
-      await ctx.db.insert("processingAttempts", {
-        stepId: step._id,
-        attempt: attemptNumber,
-        outcome,
-        provider: "openrouter",
-        ...(model === null ? {} : { model }),
-        ...(outcome === "failed" && typeof attempt.failureKind === "string"
-          ? { errorKind: attempt.failureKind }
-          : {}),
-        startedAtMs: typeof attempt.startedAtMs === "number" ? attempt.startedAtMs : Date.now(),
-        finishedAtMs: typeof attempt.finishedAtMs === "number" ? attempt.finishedAtMs : Date.now(),
-      });
-    }
-    // One sanitized completion event per provider call (route + observed
-    // model + outcome only; deduped by run+turn identity).
-    const success = attempts.find((a) => a.outcome === "succeeded");
-    const failure = [...attempts].reverse().find((a) => a.outcome === "failed");
-    const named = success ?? failure;
-    await ctx.runMutation(internal.integrations.ai.record.recordProviderCall, {
-      companyId: args.companyId,
-      routeId: "chat_analysis",
-      actualModel:
-        (typeof named?.observedModel === "string" ? named.observedModel : undefined) ??
-        (typeof named?.requestedModel === "string" ? named.requestedModel : undefined) ??
-        "unknown",
-      outcome: success !== undefined ? "succeeded" : "failed",
-      // The event dedups per turn AND retry epoch (the highest attempt
-      // number this execution allocated).
-      dedupKey: `integrations.modelCall:e3:${args.runId}:turn${args.turn}:a${highestAttemptNumber}`,
-    });
-  },
+  handler: recordModelCallHandler,
 });
+
+/**
+ * The `recordModelCall` handler as a plain function, exported for focused
+ * offline verification (tests/e7 drive it with a fake MutationCtx); the
+ * registered mutation delegates here unchanged.
+ */
+export async function recordModelCallHandler(
+  ctx: MutationCtx,
+  args: {
+    runId: Id<"processingRuns">;
+    turn: number;
+    record: unknown;
+    companyId: string;
+  },
+): Promise<void> {
+  let step = await stepRow(ctx.db, args.runId, MODEL_ANALYSIS_SEQUENCE);
+  if (step === null) {
+    const stepId = await ctx.db.insert("processingSteps", {
+      runId: args.runId,
+      stepKind: "model_analysis",
+      sequence: MODEL_ANALYSIS_SEQUENCE,
+      state: "running",
+      startedAtMs: Date.now(),
+    });
+    step = (await ctx.db.get(stepId)) ?? null;
+  }
+  if (step === null) {
+    throw new Error("analysis: model step row missing");
+  }
+  const attempts = (args.record as { attempts: Record<string, unknown>[] }).attempts;
+  let index = 0;
+  let highestAttemptNumber = args.turn * 100;
+  for (const attempt of attempts) {
+    index += 1;
+    let attemptNumber = args.turn * 100 + index;
+    // A retried action re-executes with the same turn numbers: allocate
+    // the next free slot so every REAL provider call keeps its own row.
+    while (
+      (await ctx.db
+        .query("processingAttempts")
+        .withIndex("by_step_attempt", (q) =>
+          q.eq("stepId", step._id).eq("attempt", attemptNumber),
+        )
+        .first()) !== null
+    ) {
+      attemptNumber += 1_000;
+    }
+    highestAttemptNumber = Math.max(highestAttemptNumber, attemptNumber);
+    const outcome = attempt.outcome === "succeeded" ? "succeeded" : "failed";
+    const model =
+      typeof attempt.observedModel === "string"
+        ? attempt.observedModel
+        : typeof attempt.requestedModel === "string"
+          ? attempt.requestedModel
+          : null;
+    // E8 split (R14): the supplier comes from the record's per-attempt
+    // provider column (direct `deepseek` vs fallback `openrouter`), so
+    // per-provider accounting reads the truth. Pre-split records lack
+    // the optional column and keep their legacy `openrouter` semantics.
+    const provider =
+      typeof attempt.provider === "string" ? attempt.provider : "openrouter";
+    await ctx.db.insert("processingAttempts", {
+      stepId: step._id,
+      attempt: attemptNumber,
+      outcome,
+      provider,
+      ...(model === null ? {} : { model }),
+      ...(outcome === "failed" && typeof attempt.failureKind === "string"
+        ? { errorKind: attempt.failureKind }
+        : {}),
+      startedAtMs: typeof attempt.startedAtMs === "number" ? attempt.startedAtMs : Date.now(),
+      finishedAtMs: typeof attempt.finishedAtMs === "number" ? attempt.finishedAtMs : Date.now(),
+    });
+  }
+  // One sanitized completion event per provider call (route + observed
+  // model + outcome only; deduped by run+turn identity).
+  const success = attempts.find((a) => a.outcome === "succeeded");
+  const failure = [...attempts].reverse().find((a) => a.outcome === "failed");
+  const named = success ?? failure;
+  await ctx.runMutation(internal.integrations.ai.record.recordProviderCall, {
+    companyId: args.companyId,
+    routeId: "chat_analysis",
+    actualModel:
+      (typeof named?.observedModel === "string" ? named.observedModel : undefined) ??
+      (typeof named?.requestedModel === "string" ? named.requestedModel : undefined) ??
+      "unknown",
+    outcome: success !== undefined ? "succeeded" : "failed",
+    // The event dedups per turn AND retry epoch (the highest attempt
+    // number this execution allocated).
+    dedupKey: `integrations.modelCall:e3:${args.runId}:turn${args.turn}:a${highestAttemptNumber}`,
+  });
+}
 
 /** Marks the model step finished with its bounded summary. */
 export const finalizeModelStep = internalMutation({

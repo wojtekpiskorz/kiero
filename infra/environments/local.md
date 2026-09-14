@@ -33,6 +33,7 @@ created by their owning tickets on first need. Evidence:
 | Name | Consumed by | Status |
 | --- | --- | --- |
 | `OPENROUTER_API_KEY` | Convex server actions (AI calls) | name present in local `.env` and as GitHub repo secret; Convex env injection PENDING (E2) |
+| `DEEPSEEK_API_KEY` | Convex server actions (AI chat/vision calls: the e8.0 direct DeepSeek primary route) | name verified in the Convex `staging` deployment and the GitHub `staging` environment (E8 live smoke, 2026-09-14; names only); local `.env` and dev-deployment injection PENDING (I8 owns runtime binding injection) |
 | `RESEND_API_KEY`, `RESEND_FROM` | Convex email integration (`convex/integrations/email/resend.ts`) | PENDING (B5 owner provisioning); replaces the dead `AUTH_RESEND_KEY` name |
 | `AXIOM_API_TOKEN` | gateway/media/export/backup workers + Convex app events | PENDING (I2) |
 | `R2_MEDIA_ACCESS_KEY_ID`, `R2_MEDIA_SECRET_ACCESS_KEY` | media/export containers (S3 API) | PENDING (D5/D6) |

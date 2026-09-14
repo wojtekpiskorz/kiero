@@ -104,17 +104,19 @@ GM can inspect stages, attempts and source-backed changes, retry a failed stage 
 
 ## Provider configuration
 
+Model routing follows the frozen e8.0 split order recorded in the [provider-routing ADR](../adr/provider-routing-2026-09.md): direct DeepSeek (`https://api.deepseek.com`, `DEEPSEEK_API_KEY`, alias `deepseek-flash`) serves chat and vision first, OpenRouter is the explicitly authorized fallback supplier, and OpenRouter alone serves transcription and embeddings. The table restates that accepted order.
+
 | Role | Selected candidate/configuration | Required constraint |
 | --- | --- | --- |
-| Chat / memory analysis | `z-ai/glm-5.3-flash`, then `google/gemini-3.8-flash`, then `deepseek/deepseek-v4-flash-0731` | Application-owned order; compatible tools/schema; bounded retries and deadlines; actual route recorded |
-| Images | GLM, then Gemini | DeepSeek may use completed source-linked extraction text. Both image routes failing leaves image extraction pending. |
-| Speech-to-text | `microsoft/mai-transcribe-2`, backup `openai/whisper-large-v3` through OpenRouter transcription endpoint | MAI public preview/no SLA caveat accepted as a candidate; faithful Polish speech and timing require proof. STT routing differs from chat. |
-| Semantic retrieval | `qwen/qwen3-embedding-8b` through OpenRouter, Convex vectors | Native 4096 dimensions are the initial proof baseline; version text preparation/model/index generation, recheck hydrated evidence |
-| AI SDK | TanStack AI with `@tanstack/ai-openrouter`, Chat Completions first | Prove the actual adapter forwarding and selected model/tool/schema combination. Responses beta is not the default. |
+| Chat / memory analysis | `deepseek-flash` direct on DeepSeek, then OpenRouter `z-ai/glm-5.3-flash`, then OpenRouter `google/gemini-3.8-flash` (e8.0 order) | Application-owned order; compatible tools/schema; bounded retries and deadlines; actual provider and route recorded; a missing or rejected primary credential never silently activates the fallback ([ADR](../adr/provider-routing-2026-09.md)) |
+| Images | `deepseek-flash` direct on DeepSeek (native vision), then the same two OpenRouter models (e8.0 order) | DeepSeek may use completed source-linked extraction text. Both image routes failing leaves image extraction pending. |
+| Speech-to-text | `microsoft/mai-transcribe-2`, backup `openai/whisper-large-v3` through OpenRouter transcription endpoint | MAI public preview/no SLA caveat accepted as a candidate; faithful Polish speech and timing require proof. STT routing differs from chat and stays OpenRouter-only in the e8.0 split. |
+| Semantic retrieval | `qwen/qwen3-embedding-8b` through OpenRouter, Convex vectors | Native 4096 dimensions are the initial proof baseline; version text preparation/model/index generation, recheck hydrated evidence. Embeddings stay OpenRouter-only in the e8.0 split. |
+| AI SDK | TanStack AI core with `@tanstack/ai-openrouter` for the OpenRouter positions; repository-owned direct DeepSeek transport (Responses wire, thinking disabled) | Same AG-UI event vocabulary on both transports so harvest, decoding and recording stay shared; adapter and wire-protocol selection in the [ADR](../adr/provider-routing-2026-09.md). |
 | Authentication | Convex Auth first candidate | Beta caveat accepted; enforce proof of both identities before method linking, and live revocation independently of token validity |
 | Email | Resend, Free initially | Verified app sender, Polish OTP/invites, server credentials, checked delivery and quota behavior |
 
-More than 100 output tokens per second is the GLM provider-selection target, not a guarantee. Useful slower responses during temporary dips are allowed. Preserve model ordering and measure first useful output plus end-to-end time. A fast advertised provider is not selected until the required tool/schema behavior works.
+More than 100 output tokens per second is the provider-selection target, not a guarantee. Useful slower responses during temporary dips are allowed. Preserve model ordering and measure first useful output plus end-to-end time. A fast advertised provider is not selected until the required tool/schema behavior works.
 
 Vectors are rebuildable. Incompatible model/provider implementation, dimensions or text preparation requires a new index generation and verified cutover. During embedding outages use typed/full-text retrieval and disclose relevant coverage gaps. Do not treat absence of a semantic hit as absence of a fact.
 

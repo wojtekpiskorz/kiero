@@ -39,6 +39,7 @@ import {
   errorResult,
   okResult,
   integrationsOperations,
+  type ProviderRoute,
   type ResultEnvelope,
 } from "@kiero/contracts";
 import {
@@ -50,6 +51,7 @@ import {
 } from "@kiero/runtime";
 import {
   ProbeExtractionSchema,
+  PROVIDER_ROUTING,
   ProviderPayload,
   failureToClosedError,
   finalFailure,
@@ -82,6 +84,30 @@ function openRouterCredentials(): OpenRouterCredentials | null {
     return null;
   }
   return { apiKey };
+}
+
+/**
+ * Reads the server-held direct DeepSeek key; presence only, never its
+ * value. Required configuration for every route whose frozen e8.0 order
+ * starts at the direct DeepSeek primary (chat/vision;
+ * docs/adr/provider-routing-2026-09.md): without it the direct attempt is
+ * doomed to a TERMINAL `unauthenticated` classification, so this guard
+ * refuses up front instead of burning that provider attempt.
+ */
+function directDeepSeekKeyPresent(): boolean {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  return apiKey !== undefined && apiKey !== "";
+}
+
+/**
+ * Whether one route's frozen order starts at a direct DeepSeek position
+ * (so `DEEPSEEK_API_KEY` is required configuration for it). Derived from
+ * `PROVIDER_ROUTING`, not a hardcoded route list: a future routing
+ * version that moves a route off the direct primary changes this
+ * requirement together with the route definition, not with this guard.
+ */
+function routeStartsAtDirectDeepSeek(routeId: ProviderRoute): boolean {
+  return PROVIDER_ROUTING[routeId].order[0].provider === "deepseek";
 }
 
 /**
@@ -153,7 +179,7 @@ interface CallRecordSummary {
 export function summarize(
   routeId: string,
   call: { readonly record: ProviderCallRecord },
-): PayloadExecution {
+): ExecutedPayloadExecution {
   const success = succeededAttempt(call.record);
   const failure = finalFailure(call.record);
   if (success !== undefined) {
@@ -192,17 +218,25 @@ export type PayloadExecution =
   | { readonly kind: "invalid_payload" }
   | { readonly kind: "route_mismatch"; readonly payloadKind: string };
 
+/** The decoded wire payload: the union `ProviderPayload` accepts. */
+type DecodedProviderPayload = Schema.Schema.Type<typeof ProviderPayload>;
+
+/** The one outcome kind the payload executor returns after validation. */
+type ExecutedPayloadExecution = Extract<PayloadExecution, { kind: "executed" }>;
+
 /**
- * Maps one serializable payload to its adapter call (external, in-action).
- * The payload's discriminating kind MUST equal the requested route id: a
- * mismatch is rejected before any provider call, so a chat payload can
+ * Decodes one serializable payload and checks its agreement with the
+ * requested route id (pure validation: no provider work, no key reads).
+ * A mismatch is rejected before any provider call, so a chat payload can
  * never execute and be reported as another route.
  */
-async function executePayload(
-  credentials: OpenRouterCredentials,
+function decodePayload(
   routeId: string,
   payload: unknown,
-): Promise<PayloadExecution> {
+):
+  | { kind: "invalid_payload" }
+  | { kind: "route_mismatch"; payloadKind: string }
+  | { kind: "decoded"; value: DecodedProviderPayload } {
   const decodedPayload = Schema.decodeUnknownOption(ProviderPayload)(payload);
   if (decodedPayload._tag === "None") {
     return { kind: "invalid_payload" };
@@ -211,6 +245,17 @@ async function executePayload(
   if (value.kind !== routeId) {
     return { kind: "route_mismatch", payloadKind: value.kind };
   }
+  return { kind: "decoded", value };
+}
+
+/**
+ * Maps one decoded, route-checked payload to its adapter call (external,
+ * in-action).
+ */
+async function executeDecodedPayload(
+  credentials: OpenRouterCredentials,
+  value: DecodedProviderPayload,
+): Promise<ExecutedPayloadExecution> {
   switch (value.kind) {
     case "chat_analysis": {
       // The wire payload offers only user/assistant turns; system
@@ -277,18 +322,35 @@ export async function dispatchAiCommand(
           if (credentials === null) {
             return errorResult(unavailableError(false, "provider_key_not_configured"));
           }
-          const outcome = await executePayload(credentials, decoded.routeId, decoded.payload);
-          if (outcome.kind === "invalid_payload") {
+          const payload = decodePayload(decoded.routeId, decoded.payload);
+          if (payload.kind === "invalid_payload") {
             // Undecodable payload: a validation failure, not a provider
             // failure; no provider call happened, so no event is published.
             return errorResult(validationError("provider_payload_invalid"));
           }
-          if (outcome.kind === "route_mismatch") {
+          if (payload.kind === "route_mismatch") {
             // The payload's kind disagrees with the requested route id: a
             // validation failure BEFORE any provider call; nothing executed,
             // so nothing is published or reported under the wrong route.
             return errorResult(validationError("provider_payload_route_mismatch"));
           }
+          // E8 split follow-up, mirroring the OpenRouter guard: a route
+          // whose frozen order starts at the direct DeepSeek primary
+          // refuses when DEEPSEEK_API_KEY is absent, after the pure payload
+          // validation but still BEFORE any provider call. Honest typed
+          // configuration feedback, never a silent route change: the code
+          // names the absent credential's provider (the closed ErrorCode
+          // pattern is snake_case, unlike the raw error the answer loop
+          // throws), and the OpenRouter fallback positions are NOT
+          // activated by a missing primary credential (the runner
+          // classifies the direct attempt `unauthenticated`, terminal for
+          // the whole call).
+          if (routeStartsAtDirectDeepSeek(decoded.routeId) && !directDeepSeekKeyPresent()) {
+            return errorResult(
+              unavailableError(false, "provider_deepseek_key_not_configured"),
+            );
+          }
+          const outcome = await executeDecodedPayload(credentials, payload.value);
           // The command's idempotency key, when supplied, is the operation
           // identity replays dedup on (publishCallCompleted -> outbox).
           await publishCallCompleted(
