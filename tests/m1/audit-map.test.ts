@@ -87,8 +87,8 @@ describe("M1 audit: derived map table content", () => {
     expect(run.status).toBe(0);
     expect(run.report.result).toBe("PASS");
     expect(run.report.errors).toEqual([]);
-    expect(run.report.entries).toBe(68);
-    expect(run.report.coreEdges).toBe(160);
+    expect(run.report.entries).toBe(74);
+    expect(run.report.coreEdges).toBe(178);
     expect(run.report.uxRows).toBe(61);
   });
 
@@ -273,8 +273,8 @@ describe("M1 audit: derived map table content", () => {
     const run = auditFixture({
       manifest: manifest => {
         manifest.mapBody = (manifest.mapBody as string).replace(
-          ", [M1 #141](https://github.com/wojtekpiskorz/kiero/issues/141) |\n| [R1 #126]",
-          " |\n| [R1 #126]",
+          ", [M1 #141](https://github.com/wojtekpiskorz/kiero/issues/141), [M2 #166]",
+          ", [M2 #166]",
         );
       },
     });

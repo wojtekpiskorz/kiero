@@ -6,6 +6,8 @@ The target remains a complete accepted core behind an unstyled Polish PWA. Final
 
 Start with the [live implementation map](https://github.com/wojtekpiskorz/kiero/issues/15) and [coordinator prompt](coordinator-start-prompt.md). Before selecting work, run `rtk proxy node docs/implementation/audit-map.mjs --remote` from a clean, current checkout. GitHub native blockers are readiness authority; this committed inventory is a dated cache.
 
+The [2026-09-14 VPS resumption record](vps-resumption-2026-09-14.md) supersedes older cloud-setup and provider assumptions. Staging resources and provider configuration names exist; application release and real-service qualification are still outstanding.
+
 ## Read for the selected task
 
 - [Inventory](inventory.md): all issues, integrated PRs, evidence limits and remaining owners.
@@ -19,11 +21,11 @@ Start with the [live implementation map](https://github.com/wojtekpiskorz/kiero/
 
 ## Next implementation work
 
-With M0, R1, R2, R3, R4, R5, R6, R7 and M1 closed, I8 has no open native blockers. Claim only an unassigned issue after a fresh dependency and ownership audit. Root order is a scheduling opportunity, not a promise of available accounts or cloud capacity.
+M2 #166 reconciles the new prerequisite graph. After it integrates and closes, R8 #167, R11 #169 and R10 #171 are the expected independent ready lanes. R8 precedes R9 #168 because they share release files; R11 precedes E8 #170 because they share dependencies. I8 waits for R9 and E8. J6 also waits for R10. Recheck native blockers and active ownership before dispatch.
 
 R1-R3 repair clarification provenance, purge and push delivery; R2 and R3 are closed with their evidence. R4 protects source reassignment against stale editors. R5 fixes old-source links and is closed with its live-leg evidence. R6 replaces the broken/placeholder release path with executable tooling. R7 removes the known Calendar test timing flake while preserving timeout assertions.
 
-I8 establishes an isolated real qualification environment after R6. B5, D7 and I11 then prove actual identity, media and alert delivery. I9 proves export, I10 proves complete scheduled backups, I6 proves quarantined restore, and J6 rechecks the joined repaired application. J3 and J4 qualify AI and physical devices/Google. J5 audits complete core delivery.
+I8 completes the isolated qualification environment and actual release after the new repairs. B5, D7 and I11 then prove actual identity, media and alert delivery. I9 proves export, I10 proves complete scheduled backups, I6 proves quarantined restore, and J6 rechecks the joined repaired application. J3 and J4 qualify AI and physical devices/Google. J5 audits complete core delivery.
 
 ## Resources and unresolved external work
 
