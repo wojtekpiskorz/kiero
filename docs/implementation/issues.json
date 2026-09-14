@@ -5909,7 +5909,7 @@
       "body": "## Parent\n\nImplementation map #15; post-integration cache flip.\n\n## What to build\n\nR16 #198 (PR #201) is merged and closed: the Calendar entry is withheld from the v1 composition. Synchronize the cached manifest and derived tables with that closure.\n\n## Acceptance criteria\n\n- [ ] Flip R16 to CLOSED with its merged PR, merge commit and evidence; move its row to the integrated table.\n- [ ] Refresh the map body, README frontier and m1 graph-count fixtures. Offline and remote map audits pass after merge.\n\n## Blocked by\n\n- M7 #199, closed. Recheck live state before starting.\n\n## Ownership\n\nMap tracker administration, docs/implementation/** and tests/m1/**.\n\n## Audit fixture ownership\n\nM8 owns tests/m1/** to refresh the graph-count specimens. Preserve the same negative assertions and coverage.\n",
       "bodySha256": "14b8c8a77acde2ce7ab826d179c9240b426c96cf041f001b5ae22df3e823c273",
       "audit": {
-        "mergedPr": null,
+        "mergedPr": 203,
         "mergeCommit": null,
         "implemented": "Cache-flip of the R16 closure. The PR number is recorded on merge.",
         "evidence": [
