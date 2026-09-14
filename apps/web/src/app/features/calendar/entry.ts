@@ -3,20 +3,15 @@
  * diagnostics): the Polish barebones entry point for the optional personal
  * Google calendar ("Kalendarz Kiero w Google").
  *
- * The screen renders the server's typed connection status and its honest
- * availableActions (connect / reconnect / switch / recreate / disconnect);
- * the authorization start runs server-side and the browser follows the
- * returned Google URL. G4 appends the settings surface under the
- * connection panel: sync diagnostics (last success, pending, failed,
- * reconnect-needed, cleanup residue), the personal project scope, and the
- * copies list with personal hide/restore, check-now and the Kiero deep
- * link. Mounting this entry is the lane's sanctioned host-composition
- * touch: one import + one line in ../app-features.ts (G1's, unchanged).
+ * R16 (issue #198) withholds this surface from the v1 PWA composition: the
+ * owner deferred the Google Calendar integration beyond v1 (ADR
+ * docs/adr/calendar-deferral-2026-09.md). The entry switches to the
+ * registry's pending state, so the composition's mounted filter drops it
+ * from routes and navigation while the integrated G-series code (screen,
+ * backend, contracts) stays intact for the future lane that remounts it.
  */
 
-import { createElement } from "react";
 import { appFeatureEntry } from "../../registry";
-import { CalendarFeature } from "../../../features/calendar/CalendarFeature";
 
 /** The registered host entry for the Calendar settings surface. */
 export const calendarFeatureEntry = appFeatureEntry({
@@ -35,6 +30,7 @@ export const calendarFeatureEntry = appFeatureEntry({
     // scope section's editor issues (G4's own pin-amendment precedent).
     "calendar.setSelection",
   ],
-  implementation: "mounted",
-  screen: () => createElement(CalendarFeature),
+  implementation: "pending",
+  pendingNote:
+    "Kalendarz Kiero w Google nie jest dostępny w tej wersji: podłączanie kalendarza Google zostało odroczone na późniejszą wersję Kiero. Ustalenia z terminami pozostają w Kiero, a ta funkcja wróci po dokończeniu integracji.",
 });

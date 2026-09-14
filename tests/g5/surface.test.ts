@@ -18,9 +18,7 @@ import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { operations } from "@kiero/contracts";
 import { ScopeSection } from "../../apps/web/src/features/calendar/CalendarSettings";
 import { settingsCopy, type SelectionView } from "../../apps/web/src/features/calendar/state";
-import { appFeatures } from "../../apps/web/src/app/app-features";
-
-const calendarEntry = appFeatures.find((entry) => entry.featureId === "calendar.connection");
+import { calendarFeatureEntry as calendarEntry } from "../../apps/web/src/app/features/calendar/entry";
 
 // A dummy client: mutation hooks only close over it during render; the
 // catalog query stays pending under renderToString, which is exactly the
@@ -35,7 +33,7 @@ const allProjects: SelectionView = { mode: "all_projects", projectIds: null };
 
 describe("the scope editor is mounted on the certified write (criterion 3)", () => {
   it("the registration pin carries the selection write", () => {
-    expect(calendarEntry?.consumedOperations).toContain("calendar.setSelection");
+    expect(calendarEntry.consumedOperations).toContain("calendar.setSelection");
     expect("calendar.setSelection" in operations).toBe(true);
   });
 

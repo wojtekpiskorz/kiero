@@ -129,7 +129,7 @@ describe("the shipped host features", () => {
     }
   });
 
-  it("registers every feature as pending with a note, except the mounted lanes (H1 conversation + memory, H3 search + source detail, B3 membership, B4 GM, G1 calendar, F3 notifications, H4 GM processing, H2 work/extensions/co-teraz, I3 exports); only the conversation carries its own placeholder screen", () => {
+  it("registers every feature as pending with a note, except the mounted lanes (H1 conversation + memory, H3 search + source detail, B3 membership, B4 GM, F3 notifications, H4 GM processing, H2 work/extensions/co-teraz, I3 exports); only the conversation carries its own placeholder screen", () => {
     // B3 (issue #22) is the first lane to mount a real screen through this
     // registry: the sanctioned sign-in + membership host composition.
     // B4 (issue #23) mounts the audited GM operator surface the same way;
@@ -146,7 +146,12 @@ describe("the shipped host features", () => {
     // J2 (issue #61) RETIRED the /wpis capture entry: the composer joined
     // the conversation surface, so capture.composer no longer composes.
     // I4 (issue #56) mounts the permanent-deletion surface
-    // (/usuwanie-danych).
+    // (/usuwanie-danych). R16 (issue #198) WITHHELD the G1 calendar entry
+    // from the v1 composition (the Google Calendar integration deferred
+    // beyond v1, ADR docs/adr/calendar-deferral-2026-09.md): the entry
+    // stays registered as pending with its operations intact and its
+    // screen module preserved, so it no longer composes among the
+    // mounted lanes.
     const mounted = appFeatures.filter((entry) => entry.implementation === "mounted");
     expect(mounted.map((entry) => entry.featureId)).toEqual([
       "conversation.company",
@@ -160,7 +165,6 @@ describe("the shipped host features", () => {
       "access.membership",
       "access.gm",
       "operations.processing",
-      "calendar.connection",
       "attention.push",
       "operations.deletion",
     ]);

@@ -30,7 +30,7 @@ import { renderToString } from "react-dom/server";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { operations } from "@kiero/contracts";
 import { subjectLinkPath } from "@kiero/domain";
-import { appFeatures } from "../../apps/web/src/app/app-features";
+import { calendarFeatureEntry as calendarEntry } from "../../apps/web/src/app/features/calendar/entry";
 import { ConnectionPanel } from "../../apps/web/src/features/calendar/CalendarFeature";
 import {
   CopiesSection,
@@ -50,8 +50,6 @@ import {
 } from "../../apps/web/src/features/calendar/state";
 import { availableActions } from "../../convex/calendar/connection/cores";
 import type { CalendarConnectionStatus } from "../../convex/calendar/connection/functions";
-
-const calendarEntry = appFeatures.find((entry) => entry.featureId === "calendar.connection");
 
 // A dummy client: mutation hooks only close over it during render; nothing
 // connects because no render here subscribes to a query.
@@ -140,19 +138,21 @@ function control(html: string, label: string): string | null {
 // ---------------------------------------------------------------------------
 
 describe("the calendar settings registration (A4 composition)", () => {
-  it("stays mounted at /kalendarz and names exactly the five certified operations G1+G4+G5 consume", () => {
-    expect(calendarEntry?.implementation).toBe("mounted");
-    expect(calendarEntry?.routePath).toBe("/kalendarz");
+  it("stays registered as pending at /kalendarz with the five certified operations G1+G4+G5 consume, withheld from v1 (R16)", () => {
+    expect(calendarEntry.implementation).toBe("pending");
+    expect(calendarEntry.routePath).toBe("/kalendarz");
     // G5 (issue #107) appended the personal project-selection write to the
     // same entry: the minimal flagged amendment of this pin (G4's precedent).
-    expect(calendarEntry?.consumedOperations).toEqual([
+    // R16 (issue #198) withheld the surface from the v1 composition; the
+    // operations stay pinned on the pending entry for the remounting lane.
+    expect(calendarEntry.consumedOperations).toEqual([
       "calendar.connectCalendar",
       "calendar.disconnectCalendar",
       "calendar.setCopyHidden",
       "calendar.reconcileCopy",
       "calendar.setSelection",
     ]);
-    for (const operation of calendarEntry?.consumedOperations ?? []) {
+    for (const operation of calendarEntry.consumedOperations) {
       expect(operation in operations).toBe(true);
     }
   });

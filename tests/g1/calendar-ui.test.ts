@@ -1,55 +1,61 @@
 /**
  * G1 focused verification: the Calendar connection screen (the Polish
- * barebones entry point) renders through the real A4 host registry with
- * honest copy and no fake data.
+ * barebones entry point) renders with honest copy and no fake data.
  *
- * The mounted surface needs a backend session for its live status, so the
- * headless render covers the states reachable without one (unconfigured /
- * misconfigured connection) plus the registry wiring itself: the entry is
- * mounted at /kalendarz, names exactly the two certified connection
- * operations, and the lifecycle copy (the full control vocabulary,
- * including the explicit recreate and the unknown-creation
- * acknowledgement) is pinned as stable product text. The live lifecycle
- * itself is proven by tests/g1/live-proof.mjs against the deployment.
+ * R16 (issue #198) withheld the surface from the v1 host composition
+ * (the Google Calendar integration deferred beyond v1, ADR
+ * docs/adr/calendar-deferral-2026-09.md), so the entry is no longer
+ * composed into the host routes: the registration pin reads the real
+ * entry module directly and proves it stays registered as pending with
+ * its honest Polish note and its certified operations intact, while the
+ * screen module (kept intact for the lane that remounts it) renders
+ * directly below. The screen needs a backend session for its live
+ * status, so the headless render covers the states reachable without one
+ * (unconfigured / misconfigured connection), and the lifecycle copy (the
+ * full control vocabulary, including the explicit recreate and the
+ * unknown-creation acknowledgement) is pinned as stable product text.
+ * The live lifecycle itself is proven by tests/g1/live-proof.mjs against
+ * the deployment.
  */
 
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { appFeatures } from "../../apps/web/src/app/app-features";
-import { resolveFeatureScreen } from "../../apps/web/src/app/feature-pending";
+import { calendarFeatureEntry as calendarEntry } from "../../apps/web/src/app/features/calendar/entry";
+import { CalendarFeature } from "../../apps/web/src/features/calendar/CalendarFeature";
 import { AppServicesProvider } from "../../apps/web/src/app/providers";
 import { loadAppConfig } from "../../apps/web/src/app/config";
 import { calendarCopy, reasonText } from "../../apps/web/src/features/calendar/state";
 import { availableActions } from "../../convex/calendar/connection/cores";
 
-const calendarEntry = appFeatures.find((entry) => entry.featureId === "calendar.connection");
-
 function renderCalendar(config = loadAppConfig({})): string {
-  if (calendarEntry === undefined) {
-    throw new Error("calendar.connection feature is not registered");
-  }
   return renderToString(
     createElement(AppServicesProvider, {
       services: { config },
-      children: createElement(resolveFeatureScreen(calendarEntry)),
+      children: createElement(CalendarFeature),
     }),
   );
 }
 
 describe("the calendar feature registration (A4 composition)", () => {
-  it("is mounted at /kalendarz with the Polish nav label and heading", () => {
-    expect(calendarEntry?.implementation).toBe("mounted");
-    expect(calendarEntry?.routePath).toBe("/kalendarz");
-    expect(calendarEntry?.navLabel).toBe("Kalendarz");
-    expect(calendarEntry?.screenHeading).toBe("Kalendarz Kiero w Google");
+  it("stays registered as pending with the honest Polish deferral note, withheld from v1 (R16)", () => {
+    expect(calendarEntry.implementation).toBe("pending");
+    if (calendarEntry.implementation === "pending") {
+      expect(calendarEntry.pendingNote).toContain("odroczon");
+      expect(calendarEntry.pendingNote).toContain("Kalendarz Kiero w Google");
+      expect(calendarEntry.pendingScreen).toBeUndefined();
+    }
+    expect(calendarEntry.routePath).toBe("/kalendarz");
+    expect(calendarEntry.navLabel).toBe("Kalendarz");
+    expect(calendarEntry.screenHeading).toBe("Kalendarz Kiero w Google");
   });
 
   it("consumes exactly the certified calendar operations (G1's two, plus G4's copy commands, plus G5's selection write)", () => {
     // G4 (issue #48) appended the settings surface's copy commands to the
     // SAME entry G1 registered: the minimal flagged amendment of this pin.
     // G5 (issue #107) appended the project-selection write the same way.
-    expect(calendarEntry?.consumedOperations).toEqual([
+    // R16 keeps them all on the withheld entry for the lane that remounts.
+    expect(calendarEntry.consumedOperations).toEqual([
       "calendar.connectCalendar",
       "calendar.disconnectCalendar",
       "calendar.setCopyHidden",
