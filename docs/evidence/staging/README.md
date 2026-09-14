@@ -10,6 +10,21 @@ release and provider qualification remain outstanding. The sections below preser
 the 2026-09-12 baseline; use the current checkpoint for discharged actions and
 corrected CLI procedures.
 
+Resumption update (2026-09-14, later session): the FIRST REAL STAGING RELEASE
+was dispatched through the actual Release workflow — run 34874172423 on main
+`3cf9f6e`. Every gate passed (rehearsal, verify-target, exact-SHA Checks) and
+the run then refused everything honestly: the five wrangler components blocked
+`missing-configuration` on the owner-PENDING `STAGING_CLOUDFLARE_*` secrets,
+and `convex-functions` blocked `target-verification-failed` on a newly found
+R9 parser defect (non-TTY CI spinner line false-mismatches the URL of the
+CORRECT pinned target; zero mutations ran — `function-spec` shows
+`functions: []`). The `STAGING_GATEWAY_URL` variable was provisioned and the
+VAPID name trio injected into both stores. Full record: the resumption
+section of [vps-2026-09-14.md](vps-2026-09-14.md) and `releaseAttempts` in
+[candidate.json](candidate.json). No successful application release exists
+yet; the two exact resumption triggers are the owner Cloudflare deploy
+credentials and the R9 parser repair.
+
 Status date: 2026-09-12. Worktree branch `codex/kiero-i8` from `main` at
 `1ffb4dbc3966024270987da22893fb24f02b4df3`. The machine-readable candidate
 manifest is [candidate.json](candidate.json); the living contract for
