@@ -1,0 +1,3 @@
+▌ Deploying code to deployment:
+▌ [Production] wojtek-piskorz-jr:kiero-dev-core:staging (dashboard: https://dashboard.convex.dev/t/wojtek-piskorz-jr/kiero-dev-core/fiery-raven-417)
+▌ └─ https://fiery-raven-417.eu-west-1.convex.cloud

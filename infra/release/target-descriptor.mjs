@@ -14,7 +14,11 @@
  *   for the exact release revision (`checksName`, pinned against
  *   .github/workflows/checks.yml by the guard);
  * - the deployable components, each with its build command, artifact path,
- *   transport kind and the runtime configuration NAMES it requires.
+ *   transport kind and the runtime configuration NAMES it requires. A
+ *   convex-deploy transport may additionally pin `expectedIdentity`: the
+ *   provider-observed identity (team, project, reference, type, slug, URL,
+ *   default-ness) the credential must resolve to before any mutating
+ *   command runs (R9).
  *
  * Authorization is intrinsic and re-checked at every layer: the descriptor
  * target must match the requested target, the runtime environment label
@@ -105,6 +109,54 @@ function checkTransportFields(kind, transport, violations) {
       (typeof transport.recordPath !== "string" || transport.recordPath === "")
     ) {
       violations.push("transport stub recordPath must be a non-empty string when present");
+    }
+  }
+  if (kind === "convex-deploy") {
+    // R9: the pinned provider-observed identity a Convex transport may
+    // deploy to. Optional at the format level (alpha production stays
+    // unpinned until its deployment exists); the deploy adapter's
+    // credential-target gate refuses any unpinned Convex component, so an
+    // unpinned descriptor can never reach a mutating command.
+    if (transport.expectedIdentity !== undefined) {
+      const identity = transport.expectedIdentity;
+      const identityWhere = "transport convex-deploy expectedIdentity";
+      if (!isPlainObject(identity)) {
+        violations.push(`${identityWhere} must be an object when present`);
+      } else {
+        for (const fieldName of ["teamSlug", "projectSlug", "reference", "type", "slug", "url"]) {
+          if (typeof identity[fieldName] !== "string" || identity[fieldName] === "") {
+            violations.push(`${identityWhere} requires a non-empty ${fieldName}`);
+          }
+        }
+        if (typeof identity.type === "string" && !["prod", "dev"].includes(identity.type)) {
+          violations.push(`${identityWhere} type must be "prod" or "dev" (a preview target cannot be pinned by reference)`);
+        }
+        if (typeof identity.url === "string") {
+          const urlMatch = /^https:\/\/([a-z0-9-]+)\.([a-z0-9-]+)\.convex\.cloud$/.exec(identity.url);
+          if (urlMatch === null) {
+            violations.push(`${identityWhere} url must be https://<slug>.<region>.convex.cloud`);
+          } else if (typeof identity.slug === "string" && urlMatch[1] !== identity.slug) {
+            violations.push(`${identityWhere} url host must match the pinned slug`);
+          }
+        }
+        if (identity.isDefault !== undefined && typeof identity.isDefault !== "boolean") {
+          violations.push(`${identityWhere} isDefault must be a boolean when present`);
+        }
+        const allowedIdentityFields = new Set([
+          "teamSlug",
+          "projectSlug",
+          "reference",
+          "type",
+          "slug",
+          "url",
+          "isDefault",
+        ]);
+        for (const fieldName of Object.keys(identity)) {
+          if (!allowedIdentityFields.has(fieldName)) {
+            violations.push(`${identityWhere} carries unknown field "${fieldName}"`);
+          }
+        }
+      }
     }
   }
 }

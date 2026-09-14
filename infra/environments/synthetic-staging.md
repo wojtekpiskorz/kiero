@@ -1,12 +1,17 @@
 # Environment: synthetic staging (`staging`)
 
-Status: PENDING PROVISIONING. No staging Convex deployment, buckets or
-workers exist yet; this descriptor is the contract GitHub Actions
-uses when it begins deploying synthetic staging (per the accepted release
-flow). Nothing in this file was executed against a provider. The R6
-release adapter consumes the same names through
-`infra/release/targets/staging.json` and records a BLOCKED outcome (naming
-the missing configuration) until they exist.
+Status: PARTIALLY PROVISIONED (2026-09-14). The staging Convex deployment
+exists: `fiery-raven-417` (prod-type, reference `staging`, region
+`eu-west-1`, non-default; observed through the pinned CLI's read-only
+surfaces, see
+[docs/evidence/release/verified-convex-target/README.md](../../docs/evidence/release/verified-convex-target/README.md)).
+The R2 buckets, workers and the GitHub-side `staging` environment
+variables/secrets remain PENDING owner/I8 actions. The R6 release adapter
+consumes the same names through `infra/release/targets/staging.json` and
+records a BLOCKED outcome (naming the missing configuration) until they
+exist; since R9 the descriptor also pins the deployment's identity, and the
+adapter refuses to run any Convex deploy whose credential does not resolve
+exactly that identity.
 
 This file is the living CONTRACT for staging: it states what must hold
 (topology, isolation prohibitions, secret naming) and avoids dated facts.
@@ -30,7 +35,7 @@ a separate project.
 | Environment name | `staging` (synthetic staging, CI deploy target) |
 | Convex team | `wojtek-piskorz-jr` |
 | Convex project | `kiero-dev-core` (existing; shared with dev by owner instruction, and no new project may be created) |
-| Convex deployment | prod-type deployment with reference `staging`, full selector `wojtek-piskorz-jr:kiero-dev-core:staging`, region `eu`, created without `--default` (PENDING creation) |
+| Convex deployment | `fiery-raven-417`: prod-type, reference `staging`, full selector `wojtek-piskorz-jr:kiero-dev-core:staging`, URL `https://fiery-raven-417.eu-west-1.convex.cloud` (region `eu-west-1`), non-default (created without `--default`; R9 pinned it in the staging descriptor) |
 | Cloudflare account | same account as dev (see evidence doc for the id) |
 | Cloudflare resource prefix | `kiero-staging-` |
 
@@ -63,12 +68,16 @@ Contract rules for addressing and authorizing staging:
 
 1. CI deploys to the staging deployment authenticate with a
    deployment-scoped `CONVEX_DEPLOY_KEY`; that key is the authoritative
-   target (a deployment deploy key resolves to its own deployment only).
-   `CONVEX_DEPLOYMENT` carries the reference
-   `wojtek-piskorz-jr:kiero-dev-core:staging`, which the release transport
-   records as the staging identity; a run is accepted only when the
-   deployment URL/slug it reports matches that reference (runbook R11
-   success check).
+   target AND identity (a deployment deploy key resolves to its own
+   deployment only, and the pinned CLI ignores `CONVEX_DEPLOYMENT`
+   entirely when such a key is set). `CONVEX_DEPLOYMENT` carries the
+   reference `wojtek-piskorz-jr:kiero-dev-core:staging` as declared intent
+   only, never as evidence. Since R9 the release transport resolves the
+   credential-selected deployment through a read-only probe BEFORE any
+   mutating command and accepts the run only when the provider-observed
+   type/team/project/reference/slug/URL/default-ness match the identity
+   pinned in `infra/release/targets/staging.json` (the runbook R11 success
+   check, enforced pre-mutation instead of glanced at post-hoc).
 2. Staging is addressed only through the explicit reference. The deployment
    carries no `--default` flag, so bare `convex dev` / `convex deploy`
    resolve to the project defaults and never to staging.
@@ -161,18 +170,42 @@ and no Pages provisioning step remains for staging.
 
 - Staging deploys are explicit: `wrangler deploy --env staging` inside `apps/*`
   (the `staging` env blocks point only at `kiero-staging-*` names) and
-  Convex pushes addressed by the explicit reference
-  `wojtek-piskorz-jr:kiero-dev-core:staging`, in CI via the R6 transport
-  (`CONVEX_DEPLOYMENT` from `STAGING_CONVEX_DEPLOYMENT` plus
-  `CONVEX_DEPLOY_KEY`), locally via
-  `npx --yes convex@1.45.0 deploy --env-file <staging-env-file>` where that
-  gitignored file sets `CONVEX_DEPLOYMENT` to the staging reference.
-  (Verified flag surface: `convex deploy` selects its target via
-  `CONVEX_DEPLOYMENT`/`CONVEX_DEPLOY_KEY`/`--env-file`, not via team/project
-  flags.) Because staging is inside the project pinned by the root
-  `convex.json`, the guard is the reference itself: bare commands resolve to
-  the project's default dev/production deployments and never to `staging`;
-  do not rely on a bare `convex dev`/`convex deploy` from the repository root.
+  Convex pushes authorized by the deployment-scoped staging deploy key, in
+  CI via the R6/R9 transport (`CONVEX_DEPLOY_KEY` from
+  `STAGING_CONVEX_DEPLOY_KEY`, plus the `CONVEX_DEPLOYMENT` intent label).
+  Actual pinned-CLI semantics (R9 read-only probes, 2026-09-14; the earlier
+  "deploy staging locally by reference" guidance here was wrong and is
+  withdrawn):
+  - `convex deploy` takes NO `--deployment` flag; its target selection is
+    exactly: `CONVEX_DEPLOY_KEY`/`CONVEX_DEPLOYMENT_TOKEN` first, then
+    `CONVEX_DEPLOYMENT` (or an `--env-file` setting it), then a
+    build-environment error.
+  - With a deployment-scoped deploy key the target is the key's own
+    deployment and `CONVEX_DEPLOYMENT` is ignored completely.
+  - With ONLY `CONVEX_DEPLOYMENT` set, `convex deploy` targets the
+    project's DEFAULT PRODUCTION deployment regardless of the value: a
+    full reference (`team:project:ref`) fails outright
+    (`InvalidDeploymentName: Couldn't parse deployment name staging`), and
+    a bare or type-prefixed slug resolves to the default production
+    deployment (`wary-coyote-511`) while merely noting the value. A local
+    "deploy staging by reference" run can therefore only ever reach the
+    default production deployment — never staging.
+  - Read-only commands that DO accept the full reference through their own
+    `--deployment` flag are safe for local staging inspection:
+    `npx --yes convex@1.45.0 env list --names-only --deployment
+    wojtek-piskorz-jr:kiero-dev-core:staging` and
+    `… function-spec --deployment …` (and `… logs --deployment …`, which
+    never terminates on its own). Note `env list --names-only` prints
+    variable names only: it authenticates the credential but observes no
+    identity.
+  - A local deploy of staging is possible ONLY by holding a
+    deployment-scoped staging deploy key in the environment
+    (`CONVEX_DEPLOY_KEY`); the sanctioned deploy path is the Release
+    workflow, whose adapter verifies the key-resolved identity against the
+    descriptor pin before any mutation. Because staging is inside the
+    project pinned by the root `convex.json`, bare `convex dev`/`convex
+    deploy` resolve to the project's default dev/production deployments
+    and never to `staging`.
 - CI never reuses dev secrets or dev resource names; the workflow defines
   `environment: staging` with its own secret set.
 

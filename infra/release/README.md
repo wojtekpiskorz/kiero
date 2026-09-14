@@ -62,13 +62,26 @@ only; presence is checked at deploy time, values are never read here.
    evidence/releases.jsonl --outcomes deploy-outcomes.json`, the checked
    adapter. It re-validates the Checks report itself, requires the
    runtime label to equal the descriptor target, checks configuration
-   NAMES for presence, builds the checked-out tree, digests the artifact
-   (file-tree manifest SHA-256) and hands the REAL artifact path plus the
-   validated descriptor to the component's transport
+   NAMES for presence, and for every Convex component runs the R9
+   credential-target gate (`verify-convex-target.mjs`) BEFORE any build
+   or transport command: the read-only `convex deploy --dry-run` probe
+   resolves the deployment the CONVEX_DEPLOY_KEY credential actually
+   authorizes, and the run continues only when that provider-observed
+   identity (type, team, project, reference, slug, URL, default-ness) is
+   the identity pinned in the descriptor. A mismatched, missing,
+   unsupported or unresolvable credential blocks as
+   `target-verification-failed` with zero mutating commands spawned —
+   the caller-provided CONVEX_DEPLOYMENT label is never trusted as
+   identity (the pinned CLI ignores it entirely when a deployment-scoped
+   key is set). The adapter then builds the checked-out tree, digests the
+   artifact (file-tree manifest SHA-256) and hands the REAL artifact path
+   plus the validated descriptor to the component's transport
    (`transports/*.mjs`): `wrangler-pages` (web build), `wrangler-deploy`
-   (gateway/media/export/backup workers), `convex-deploy` (functions) and
-   `stub` (tests/local rehearsal only). Every component ends in exactly
-   one terminal outcome; the exit code is non-zero when any component is
+   (gateway/media/export/backup workers and the static-assets web
+   Worker), `convex-deploy` (functions; re-verifies the deploy's own
+   announcement and records the provider-observed identity) and `stub`
+   (tests/local rehearsal only). Every component ends in exactly one
+   terminal outcome; the exit code is non-zero when any component is
    blocked, after the evidence is appended.
 4. `record-release-evidence.mjs` appends the attempt-level record
    (rehearsal verdict, versions, notes, migration-ledger digest).
@@ -77,11 +90,14 @@ only; presence is checked at deploy time, values are never read here.
 
 - **deployed**: only with component, revision, artifact digest,
   descriptor id AND the remote identity reported by the transport
-  (deployment reference, Pages project + URL, or worker name + version).
+  (the PROVIDER-OBSERVED Convex identity for `convex-deploy`, Pages
+  project + URL, or worker name + version).
 - **skipped**: only when the target descriptor excludes the component.
 - **blocked**: missing or unauthorized configuration (NAMES only:
   which configuration names were absent, which label was observed),
-  refused/missing Checks, failed build or failed transport. Blocked runs
+  refused/missing Checks, failed target verification (a Convex
+  credential that does not resolve the pinned identity), failed build
+  or failed transport. Blocked runs
   FAIL the job while the evidence ledger is still uploaded
   (`if: always()`); a green deploy job always means deployed bytes.
 

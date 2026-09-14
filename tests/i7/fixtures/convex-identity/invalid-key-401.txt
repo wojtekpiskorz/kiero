@@ -1,0 +1,2 @@
+✖ Error fetching POST  https://api.convex.dev/api/deployment/url_for_key 401 Unauthorized: AuthenticationFailed: Invalid Convex deploy key
+Authenticate with `npx convex dev`
