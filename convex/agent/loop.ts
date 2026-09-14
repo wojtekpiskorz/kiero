@@ -36,7 +36,12 @@
  */
 
 import { v } from "convex/values";
-import { runChatTurn, type AnyChatToolSpec, type OpenRouterCredentials } from "@kiero/providers";
+import {
+  ROUTING_CONFIG_VERSION,
+  runChatTurn,
+  type AnyChatToolSpec,
+  type ChatTurnCredentials,
+} from "@kiero/providers";
 import {
   ANSWER_TOOLS,
   MAX_ANSWER_TURNS,
@@ -49,7 +54,6 @@ import {
   answerRevisionSnapshotOf,
   answerSystemPrompt,
   applyAnswerToolCall,
-  assistantToolCallsMessage,
   contextRefreshedNudge,
   emptyAnswerState,
   evidenceSearchResult,
@@ -63,7 +67,6 @@ import {
   recordDomainChange,
   refreshedStateMessage,
   refreshedSubmitStage,
-  toolResultMessage,
   type AnswerContext,
   type AnswerEvidenceEntry,
   type AnswerFreshnessDecision,
@@ -84,11 +87,25 @@ import { resolveAccessContextFromConvexAuth } from "../access/identity/resolutio
 import { resolveEvidenceHandles } from "./execute";
 import { loadAnswerContext } from "./context";
 
-/** The answer-flow pipeline version (loop shape, tool routing). */
-export const ANSWER_FLOW_PIPELINE_VERSION = "e6.answer/2" as const;
+/**
+ * The answer-flow pipeline version (loop shape, tool routing). Bumped to
+ * e6.answer/3 by the E8 coordinated lane: the loop's recorded wire
+ * encoding changed from prose renderings to NATIVE tool rounds, which
+ * changes how recorded runs are interpreted (versions promise
+ * interpretability against the flow that produced each answer).
+ */
+export const ANSWER_FLOW_PIPELINE_VERSION = "e6.answer/3" as const;
 
-/** The model-configuration version label recorded with every answer. */
-export const ANSWER_MODEL_CONFIGURATION_VERSION = "e6.routing#chat_analysis" as const;
+/**
+ * The model-configuration version label recorded with every answer,
+ * composed exactly the way E3's analyze.ts composes its label: the routing
+ * namespace plus the frozen routing configuration version, so the label
+ * follows every routing change (E8 moved the chat route to direct
+ * DeepSeek with the authorized fallback, e8.0) without a coordinated loop
+ * edit.
+ */
+export const ANSWER_MODEL_CONFIGURATION_VERSION =
+  `e2.routing/${ROUTING_CONFIG_VERSION}#chat_analysis` as const;
 
 /** One turn's execution log entry: tool names, bounded args, results. */
 export interface TurnLogEntry {
@@ -646,11 +663,24 @@ export async function dispatchAnswerToolCall(
   };
 }
 
-/** One replayed message turn in the wire shape both halves understand. */
-export interface AnswerMessageWire {
-  readonly role: "user" | "assistant";
-  readonly content: readonly { kind: "text"; text: string }[];
-}
+/**
+ * One replayed message turn in the wire shape both halves understand
+ * (E8: native tool rounds instead of prose renderings, so a multi-turn
+ * loop replays identically on the direct DeepSeek transport and the
+ * OpenRouter fallback).
+ */
+export type AnswerMessageWire =
+  | { readonly role: "user" | "assistant"; readonly content: readonly { kind: "text"; text: string }[] }
+  | {
+      readonly role: "assistant-tool-calls";
+      readonly calls: readonly { readonly id: string; readonly name: string; readonly arguments: string }[];
+    }
+  | {
+      readonly role: "tool-result";
+      readonly toolCallId: string;
+      readonly name: string;
+      readonly content: string;
+    };
 
 /** The JSON-serializable between-rounds state of one answer run. */
 export interface AnswerRoundState {
@@ -718,11 +748,23 @@ export async function runAnswerRound(
   questionSourceId: Id<"sources">,
   current: AnswerRoundState,
 ): Promise<AnswerRoundOutcome> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (apiKey === undefined || apiKey === "") {
-    throw new Error("agent: provider_key_not_configured");
+  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  if (openRouterKey === undefined || openRouterKey === "") {
+    throw new Error("agent: provider_key_not_configured:OPENROUTER_API_KEY");
   }
-  const credentials: OpenRouterCredentials = { apiKey };
+  // E8 split: the answer loop runs on the direct DeepSeek primary route
+  // with the authorized OpenRouter fallback, so BOTH keys are required
+  // configuration. Names only are reported, never values; a missing key
+  // fails fast instead of burning a provider attempt that is doomed to a
+  // terminal unauthenticated classification.
+  const deepSeekKey = process.env.DEEPSEEK_API_KEY;
+  if (deepSeekKey === undefined || deepSeekKey === "") {
+    throw new Error("agent: provider_key_not_configured:DEEPSEEK_API_KEY");
+  }
+  const credentials: ChatTurnCredentials = {
+    apiKey: openRouterKey,
+    deepseekApiKey: deepSeekKey,
+  };
   const tools: AnyChatToolSpec[] = ANSWER_TOOLS.map((tool) => ({
     name: tool.name,
     description: tool.description,
@@ -835,11 +877,17 @@ export async function runAnswerRound(
     }
     return finish(null, {}); // the model finished after submitting (or the budget is spent)
   }
+  // Native tool round: the assistant's calls replay as the provider's own
+  // function_call items (not prose), keeping the loop's history portable
+  // across the direct and fallback transports (E8).
   messages.push({
-    role: "assistant",
-    content: [
-      { kind: "text", text: assistantToolCallsMessage(activeCalls) },
-    ],
+    role: "assistant-tool-calls",
+    calls: activeCalls.map((call) => ({
+      id: call.id,
+      name: call.name,
+      // Schema-valid by construction: re-serialized from the decoded turn.
+      arguments: JSON.stringify(call.arguments),
+    })),
   });
   const results: string[] = [];
   let done = false;
@@ -876,10 +924,10 @@ export async function runAnswerRound(
     results.push(outcome.toolResult.slice(0, 300));
     done = done || outcome.done;
     messages.push({
-      role: "user",
-      content: [
-        { kind: "text", text: toolResultMessage(toolCall.name, outcome.toolResult) },
-      ],
+      role: "tool-result",
+      toolCallId: toolCall.id,
+      name: toolCall.name,
+      content: outcome.toolResult,
     });
   }
   turnLog.push(turnLogEntry(turns, activeCalls, results));

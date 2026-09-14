@@ -75,7 +75,10 @@ describe("versioned text preparation", () => {
 
 describe("the pinned initial candidate", () => {
   it("mirrors E2's routing constants exactly (drift fails here)", () => {
-    expect(INDEX_CANDIDATE.embeddingModel).toBe(EMBEDDING_MODEL_ORDER[0]);
+    // The index candidate carries the MODEL name; the E8 routing order
+    // carries provider-qualified targets (embeddings stayed OpenRouter).
+    expect(INDEX_CANDIDATE.embeddingModel).toBe(EMBEDDING_MODEL_ORDER[0]?.model);
+    expect(EMBEDDING_MODEL_ORDER[0]?.provider).toBe("openrouter");
     expect(INDEX_CANDIDATE.dimensions).toBe(EMBEDDING_DIMENSIONS_BASELINE);
     expect(INDEX_CANDIDATE.dimensions).toBe(4096);
     expect(INDEX_CANDIDATE.textPreparationVersion).toBe(TEXT_PREPARATION_VERSION);

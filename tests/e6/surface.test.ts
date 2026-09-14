@@ -53,7 +53,10 @@ describe("the declared answer tool set", () => {
     // The loop module imports ANSWER_TOOLS/answerSystemPrompt from the same
     // package root; the recorded version pins must agree with the surface.
     expect(ANSWER_FLOW_PIPELINE_VERSION).toMatch(/^e6\.answer\//);
-    expect(ANSWER_MODEL_CONFIGURATION_VERSION).toBe("e6.routing#chat_analysis");
+    // Composed the way E3's analyze.ts composes its label, so the value
+    // follows the frozen routing version (E8: direct DeepSeek + authorized
+    // OpenRouter fallback, e8.0) without a coordinated loop edit.
+    expect(ANSWER_MODEL_CONFIGURATION_VERSION).toBe("e2.routing/e8.0#chat_analysis");
   });
 });
 
@@ -187,8 +190,8 @@ describe("the versioned dialogue surface", () => {
   it("pins the version labels the loop records with every answer", () => {
     expect(ANSWER_PROMPT_VERSION).toBe("e6.prompt-pl/4");
     expect(ANSWER_SCHEMA_VERSION).toBe("e6.schema/1");
-    expect(ANSWER_FLOW_PIPELINE_VERSION).toBe("e6.answer/2");
-    expect(ANSWER_MODEL_CONFIGURATION_VERSION).toBe("e6.routing#chat_analysis");
+    expect(ANSWER_FLOW_PIPELINE_VERSION).toBe("e6.answer/3");
+    expect(ANSWER_MODEL_CONFIGURATION_VERSION).toBe("e2.routing/e8.0#chat_analysis");
   });
 
   it("the Polish system prompt states the grounding, updating and no-guessing rules", () => {

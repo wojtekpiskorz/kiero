@@ -20,20 +20,27 @@ import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
 import type { AdapterYieldChunk } from "@tanstack/ai";
 import {
+  ROUTING_CONFIG_VERSION,
   chatWithRoute,
   classifyChatFailure,
   harvestStream,
   structuredChatWithRoute,
+  type ChatTurnCredentials,
   type ChatRequest,
-  type OpenRouterCredentials,
   type ProviderFailure,
+  type RouteTarget,
   type StreamObservation,
 } from "@kiero/providers";
 import type { ModelRoute } from "@kiero/providers";
 
 /** Synthetic credentials; the injected attempts never touch the network. */
-const credentials: OpenRouterCredentials = { apiKey: "test-only-not-a-real-key" };
-const route: ModelRoute = { order: ["model-a", "model-b"] };
+const credentials: ChatTurnCredentials = {
+  apiKey: "test-only-not-a-real-key",
+  deepseekApiKey: "test-only-not-a-real-key",
+};
+const targetA: RouteTarget = { provider: "openrouter", model: "model-a" };
+const targetB: RouteTarget = { provider: "openrouter", model: "model-b" };
+const route: ModelRoute = { order: [targetA, targetB] };
 
 /** A sample tool input contract: strict enum + bounded text (A2-style). */
 const ProbeToolInput = Schema.Struct({
@@ -82,6 +89,16 @@ function runFinished(model = "model-a", usage?: unknown): unknown {
     timestamp: 4,
   };
 }
+function runFinishedWith(finishReason: "length" | "content_filter", model = "model-a"): unknown {
+  return {
+    type: "RUN_FINISHED",
+    runId: "r1",
+    threadId: "t1",
+    model,
+    finishReason,
+    timestamp: 4,
+  };
+}
 function runError(code?: string | number): unknown {
   return {
     type: "RUN_ERROR",
@@ -102,17 +119,17 @@ function runError(code?: string | number): unknown {
 function fakeStreamAttempts(script: Record<string, unknown[]>) {
   const calls: string[] = [];
   const attempt = async (
-    _creds: OpenRouterCredentials,
-    model: string,
+    _creds: ChatTurnCredentials,
+    target: RouteTarget,
     _request: ChatRequest,
   ): Promise<
     | { ok: true; observation: StreamObservation }
     | { ok: false; failure: ProviderFailure; observation?: StreamObservation }
   > => {
-    calls.push(model);
-    const scripted = script[model];
+    calls.push(target.model);
+    const scripted = script[target.model];
     if (scripted === undefined) {
-      throw new Error(`unexpected attempt for ${model}`);
+      throw new Error(`unexpected attempt for ${target.model}`);
     }
     const observation = await harvestStream(eventsOf(scripted));
     if (observation.failed) {
@@ -227,7 +244,7 @@ describe("chat provider output decode (harvest -> decode -> record)", () => {
     expect(attempt?.observedModel).toBe("model-a");
     expect(attempt?.usage?.totalTokens).toBe(6);
     expect(attempt?.usage?.costUsd).toBe(0.000001);
-    expect(attempt?.routingConfigVersion).toBe("e2.0");
+    expect(attempt?.routingConfigVersion).toBe(ROUTING_CONFIG_VERSION);
     expect(fake.calls).toEqual(["model-a"]);
   });
 
@@ -424,5 +441,82 @@ describe("chat provider output decode (harvest -> decode -> record)", () => {
     expect(result.record.attempts[0]?.observedModel).toBe("model-a");
     expect(result.record.attempts[0]?.requestedModel).toBe("model-a");
     expect(result.record.attempts[1]?.observedModel).toBe("model-b");
+  });
+});
+
+describe("terminal finish classification (truncated/refused output never succeeds)", () => {
+  it("rejects a truncated structured turn (finish length) even though the JSON is valid", async () => {
+    const fake = fakeStreamAttempts({
+      "model-a": [
+        runStarted(),
+        textDelta('{"odp":"tak"}'),
+        // The provider reported max_output_tokens exhaustion: the text is
+        // syntactically complete but the turn is NOT a success.
+        runFinishedWith("length"),
+      ],
+    });
+    const result = await structuredChatWithRoute(
+      credentials,
+      "chat_analysis",
+      route,
+      {
+        messages: [{ role: "user", content: [{ kind: "text", text: "pytanie" }] }],
+        outputSchema: ProbeOutput,
+      },
+      fake.attempt,
+    );
+    expect(result.outcome.outcome).toBe("failed");
+    if (result.outcome.outcome === "failed") {
+      expect(result.outcome.failure.kind).toBe("output_rejected");
+      expect(result.outcome.failure.fallbackEligible).toBe(false);
+    }
+    expect(fake.calls).toEqual(["model-a"]);
+  });
+
+  it("rejects a content-filtered finish before accepting the text", async () => {
+    const fake = fakeStreamAttempts({
+      "model-a": [
+        runStarted(),
+        textDelta("nieprzetworzona czesc"),
+        runFinishedWith("content_filter"),
+      ],
+    });
+    const result = await chatWithRoute(
+      credentials,
+      "chat_analysis",
+      route,
+      { messages: [{ role: "user", content: [{ kind: "text", text: "pytanie" }] }] },
+      fake.attempt,
+    );
+    expect(result.outcome.outcome).toBe("failed");
+    if (result.outcome.outcome === "failed") {
+      expect(result.outcome.failure.kind).toBe("output_rejected");
+    }
+  });
+
+  it("rejects a truncated turn that also carries tool calls", async () => {
+    const fake = fakeStreamAttempts({
+      "model-a": [
+        runStarted(),
+        toolStart("call-1", "record_finding"),
+        toolArgs("call-1", '{"findingKey":"deadline","knowledgeState":"known"}'),
+        toolEnd("call-1", "record_finding"),
+        runFinishedWith("length"),
+      ],
+    });
+    const result = await chatWithRoute(
+      credentials,
+      "chat_analysis",
+      route,
+      {
+        messages: [{ role: "user", content: [{ kind: "text", text: "ustal" }] }],
+        tools: [{ name: "record_finding", description: "record", input: ProbeToolInput }],
+      },
+      fake.attempt,
+    );
+    expect(result.outcome.outcome).toBe("failed");
+    if (result.outcome.outcome === "failed") {
+      expect(result.outcome.failure.kind).toBe("output_rejected");
+    }
   });
 });

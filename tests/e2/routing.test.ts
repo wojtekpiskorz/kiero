@@ -1,17 +1,20 @@
 /**
- * E2 focused verification: server-owned routing configuration.
+ * E2/E8 focused verification: server-owned routing configuration.
  *
- * The accepted model order per role is application configuration (issue E2
+ * The accepted route per role is application configuration (issue E2/E8
  * acceptance criteria: no user or GM model selector exists; every role
  * follows the fixed application configuration). These tests pin the frozen
- * table and the closed error vocabulary so any change is a deliberate,
- * version-bumping code change.
+ * table — including the E8 provider split and the authorized fallback's
+ * independence from the direct route — and the closed error vocabulary so
+ * any change is a deliberate, version-bumping code change.
  */
 
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
 import {
   CHAT_MODEL_ORDER,
+  DEEPSEEK_API_BASE_URL,
+  DEEPSEEK_CHAT_MODEL,
   EMBEDDING_DIMENSIONS_BASELINE,
   EMBEDDING_MODEL_ORDER,
   PROVIDER_ROUTING,
@@ -22,42 +25,79 @@ import {
   failureToClosedError,
   providerFailure,
 } from "@kiero/providers";
+import type { ModelRoute } from "@kiero/providers";
 
-describe("server-owned routing configuration", () => {
-  it("pins the accepted chat order exactly", () => {
+describe("server-owned routing configuration (E8 provider split)", () => {
+  it("pins the accepted chat order exactly: direct DeepSeek first, then two OpenRouter models", () => {
     expect([...CHAT_MODEL_ORDER]).toEqual([
-      "z-ai/glm-5.3-flash",
-      "google/gemini-3.8-flash",
-      "deepseek/deepseek-v4-flash-0731",
+      { provider: "deepseek", model: "deepseek-flash" },
+      { provider: "openrouter", model: "z-ai/glm-5.3-flash" },
+      { provider: "openrouter", model: "google/gemini-3.8-flash" },
     ]);
   });
 
-  it("vision uses GLM then Gemini and never the text-only DeepSeek route", () => {
+  it("vision runs the direct vision-capable DeepSeek model first, then the same OpenRouter fallbacks", () => {
     expect([...VISION_MODEL_ORDER]).toEqual([
-      "z-ai/glm-5.3-flash",
-      "google/gemini-3.8-flash",
+      { provider: "deepseek", model: "deepseek-flash" },
+      { provider: "openrouter", model: "z-ai/glm-5.3-flash" },
+      { provider: "openrouter", model: "google/gemini-3.8-flash" },
     ]);
-    expect(VISION_MODEL_ORDER).not.toContain("deepseek/deepseek-v4-flash-0731");
   });
 
-  it("STT uses MAI-Transcribe 2 first with Whisper Large V3 backup", () => {
+  it("never keeps the duplicated Flash alias as an OpenRouter fallback position", () => {
+    // Owner decision (issue #170, 2026-09-14): an OpenRouter-served Flash
+    // alias is the SAME model the direct route already tried — a second
+    // attempt against it would be a disguised same-model retry.
+    for (const order of [CHAT_MODEL_ORDER, VISION_MODEL_ORDER]) {
+      const openRouterModels = order
+        .filter((target) => target.provider === "openrouter")
+        .map((target) => target.model);
+      expect(openRouterModels.some((model) => model.includes("deepseek"))).toBe(false);
+      expect(openRouterModels).not.toContain("deepseek/deepseek-v4-flash-0731");
+    }
+  });
+
+  it("every chat/vision fallback position is a model DISTINCT from the direct alias, on the other supplier", () => {
+    for (const order of [CHAT_MODEL_ORDER, VISION_MODEL_ORDER]) {
+      expect(order[0]?.provider).toBe("deepseek");
+      expect(order[0]?.model).toBe(DEEPSEEK_CHAT_MODEL);
+      for (const fallback of order.slice(1)) {
+        expect(fallback.provider).toBe("openrouter");
+        expect(fallback.model).not.toContain("deepseek");
+        expect(fallback.model).not.toBe(DEEPSEEK_CHAT_MODEL);
+      }
+    }
+  });
+
+  it("STT stays OpenRouter-only: MAI-Transcribe 2 first with Whisper Large V3 backup", () => {
     expect([...STT_MODEL_ORDER]).toEqual([
-      "microsoft/mai-transcribe-2",
-      "openai/whisper-large-v3",
+      { provider: "openrouter", model: "microsoft/mai-transcribe-2" },
+      { provider: "openrouter", model: "openai/whisper-large-v3" },
     ]);
   });
 
-  it("embeddings pin the single accepted model and the 4096 baseline", () => {
-    expect([...EMBEDDING_MODEL_ORDER]).toEqual(["qwen/qwen3-embedding-8b"]);
+  it("embeddings stay OpenRouter-only on the single accepted model and the 4096 baseline", () => {
+    expect([...EMBEDDING_MODEL_ORDER]).toEqual([
+      { provider: "openrouter", model: "qwen/qwen3-embedding-8b" },
+    ]);
     expect(EMBEDDING_DIMENSIONS_BASELINE).toBe(4096);
   });
 
-  it("the routing table equals the literal orders and is versioned", () => {
+  it("the routing table equals the literal orders, uses the canonical direct base, and is versioned", () => {
     expect(PROVIDER_ROUTING.chat_analysis.order).toEqual(CHAT_MODEL_ORDER);
     expect(PROVIDER_ROUTING.vision_extraction.order).toEqual(VISION_MODEL_ORDER);
     expect(PROVIDER_ROUTING.speech_to_text.order).toEqual(STT_MODEL_ORDER);
     expect(PROVIDER_ROUTING.embedding.order).toEqual(EMBEDDING_MODEL_ORDER);
+    expect(DEEPSEEK_API_BASE_URL).toBe("https://api.deepseek.com");
     expect(ROUTING_CONFIG_VERSION).toMatch(/^e\d+\.\d+$/);
+  });
+
+  it("a bare model slug is a compile-time error: every position must name its supplier", () => {
+    // The route order type is closed to provider-qualified targets, so a
+    // slug route fails typecheck instead of being normalized silently.
+    // @ts-expect-error a bare slug carries no supplier qualifier
+    const slugRoute: ModelRoute = { order: ["openai/whisper-large-v3"] };
+    void slugRoute;
   });
 
   it("SDK classification is authoritative on the HTTP status, even when wrapped", () => {
@@ -77,9 +117,9 @@ describe("server-owned routing configuration", () => {
     expect(classifySdkFailure(
       Object.assign(new Error("auth"), { statusCode: 401 }),
     ).kind).toBe("unauthenticated");
-    expect(classifySdkFailure(Object.assign(new Error("t"), { name: "RequestTimeoutError" })).kind).toBe(
-      "deadline_exceeded",
-    );
+    expect(classifySdkFailure(
+      Object.assign(new Error("t"), { name: "RequestTimeoutError" }),
+    ).kind).toBe("deadline_exceeded");
     expect(classifySdkFailure(Object.assign(new Error("a"), { name: "AbortError" })).kind).toBe(
       "deadline_exceeded",
     );

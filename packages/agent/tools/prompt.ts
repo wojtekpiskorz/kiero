@@ -19,7 +19,6 @@ import {
 import type { AnswerContext } from "./context";
 import type { AnswerEvidenceEntry } from "./context";
 import { owedDisclosures } from "./context";
-import type { DecodedAnswerCall } from "./reducer";
 
 /** Renders one encoded finding value compactly for the model. */
 function valuePreview(value: unknown): string {
@@ -158,18 +157,6 @@ export function questionUserMessage(context: AnswerContext): string {
   ]
     .filter((line) => line !== "")
     .join("\n");
-}
-
-/** Serializes the assistant's tool calls as its own prior turn text. */
-export function assistantToolCallsMessage(calls: readonly DecodedAnswerCall[]): string {
-  return calls
-    .map((call) => JSON.stringify({ narzedzie: call.name, argumenty: call.arguments }))
-    .join("\n");
-}
-
-/** Encodes one tool result as the user turn the model reads next. */
-export function toolResultMessage(toolName: string, result: string): string {
-  return `WYNIK NARZĘDZIA ${toolName}: ${result}`;
 }
 
 /** Encodes search results as the tool-result text the model reads. */

@@ -1,30 +1,41 @@
 /**
- * The chat adapter over TanStack AI's OpenRouter Chat Completions forwarding
- * (E2).
+ * The chat adapter over two transports (E2; split by E8): DIRECT DeepSeek
+ * for the primary chat/vision position, the pinned
+ * `@tanstack/ai-openrouter` adapter for the authorized fallback positions.
  *
- * Every chat request goes through `@tanstack/ai-openrouter`
- * (`createOpenRouterText` -> `adapter.chatStream`, the pinned published
- * adapter), one accepted model per attempt, so the observed route is always
- * unambiguous. The AG-UI event stream the adapter yields is harvested here:
+ * Every chat request goes through ONE attempt function,
+ * {@link chatAttempt}, which dispatches on the provider-qualified route
+ * target it receives from the ordered-route runner:
  *
- * - `RUN_STARTED`/`RUN_FINISHED` carry the model that actually served the
- *   response (`chunk.model` from OpenRouter, not the requested name) and
- *   `RUN_FINISHED` carries usage/cost when reported;
- * - `TEXT_MESSAGE_CONTENT` deltas accumulate the completion text;
- * - `TOOL_CALL_START`/`ARGS`/`END` accumulate the RAW argument text per call.
+ * - `deepseek` targets run the repository-owned direct transport
+ *   (`deepseekResponsesStream`, ./deepseek.ts): one bounded streaming
+ *   request against `POST https://api.deepseek.com/responses` with thinking
+ *   explicitly disabled and native Responses JSON-Schema output, mapped
+ *   onto the same AG-UI event vocabulary;
+ * - `openrouter` targets run `createOpenRouterText` -> `adapter.chatStream`
+ *   exactly as before (the retained fallback + STT/embeddings supplier).
  *
- * Decoding is owned here, not by the adapter: the adapter silently tolerates
- * malformed tool-argument JSON (it yields an empty `input` object), so the
- * raw accumulated arguments are re-parsed and decoded against the caller's
- * Effect Schema before anything is returned. Structured output requests pin
- * `responseFormat: json_schema` with the schema converted through the A3
- * runtime's `toolJsonSchemaForStructuredOutput` (the proved conversion path;
- * tool input schemas use `toolJsonSchema`). Provider output that does not
- * decode fails closed — it never falls back to another model (see
- * ./failures.ts).
+ * The AG-UI event stream is harvested once, for both transports
+ * (`harvestStream`): `RUN_STARTED`/`RUN_FINISHED` carry the model that
+ * actually served the response and `RUN_FINISHED` carries usage and its
+ * finish reason; `TEXT_MESSAGE_CONTENT` deltas accumulate the completion
+ * text; `TOOL_CALL_START`/`ARGS`/`END` accumulate the RAW argument text per
+ * call. Truncated (`length`) and refused (`content_filter`) finishes never
+ * decode as success: a syntactically valid partial result is not proof of
+ * successful completion.
  *
- * One bounded deadline per attempt (AbortController + SDK timeout, retries
- * disabled in the SDK: the ordered fallback loop owns retries).
+ * Decoding is owned here, not by any adapter: the raw accumulated arguments
+ * are re-parsed and decoded against the caller's Effect Schema before
+ * anything is returned. Structured output requests pin schema-constrained
+ * generation on BOTH transports — strict `json_schema` through OpenRouter,
+ * `text.format json_schema` through the direct Responses wire — converted
+ * through the A3 runtime's `toolJsonSchemaForStructuredOutput` (the proved
+ * conversion path; tool input schemas use `toolJsonSchema`). Provider
+ * output that does not decode fails closed — it never falls back to
+ * another model (see ./failures.ts).
+ *
+ * One bounded deadline per attempt (AbortController + transport timeout,
+ * retries disabled in the SDK: the ordered fallback loop owns retries).
  */
 
 import { Schema } from "effect";
@@ -39,8 +50,10 @@ import { createOpenRouterText } from "@tanstack/ai-openrouter";
 import { toolJsonSchema, toolJsonSchemaForStructuredOutput } from "@kiero/runtime";
 import {
   CHAT_ATTEMPT_DEADLINE_MS,
+  DEEPSEEK_MAX_OUTPUT_TOKENS,
   PROVIDER_ROUTING,
   type ModelRoute,
+  type RouteTarget,
 } from "./routing";
 import {
   classifyChatFailure,
@@ -53,6 +66,11 @@ import {
   type RouteCallResult,
 } from "./runner";
 import type { UsageObservation } from "./callRecord";
+import {
+  deepSeekCredentialsFromEnv,
+  deepSeekResponsesStream,
+  type DeepSeekCredentials,
+} from "./deepseek";
 
 /** Server-side OpenRouter credentials; never constructed from client input. */
 export interface OpenRouterCredentials {
@@ -73,6 +91,36 @@ export function openRouterCredentialsFromEnv(): OpenRouterCredentials | null {
   return { apiKey };
 }
 
+/**
+ * Credentials for the chat/vision roles after the E8 split. The OpenRouter
+ * key stays in its legacy position (it serves the authorized fallback
+ * positions AND the retained STT/embeddings roles, so every existing wiring
+ * site keeps working unchanged); the direct DeepSeek key rides along when
+ * the caller holds one, and the canonical environment reader supplies it
+ * otherwise. Structurally compatible with `OpenRouterCredentials` on
+ * purpose: no caller outside this package needs a coordinated change to
+ * start routing chat through DeepSeek-direct.
+ */
+export interface ChatTurnCredentials extends OpenRouterCredentials {
+  /**
+   * Direct DeepSeek API key. When absent, `deepSeekCredentialsFromEnv` is
+   * consulted; when neither holds, the direct attempt fails TERMINALLY
+   * (`unauthenticated`) — a missing primary credential must never silently
+   * reroute chat to the OpenRouter fallback.
+   */
+  readonly deepseekApiKey?: string;
+}
+
+/** Resolves the direct DeepSeek credential for one chat/vision call. */
+function resolveDeepSeekCredentials(
+  credentials: ChatTurnCredentials,
+): DeepSeekCredentials | null {
+  if (credentials.deepseekApiKey !== undefined && credentials.deepseekApiKey !== "") {
+    return { apiKey: credentials.deepseekApiKey };
+  }
+  return deepSeekCredentialsFromEnv();
+}
+
 /** Typed message content: plain text or inline image data for vision routes. */
 export type ChatContent =
   | { readonly kind: "text"; readonly text: string }
@@ -82,16 +130,38 @@ export type ChatContent =
       readonly mimeType: "image/png" | "image/jpeg" | "image/webp";
     };
 
+/** One native assistant tool call replayed in a later request. */
+export interface ChatAssistantToolCall {
+  readonly id: string;
+  readonly name: string;
+  /**
+   * Raw JSON argument text. Re-serialized from the DECODED turn result, so
+   * it is schema-valid by construction; replaying the provider's native
+   * tool round (instead of rendering it as prose) is what keeps multi-turn
+   * tool loops portable across BOTH transports — a conversation whose
+   * first rounds served on DeepSeek-direct can continue on the OpenRouter
+   * fallback with the identical message history.
+   */
+  readonly arguments: string;
+}
+
 /**
  * One conversation message in the typed request shape. System instructions
- * travel only through `ChatRequest.systemPrompt` (the adapter maps them to
- * the provider's system messages); tool-result turns belong to the consumer's
- * loop (E3+/E6), not to this single-turn interface.
+ * travel only through `ChatRequest.systemPrompt` (each transport maps them
+ * to its system mechanism). Plain turns carry user/assistant content; the
+ * `assistant-tool-calls` and `tool-result` members are the NATIVE tool
+ * round: after the consumer executes decoded calls, it appends what the
+ * assistant asked for and what the execution answered.
  */
-export interface ChatMessagePart {
-  readonly role: "user" | "assistant";
-  readonly content: readonly ChatContent[];
-}
+export type ChatMessagePart =
+  | { readonly role: "user" | "assistant"; readonly content: readonly ChatContent[] }
+  | { readonly role: "assistant-tool-calls"; readonly calls: readonly ChatAssistantToolCall[] }
+  | {
+      readonly role: "tool-result";
+      readonly toolCallId: string;
+      readonly name: string;
+      readonly content: string;
+    };
 
 /**
  * One declared tool. The input codec is an Effect Schema contract: it is
@@ -135,10 +205,11 @@ export interface ChatRequest {
 
 /**
  * The structured chat request: the same turn plus a REQUIRED output codec,
- * in the style of `ChatToolSpec<I>`. The request pins strict `json_schema`
- * converted from this codec (A3 `toolJsonSchemaForStructuredOutput`) and the
- * completion text must decode through it. With tools declared, the model may
- * still answer with tool calls, so the value type is `Output | ChatTurnResult`.
+ * in the style of `ChatToolSpec<I>`. The request pins schema-constrained
+ * generation converted from this codec (A3 `toolJsonSchemaForStructuredOutput`)
+ * and the completion text must decode through it. With tools declared, the
+ * model may still answer with tool calls, so the value type is
+ * `Output | ChatTurnResult`.
  */
 export interface StructuredChatRequest<Output = unknown> extends ChatRequest {
   readonly outputSchema: Schema.Codec<Output, unknown, never, never>;
@@ -166,7 +237,7 @@ export type StructuredChatCallResult<Output = unknown> =
   RouteCallResult<ChatTurnResult | Output>;
 
 /**
- * The observed model/usage harvested from the adapter's event stream.
+ * The observed model/usage/finish harvested from an adapter event stream.
  * Exported for the focused verification fixtures (tests/e2): synthetic AG-UI
  * stream observations feed the decode/fallback proofs without network.
  */
@@ -181,6 +252,12 @@ export interface StreamObservation {
     totalTokens?: number;
     costUsd?: number;
   };
+  /**
+   * Terminal finish reason as reported by the provider's run-finished
+   * event, when it reported one. `length` (truncated) and
+   * `content_filter` (refused) are never accepted as complete output.
+   */
+  finishReason?: "stop" | "tool_calls" | "length" | "content_filter";
   failureCode?: string | number;
   failed: boolean;
 }
@@ -188,31 +265,78 @@ export interface StreamObservation {
 /** The model-name parameter of the adapter factory (catalogued slugs). */
 type OpenRouterModelName = Parameters<typeof createOpenRouterText>[0];
 
+/** One declared tool in the shared provider-neutral declaration shape. */
+interface DeclaredTool {
+  readonly name: string;
+  readonly description: string;
+  readonly jsonSchema: Record<string, unknown>;
+}
+
+/** Converts the typed tool specs to the shared declaration shape. */
+function declaredTools(request: ChatAttemptRequest): DeclaredTool[] | undefined {
+  if (request.tools === undefined || request.tools.length === 0) {
+    return undefined;
+  }
+  return request.tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    jsonSchema: toolJsonSchema(tool.input),
+  }));
+}
+
 /** Converts the typed message shape to TanStack `ModelMessage`s. */
 function toModelMessages(messages: readonly ChatMessagePart[]): ModelMessage[] {
-  return messages.map((message) => ({
-    role: message.role,
-    content: message.content.map((part) =>
-      part.kind === "text"
-        ? { type: "text" as const, content: part.text }
-        : {
-            type: "image" as const,
-            source: {
-              type: "data" as const,
-              value: part.base64,
-              mimeType: part.mimeType,
+  const converted: ModelMessage[] = [];
+  for (const message of messages) {
+    if (message.role === "assistant-tool-calls") {
+      // Native replay through the TanStack message model: the OpenRouter
+      // adapter forwards assistant toolCalls and role-"tool" results, so a
+      // tool loop started on the direct transport continues unchanged when
+      // an eligible failure moves the route to the fallback provider.
+      converted.push({
+        role: "assistant",
+        content: [],
+        toolCalls: message.calls.map((call) => ({
+          id: call.id,
+          type: "function" as const,
+          function: { name: call.name, arguments: call.arguments },
+        })),
+      });
+      continue;
+    }
+    if (message.role === "tool-result") {
+      converted.push({
+        role: "tool",
+        content: message.content,
+        toolCallId: message.toolCallId,
+      });
+      continue;
+    }
+    converted.push({
+      role: message.role,
+      content: message.content.map((part) =>
+        part.kind === "text"
+          ? { type: "text" as const, content: part.text }
+          : {
+              type: "image" as const,
+              source: {
+                type: "data" as const,
+                value: part.base64,
+                mimeType: part.mimeType,
+              },
             },
-          },
-    ),
-  }));
+      ),
+    });
+  }
+  return converted;
 }
 
 /**
  * Harvests one adapter event stream into the raw observation. Exported for
  * the focused verification fixtures (tests/e2), like `decodeEmbedding` and
  * `decodeTranscription`: synthetic AG-UI event sequences drive the REAL
- * harvest (text/argument accumulation, observed model, usage, failure code)
- * offline, including fragmented deltas.
+ * harvest (text/argument accumulation, observed model, usage, finish
+ * reason, failure code) offline, including fragmented deltas.
  */
 export async function harvestStream(
   stream: AsyncIterable<AdapterYieldChunk>,
@@ -239,6 +363,15 @@ export async function harvestStream(
               ...(typeof usage.totalTokens === "number" ? { totalTokens: usage.totalTokens } : {}),
               ...(typeof usage.cost === "number" ? { costUsd: usage.cost } : {}),
             };
+          }
+          const finish = (event as { finishReason?: StreamObservation["finishReason"] }).finishReason;
+          if (
+            finish === "stop" ||
+            finish === "tool_calls" ||
+            finish === "length" ||
+            finish === "content_filter"
+          ) {
+            observation.finishReason = finish;
           }
         }
         break;
@@ -321,45 +454,104 @@ function parseCompletionJson(text: string): { ok: true; value: unknown } | { ok:
   }
 }
 
+/** The shape every transport-level chat attempt returns. */
+export type ChatAttemptResult =
+  | { ok: true; observation: StreamObservation }
+  | { ok: false; failure: ProviderFailure; observation?: StreamObservation };
+
 /**
- * Runs ONE chat attempt against one model through the TanStack OpenRouter
- * adapter: one bounded request, raw stream harvested, no fallback decisions.
- *
- * A stream-level failure (RUN_ERROR event) returns the harvested observation
- * alongside the failure, so the record still carries the model observed in
- * RUN_STARTED and any first-output time — the contract records route, model
- * AND failure. An error THROWN before any stream existed has no observation
- * and classifies as `internal_error` (our side of the seam): terminal, so an
- * internal defect never silently burns the accepted order.
+ * The ONE bounded-attempt skeleton every chat transport reuses: the
+ * per-attempt deadline (AbortController + CHAT_ATTEMPT_DEADLINE_MS), the
+ * real harvest of the opened stream, the stream-level failure
+ * classification and the thrown-error classification (abort shapes are the
+ * deadline; anything else thrown on Kiero's side of the seam (adapter
+ * construction, request wiring, transport defect) is `internal_error`,
+ * terminal, so an internal defect never silently burns the accepted order)
+ * live here exactly once. `open` receives the deadline's controller: the
+ * TanStack adapter wants the controller itself, the direct transport
+ * wants its signal.
  */
-export async function chatAttempt(
+async function boundedChatAttempt(
+  open: (abort: AbortController) => AsyncIterable<AdapterYieldChunk>,
+): Promise<ChatAttemptResult> {
+  const abort = new AbortController();
+  const deadline = setTimeout(() => abort.abort(), CHAT_ATTEMPT_DEADLINE_MS);
+  try {
+    // A stream-level failure still carries the observation's routing
+    // metadata (the model that served RUN_STARTED, any first-output time):
+    // recorded with the failure, not discarded.
+    const observation = await harvestStream(open(abort));
+    if (observation.failed) {
+      return {
+        ok: false,
+        failure: classifyChatFailure(observation.failureCode),
+        observation,
+      };
+    }
+    return { ok: true, observation };
+  } catch (cause) {
+    if (cause instanceof Error && (cause.name === "AbortError" || cause.name === "TimeoutError")) {
+      return { ok: false, failure: providerFailure("deadline_exceeded") };
+    }
+    return { ok: false, failure: providerFailure("internal_error") };
+  } finally {
+    clearTimeout(deadline);
+  }
+}
+
+/**
+ * Runs ONE direct DeepSeek chat attempt against one model through the
+ * repository-owned Responses transport: pure request mapping over the
+ * shared bounded-attempt skeleton. The transport reports every failure as
+ * a sanitized RUN_ERROR code; only a malformed request (our side of the
+ * seam) throws, which the skeleton classifies as `internal_error`.
+ */
+async function deepSeekChatAttempt(
+  credentials: DeepSeekCredentials,
+  model: string,
+  request: ChatAttemptRequest,
+): Promise<ChatAttemptResult> {
+  const tools = declaredTools(request);
+  return boundedChatAttempt((abort) =>
+    deepSeekResponsesStream(credentials, {
+      model,
+      messages: request.messages,
+      ...(request.systemPrompt === undefined ? {} : { systemPrompt: request.systemPrompt }),
+      ...(tools === undefined
+        ? {}
+        : {
+            tools: tools.map((tool) => ({
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.jsonSchema,
+            })),
+          }),
+      ...(request.outputSchema === undefined
+        ? {}
+        : {
+            outputSchema: {
+              name: "kiero_structured_output",
+              schema: toolJsonSchemaForStructuredOutput(request.outputSchema),
+            },
+          }),
+      maxOutputTokens: DEEPSEEK_MAX_OUTPUT_TOKENS,
+      signal: abort.signal,
+    }),
+  );
+}
+
+/**
+ * Runs ONE OpenRouter chat attempt against one model through the pinned
+ * TanStack adapter: pure request mapping over the shared bounded-attempt
+ * skeleton. Unchanged from E2 apart from the provider-qualified call
+ * shape; it now serves the authorized fallback positions.
+ */
+async function openRouterChatAttempt(
   credentials: OpenRouterCredentials,
   model: string,
   request: ChatAttemptRequest,
-): Promise<
-  | { ok: true; observation: StreamObservation }
-  | { ok: false; failure: ProviderFailure; observation?: StreamObservation }
-> {
-  const adapter = createOpenRouterText(
-    // The frozen accepted order (and probe prefixes over its slugs) contains
-    // only catalogued OpenRouter identifiers; the live probes verify the
-    // current catalog during implementation. The cast is name-level only.
-    model as OpenRouterModelName,
-    credentials.apiKey,
-    {
-      timeoutMs: CHAT_ATTEMPT_DEADLINE_MS,
-      retryConfig: { strategy: "none" },
-    },
-  );
-  const abort = new AbortController();
-  const deadline = setTimeout(() => abort.abort(), CHAT_ATTEMPT_DEADLINE_MS);
-  const providerTools = request.tools?.map((tool) =>
-    toolDefinition({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: toolJsonSchema(tool.input) as JSONSchema,
-    }),
-  );
+): Promise<ChatAttemptResult> {
+  const tools = declaredTools(request);
   const responseFormat =
     request.outputSchema === undefined
       ? undefined
@@ -371,14 +563,33 @@ export async function chatAttempt(
             schema: toolJsonSchemaForStructuredOutput(request.outputSchema) as JSONSchema,
           },
         };
-  try {
-    const stream = adapter.chatStream({
+  return boundedChatAttempt((abort) => {
+    const adapter = createOpenRouterText(
+      // The frozen accepted order (and probe prefixes over its slugs) contains
+      // only catalogued OpenRouter identifiers; the live probes verify the
+      // current catalog during implementation. The cast is name-level only.
+      model as OpenRouterModelName,
+      credentials.apiKey,
+      {
+        timeoutMs: CHAT_ATTEMPT_DEADLINE_MS,
+        retryConfig: { strategy: "none" },
+      },
+    );
+    return adapter.chatStream({
       model,
       messages: toModelMessages(request.messages),
       ...(request.systemPrompt === undefined ? {} : { systemPrompts: [request.systemPrompt] }),
-      ...(providerTools === undefined || providerTools.length === 0
+      ...(tools === undefined
         ? {}
-        : { tools: providerTools }),
+        : {
+            tools: tools.map((tool) =>
+              toolDefinition({
+                name: tool.name,
+                description: tool.description,
+                inputSchema: tool.jsonSchema as JSONSchema,
+              }),
+            ),
+          }),
       abortController: abort,
       // Silent logger: the adapter's default logs provider chunks and raw
       // tool arguments on error; diagnostics stay closed unless explicitly
@@ -400,40 +611,57 @@ export async function chatAttempt(
         ...(responseFormat === undefined ? {} : { responseFormat }),
       },
     });
-    const observation = await harvestStream(stream);
-    if (observation.failed) {
-      // Stream-level failure: the observation still carries the model that
-      // served RUN_STARTED and any first-output time — recorded with the
-      // failure, not discarded.
-      return {
-        ok: false,
-        failure: classifyChatFailure(observation.failureCode),
-        observation,
-      };
+  });
+}
+
+/**
+ * Runs ONE chat attempt against ONE provider-qualified target, dispatching
+ * on the target's supplier. A `deepseek` target without a resolvable direct
+ * credential fails TERMINALLY as `unauthenticated`: a missing primary key
+ * is a configuration problem that must surface, never a silent reroute to
+ * the OpenRouter fallback (routing decision record, E8 amendment).
+ */
+export async function chatAttempt(
+  credentials: ChatTurnCredentials,
+  target: RouteTarget,
+  request: ChatAttemptRequest,
+): Promise<ChatAttemptResult> {
+  if (target.provider === "deepseek") {
+    const direct = resolveDeepSeekCredentials(credentials);
+    if (direct === null) {
+      return { ok: false, failure: providerFailure("unauthenticated") };
     }
-    return { ok: true, observation };
-  } catch (cause) {
-    if (cause instanceof Error && (cause.name === "AbortError" || cause.name === "TimeoutError")) {
-      return { ok: false, failure: providerFailure("deadline_exceeded") };
-    }
-    // Thrown before any stream existed (adapter construction, request
-    // wiring): our side of the seam, not a provider route failure.
-    return { ok: false, failure: providerFailure("internal_error") };
-  } finally {
-    clearTimeout(deadline);
+    return deepSeekChatAttempt(direct, target.model, request);
   }
+  return openRouterChatAttempt(credentials, target.model, request);
+}
+
+/**
+ * Finish states that must never decode as a successful turn, whatever
+ * syntactically valid content accompanied them.
+ */
+function rejectedFinish(observation: StreamObservation): ProviderFailure | null {
+  if (observation.finishReason === "length" || observation.finishReason === "content_filter") {
+    return providerFailure("output_rejected");
+  }
+  return null;
 }
 
 /**
  * Decodes tool calls from a successful stream observation into the typed
  * turn result. Malformed JSON, schema mismatches and undeclared tool names
  * fail closed (`output_rejected` / `unknown_tool`); these are never eligible
- * for fallback.
+ * for fallback. Truncated and content-filtered finishes fail the same way
+ * BEFORE any output is accepted.
  */
 function decodeToolTurn(
   request: ChatRequest,
   observation: StreamObservation,
 ): { ok: true; value: ChatTurnResult } | { ok: false; failure: ProviderFailure } {
+  const finish = rejectedFinish(observation);
+  if (finish !== null) {
+    return { ok: false, failure: finish };
+  }
   const toolSchemas = new Map<string, Schema.Codec<unknown, unknown, never, never>>();
   for (const tool of request.tools ?? []) {
     toolSchemas.set(tool.name, tool.input as Schema.Codec<unknown, unknown, never, never>);
@@ -480,6 +708,10 @@ function decodeStructuredTurn<Output>(
   request: StructuredChatRequest<Output>,
   observation: StreamObservation,
 ): { ok: true; value: ChatTurnResult | Output } | { ok: false; failure: ProviderFailure } {
+  const finish = rejectedFinish(observation);
+  if (finish !== null) {
+    return { ok: false, failure: finish };
+  }
   if (observation.toolCalls.length > 0) {
     return decodeToolTurn(request, observation);
   }
@@ -533,10 +765,10 @@ function attemptFailure(failure: {
 /**
  * Runs one chat-shaped call over an ordered route (server-owned): the shared
  * ordered-route runner owns the loop, records, eligibility short-circuit and
- * record seal; this adapter supplies only the per-model attempt (one bounded
- * request through the TanStack adapter, then the typed decode of the
- * harvested stream — incompatible output fails closed with its observed
- * routing metadata still recorded).
+ * record seal; this adapter supplies only the per-target attempt (one
+ * bounded request through the transport the target selects, then the typed
+ * decode of the harvested stream — incompatible output fails closed with its
+ * observed routing metadata still recorded).
  *
  * `route` is a server-side parameter so verification probes (and only they)
  * can exercise the fallback order against controlled first positions; the
@@ -544,14 +776,14 @@ function attemptFailure(failure: {
  * input reaches this parameter.
  */
 export async function chatWithRoute(
-  credentials: OpenRouterCredentials,
+  credentials: ChatTurnCredentials,
   recordRouteId: "chat_analysis" | "vision_extraction",
   route: ModelRoute,
   request: ChatRequest,
   attemptFunction: typeof chatAttempt = chatAttempt,
 ): Promise<ChatCallResult> {
-  return runOrderedRoute(recordRouteId, route, async (model) => {
-    const attempt = await attemptFunction(credentials, model, request);
+  return runOrderedRoute(recordRouteId, route, async (target) => {
+    const attempt = await attemptFunction(credentials, target, request);
     if (!attempt.ok) {
       return attemptFailure(attempt);
     }
@@ -562,14 +794,14 @@ export async function chatWithRoute(
 
 /** The structured variant over the same runner and attempt protocol. */
 export async function structuredChatWithRoute<Output>(
-  credentials: OpenRouterCredentials,
+  credentials: ChatTurnCredentials,
   recordRouteId: "chat_analysis" | "vision_extraction",
   route: ModelRoute,
   request: StructuredChatRequest<Output>,
   attemptFunction: typeof chatAttempt = chatAttempt,
 ): Promise<StructuredChatCallResult<Output>> {
-  return runOrderedRoute(recordRouteId, route, async (model) => {
-    const attempt = await attemptFunction(credentials, model, request);
+  return runOrderedRoute(recordRouteId, route, async (target) => {
+    const attempt = await attemptFunction(credentials, target, request);
     if (!attempt.ok) {
       return attemptFailure(attempt);
     }
@@ -580,7 +812,7 @@ export async function structuredChatWithRoute<Output>(
 
 /** The public plain chat entry point: the frozen accepted chat route. */
 export async function runChatTurn(
-  credentials: OpenRouterCredentials,
+  credentials: ChatTurnCredentials,
   request: ChatRequest,
 ): Promise<ChatCallResult> {
   return chatWithRoute(credentials, "chat_analysis", PROVIDER_ROUTING.chat_analysis, request);
@@ -588,7 +820,7 @@ export async function runChatTurn(
 
 /** The public structured chat entry point: the frozen accepted chat route. */
 export async function runStructuredChat<Output>(
-  credentials: OpenRouterCredentials,
+  credentials: ChatTurnCredentials,
   request: StructuredChatRequest<Output>,
 ): Promise<StructuredChatCallResult<Output>> {
   return structuredChatWithRoute(credentials, "chat_analysis", PROVIDER_ROUTING.chat_analysis, request);

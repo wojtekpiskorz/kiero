@@ -22,6 +22,7 @@ import {
   PROVIDER_ROUTING,
   STT_ATTEMPT_DEADLINE_MS,
   type ModelRoute,
+  type RouteTarget,
 } from "./routing";
 import { classifySdkFailure, providerFailure, type ProviderFailure } from "./failures";
 import { runOrderedRoute, type RouteCallResult } from "./runner";
@@ -97,15 +98,22 @@ function usageObservation(value: SttTranscription) {
   return usage;
 }
 
-/** Runs ONE transcription attempt against one model (no fallback decisions). */
+/**
+ * Runs ONE transcription attempt against one target (no fallback
+ * decisions). The retained E8 owner decision keeps STT on OpenRouter
+ * exclusively: no supported direct DeepSeek transcription endpoint exists,
+ * so the attempt is an OpenRouter client call whatever qualifier the frozen
+ * route carries (the STT order only ever says `openrouter`).
+ */
 export async function sttAttempt(
   credentials: OpenRouterCredentials,
-  model: string,
+  target: RouteTarget,
   request: SttRequest,
 ): Promise<
   | { ok: true; value: SttTranscription; observedModel: string | undefined }
   | { ok: false; failure: ProviderFailure }
 > {
+  const model = target.model;
   const client = new OpenRouter({
     apiKey: credentials.apiKey,
     timeoutMs: STT_ATTEMPT_DEADLINE_MS,
@@ -144,8 +152,8 @@ export async function transcriptionWithRoute(
   request: SttRequest,
   attemptFunction: typeof sttAttempt = sttAttempt,
 ): Promise<SttCallResult> {
-  return runOrderedRoute("speech_to_text", route, async (model) => {
-    const attempt = await attemptFunction(credentials, model, request);
+  return runOrderedRoute("speech_to_text", route, async (target) => {
+    const attempt = await attemptFunction(credentials, target, request);
     if (!attempt.ok) {
       return { ok: false as const, failure: attempt.failure };
     }

@@ -1,13 +1,15 @@
 /**
- * E2 focused verification: bounded ordered fallback.
+ * E2/E8 focused verification: bounded ordered fallback across PROVIDERS.
  *
  * FIXTURES ARE SYNTHETIC failures injected through the server-side attempt
  * seam (`chatWithRoute`/`transcriptionWithRoute`/`embeddingWithRoute`
  * accept an attempt function so verification can stall/fail each route
  * deterministically — the production entry points always use the real
  * adapter). Assertions cover the acceptance criteria: fallback happens only
- * on a classified eligible failure, records the actual route tried, walks
- * the accepted order, and stops on anything else.
+ * on a classified eligible failure, records the actual route tried
+ * (provider AND model), walks the accepted order across the DeepSeek ->
+ * OpenRouter boundary, stops on anything else, and leaves the degraded
+ * outcome honestly recorded when both providers fail.
  */
 
 import { describe, expect, it } from "vitest";
@@ -19,12 +21,16 @@ import {
   structuredChatWithRoute,
   providerFailure,
   transcriptionWithRoute,
-  type OpenRouterCredentials,
+  type ChatTurnCredentials,
   type ProviderFailure,
+  type RouteTarget,
   type StreamObservation,
 } from "@kiero/providers";
 
-const credentials: OpenRouterCredentials = { apiKey: "test-only-not-a-real-key" };
+const credentials: ChatTurnCredentials = {
+  apiKey: "test-only-not-a-real-key",
+  deepseekApiKey: "test-only-not-a-real-key",
+};
 
 function failed(kind: ProviderFailure["kind"]): { ok: false; failure: ProviderFailure } {
   return { ok: false, failure: providerFailure(kind) };
@@ -48,15 +54,20 @@ function succeeded(
 }
 
 /** Scripts per-model outcomes for the chat attempt seam. */
-function chatScript(script: Record<string, { ok: true; observation: StreamObservation } | { ok: false; failure: ProviderFailure }>) {
-  const calls: string[] = [];
+function chatScript(
+  script: Record<
+    string,
+    { ok: true; observation: StreamObservation } | { ok: false; failure: ProviderFailure }
+  >,
+) {
+  const calls: RouteTarget[] = [];
   return {
     calls,
-    attempt: async (_c: OpenRouterCredentials, model: string) => {
-      calls.push(model);
-      const outcome = script[model];
+    attempt: async (_c: ChatTurnCredentials, target: RouteTarget) => {
+      calls.push(target);
+      const outcome = script[target.model];
       if (outcome === undefined) {
-        throw new Error(`unexpected attempt for ${model}`);
+        throw new Error(`unexpected attempt for ${target.provider}:${target.model}`);
       }
       return outcome;
     },
@@ -71,16 +82,15 @@ const ProbeStrict = Schema.Struct({
   odp: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
 });
 
-describe("bounded ordered fallback (chat)", () => {
-  it("an unavailable first route (404-class) advances to the next accepted model", async () => {
-    const first = CHAT_MODEL_ORDER[0];
-    const second = CHAT_MODEL_ORDER[1];
+describe("bounded ordered fallback (chat, across providers)", () => {
+  it("an unavailable direct DeepSeek position advances to the OpenRouter fallback", async () => {
+    const [first, second] = CHAT_MODEL_ORDER;
     if (first === undefined || second === undefined) {
       throw new Error("chat order fixture");
     }
     const script = chatScript({
-      [first]: failed("provider_unavailable"),
-      [second]: succeeded(),
+      [first.model]: failed("provider_unavailable"),
+      [second.model]: succeeded(),
     });
     const result = await chatWithRoute(
       credentials,
@@ -93,27 +103,29 @@ describe("bounded ordered fallback (chat)", () => {
     expect(result.outcome.outcome).toBe("succeeded");
     expect(result.record.attempts).toHaveLength(2);
     expect(result.record.attempts[0]).toMatchObject({
-      requestedModel: first,
+      provider: "deepseek",
+      requestedModel: first.model,
       outcome: "failed",
       failureKind: "provider_unavailable",
       fallbackEligible: true,
     });
     expect(result.record.attempts[1]).toMatchObject({
-      requestedModel: second,
+      provider: "openrouter",
+      requestedModel: second.model,
       observedModel: "observed/primary",
       outcome: "succeeded",
     });
   });
 
-  it("rate limiting and deadline exhaustion are eligible; the walk continues", async () => {
+  it("rate limiting and deadline exhaustion are eligible on either provider; the walk continues", async () => {
     const [first, second, third] = CHAT_MODEL_ORDER;
     if (first === undefined || second === undefined || third === undefined) {
       throw new Error("chat order fixture");
     }
     const script = chatScript({
-      [first]: failed("rate_limited"),
-      [second]: failed("deadline_exceeded"),
-      [third]: succeeded({ observedModel: "observed/deepseek" }),
+      [first.model]: failed("rate_limited"),
+      [second.model]: failed("deadline_exceeded"),
+      [third.model]: succeeded({ observedModel: "observed/gemini" }),
     });
     const result = await chatWithRoute(
       credentials,
@@ -129,6 +141,11 @@ describe("bounded ordered fallback (chat)", () => {
       "deadline_exceeded",
       undefined,
     ]);
+    expect(result.record.attempts.map((attempt) => attempt.provider)).toEqual([
+      "deepseek",
+      "openrouter",
+      "openrouter",
+    ]);
   });
 
   it("connection failure before a response is eligible", async () => {
@@ -137,8 +154,8 @@ describe("bounded ordered fallback (chat)", () => {
       throw new Error("chat order fixture");
     }
     const script = chatScript({
-      [first]: failed("connection_failed"),
-      [second]: succeeded(),
+      [first.model]: failed("connection_failed"),
+      [second.model]: succeeded(),
     });
     const result = await chatWithRoute(
       credentials,
@@ -151,12 +168,12 @@ describe("bounded ordered fallback (chat)", () => {
     expect(result.record.attempts).toHaveLength(2);
   });
 
-  it("an unauthenticated route (401) is terminal: no second model is tried", async () => {
+  it("a rejected DeepSeek credential (401) is terminal: OpenRouter is never silently activated", async () => {
     const [first] = CHAT_MODEL_ORDER;
     if (first === undefined) {
       throw new Error("chat order fixture");
     }
-    const script = chatScript({ [first]: failed("unauthenticated") });
+    const script = chatScript({ [first.model]: failed("unauthenticated") });
     const result = await chatWithRoute(
       credentials,
       "chat_analysis",
@@ -168,16 +185,17 @@ describe("bounded ordered fallback (chat)", () => {
     expect(result.outcome.outcome).toBe("failed");
     if (result.outcome.outcome === "failed") {
       expect(result.outcome.failure.kind).toBe("unauthenticated");
+      expect(result.outcome.failure.fallbackEligible).toBe(false);
     }
   });
 
-  it("exhausted credits (402) and rejected parameters (400) are terminal", async () => {
+  it("exhausted credits (402) and rejected parameters (400) are terminal on the direct provider", async () => {
     for (const kind of ["insufficient_credits", "unsupported_parameters", "internal_error"] as const) {
       const [first] = CHAT_MODEL_ORDER;
       if (first === undefined) {
         throw new Error("chat order fixture");
       }
-      const script = chatScript({ [first]: failed(kind) });
+      const script = chatScript({ [first.model]: failed(kind) });
       const result = await chatWithRoute(
         credentials,
         "chat_analysis",
@@ -193,14 +211,14 @@ describe("bounded ordered fallback (chat)", () => {
     }
   });
 
-  it("incompatible output on a later model is terminal for the whole call", async () => {
+  it("incompatible output on the fallback provider is terminal for the whole call", async () => {
     const [first, second] = CHAT_MODEL_ORDER;
     if (first === undefined || second === undefined) {
       throw new Error("chat order fixture");
     }
     const script = chatScript({
-      [first]: failed("provider_unavailable"),
-      [second]: succeeded({ text: "not json at all {" }),
+      [first.model]: failed("provider_unavailable"),
+      [second.model]: succeeded({ text: "not json at all {" }),
     });
     const result = await structuredChatWithRoute(
       credentials,
@@ -216,15 +234,15 @@ describe("bounded ordered fallback (chat)", () => {
     }
   });
 
-  it("all routes failing eligible failures records each tried route and the last failure", async () => {
+  it("both providers failing eligible failures records every route and the degraded outcome", async () => {
     const [first, second, third] = CHAT_MODEL_ORDER;
     if (first === undefined || second === undefined || third === undefined) {
       throw new Error("chat order fixture");
     }
     const script = chatScript({
-      [first]: failed("provider_unavailable"),
-      [second]: failed("rate_limited"),
-      [third]: failed("deadline_exceeded"),
+      [first.model]: failed("provider_unavailable"),
+      [second.model]: failed("rate_limited"),
+      [third.model]: failed("deadline_exceeded"),
     });
     const result = await chatWithRoute(
       credentials,
@@ -235,26 +253,31 @@ describe("bounded ordered fallback (chat)", () => {
     );
     expect(result.outcome.outcome).toBe("failed");
     if (result.outcome.outcome === "failed") {
+      // Degraded behavior when every supplier failed: the LAST observed
+      // eligible failure stands, honestly recorded — never a silent
+      // success, never a fabricated transcript.
       expect(result.outcome.failure.kind).toBe("deadline_exceeded");
+      expect(result.outcome.failure.fallbackEligible).toBe(true);
     }
     expect(result.record.attempts.map((attempt) => attempt.requestedModel)).toEqual([
-      first,
-      second,
-      third,
+      first.model,
+      second.model,
+      third.model,
     ]);
+    expect(result.record.attempts.every((attempt) => attempt.outcome === "failed")).toBe(true);
   });
 });
 
-describe("bounded ordered fallback (STT)", () => {
+describe("bounded ordered fallback (STT, retained OpenRouter-only roles)", () => {
   it("MAI failing eligible advances to the Whisper backup in order", async () => {
     const [mai, whisper] = STT_MODEL_ORDER;
     if (mai === undefined || whisper === undefined) {
       throw new Error("stt order fixture");
     }
-    const calls: string[] = [];
-    const attempt = async (_c: OpenRouterCredentials, model: string) => {
-      calls.push(model);
-      if (model === mai) {
+    const calls: RouteTarget[] = [];
+    const attempt = async (_c: ChatTurnCredentials, target: RouteTarget) => {
+      calls.push(target);
+      if (target.model === mai.model) {
         return failed("provider_unavailable");
       }
       return {
@@ -270,6 +293,7 @@ describe("bounded ordered fallback (STT)", () => {
       attempt,
     );
     expect(calls).toEqual([mai, whisper]);
+    expect(calls.every((target) => target.provider === "openrouter")).toBe(true);
     expect(result.outcome.outcome).toBe("succeeded");
     if (result.outcome.outcome === "succeeded") {
       expect(result.outcome.value.text).toBe("proba transkrypcji");
