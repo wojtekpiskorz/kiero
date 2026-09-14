@@ -1,22 +1,30 @@
 /**
  * The ONE ordered-route runner (E2 structural repair, advisory review
- * round 1): the bounded fallback loop, the per-attempt records, the
- * eligibility short-circuit and the record seal live here exactly once.
+ * round 1; E8 provider-qualified positions): the bounded fallback loop, the
+ * per-attempt records, the eligibility short-circuit and the record seal
+ * live here exactly once.
  *
  * Every role adapter (chat, vision via chat, STT, embeddings) supplies only
- * its attempt function — one bounded request against ONE model, returning
- * either a typed value plus the observed routing metadata, or a sanitized
- * classified failure. The runner then owns the shared discipline:
+ * its attempt function — one bounded request against ONE provider-qualified
+ * target, returning either a typed value plus the observed routing
+ * metadata, or a sanitized classified failure. The runner then owns the
+ * shared discipline:
  *
- * - each model in the accepted order gets ONE attempt, in order;
- * - a failure advances to the next model ONLY when it was classified
+ * - each target in the accepted order gets ONE attempt, in order — the
+ *   E8 order crosses supplier boundaries (direct DeepSeek first, the
+ *   authorized OpenRouter fallback positions next) and the runner treats
+ *   them uniformly: eligibility is a property of the FAILURE CLASS, not of
+ *   the provider;
+ * - a failure advances to the next target ONLY when it was classified
  *   eligible (transport/availability); incompatible output and
- *   configuration failures are terminal for the whole call;
- * - every attempt is recorded with its requested model, the observed model
- *   and usage when the provider reported them, latency, first output and
- *   the sanitized failure classification — under the calling role's route
- *   id and the frozen routing configuration version;
- * - exhausting the order leaves the last observed eligible failure standing.
+ *   configuration failures are terminal for the whole call — a rejected
+ *   DeepSeek key or schema must never silently activate OpenRouter;
+ * - every attempt is recorded with its provider, requested model, the
+ *   observed model and usage when the provider reported them, latency,
+ *   first output and the sanitized failure classification — under the
+ *   calling role's route id and the frozen routing configuration version;
+ * - exhausting the order leaves the last observed eligible failure standing
+ *   (both providers failing is the recorded degraded outcome).
  *
  * This is the single place later lanes (D6, E3–E5) reuse for classification
  * and recording; adding a role means writing an attempt function, never a
@@ -33,7 +41,7 @@ import {
   type UsageObservation,
 } from "./callRecord";
 import { providerFailure, type ProviderFailure } from "./failures";
-import type { ModelRoute } from "./routing";
+import { normalizeRoutePosition, type ModelRoute, type RouteTarget } from "./routing";
 
 /** Routing metadata an attempt can report for its record, when observed. */
 export interface AttemptObservation {
@@ -62,7 +70,7 @@ export interface RouteCallResult<T> {
 function attemptRow(
   routeId: ProviderCallRouteId,
   routingConfigVersion: string,
-  model: string,
+  target: RouteTarget,
   observation: AttemptObservation,
   outcome: { readonly succeeded: true } | { readonly succeeded: false; readonly failure: ProviderFailure },
   startedAtMs: number,
@@ -71,7 +79,8 @@ function attemptRow(
   return Schema.decodeUnknownSync(ProviderCallAttemptSchema)({
     routeId,
     routingConfigVersion,
-    requestedModel: model,
+    provider: target.provider,
+    requestedModel: target.model,
     ...(observation.observedModel === undefined ? {} : { observedModel: observation.observedModel }),
     ...(outcome.succeeded
       ? { outcome: "succeeded" as const }
@@ -89,24 +98,28 @@ function attemptRow(
 
 /**
  * Runs one role call over an ordered (server-owned) route. `attemptRoute`
- * runs once per model in `route.order`; the runner records, classifies and
- * decides. See the module docs for the exact discipline.
+ * runs once per provider-qualified target in `route.order`; the runner
+ * records, classifies and decides. See the module docs for the exact
+ * discipline.
  */
 export async function runOrderedRoute<T>(
   routeId: ProviderCallRouteId,
   route: ModelRoute,
-  attemptRoute: (model: string) => Promise<RouteAttempt<T>>,
+  attemptRoute: (target: RouteTarget) => Promise<RouteAttempt<T>>,
 ): Promise<RouteCallResult<T>> {
   const builder = newCallRecord(routeId);
   let lastFailure: ProviderFailure | undefined;
-  for (const model of route.order) {
+  for (const position of route.order) {
+    // Legacy slug positions normalize to their (only possible) provider;
+    // the frozen production routes arrive already provider-qualified.
+    const target = normalizeRoutePosition(position);
     const startedAtMs = Date.now();
-    const attempt = await attemptRoute(model);
+    const attempt = await attemptRoute(target);
     const finishedAtMs = Date.now();
     if (!attempt.ok) {
       lastFailure = attempt.failure;
       builder.attempts.push(
-        attemptRow(routeId, builder.routingConfigVersion, model, attempt, {
+        attemptRow(routeId, builder.routingConfigVersion, target, attempt, {
           succeeded: false,
           failure: attempt.failure,
         }, startedAtMs, finishedAtMs),
@@ -120,7 +133,7 @@ export async function runOrderedRoute<T>(
       continue;
     }
     builder.attempts.push(
-      attemptRow(routeId, builder.routingConfigVersion, model, attempt, { succeeded: true }, startedAtMs, finishedAtMs),
+      attemptRow(routeId, builder.routingConfigVersion, target, attempt, { succeeded: true }, startedAtMs, finishedAtMs),
     );
     return {
       outcome: { outcome: "succeeded", value: attempt.value },

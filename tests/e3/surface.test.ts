@@ -64,7 +64,11 @@ describe("executor registration behind the A3 seam", () => {
 
 describe("run versions and resumable stage sequences", () => {
   it("pins the pipeline/prompt/schema/model-configuration labels", () => {
-    expect(MODEL_CONFIGURATION_VERSION).toBe("e2.routing/e2.0#chat_analysis");
+    // The `e2.routing/` label prefix is analyze.ts's namespace (E3's file);
+    // the version segment follows the frozen routing configuration, which
+    // E8 bumped to e8.0 when chat moved to direct DeepSeek with the
+    // authorized OpenRouter fallback.
+    expect(MODEL_CONFIGURATION_VERSION).toBe("e2.routing/e8.0#chat_analysis");
   });
 
   it("stage sequences are distinct and ordered (resumable status)", () => {

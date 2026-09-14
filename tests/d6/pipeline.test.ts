@@ -370,8 +370,8 @@ function scriptedAttempt(
   scripts: Record<string, "succeed" | { fail: ProviderFailureKind; fallbackEligible: boolean }>,
   transcript: SttTranscription = { text: "sztuka na segmentach" },
 ) {
-  return async (_credentials: unknown, model: string) => {
-    const script = scripts[model];
+  return async (_credentials: unknown, target: { model: string }) => {
+    const script = scripts[target.model];
     if (script === "succeed") {
       return { ok: true as const, value: transcript, observedModel: undefined };
     }

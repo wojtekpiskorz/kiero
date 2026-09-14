@@ -1,27 +1,39 @@
 /**
- * E2 live smoke proof (authorized dev spend, single-digit requests).
+ * E2/E8 live smoke proof (authorized dev spend, single-digit requests).
  *
- * Runs ONLY when BOTH hold:
- *  - `OPENROUTER_API_KEY` is present in the environment (injected, never
- *    written anywhere; the key value is never printed, logged or committed);
+ * Runs ONLY when ALL hold:
+ *  - `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` are present in the
+ *    environment (injected, never written anywhere; the key values are
+ *    never printed, logged or committed);
  *  - `KIERO_E2_LIVE_SMOKE=1` explicitly opts in (plain `npm test` never
  *    spends).
  *
  * Proofs (issue acceptance criteria):
- *  1. ONE real chat completion through the pinned `@tanstack/ai-openrouter`
- *     adapter with the first-choice model and a strict json_schema output,
- *     asserting the observed model/route/version are recorded and the
- *     response decodes through the typed adapter.
+ *  1. ONE real DIRECT chat completion through the repository-owned DeepSeek
+ *     Responses transport (first-choice position, strict json_schema
+ *     output, thinking explicitly disabled), asserting the observed
+ *     model/provider/route/version are recorded and the response decodes
+ *     through the typed adapter. Direct attempts report token usage and NO
+ *     cost (the direct API reports none — absent is not zero).
  *  2. ONE fallback-order observation: a controlled probe prefix model that
- *     cannot exist (404 before any inference) is classified eligible and the
- *     accepted first-choice model serves the retry. This is an honest forced
- *     first-position failure, labeled as a probe route — the production
- *     entry points take no model parameter.
- *  3. ONE embedding probe: the observed vector must be the versioned
- *     4096-dimension baseline, with the observed model recorded.
- *  4. ONE transcription probe on the dedicated endpoint with a tiny
- *     synthetic tone (synthetic media, clearly labeled; Polish).
- *  5. ONE vision probe on a tiny synthetic PNG through the vision order.
+ *     cannot exist (404 before any inference) is classified eligible and
+ *     the DIRECT first-choice model serves the retry — the live walk
+ *     crosses a provider boundary. The reverse direction (direct DeepSeek
+ *     failing eligible into OpenRouter) is proven offline in
+ *     tests/e2/fallback.test.ts: forcing it live would require a real
+ *     outage, and DeepSeek answers an unknown model name with HTTP 400,
+ *     which is TERMINAL by policy (a configuration mismatch must not
+ *     silently activate the fallback).
+ *  3. ONE multi-round tool conversation on the direct transport: the model
+ *     calls the declared tool, Kiero replays the NATIVE function_call /
+ *     function_call_output round, and the model answers from the result.
+ *  4. ONE embedding probe on RETAINED OpenRouter: the observed vector must
+ *     be the versioned 4096-dimension baseline, with the observed model
+ *     recorded.
+ *  5. ONE transcription probe on RETAINED OpenRouter with a tiny synthetic
+ *     tone (synthetic media, clearly labeled; Polish).
+ *  6. ONE vision probe on a tiny synthetic PNG over the direct vision
+ *     route.
  *
  * Everything printed is sanitized routing metadata only.
  */
@@ -37,12 +49,20 @@ import {
   runStructuredChat,
   runTranscription,
   runVisionExtraction,
-  type OpenRouterCredentials,
+  type ChatTurnCredentials,
 } from "@kiero/providers";
 
-const apiKey = process.env.OPENROUTER_API_KEY;
-const live = apiKey !== undefined && apiKey !== "" && process.env.KIERO_E2_LIVE_SMOKE === "1";
-const credentials: OpenRouterCredentials | null = live ? { apiKey } : null;
+const openRouterKey = process.env.OPENROUTER_API_KEY;
+const deepSeekKey = process.env.DEEPSEEK_API_KEY;
+const live =
+  openRouterKey !== undefined &&
+  openRouterKey !== "" &&
+  deepSeekKey !== undefined &&
+  deepSeekKey !== "" &&
+  process.env.KIERO_E2_LIVE_SMOKE === "1";
+const credentials: ChatTurnCredentials | null = live
+  ? { apiKey: openRouterKey, deepseekApiKey: deepSeekKey }
+  : null;
 
 /** Sanitized routing-only dump for the evidence record. */
 function sanitized(record: unknown): string {
@@ -140,9 +160,13 @@ const ProbeExtraction = Schema.Struct({
   ).pipe(Schema.check(Schema.isMaxLength(50))),
 });
 
-describeLive("E2 live smoke (authorized spend)", () => {
+const ProbeToolInput = Schema.Struct({
+  alias: Schema.String.pipe(Schema.check(Schema.isMinLength(1))),
+});
+
+describeLive("E8 live smoke (authorized spend)", () => {
   it(
-    "completes one structured chat turn on the first-choice model with recorded route",
+    "completes one DIRECT structured chat turn with recorded provider/route",
     { timeout: 90_000 },
     async () => {
       if (credentials === null) {
@@ -158,7 +182,7 @@ describeLive("E2 live smoke (authorized spend)", () => {
         outputSchema: ProbeOutput,
       });
       // eslint-disable-next-line no-console
-      console.log("[e2-smoke/chat] record:", sanitized(result.record));
+      console.log("[e8-smoke/chat] record:", sanitized(result.record));
       expect(result.outcome.outcome).toBe("succeeded");
       if (result.outcome.outcome === "succeeded" && !("toolCalls" in result.outcome.value)) {
         // The value already carries the codec's type: no re-decode needed.
@@ -166,14 +190,18 @@ describeLive("E2 live smoke (authorized spend)", () => {
       }
       const success = result.record.attempts.find((a) => a.outcome === "succeeded");
       expect(success).toBeDefined();
-      expect(success?.requestedModel).toBe(CHAT_MODEL_ORDER[0]);
+      expect(success?.provider).toBe("deepseek");
+      expect(success?.requestedModel).toBe(CHAT_MODEL_ORDER[0]?.model);
       expect(success?.observedModel).toBeDefined();
       expect(success?.routingConfigVersion).toBe(ROUTING_CONFIG_VERSION);
+      // The direct API reports no request cost: absent, never zero.
+      expect(success?.usage?.costUsd).toBeUndefined();
+      expect(success?.usage?.totalTokens).toBeGreaterThan(0);
     },
   );
 
   it(
-    "observes ordered fallback when the first position cannot serve (404 probe)",
+    "observes the provider-boundary fallback when the first position cannot serve (404 probe)",
     { timeout: 120_000 },
     async () => {
       if (credentials === null) {
@@ -181,7 +209,10 @@ describeLive("E2 live smoke (authorized spend)", () => {
       }
       // Probe route ONLY (server-side verification parameter): a first
       // position no catalog can serve, then the accepted order unchanged.
-      const probeOrder = ["kiero/nonexistent-probe-model", ...CHAT_MODEL_ORDER] as const;
+      const probeOrder = [
+        { provider: "openrouter" as const, model: "kiero/nonexistent-probe-model" },
+        ...CHAT_MODEL_ORDER,
+      ] as const;
       const result = await chatWithRoute(
         credentials,
         "chat_analysis",
@@ -193,21 +224,88 @@ describeLive("E2 live smoke (authorized spend)", () => {
         },
       );
       // eslint-disable-next-line no-console
-      console.log("[e2-smoke/fallback] record:", sanitized(result.record));
+      console.log("[e8-smoke/fallback] record:", sanitized(result.record));
       expect(result.outcome.outcome).toBe("succeeded");
       expect(result.record.attempts.length).toBeGreaterThanOrEqual(2);
       expect(result.record.attempts[0]).toMatchObject({
+        provider: "openrouter",
         requestedModel: "kiero/nonexistent-probe-model",
         outcome: "failed",
         fallbackEligible: true,
       });
       const success = result.record.attempts.find((a) => a.outcome === "succeeded");
-      expect(success?.requestedModel).toBe(CHAT_MODEL_ORDER[0]);
+      expect(success?.provider).toBe("deepseek");
+      expect(success?.requestedModel).toBe(CHAT_MODEL_ORDER[0]?.model);
     },
   );
 
   it(
-    "embeds one text at the versioned 4096-dimension baseline",
+    "completes a two-round tool conversation with NATIVE replay on the direct transport",
+    { timeout: 120_000 },
+    async () => {
+      if (credentials === null) {
+        throw new Error("unreachable: gated");
+      }
+      const tools = [
+        {
+          name: "termin_projektu",
+          description: "Zwraca termin (data) dla aliasu projektu.",
+          input: ProbeToolInput,
+        },
+      ];
+      const first = [
+        { role: "user" as const, content: [{ kind: "text" as const, text: "Do kiedy termin projektu Banan? Użyj narzędzia." }] },
+      ];
+      const round1 = await chatWithRoute(credentials, "chat_analysis", { order: CHAT_MODEL_ORDER }, { messages: first, tools });
+      expect(round1.outcome.outcome).toBe("succeeded");
+      if (round1.outcome.outcome !== "succeeded") {
+        throw new Error("round 1 failed");
+      }
+      if (round1.outcome.value.toolCalls.length === 0) {
+        // Model answered directly: the tool loop is not the deterministic
+        // path on every attempt; record honestly and skip the replay round.
+        // eslint-disable-next-line no-console
+        console.log("[e8-smoke/tools] round 1 answered without a tool call; replay round skipped");
+        return;
+      }
+      const call = round1.outcome.value.toolCalls[0];
+      expect(call?.name).toBe("termin_projektu");
+      // eslint-disable-next-line no-console
+      console.log("[e8-smoke/tools] round 1 record:", sanitized(round1.record));
+      const round2 = await chatWithRoute(
+        credentials,
+        "chat_analysis",
+        { order: CHAT_MODEL_ORDER },
+        {
+          messages: [
+            ...first,
+            {
+              role: "assistant-tool-calls",
+              calls: [{ id: call?.id ?? "", name: call?.name ?? "", arguments: JSON.stringify(call?.arguments) }],
+            },
+            {
+              role: "tool-result",
+              toolCallId: call?.id ?? "",
+              name: call?.name ?? "",
+              content: "2026-09-20",
+            },
+          ],
+          tools,
+        },
+      );
+      // eslint-disable-next-line no-console
+      console.log("[e8-smoke/tools] round 2 record:", sanitized(round2.record));
+      expect(round2.outcome.outcome).toBe("succeeded");
+      if (round2.outcome.outcome === "succeeded") {
+        expect(round2.outcome.value.text).toContain("2026");
+      }
+      const success = round2.record.attempts.find((a) => a.outcome === "succeeded");
+      expect(success?.provider).toBe("deepseek");
+    },
+  );
+
+  it(
+    "embeds one text at the versioned 4096-dimension baseline (retained OpenRouter)",
     { timeout: 90_000 },
     async () => {
       if (credentials === null) {
@@ -218,17 +316,19 @@ describeLive("E2 live smoke (authorized spend)", () => {
         inputKind: "search_document",
       });
       // eslint-disable-next-line no-console
-      console.log("[e2-smoke/embedding] record:", sanitized(result.record));
+      console.log("[e8-smoke/embedding] record:", sanitized(result.record));
       expect(result.outcome.outcome).toBe("succeeded");
       if (result.outcome.outcome === "succeeded") {
         expect(result.outcome.value.vector).toHaveLength(4096);
         expect(result.outcome.value.observedModel.toLowerCase()).toContain("qwen3-embedding-8b");
       }
+      const success = result.record.attempts.find((a) => a.outcome === "succeeded");
+      expect(success?.provider).toBe("openrouter");
     },
   );
 
   it(
-    "transcribes a tiny synthetic Polish-labeled tone segment (typed probe)",
+    "transcribes a tiny synthetic Polish-labeled tone segment (retained OpenRouter)",
     { timeout: 120_000 },
     async () => {
       if (credentials === null) {
@@ -241,13 +341,14 @@ describeLive("E2 live smoke (authorized spend)", () => {
         language: "pl",
       });
       // eslint-disable-next-line no-console
-      console.log("[e2-smoke/stt] record:", sanitized(result.record));
+      console.log("[e8-smoke/stt] record:", sanitized(result.record));
       // A tone carries no speech: the honest expectation is a well-formed
       // classified outcome, not transcript content. The record must show the
       // accepted order and either a decoded non-empty transcript or an
       // explicit classified failure (recorded for D6's real-audio proof).
       expect(result.record.attempts.length).toBeGreaterThanOrEqual(1);
       expect(result.record.routingConfigVersion).toBe(ROUTING_CONFIG_VERSION);
+      expect(result.record.attempts.every((a) => a.provider === "openrouter")).toBe(true);
       if (result.outcome.outcome === "succeeded") {
         expect(result.outcome.value.text.length).toBeGreaterThan(0);
       } else {
@@ -257,7 +358,7 @@ describeLive("E2 live smoke (authorized spend)", () => {
   );
 
   it(
-    "extracts from a tiny synthetic image over the vision order",
+    "extracts from a tiny synthetic image over the DIRECT vision route",
     { timeout: 120_000 },
     async () => {
       if (credentials === null) {
@@ -270,7 +371,7 @@ describeLive("E2 live smoke (authorized spend)", () => {
         outputSchema: ProbeExtraction,
       });
       // eslint-disable-next-line no-console
-      console.log("[e2-smoke/vision] record:", sanitized(result.record));
+      console.log("[e8-smoke/vision] record:", sanitized(result.record));
       expect(result.outcome.outcome).toBe("succeeded");
       if (result.outcome.outcome === "succeeded" && !("toolCalls" in result.outcome.value)) {
         // The value already carries the codec's type: no re-decode needed.
@@ -278,12 +379,8 @@ describeLive("E2 live smoke (authorized spend)", () => {
       }
       const success = result.record.attempts.find((a) => a.outcome === "succeeded");
       expect(success).toBeDefined();
-      // The vision order never includes the text-only route.
-      expect(
-        result.record.attempts.every(
-          (a) => a.requestedModel !== "deepseek/deepseek-v4-flash-0731",
-        ),
-      ).toBe(true);
+      expect(success?.provider).toBe("deepseek");
+      expect(success?.requestedModel).toBe("deepseek-flash");
     },
   );
 });

@@ -94,21 +94,26 @@ export function classifyStatus(status: number): ProviderFailure {
 }
 
 /**
- * Classifies a failure the TanStack adapter reported as a stream-level AG-UI
+ * Classifies a failure a transport reported as a stream-level AG-UI
  * RUN_ERROR event, using only its machine-readable `code` — never the
  * message text, which is provider-controlled.
  *
- * `code === "aborted"` is the adapter's shape for an aborted/deadline hit;
- * numeric codes are HTTP statuses. An unrecognized/absent code from a
- * stream-level failure is treated as route unavailability: it keeps the
- * bounded loop moving instead of hanging, and the kind is recorded so the
- * probe evidence can demand better codes later. This function is ONLY for
- * stream-level events; an error THROWN before any stream existed is our
- * side of the seam and classifies as `internal_error` (see ./chat.ts).
+ * `code === "aborted"` is the adapters' shape for an aborted/deadline hit;
+ * numeric codes are HTTP statuses; `"network_error"` is the direct DeepSeek
+ * transport's shape for a fetch-level failure before any provider response
+ * existed. An unrecognized/absent code from a stream-level failure is
+ * treated as route unavailability: it keeps the bounded loop moving instead
+ * of hanging, and the kind is recorded so the probe evidence can demand
+ * better codes later. This function is ONLY for stream-level events; an
+ * error THROWN before any stream existed is our side of the seam and
+ * classifies as `internal_error` (see ./chat.ts).
  */
 export function classifyChatFailure(code: string | number | undefined): ProviderFailure {
   if (code === "aborted" || code === "AbortError" || code === "TimeoutError") {
     return providerFailure("deadline_exceeded");
+  }
+  if (code === "network_error") {
+    return providerFailure("connection_failed");
   }
   const status = typeof code === "number" ? code : Number(code);
   if (Number.isInteger(status) && status >= 400 && status <= 599) {

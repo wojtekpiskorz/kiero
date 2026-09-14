@@ -24,6 +24,7 @@ import {
   EMBEDDING_DIMENSIONS_BASELINE,
   PROVIDER_ROUTING,
   type ModelRoute,
+  type RouteTarget,
 } from "./routing";
 import { classifySdkFailure, providerFailure, type ProviderFailure } from "./failures";
 import { runOrderedRoute, type RouteCallResult } from "./runner";
@@ -111,12 +112,19 @@ export function decodeEmbedding(
   return { ok: true, value: { vector, observedModel, usage } };
 }
 
-/** Runs ONE embedding attempt against one model (no fallback decisions). */
+/**
+ * Runs ONE embedding attempt against one target (no fallback decisions).
+ * The retained E8 owner decision keeps embeddings on OpenRouter
+ * exclusively: no supported direct DeepSeek embeddings endpoint exists, so
+ * the attempt is an OpenRouter client call whatever qualifier the frozen
+ * route carries (the embedding order only ever says `openrouter`).
+ */
 export async function embeddingAttempt(
   credentials: OpenRouterCredentials,
-  model: string,
+  target: RouteTarget,
   request: EmbeddingRequest,
 ): Promise<{ ok: true; value: EmbeddingResult } | { ok: false; failure: ProviderFailure }> {
+  const model = target.model;
   const client = new OpenRouter({
     apiKey: credentials.apiKey,
     timeoutMs: EMBEDDING_ATTEMPT_DEADLINE_MS,
@@ -156,8 +164,8 @@ export async function embeddingWithRoute(
   request: EmbeddingRequest,
   attemptFunction: typeof embeddingAttempt = embeddingAttempt,
 ): Promise<EmbeddingCallResult> {
-  return runOrderedRoute("embedding", route, async (model) => {
-    const attempt = await attemptFunction(credentials, model, request);
+  return runOrderedRoute("embedding", route, async (target) => {
+    const attempt = await attemptFunction(credentials, target, request);
     if (!attempt.ok) {
       return { ok: false as const, failure: attempt.failure };
     }

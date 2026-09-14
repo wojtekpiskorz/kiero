@@ -2,11 +2,13 @@
  * Route/model/version recording per provider call (E2).
  *
  * Every provider call produces one immutable record of its attempts: which
- * model was requested (the accepted order position actually tried), which
- * model actually served the request as observed in the provider's response
- * (never assumed from the request), the routing configuration version the
- * decision was made under, latency, observed usage and the sanitized failure
- * classification when an attempt failed.
+ * supplier and model was requested (the accepted order position actually
+ * tried — `provider` distinguishes direct DeepSeek from the retained
+ * OpenRouter positions since E8), which model actually served the request
+ * as observed in the provider's response (never assumed from the request),
+ * the routing configuration version the decision was made under, latency,
+ * observed usage and the sanitized failure classification when an attempt
+ * failed.
  *
  * Consumers:
  * - `processingAttempts` rows (platform pipeline tables) carry the
@@ -51,6 +53,13 @@ export const ProviderCallAttempt = Schema.Struct({
   routeId: ProviderCallRouteId,
   /** Frozen routing configuration version the attempt ran under. */
   routingConfigVersion: Schema.NonEmptyString,
+  /**
+   * The supplier that served the attempt (E8 split: direct `deepseek` vs
+   * retained/fallback `openrouter`). Optional so records recorded before
+   * the split still decode; new attempts always carry it, keeping usage and
+   * cost accounting distinguishable per provider.
+   */
+  provider: Schema.optionalKey(Schema.Literals(["deepseek", "openrouter"])),
   /** The model this attempt requested (position in the accepted order). */
   requestedModel: Schema.NonEmptyString,
   /** The model that actually served the response, as observed in it. */
