@@ -1,9 +1,12 @@
 /**
  * The single redaction definition for Kiero diagnostics (I2).
  *
- * PURE MODULE: no Convex, Effect or Node imports, so the gateway Worker and
+ * PURE MODULE: no Convex or Node imports, so the gateway Worker and
  * the Convex functions share ONE sanitizer (the architecture's GW -> OBS flow
- * must not grow a second, drifting copy).
+ * must not grow a second, drifting copy). Its single import is the shared
+ * deployment label pattern from @kiero/runtime (itself Convex-free): R13's
+ * consolidation of the environment label set that used to live here as a
+ * private regex twin.
  *
  * Redaction is enforced BY CONSTRUCTION:
  *
@@ -25,6 +28,8 @@
  * The output of `sanitizeDiagnosticEvent` is the ONLY shape `emit.ts` writes
  * to `diagnosticEvents`, and the only shape the sink forwards.
  */
+
+import { DEPLOYMENT_ENVIRONMENT_PATTERN } from "@kiero/runtime";
 
 /** Version of the redaction rules (recorded on every stored event). */
 export const REDACTION_VERSION = "i2.redact.1";
@@ -114,7 +119,8 @@ export const METADATA_KEY_FORMATS = {
   basis: /^(observed|estimate)$/,
   level: /^(warning_400|alert_500)$/,
   serviceName: /^[a-z][a-z0-9_.-]{2,63}$/,
-  environment: /^(dev|staging|alpha-production)$/,
+  /** The closed deployment label set, shared with the classification rule (R13). */
+  environment: DEPLOYMENT_ENVIRONMENT_PATTERN,
   /** Gateway route path (starts with `/`, no query strings possible). */
   route: /^\/[a-z0-9/_-]{1,120}$/,
   /** HTTP status code. */
