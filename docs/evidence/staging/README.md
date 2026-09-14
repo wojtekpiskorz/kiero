@@ -1,5 +1,15 @@
 # Staging qualification environment evidence (I8 #133)
 
+Current provisioning is recorded in [the 2026-09-14 VPS checkpoint](vps-2026-09-14.md).
+The named EU staging deployment, GitHub staging environment, release credential,
+session-signing keys and EU R2 buckets now exist. The owner selected Workers
+Static Assets for the web host, direct DeepSeek API for chat/vision, and retained
+OpenRouter for transcription and embeddings; Google, Resend, DeepSeek and
+OpenRouter configuration names are present in both server stores. Application
+release and provider qualification remain outstanding. The sections below preserve
+the 2026-09-12 baseline; use the current checkpoint for discharged actions and
+corrected CLI procedures.
+
 Status date: 2026-09-12. Worktree branch `codex/kiero-i8` from `main` at
 `1ffb4dbc3966024270987da22893fb24f02b4df3`. The machine-readable candidate
 manifest is [candidate.json](candidate.json); the living contract for

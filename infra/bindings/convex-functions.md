@@ -17,6 +17,9 @@ now part of the inventory. Presence states live in
 
 | Name | Consumer | Purpose | Injected via | Status |
 | --- | --- | --- | --- | --- |
+| `JWT_PRIVATE_KEY` | Convex Auth session issuance | Deployment-specific RS256 PKCS#8 signing key | `STAGING_JWT_PRIVATE_KEY` GitHub environment secret and per-deployment Convex variable, transferred through stdin | SET on staging 2026-09-14; in-memory signature verification passed; deployed auth proof pending |
+| `JWKS` | Convex Auth verification endpoint | Public verification keys derived from the staging signing key | `STAGING_JWKS` GitHub environment secret and per-deployment Convex variable | SET on staging 2026-09-14; published endpoint proof pending |
+| `DEEPSEEK_API_KEY` | Planned direct DeepSeek provider adapter | Owner-selected direct API access to `deepseek-flash`, observed as V4.1 Flash on 2026-09-14 | `STAGING_DEEPSEEK_API_KEY` GitHub environment secret and per-deployment Convex variable | PENDING provider credential and implementation prerequisite; not yet consumed by the current adapter |
 | `OPENROUTER_API_KEY` | AI actions (chat, vision, STT, embeddings) | OpenRouter API authentication for all model calls from server actions | `npx --yes convex@1.45.0 env set OPENROUTER_API_KEY` per deployment (dev: locally; staging/alpha: CI from GitHub secret), or dashboard Settings > Environment Variables | name VERIFIED in local `.env` and GitHub secrets; Convex env injection PENDING (E2 first real call) |
 | `RESEND_API_KEY` | `convex/integrations/email/resend.ts` (exported `RESEND_API_KEY_NAME`) | Resend credential for transactional email (OTP/invites); runtime reads exactly this name, not `AUTH_RESEND_KEY` | same as above | PENDING (B5 owner provisioning) |
 | `RESEND_FROM` | same module | verified sender identity for outgoing email | same as above | PENDING (owner domain verification) |
@@ -32,6 +35,7 @@ now part of the inventory. Presence states live in
 
 | Name | Consumer | Purpose |
 | --- | --- | --- |
+| `SITE_URL` | Convex Auth OAuth return | Staging web origin used after Google sign-in; distinct from the provider callback on the Convex HTTP Actions origin |
 | `AXIOM_DATASET` | telemetry forwarder | dataset name (`kiero-observability`) |
 | `KIERO_ENVIRONMENT` | telemetry forwarder | environment tag (`dev` / `staging` / `alpha-production`) stamped on forwarded events |
 | `KIERO_DEPLOYMENT_LABEL` | `convex/platform/http.ts`, `operations/telemetry/http.ts` | deployment identifier reported in diagnostics snapshots |

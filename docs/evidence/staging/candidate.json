@@ -14,7 +14,8 @@
     "label": "staging",
     "githubEnvironment": "staging",
     "runtimeLabels": ["ENVIRONMENT=staging", "KIERO_ENVIRONMENT=staging"],
-    "webOrigin": "https://kiero-staging-web.pages.dev"
+    "webOrigin": "https://kiero-staging-web.wojtek-524.workers.dev",
+    "webOriginStatus": "planned Workers Static Assets host; not deployed"
   },
   "convex": {
     "team": "wojtek-piskorz-jr",
@@ -25,23 +26,35 @@
     "deploymentType": "prod",
     "region": "eu",
     "isDefault": false,
-    "deploymentSlug": "PENDING creation (record here when provisioned)",
-    "deploymentUrl": "PENDING (<slug>.eu-west-1.convex.cloud)"
+    "deploymentSlug": "fiery-raven-417",
+    "deploymentId": 5477316,
+    "deploymentUrl": "https://fiery-raven-417.eu-west-1.convex.cloud",
+    "httpActionsUrl": "https://fiery-raven-417.eu-west-1.convex.site",
+    "provisionedAt": "2026-09-14",
+    "observedRegion": "aws-eu-west-1",
+    "applicationReleaseStatus": "NOT RUN"
   },
   "cloudflare": {
     "accountSameAsDev": true,
-    "pagesProject": "kiero-staging-web",
+    "webHosting": {
+      "kind": "workers-static-assets",
+      "workerName": "kiero-staging-web",
+      "status": "owner-selected; release configuration prerequisite outstanding"
+    },
     "workers": [
+      "kiero-staging-web",
       "kiero-staging-gateway",
       "kiero-staging-media-worker",
       "kiero-staging-export-worker",
       "kiero-staging-backup-worker"
     ],
     "r2Buckets": [
-      { "name": "kiero-staging-media", "jurisdiction": "eu", "location": "weur" },
-      { "name": "kiero-staging-backup", "jurisdiction": "eu", "location": "weur" }
+      { "name": "kiero-staging-media", "jurisdiction": "eu", "status": "created 2026-09-14" },
+      { "name": "kiero-staging-backup", "jurisdiction": "eu", "status": "created 2026-09-14" }
     ],
-    "corsAllowListOrigins": ["https://kiero-staging-web.pages.dev"]
+    "corsAllowListOrigins": ["https://kiero-staging-web.wojtek-524.workers.dev"],
+    "workerReleaseStatus": "NOT RUN",
+    "r2LocationNote": "Wrangler 4.130.0 rejects combining --jurisdiction and --location. Created with --jurisdiction eu; no narrower placement is claimed."
   },
   "githubConfiguration": {
     "environmentVariables": [
@@ -52,7 +65,10 @@
       { "name": "STAGING_CONVEX_DEPLOY_KEY", "consumer": "CONVEX_DEPLOY_KEY (deployment-scoped deploy key; see evidence runbook R4 for the workflow mapping status)" },
       { "name": "STAGING_CLOUDFLARE_API_TOKEN", "consumer": "CLOUDFLARE_API_TOKEN (wrangler)" },
       { "name": "STAGING_CLOUDFLARE_ACCOUNT_ID", "consumer": "CLOUDFLARE_ACCOUNT_ID (wrangler)" },
-      { "name": "STAGING_OPENROUTER_API_KEY", "consumer": "Convex env OPENROUTER_API_KEY" },
+      { "name": "STAGING_DEEPSEEK_API_KEY", "consumer": "Convex env DEEPSEEK_API_KEY; E8 implements the direct chat/vision client" },
+      { "name": "STAGING_OPENROUTER_API_KEY", "consumer": "Convex env OPENROUTER_API_KEY; retained for STT and embeddings per the final owner split" },
+      { "name": "STAGING_JWT_PRIVATE_KEY", "consumer": "Convex Auth session signing" },
+      { "name": "STAGING_JWKS", "consumer": "Convex Auth public verification keys" },
       { "name": "STAGING_RESEND_API_KEY", "consumer": "Convex env RESEND_API_KEY" },
       { "name": "STAGING_RESEND_FROM", "consumer": "Convex env RESEND_FROM" },
       { "name": "STAGING_AUTH_GOOGLE_ID", "consumer": "Convex env AUTH_GOOGLE_ID" },
@@ -74,10 +90,23 @@
     ]
   },
   "oauthPins": {
-    "googleWebOrigin": "https://kiero-staging-web.pages.dev",
-    "calendarRedirectUri": "PENDING owner Google OAuth client; must be registered for the staging origin only, distinct from any dev client",
-    "note": "separate staging Google OAuth client (or separate redirect URIs); staging credentials are never reused from dev"
+    "googleWebOrigin": "https://kiero-staging-web.wojtek-524.workers.dev",
+    "googleSignInRedirectUri": "https://fiery-raven-417.eu-west-1.convex.site/api/auth/callback/google",
+    "calendarRedirectUri": "https://fiery-raven-417.eu-west-1.convex.site/calendar/oauth/callback",
+    "status": "Google Web OAuth client created in project kiero-508611 (External/Testing, one test user); credential names stored. Runtime callback behavior unverified until release.",
+    "note": "Use a separate staging Google OAuth client. Provider callbacks use the Convex HTTP Actions origin; SITE_URL and KIERO_CALENDAR_APP_BASE_URL use the web origin."
   },
+  "providerDecision": {
+    "date": "2026-09-14",
+    "chatAndVisionProvider": "DeepSeek API, direct",
+    "model": "deepseek-flash",
+    "observedModelRelease": "DeepSeek-V4.1-Flash, 2026-09-10",
+    "audioAndEmbeddingsProvider": "OpenRouter, retained",
+    "audioModels": "MAI-Transcribe-2 with Whisper backup",
+    "embeddingModel": "Qwen3-Embedding-8B, 4096 dimensions",
+    "status": "final owner split; credential names for both providers stored. E8 implements the direct DeepSeek client; actual availability of every model is unverified"
+  },
+  "provisioningEvidence": "vps-2026-09-14.md",
   "isolation": {
     "mechanism": "named Convex deployment inside kiero-dev-core (per-deployment data, credentials, scheduler, storage) + kiero-staging-* Cloudflare resources + STAGING_-prefixed GitHub secrets",
     "perDeploymentBoundaries": ["database", "environment-variables-and-auth-keys", "scheduler", "file-storage"],
@@ -136,14 +165,13 @@
     }
   ],
   "pendingOwnerActions": [
-    "verify kiero-dev-core deployment inventory, plan headroom for a second prod-type deployment and month-quota state (dashboard)",
-    "create deployment wojtek-piskorz-jr:kiero-dev-core:staging --type prod --region eu (never --default) and record slug/URL here",
-    "generate a deployment-scoped Convex deploy key for staging and store it as GitHub environment secret STAGING_CONVEX_DEPLOY_KEY",
-    "execute evidence runbook R4: the release.yml + staging.json CONVEX_DEPLOY_KEY mapping follow-up (R6-owned files; note only, not edited by I8)",
-    "create R2 buckets kiero-staging-media / kiero-staging-backup (--jurisdiction eu --location weur) and their scoped tokens",
-    "create Pages project kiero-staging-web",
-    "create the GitHub staging environment + vars/secrets; configure alpha-production protection with a single gh api -X PUT repos/wojtekpiskorz/kiero/environments/alpha-production --input call whose body carries {\"deployment_branch_policy\":{\"restricted\":true},\"reviewers\":[{\"type\":\"User\",\"id\":<owner-user-id>}]} (no separate reviewers endpoint exists)",
-    "set runtime env vars on the staging Convex deployment per-deployment only (names only, per the runbook); never via convex env default, and the prod-type default list must stay empty",
+    "supply Cloudflare token-management and billing access or directly provision the required staging CI and bucket-scoped R2 credentials",
+    "integrate the Workers Static Assets frontend release prerequisite and verify the observed deployed web origin",
+    "integrate the Convex actual-target verification prerequisite before the first application release",
+    "complete the E8 direct DeepSeek chat/vision implementation against the stored credential names; OpenRouter stays the audio/embeddings provider per the final owner split",
+    "configure the remaining runtime credential names (telemetry, VAPID) and verify deployed injection; Google, Resend, DeepSeek and OpenRouter names are already stored",
+    "configure alpha-production reviewers and branch policy using protected_branches/custom_branch_policies and the separate deployment branch-policy endpoint after the owner identity decision",
+    "complete runtime bindings per deployment and per Worker; verify generated session keys and that proof/fixture switches are unset",
     "dispatch the first real staging Release run and attach run id + deployment identifiers here; verify the reported Convex deployment slug/URL matches this manifest's deploymentReference"
   ]
 }
