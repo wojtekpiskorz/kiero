@@ -29,6 +29,21 @@ export interface CalendarBridgeEnv {
   readonly CONVEX_SITE_URL?: string;
   /** Shared service credential (secret binding; never a committed value). */
   readonly KIERO_SERVICE_TOKEN?: string;
+  /**
+   * The configured PWA origin the callback page's "Wróć do Kiero" link
+   * targets (R12; the same deployment variable name the direct Convex
+   * callback reads — single-sourced as `CALENDAR_APP_BASE_URL_ENV` in
+   * convex/calendar/connection/return.ts, which the route reads through
+   * that constant so name drift cannot compile; http.ts only re-exports
+   * it).
+   */
+  readonly KIERO_CALENDAR_APP_BASE_URL?: string;
+  /**
+   * The Worker's environment label (dev/staging/alpha-production; the same
+   * closed set the telemetry surface reads). Drives the return resolver's
+   * plain-http-only-in-dev rule.
+   */
+  readonly ENVIRONMENT?: string;
 }
 
 /** One sanitized calendar bridge failure. */

@@ -17,7 +17,11 @@
  *   deployment's verified bridge completion route (service credential ->
  *   the A3 bridge check; the callback itself re-checks membership), then
  *   renders a minimal Polish HTML status page. No token, code or state
- *   value is ever echoed, logged or put into the page.
+ *   value is ever echoed, logged or put into the page. The page's
+ *   "Wróć do Kiero" footer targets the CONFIGURED application origin
+ *   (R12: `KIERO_CALENDAR_APP_BASE_URL` on this Worker), resolved by the
+ *   SAME R10 resolver the direct Convex callback uses — never "/" on the
+ *   Worker host and never anything the caller supplied.
  *
  * Paths live under the existing `/platform/` route prefix the Worker
  * serves, so registration is the documented imports-only append in
@@ -27,6 +31,17 @@
 
 import { calendarComplete, calendarStart, type CalendarBridgeEnv } from "./client";
 import { answerOrNull } from "../../../../convex/calendar/connection/answers";
+// The R10 return resolver from its PURE shared home (the same ruling as
+// `answerOrNull` above): ONE definition of where the callback page's
+// link leads, shared by the direct Convex callback and this Worker page.
+import {
+  CALENDAR_APP_BASE_URL_ENV,
+  calendarAppReturnHref,
+  type CalendarAppReturnEnv,
+} from "../../../../convex/calendar/connection/return";
+// The shared status-page renderer (pure home; the direct Convex callback
+// page imports the same definition, so the Polish copy lives once).
+import { polishStatusPage } from "../../../../convex/calendar/connection/render";
 import type { GatewayRoute } from "../platform/routes";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -36,13 +51,22 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-/** Minimal Polish status page (barebones: semantic HTML, no styling). */
-function polishStatusPage(title: string, detail: string, status: number): Response {
-  const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Kiero — Kalendarz</title></head><body><section aria-labelledby="k"><h1 id="k">Kalendarz Kiero w Google</h1><p role="status">${title}</p><p>${detail}</p><p><a href="/">Wróć do Kiero</a></p></section></body></html>`;
-  return new Response(html, {
-    status,
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-  });
+/**
+ * Resolves the page's return target through the R10 resolver from THIS
+ * Worker's bindings only — a literal two-key mapping onto the resolver's
+ * contract: the PWA origin passes through under the same deployment
+ * variable name, and the Worker's `ENVIRONMENT` label (the same closed
+ * dev/staging/alpha-production set the telemetry surface reads) stands
+ * in for the resolver's `KIERO_ENVIRONMENT`, so plain http stays a
+ * dev-only allowance here too. Both may be undefined; the resolver
+ * itself decides what absent means. Nothing caller-supplied participates.
+ */
+function gatewayReturnHref(env: CalendarBridgeEnv): string | null {
+  const resolverInput: CalendarAppReturnEnv = {
+    [CALENDAR_APP_BASE_URL_ENV]: env[CALENDAR_APP_BASE_URL_ENV],
+    KIERO_ENVIRONMENT: env.ENVIRONMENT,
+  };
+  return calendarAppReturnHref(resolverInput);
 }
 
 /** The G1 Calendar OAuth route provider. */
@@ -76,11 +100,15 @@ export const calendarOAuthRoutes: readonly GatewayRoute[] = [
       const state = url.searchParams.get("state") ?? "";
       const code = url.searchParams.get("code");
       const error = url.searchParams.get("error");
+      // Server-side configuration only (R12): the request itself (host,
+      // query, headers) never influences where the page's link leads.
+      const returnHref = gatewayReturnHref(env);
       if (state.length === 0) {
         return polishStatusPage(
           "Nieprawidłowe połączenie.",
           "Ten link jest niekompletny. Zacznij połączenie od nowa w Kiero.",
           400,
+          returnHref,
         );
       }
       const outcome = await calendarComplete(env, { state, code, error });
@@ -93,6 +121,7 @@ export const calendarOAuthRoutes: readonly GatewayRoute[] = [
           "Połączenie kalendarza nie zostało ukończone.",
           "Wróć do Kiero i sprawdź stan połączenia kalendarza.",
           400,
+          returnHref,
         );
       }
       const value =
@@ -104,6 +133,7 @@ export const calendarOAuthRoutes: readonly GatewayRoute[] = [
           "Kalendarz Kiero jest połączony.",
           "Możesz wrócić do Kiero i korzystać z terminów w swoim kalendarzu Google.",
           200,
+          returnHref,
         );
       }
       // The same typed reason the direct Convex callback page renders (the
@@ -114,9 +144,10 @@ export const calendarOAuthRoutes: readonly GatewayRoute[] = [
           "Połączenie kalendarza nie zostało ukończone.",
           "Wróć do Kiero i sprawdź stan połączenia kalendarza.",
           400,
+          returnHref,
         );
       }
-      return polishStatusPage(answer.polishTitle, answer.polishDetail, answer.status);
+      return polishStatusPage(answer.polishTitle, answer.polishDetail, answer.status, returnHref);
     },
   },
 ];

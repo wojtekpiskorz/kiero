@@ -41,7 +41,13 @@
     "ENVIRONMENT": "dev",
     // Non-secret URL of the matching Convex deployment's HTTP actions.
     // Fill per environment when that deployment exists (empty = not yet set).
-    "CONVEX_SITE_URL": ""
+    "CONVEX_SITE_URL": "",
+    // Non-secret PWA origin the Calendar callback page's return link
+    // targets (R12; the same variable name the Convex deployment reads).
+    // Local dev fills the origin the kiero-dev-web Worker serves on
+    // (empty = not yet set: the callback honestly renders the no-link
+    // page until then, never a return to this Worker).
+    "KIERO_CALENDAR_APP_BASE_URL": ""
   },
   "env": {
     "staging": {
@@ -61,7 +67,10 @@
         // company origins are intentionally absent.
         "ALLOWED_APP_ORIGINS": "https://kiero-staging-web.wojtek-524.workers.dev",
         // Fill when the staging Convex deployment exists (empty = not yet set).
-        "CONVEX_SITE_URL": ""
+        "CONVEX_SITE_URL": "",
+        // R12: the PWA origin the Calendar callback page returns to — the
+        // same staging web Worker the CORS allow-list above pins.
+        "KIERO_CALENDAR_APP_BASE_URL": "https://kiero-staging-web.wojtek-524.workers.dev"
       }
     },
     "alpha-production": {
@@ -75,7 +84,9 @@
       ],
       "vars": {
         "ENVIRONMENT": "alpha-production",
-        "CONVEX_SITE_URL": ""
+        "CONVEX_SITE_URL": "",
+        // Fill when the alpha web origin exists (empty = not yet set).
+        "KIERO_CALENDAR_APP_BASE_URL": ""
       }
     }
   }
