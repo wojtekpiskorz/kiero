@@ -5549,7 +5549,7 @@
       "body": "## Parent\n\nImplementation map #15; post-integration cache flip.\n\n## What to build\n\nR8 #167 (PR #179), R10 #171 (PR #177) and R11 #169 (PR #180) are merged and closed. Synchronize the cached manifest and every derived table with those closures, and register the two bounded follow-ups created from R10's advisory review (R12 #181 gateway Calendar return, R13 #182 environment-label consolidation) as native children blocking J6.\n\n## Acceptance criteria\n\n- [ ] Flip R8, R10 and R11 to CLOSED in the manifest with their merged PRs, merge commits, implemented behavior and remaining owners; move their rows to the integrated table and update the UX/proof owner cells that referenced them.\n- [ ] Register R12 #181 and R13 #182 as open children blocked by R10, blocking J6; add their graph, inventory and mermaid rows.\n- [ ] Refresh the cached map body, README frontier and m1 graph-count fixtures. Offline and remote map audits pass after merge.\n\n## Blocked by\n\n- M3 #175, closed. Recheck live state before starting.\n\n## Ownership\n\nMap tracker administration, docs/implementation/** and tests/m1/**.\n\n## Audit fixture ownership\n\nM4 owns tests/m1/** to refresh the graph-count specimens. Preserve the same negative assertions and coverage.\n",
       "bodySha256": "a747e3ee263596f564ab52ddd9f93b445252ba0bb59cfbf4c565b2a925281e99",
       "audit": {
-        "mergedPr": null,
+        "mergedPr": 185,
         "mergeCommit": null,
         "implemented": "Cache-flip of the R8/R10/R11 closures and registration of R12/R13 as J6 blockers. The PR number is recorded on merge.",
         "evidence": [
