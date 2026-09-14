@@ -36,7 +36,12 @@
  */
 
 import { v } from "convex/values";
-import { runChatTurn, type AnyChatToolSpec, type ChatTurnCredentials } from "@kiero/providers";
+import {
+  ROUTING_CONFIG_VERSION,
+  runChatTurn,
+  type AnyChatToolSpec,
+  type ChatTurnCredentials,
+} from "@kiero/providers";
 import {
   ANSWER_TOOLS,
   MAX_ANSWER_TURNS,
@@ -82,11 +87,25 @@ import { resolveAccessContextFromConvexAuth } from "../access/identity/resolutio
 import { resolveEvidenceHandles } from "./execute";
 import { loadAnswerContext } from "./context";
 
-/** The answer-flow pipeline version (loop shape, tool routing). */
-export const ANSWER_FLOW_PIPELINE_VERSION = "e6.answer/2" as const;
+/**
+ * The answer-flow pipeline version (loop shape, tool routing). Bumped to
+ * e6.answer/3 by the E8 coordinated lane: the loop's recorded wire
+ * encoding changed from prose renderings to NATIVE tool rounds, which
+ * changes how recorded runs are interpreted (versions promise
+ * interpretability against the flow that produced each answer).
+ */
+export const ANSWER_FLOW_PIPELINE_VERSION = "e6.answer/3" as const;
 
-/** The model-configuration version label recorded with every answer. */
-export const ANSWER_MODEL_CONFIGURATION_VERSION = "e6.routing#chat_analysis" as const;
+/**
+ * The model-configuration version label recorded with every answer,
+ * composed exactly the way E3's analyze.ts composes its label: the routing
+ * namespace plus the frozen routing configuration version, so the label
+ * follows every routing change (E8 moved the chat route to direct
+ * DeepSeek with the authorized fallback, e8.0) without a coordinated loop
+ * edit.
+ */
+export const ANSWER_MODEL_CONFIGURATION_VERSION =
+  `e2.routing/${ROUTING_CONFIG_VERSION}#chat_analysis` as const;
 
 /** One turn's execution log entry: tool names, bounded args, results. */
 export interface TurnLogEntry {

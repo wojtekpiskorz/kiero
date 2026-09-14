@@ -175,8 +175,17 @@ NOT adopted because:
 
 - `convex/agent` (E6 answer loop) passes both keys explicitly
   (`ChatTurnCredentials`), fails fast naming the missing variable, and
-  replays native tool rounds. `convex/search` (E5) is unchanged
-  (embeddings stayed OpenRouter).
+  replays native tool rounds. Because the recorded wire encoding changed
+  from prose renderings to native rounds, `ANSWER_FLOW_PIPELINE_VERSION`
+  was bumped to `e6.answer/3` and the loop's
+  `ANSWER_MODEL_CONFIGURATION_VERSION` is now composed from
+  `ROUTING_CONFIG_VERSION` exactly the way E3's analyze.ts composes its
+  label (currently `e2.routing/e8.0#chat_analysis`), so recorded answers
+  stay interpretable and the label follows routing changes without a
+  coordinated loop edit. The prose tool-round builders the loop used
+  before were deleted from the answer-tools surface; the planning copies
+  stay live for E3/E4. `convex/search` (E5) is unchanged (embeddings
+  stayed OpenRouter).
 - The chat/vision entry points keep accepting the legacy
   `{ apiKey }` OpenRouter credential shape (extended optionally with
   `deepseekApiKey`), so call sites outside this issue's ownership

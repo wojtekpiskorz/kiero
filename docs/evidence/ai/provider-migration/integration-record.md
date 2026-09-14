@@ -66,13 +66,45 @@ The temporary compatibility shim from the first E8 round is gone:
   of degrading to `stream_terminated`. Covered by a new offline test
   (terminal frame delivered without a trailing newline).
 
-## Verification (after the findings)
+## Round-2 review findings (same lane, 2026-09-14)
+
+The round-2 review approved the structure and asked for one landing change
+plus a minor deletion; both applied in the same worktree.
+
+1. **The answer loop's model-configuration label is now composed, not
+   static** (a D6-style coordinated edit, disclosed here):
+   `ANSWER_MODEL_CONFIGURATION_VERSION` in `convex/agent/loop.ts` was the
+   static `"e6.routing#chat_analysis"`; it is now
+   `` `e2.routing/${ROUTING_CONFIG_VERSION}#chat_analysis` ``, composed
+   exactly the way E3's analyze.ts composes its label (the routing
+   namespace plus the frozen routing version imported from
+   `@kiero/providers`). The label now reads
+   `e2.routing/e8.0#chat_analysis` and follows every future routing change
+   without a coordinated loop edit. Pins updated in
+   `tests/e6/surface.test.ts` (both the surface-agreement test and the
+   versioned-dialogue pin).
+2. **`ANSWER_FLOW_PIPELINE_VERSION` bumped `e6.answer/2` -> `e6.answer/3`**
+   (coordinator decision, recorded here and in the ADR): the loop's
+   recorded wire encoding changed from prose renderings to NATIVE tool
+   rounds in the first E8 round, which changes how recorded runs are
+   interpreted; the versions surface promises interpretability against the
+   flow that produced each answer. Pin updated in the same test.
+3. **Dead prose builders deleted** from `packages/agent/tools/prompt.ts`
+   (coordinator-authorized deletion in the same lane):
+   `assistantToolCallsMessage` and `toolResultMessage` lost their only
+   consumer when the answer loop switched to native rounds. The planning
+   copies in `packages/agent/planning/prompt.ts` stay live (E3's analyze
+   and E4's model stage import them from `@kiero/agent` root); no test
+   pinned the deleted pair. The answer-tools barrel doc no longer
+   advertises the prose tool-round renderings.
+
+## Verification (after all findings)
 
 Run in this worktree; tails reported in the final lane report:
 
 ```bash
 rtk npm run typecheck
-rtk npx vitest run tests/e2 tests/d6 tests/e3
+rtk npx vitest run tests/e6 tests/e2 tests/d6
 rtk npm test
 ```
 

@@ -22,8 +22,11 @@
  * - `tokenize`/`inflectionMatch`/`overlapLocation`: the pure,
  *   inflection-tolerant matching half of the tenant-scoped evidence
  *   search;
- * - the versioned Polish dialogue builder (system prompt, question
- *   message, tool-result encodings).
+ * - the versioned Polish dialogue builders (system prompt, question
+ *   message, evidence-result encoding). The former prose tool-round
+ *   renderings were deleted when the answer loop switched to replaying
+ *   NATIVE tool rounds (E8 coordinated lane); the planning copies in
+ *   @kiero/agent stay live for E3/E4.
  *
  * The Convex-coupled half (context loading, tenant-scoped evidence search,
  * checked executions through the C2-C4 dispatches, the bounded answer
