@@ -21,7 +21,6 @@ flowchart TD
   J6["J6 #139"]
   R9["R9 #168"]
   E8["E8 #170"]
-  R12["R12 #181"]
   R13["R13 #182"]
   I10 --> I6
   J6 --> J3
@@ -40,9 +39,7 @@ flowchart TD
   I8 --> I11
   D7 --> J6
   B5 --> J6
-  R12 --> J6
   R13 --> J6
-  R12 --> R13
 ```
 
 ## Scheduling and ownership
@@ -133,7 +130,7 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [R11 #169](https://github.com/wojtekpiskorz/kiero/issues/169) | CLOSED | [M2 #166](https://github.com/wojtekpiskorz/kiero/issues/166), [B1 #20](https://github.com/wojtekpiskorz/kiero/issues/20) | Remaining execution |
 | [E8 #170](https://github.com/wojtekpiskorz/kiero/issues/170) | OPEN | [M2 #166](https://github.com/wojtekpiskorz/kiero/issues/166), [E2 #36](https://github.com/wojtekpiskorz/kiero/issues/36), [R11 #169](https://github.com/wojtekpiskorz/kiero/issues/169) | Remaining execution |
 | [R10 #171](https://github.com/wojtekpiskorz/kiero/issues/171) | CLOSED | [M2 #166](https://github.com/wojtekpiskorz/kiero/issues/166), [G1 #45](https://github.com/wojtekpiskorz/kiero/issues/45) | Remaining execution |
-| [R12 #181](https://github.com/wojtekpiskorz/kiero/issues/181) | OPEN | [R10 #171](https://github.com/wojtekpiskorz/kiero/issues/171) | Remaining execution |
+| [R12 #181](https://github.com/wojtekpiskorz/kiero/issues/181) | CLOSED | [R10 #171](https://github.com/wojtekpiskorz/kiero/issues/171) | Remaining execution |
 | [R13 #182](https://github.com/wojtekpiskorz/kiero/issues/182) | OPEN | [R10 #171](https://github.com/wojtekpiskorz/kiero/issues/171), [R12 #181](https://github.com/wojtekpiskorz/kiero/issues/181) | Remaining execution |
 
 Administration rows are documentation work, not core features. Their cached states change only through bounded administration PRs that rerun the audit and keep every derived cell equal to the manifest.

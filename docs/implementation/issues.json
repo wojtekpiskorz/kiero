@@ -5484,14 +5484,26 @@
       "solution": "## Parent\n\nImplementation map #15; R10 #171 advisory review follow-up.\n\n## What to build\n\nThe gateway Worker's Calendar callback page (`apps/gateway/src/calendar-oauth/routes.ts`, `GET /platform/calendar/oauth/callback`) still renders \"Wróć do Kiero\" with `href=\"/\"`, which returns the browser to the gateway Worker host instead of the PWA — the same defect R10 fixed on the direct Convex callback. Complete the repair on the gateway leg.\n\n## Acceptance criteria\n\n- [ ] Reuse the R10 resolver semantics (`calendarAppReturnHref` from `convex/calendar/connection/http.ts`, importing across the boundary the way `answerOrNull` already crosses at `routes.ts:29`) or hoist the resolver to a shared neutral home if the gateway team review prefers; never duplicate a second copy.\n- [ ] Resolve the return target from trusted server-side configuration only (`KIERO_CALENDAR_APP_BASE_URL` bound on the gateway Worker); never caller-supplied. Missing or invalid configuration renders the honest Polish notice without a link.\n- [ ] Preserve the bridge completion protocol, service-credential checks, and Polish success/denial/failure copy.\n- [ ] Deterministic tests through the real gateway route boundary: distinct gateway host, valid/absent/invalid configuration, hostile return inputs ignored, exact href assertions.\n\n## Blocked by\n\n- R10 #171, closed. Recheck live state before starting.\n\n## Ownership\n\n- apps/gateway/src/calendar-oauth/**\n- apps/gateway/wrangler.jsonc (the variable binding only)\n- tests/g1/**\n- docs/evidence/integrations/calendar-gateway-return/**\n\nOne issue-specific worktree and PR. Native blockers govern readiness. J4 proves the real two-account journey on the joined candidate.\n",
       "issueNumber": 181,
       "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/181",
-      "state": "OPEN",
+      "state": "CLOSED",
       "body": "## Parent\n\nImplementation map #15; R10 #171 advisory review follow-up.\n\n## What to build\n\nThe gateway Worker's Calendar callback page (`apps/gateway/src/calendar-oauth/routes.ts`, `GET /platform/calendar/oauth/callback`) still renders \"Wróć do Kiero\" with `href=\"/\"`, which returns the browser to the gateway Worker host instead of the PWA — the same defect R10 fixed on the direct Convex callback. Complete the repair on the gateway leg.\n\n## Acceptance criteria\n\n- [ ] Reuse the R10 resolver semantics (`calendarAppReturnHref` from `convex/calendar/connection/http.ts`, importing across the boundary the way `answerOrNull` already crosses at `routes.ts:29`) or hoist the resolver to a shared neutral home if the gateway team review prefers; never duplicate a second copy.\n- [ ] Resolve the return target from trusted server-side configuration only (`KIERO_CALENDAR_APP_BASE_URL` bound on the gateway Worker); never caller-supplied. Missing or invalid configuration renders the honest Polish notice without a link.\n- [ ] Preserve the bridge completion protocol, service-credential checks, and Polish success/denial/failure copy.\n- [ ] Deterministic tests through the real gateway route boundary: distinct gateway host, valid/absent/invalid configuration, hostile return inputs ignored, exact href assertions.\n\n## Blocked by\n\n- R10 #171, closed. Recheck live state before starting.\n\n## Ownership\n\n- apps/gateway/src/calendar-oauth/**\n- apps/gateway/wrangler.jsonc (the variable binding only)\n- tests/g1/**\n- docs/evidence/integrations/calendar-gateway-return/**\n\nOne issue-specific worktree and PR. Native blockers govern readiness. J4 proves the real two-account journey on the joined candidate.\n",
       "bodySha256": "8b5080816970933d043008edda6b40e6c67367c9cc6eedb470d97491a7870c08",
       "key": "R12",
       "title": "[R12] Return from the gateway Calendar callback to the configured PWA origin",
       "sources": [
         "r10-advisory-review"
-      ]
+      ],
+      "audit": {
+        "mergedPr": 184,
+        "mergeCommit": "484cd9bf8fa89bfcb106eb34b078da203bf14a53",
+        "implemented": "The gateway Calendar callback returns to the configured PWA origin through the shared resolver and shared page renderer hoisted into pure modules (return.ts, render.ts), with strict server-side-only configuration resolution and the honest no-link Polish fallback; 27 boundary tests.",
+        "evidence": [
+          "https://github.com/wojtekpiskorz/kiero/pull/184",
+          "docs/evidence/integrations/calendar-gateway-return/README.md"
+        ],
+        "remaining": [
+          "Deployment belongs to I8 #133; the real two-account Calendar journey to J4 #63."
+        ]
+      }
     },
     {
       "blockedBy": [
