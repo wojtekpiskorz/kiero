@@ -37,10 +37,11 @@ import { answerOrNull } from "../../../../convex/calendar/connection/answers";
 import {
   CALENDAR_APP_BASE_URL_ENV,
   calendarAppReturnHref,
+  type CalendarAppReturnEnv,
 } from "../../../../convex/calendar/connection/return";
-// Canonical HTML escape (the exports protocol helper), the same one the
-// Convex status page routes the href through.
-import { escapeHtml } from "../../../../convex/operations/exports/protocol";
+// The shared status-page renderer (pure home; the direct Convex callback
+// page imports the same definition, so the Polish copy lives once).
+import { polishStatusPage } from "../../../../convex/calendar/connection/render";
 import type { GatewayRoute } from "../platform/routes";
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -52,46 +53,20 @@ function jsonResponse(status: number, body: unknown): Response {
 
 /**
  * Resolves the page's return target through the R10 resolver from THIS
- * Worker's bindings only. The adapter maps the gateway's own variable
- * names onto the resolver's input: the PWA origin passes through under
- * the same deployment variable name, and the Worker's `ENVIRONMENT`
- * label (the same closed dev/staging/alpha-production set the telemetry
- * surface reads) stands in for the resolver's `KIERO_ENVIRONMENT`, so
- * plain http stays a dev-only allowance here too. Nothing caller-supplied
- * participates.
+ * Worker's bindings only — a literal two-key mapping onto the resolver's
+ * contract: the PWA origin passes through under the same deployment
+ * variable name, and the Worker's `ENVIRONMENT` label (the same closed
+ * dev/staging/alpha-production set the telemetry surface reads) stands
+ * in for the resolver's `KIERO_ENVIRONMENT`, so plain http stays a
+ * dev-only allowance here too. Both may be undefined; the resolver
+ * itself decides what absent means. Nothing caller-supplied participates.
  */
 function gatewayReturnHref(env: CalendarBridgeEnv): string | null {
-  const configured = env[CALENDAR_APP_BASE_URL_ENV];
-  const resolverInput: Parameters<typeof calendarAppReturnHref>[0] = {
-    KIERO_ENVIRONMENT: env.ENVIRONMENT ?? "dev",
+  const resolverInput: CalendarAppReturnEnv = {
+    [CALENDAR_APP_BASE_URL_ENV]: env[CALENDAR_APP_BASE_URL_ENV],
+    KIERO_ENVIRONMENT: env.ENVIRONMENT,
   };
-  if (configured !== undefined) {
-    resolverInput[CALENDAR_APP_BASE_URL_ENV] = configured;
-  }
   return calendarAppReturnHref(resolverInput);
-}
-
-/**
- * Minimal Polish status page (barebones: semantic HTML, no styling). The
- * footer link targets the configured application origin (R12); with no
- * valid configuration the page honestly states the return is unavailable
- * instead of linking anywhere (never "/" on the Worker host).
- */
-function polishStatusPage(
-  title: string,
-  detail: string,
-  status: number,
-  returnHref: string | null,
-): Response {
-  const footer =
-    returnHref === null
-      ? `<p>Powrót do Kiero jest niedostępny. Otwórz aplikację bezpośrednio.</p>`
-      : `<p><a href="${escapeHtml(returnHref)}">Wróć do Kiero</a></p>`;
-  const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Kiero — Kalendarz</title></head><body><section aria-labelledby="k"><h1 id="k">Kalendarz Kiero w Google</h1><p role="status">${title}</p><p>${detail}</p>${footer}</section></body></html>`;
-  return new Response(html, {
-    status,
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-  });
 }
 
 /** The G1 Calendar OAuth route provider. */

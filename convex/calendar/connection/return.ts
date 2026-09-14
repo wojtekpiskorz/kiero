@@ -15,6 +15,20 @@
 export const CALENDAR_APP_BASE_URL_ENV = "KIERO_CALENDAR_APP_BASE_URL";
 
 /**
+ * The trusted server-side inputs the resolver reads (exported the way
+ * ./answers.ts exports CallbackAnswer). Both keys admit an explicit
+ * undefined — honest under exactOptionalPropertyTypes because the
+ * resolver treats absent, undefined and empty identically, and the
+ * Convex side passes `process.env` (an index-signature record).
+ */
+export interface CalendarAppReturnEnv {
+  /** The configured application origin (`KIERO_CALENDAR_APP_BASE_URL`). */
+  readonly [CALENDAR_APP_BASE_URL_ENV]?: string | undefined;
+  /** The deployment's environment self-description; absent/unknown means dev. */
+  readonly KIERO_ENVIRONMENT?: string | undefined;
+}
+
+/**
  * Resolves the callback page's "Wróć do Kiero" target from SERVER-SIDE
  * configuration only: `KIERO_CALENDAR_APP_BASE_URL`, the application
  * origin (optionally with a subpath) this deployment is paired with. The
@@ -29,10 +43,7 @@ export const CALENDAR_APP_BASE_URL_ENV = "KIERO_CALENDAR_APP_BASE_URL";
  * behavior: the page renders WITHOUT a link and says so in Polish —
  * never a fallback to "/" or any guessed origin.
  */
-export function calendarAppReturnHref(env: {
-  [CALENDAR_APP_BASE_URL_ENV]?: string;
-  KIERO_ENVIRONMENT?: string;
-}): string | null {
+export function calendarAppReturnHref(env: CalendarAppReturnEnv): string | null {
   const configured = env[CALENDAR_APP_BASE_URL_ENV];
   if (typeof configured !== "string" || configured.length === 0) {
     return null;

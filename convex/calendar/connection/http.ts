@@ -41,9 +41,6 @@ import type { Id } from "../../_generated/dataModel";
 import { errorResult, okResult } from "@kiero/contracts";
 import { unauthenticatedError, forbiddenError, unsupportedError } from "@kiero/runtime";
 import { verifyServiceBearerToken } from "../../operations/telemetry/serviceToken";
-// Canonical HTML escape (the exports protocol helper): one definition of
-// which characters get escaped, shared with the export renderer.
-import { escapeHtml } from "../../operations/exports/protocol";
 import {
   decideCalendarCreateOutcome,
   decideCalendarReadOutcome,
@@ -65,6 +62,9 @@ import { calendarApiBase } from "./functions";
 import { sealCredential } from "./credentialStore";
 import { answerFor, type CallbackAnswer } from "./answers";
 import { calendarAppReturnHref } from "./return";
+// The shared status-page renderer (pure home ./render.ts; the gateway's
+// callback route imports the same definition).
+import { polishStatusPage } from "./render";
 
 // ---------------------------------------------------------------------------
 // Small shared helpers.
@@ -74,29 +74,6 @@ function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "content-type": "application/json", "cache-control": "no-store" },
-  });
-}
-
-/**
- * Minimal Polish status page (barebones: semantic HTML, no styling). The
- * footer link targets the configured application origin (R10); with no
- * valid configuration the page honestly states the return is unavailable
- * instead of linking anywhere (never "/" on the deployment host).
- */
-function polishStatusPage(
-  title: string,
-  detail: string,
-  status: number,
-  returnHref: string | null,
-): Response {
-  const footer =
-    returnHref === null
-      ? `<p>Powrót do Kiero jest niedostępny. Otwórz aplikację bezpośrednio.</p>`
-      : `<p><a href="${escapeHtml(returnHref)}">Wróć do Kiero</a></p>`;
-  const html = `<!doctype html><html lang="pl"><head><meta charset="utf-8"><title>Kiero — Kalendarz</title></head><body><section aria-labelledby="k"><h1 id="k">Kalendarz Kiero w Google</h1><p role="status">${title}</p><p>${detail}</p>${footer}</section></body></html>`;
-  return new Response(html, {
-    status,
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
   });
 }
 

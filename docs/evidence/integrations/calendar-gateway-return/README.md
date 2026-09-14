@@ -15,6 +15,14 @@ This session held no cloud credentials and deployed nothing. Everything
 executable locally was executed and is recorded below. The two steps that
 need the outside world are NOT RUN by design and named in section 4.
 
+Follow-up (same day): PR #184's advisory review requested changes and the
+coordinator ruled on the PR thread to apply all three findings in this
+worktree as new uncommitted changes — the shared renderer hoist, the
+named widened resolver input contract (collapsing the adapter to a
+literal two-key mapping), and a stale single-source comment fix. Section
+1 and section 5 record the outcome; section 3 carries the post-review
+check tails.
+
 ## 1. Design: how the return target is resolved
 
 - Source of truth: the Worker variable `KIERO_CALENDAR_APP_BASE_URL`
@@ -27,17 +35,24 @@ need the outside world are NOT RUN by design and named in section 4.
 - ONE resolver, no second copy: the R10 function `calendarAppReturnHref`
   (strict validation + normalization; see R10's
   `docs/evidence/integrations/calendar-return/README.md` section 1 for
-  the full rule list) is the single definition. The gateway route calls
-  it through a small adapter (`gatewayReturnHref` in routes.ts) that
-  maps the Worker's own binding names onto the resolver's input:
+  the full rule list) is the single definition. Its input is the named
+  contract `CalendarAppReturnEnv`, exported from the shared home the
+  way `answers.ts` exports `CallbackAnswer` (review finding 2): both
+  keys read `?: string | undefined` — honest under
+  exactOptionalPropertyTypes because the resolver treats absent,
+  undefined and empty identically, and the Convex side passes
+  `process.env` (an index-signature record). The gateway route calls
+  the resolver through a collapsed literal two-key mapping
+  (`gatewayReturnHref` in routes.ts):
   - the PWA origin passes through under the same deployment variable
     name (`KIERO_CALENDAR_APP_BASE_URL`);
   - the Worker's `ENVIRONMENT` label (the same closed
     dev/staging/alpha-production set the gateway telemetry surface
-    reads, absent ⇒ dev) stands in for the resolver's
-    `KIERO_ENVIRONMENT`, so the plain-http-only-in-dev rule keeps its
-    meaning on the Worker host (pinned by the "ENVIRONMENT label drives
-    the http rule" tests).
+    reads) stands in for the resolver's `KIERO_ENVIRONMENT`, so the
+    plain-http-only-in-dev rule keeps its meaning on the Worker host
+    (pinned by the "ENVIRONMENT label drives the http rule" tests).
+    Both values may be undefined; the resolver itself owns what absent
+    means — the adapter no longer re-implements its default.
 - Shared home (FLAGGED out-of-ownership edit, see section 5): the
   resolver moved verbatim from `convex/calendar/connection/http.ts`
   into the new PURE module `convex/calendar/connection/return.ts` (the
@@ -51,15 +66,28 @@ need the outside world are NOT RUN by design and named in section 4.
   `.d.ts` references) into the gateway's isolated
   `@cloudflare/workers-types` project, corrupting global `fetch`,
   `BufferSource` and `Crypto` resolution for unrelated gateway files.
-- Rendering: the gateway `polishStatusPage` now takes the resolved
-  `returnHref` and renders the SAME footer as the Convex page:
-  `<p><a href="{escaped target}">Wróć do Kiero</a></p>` through the
-  canonical `escapeHtml` (convex/operations/exports/protocol.ts, already
-  imported by the gateway's exports route), or, when the resolver
-  answers null, the honest Polish note `Powrót do Kiero jest
+- Rendering — ONE renderer, no second copy (review finding 1): after
+  the R12 footer change the gateway's `polishStatusPage` and the Convex
+  one were character-identical mirrors carrying product copy, so the
+  renderer moved into the new PURE module
+  `convex/calendar/connection/render.ts` (one concern per file beside
+  the resolver). Its only dependency is the canonical `escapeHtml`
+  from convex/operations/exports/protocol.ts — an import-free module,
+  safe for both isolated type graphs. `http.ts` imports it (the
+  function was module-private there, so no re-export is needed and the
+  public surface stays identical); routes.ts imports it from the pure
+  home. The footer is either
+  `<p><a href="{escaped target}">Wróć do Kiero</a></p>` or, when the
+  resolver answers null, the honest Polish note `Powrót do Kiero jest
   niedostępny. Otwórz aplikację bezpośrednio.` with NO anchor, never
   `href="/"`, never a guessed origin. Every typed page (success, each
   failure, the incomplete-link page) keeps its copy and status.
+  Precedent correction (from the PR-body record): the gateway's
+  exports route imports convex/sources/media_access/protocol, NOT
+  operations/exports/protocol — the calendar route (via the shared
+  renderer) is the gateway's first import of operations/exports/protocol,
+  and it typechecks cleanly in the isolated workers-types project
+  because that module pulls no type-graph baggage.
 - Env typing: `CalendarBridgeEnv` (apps/gateway/src/calendar-oauth/
   client.ts) gained `KIERO_CALENDAR_APP_BASE_URL?` and `ENVIRONMENT?`.
   The route reads the origin through the exported
@@ -137,6 +165,25 @@ skipped (2340)` tests; the R12 delta is exactly +1 file and +27 tests
 file / 5 skipped tests are the pre-existing skips on `main`, untouched
 by R12.
 
+Post-review re-run (all three advisory findings applied, uncommitted
+on top):
+
+```
+rtk npm run typecheck                                     # exit 0 (root + container + workspaces)
+rtk npx vitest run tests/g1
+  # Test Files  8 passed (8)
+  #      Tests  125 passed (125)
+rtk npm test                                              # exit 0
+  # Test Files  172 passed | 1 skipped (173)
+  #      Tests  2362 passed | 5 skipped (2367)
+```
+
+Identical totals to the pre-review run: the renderer hoist, the named
+contract type and the comment fix are behavior-preserving refactors
+(R10's 26 tests still import from `http.ts` and pass through the
+import/re-export; the 27 gateway tests assert the same exact HTML
+through the now-shared renderer).
+
 ### Failed attempts (preserved)
 
 1. The first implementation imported `calendarAppReturnHref` directly
@@ -186,19 +233,25 @@ by R12.
 ## 5. Out-of-ownership edits and observations (flagged, not silently done)
 
 - FLAGGED EDIT: `convex/calendar/connection/http.ts` (R10's merged lane,
-  outside R12's listed ownership) was touched ONCE, mechanically: the
-  resolver block moved verbatim into the new pure module
-  `convex/calendar/connection/return.ts`; `http.ts` imports it and
-  re-exports `CALENDAR_APP_BASE_URL_ENV` and `calendarAppReturnHref`,
-  keeping the module's public surface identical (R10's
-  `tests/g1/callback-return.test.ts` imports these names from `http.ts`
-  and passes unchanged). The issue text itself sanctions the hoist
-  ("hoist the resolver to a shared neutral home … never duplicate a
-  second copy"); the coordinator note preferring the direct import
+  outside R12's listed ownership) was touched ONCE in the initial R12
+  pass, mechanically: the resolver block moved verbatim into the new
+  pure module `convex/calendar/connection/return.ts`; `http.ts` imports
+  it and re-exports `CALENDAR_APP_BASE_URL_ENV` and
+  `calendarAppReturnHref`, keeping the module's public surface identical
+  (R10's `tests/g1/callback-return.test.ts` imports these names from
+  `http.ts` and passes unchanged). The issue text itself sanctions the
+  hoist ("hoist the resolver to a shared neutral home … never duplicate
+  a second copy"); the coordinator note preferring the direct import
   assumed it was the minimal-risk path, which the typecheck evidence in
-  section 3 disproves. This edit needs the coordinator's/review's
-  explicit acknowledgment, and R10's owner should be notified of the
-  new shared home.
+  section 3 disproves. The PR #184 advisory review then confirmed the
+  shared-home direction and the coordinator's PR-thread ruling
+  explicitly ordered the renderer hoist, so a second mechanical edit to
+  the same file followed: `polishStatusPage` moved verbatim into the
+  new pure module `convex/calendar/connection/render.ts` (module-private
+  in `http.ts`, hence imported there with no re-export needed; the
+  escapeHtml import moved with it). Both edits are covered by the
+  coordinator's ruling; R10's owner should be notified of the two new
+  shared homes (`return.ts`, `render.ts`).
 - `convex/calendar/connection/operations.ts` still keeps an
   "Environment names consumed here" header inventory that does not
   mention `KIERO_CALENDAR_APP_BASE_URL` (same observation R10 recorded;
