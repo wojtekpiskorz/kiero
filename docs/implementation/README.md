@@ -21,7 +21,7 @@ The [2026-09-14 VPS resumption record](vps-resumption-2026-09-14.md) supersedes 
 
 ## Next implementation work
 
-M2 #166 reconciles the new prerequisite graph. After it integrates and closes, R8 #167, R11 #169 and R10 #171 are the expected independent ready lanes. R8 precedes R9 #168 because they share release files; R11 precedes E8 #170 because they share dependencies. I8 waits for R9 and E8. J6 also waits for R10. Recheck native blockers and active ownership before dispatch.
+M2 #166 and its review follow-up M3 #175 are closed. R8 #167, R11 #169 and R10 #171 are the current independent ready lanes. R8 precedes R9 #168 because they share release files; R11 precedes E8 #170 because they share dependencies. I8 waits for R9 and E8. J6 also waits for R10. Recheck native blockers and active ownership before dispatch.
 
 R1-R3 repair clarification provenance, purge and push delivery; R2 and R3 are closed with their evidence. R4 protects source reassignment against stale editors. R5 fixes old-source links and is closed with its live-leg evidence. R6 replaces the broken/placeholder release path with executable tooling. R7 removes the known Calendar test timing flake while preserving timeout assertions.
 
