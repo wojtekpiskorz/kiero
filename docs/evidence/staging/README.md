@@ -5,7 +5,7 @@ The named EU staging deployment, GitHub staging environment, release credential,
 session-signing keys and EU R2 buckets now exist. The owner selected Workers
 Static Assets for the web host, direct DeepSeek API for chat/vision, and retained
 OpenRouter for transcription and embeddings; Google, Resend, DeepSeek and
-OpenRouter configuration names are present in both server stores. The full staging release completed 2026-09-15 (run 34953365470); provider qualification (B5/D7/I11 lanes) remains outstanding. The sections below preserve
+OpenRouter configuration names are present in both server stores. The full staging release completed 2026-09-15 (all components live since run 34966103795 with runtime secrets injected); the ordinary smoke's unauthenticated legs passed 2026-09-15 (PWA/SW, provider availability, a real Resend send, the Google OAuth redirect, the client-asset leak scan) and the authenticated leg waits on the owner's tester login (see the smoke section of the checkpoint). Provider qualification (B5/D7/I11 lanes) remains outstanding. The sections below preserve
 the 2026-09-12 baseline; use the current checkpoint for discharged actions and
 corrected CLI procedures.
 

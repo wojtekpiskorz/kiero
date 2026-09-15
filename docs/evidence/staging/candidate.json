@@ -586,5 +586,26 @@
       "note": "Owner creates the account, dataset and ingest token; ingested through the unblock wizard."
     }
   },
-  "webOriginStatus": "deployed 2026-09-15 (release run 34953365470); live verification: SPA fallback routes and /sw.js served as themselves"
+  "webOriginStatus": "deployed 2026-09-15 (release run 34953365470); live verification: SPA fallback routes and /sw.js served as themselves",
+  "authenticatedSmoke": {
+    "executedAt": "2026-09-15",
+    "environment": "live stack of release run 34966103795; real Chromium (playwright-core 1.63.0, chromium-1234) from the VPS, locale pl-PL, no fixture flags on the deployment",
+    "legs": {
+      "pwaShellRender": "PASS (title Kiero, 15 navigation entries, backend connected a3.0, zero console errors)",
+      "serviceWorker": "PASS (registered at the web origin)",
+      "providerAvailability": "PASS (emailCode true, google true; Google button rendered)",
+      "resendSend": "PASS (ordinary email-code request for wojtek@honestly.design answered: code sent, valid 15 minutes; fail-closed design means a provider rejection would surface as an error)",
+      "googleOauthRedirect": "PASS (accounts.google.com sign-in for fiery-raven-417.eu-west-1.convex.site with the pinned redirect_uri /api/auth/callback/google and client 932692636558-…)",
+      "googleLoginCompletion": "BLOCKED (owner credential step; persistent-profile Chromium staged on the VPS desktop via noVNC)",
+      "authenticatedAiCall": "BLOCKED (same owner step; then enterGmMode + one agent answer through the live providers)",
+      "clientAssetLeakScan": "PASS (no secret names or credential shapes in the deployed bundle; benign 40-char matches identified; only the Convex URL and gateway origin baked in)"
+    },
+    "newObservation": "PWA update handshake (apps/web/src/pwa/update/handshake.ts) fetches <convex-site>/platform/health cross-origin; the Convex route emits no CORS headers, so the major-version gate is inert in the deployed topology (honest unavailable degradation). Recorded follow-up for J4/J6; not an I8 closure blocker.",
+    "blockedCase": {
+      "case": "Google login completion + GM initialization (enterGmMode for the allow-listed GM) + authenticated AI call",
+      "responsible": "owner",
+      "nextAction": "complete the Google tester sign-in in the prepared browser (noVNC desktop, profile /tmp/kiero-smoke/profile) or relay a fresh email-code OTP; the coordinator then finishes the authenticated leg",
+      "resumptionTrigger": "login observed in the profile or OTP relayed"
+    }
+  }
 }
