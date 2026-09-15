@@ -7,11 +7,11 @@ Static Assets for the web host, direct DeepSeek API for chat/vision, and retaine
 OpenRouter for transcription and embeddings; Google, Resend, DeepSeek and
 OpenRouter configuration names are present in both server stores. The full
 staging release completed 2026-09-15 (all components live since run
-34966103795 with runtime secrets injected). The ordinary smoke's
-unauthenticated legs passed the same day (PWA/SW, provider availability,
-a real Resend send, the Google OAuth redirect, the client-asset leak
-scan); the authenticated leg waits on the owner's tester login (see the
-smoke section of the checkpoint). Provider qualification (B5/D7/I11
+34966103795; R18's repair rides run 35006642126). The ordinary
+authenticated smoke PASSED end to end the same day through the
+API-mailbox funnel (delivered-OTP sign-in, company creation, one
+message, one live agent answer, the audited GM initialization; see the
+smoke sections of the checkpoint). Provider qualification (B5/D7/I11
 lanes) remains outstanding. The sections below preserve
 the 2026-09-12 baseline; use the current checkpoint for discharged actions and
 corrected CLI procedures.

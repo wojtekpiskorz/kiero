@@ -588,26 +588,32 @@
   },
   "webOriginStatus": "deployed 2026-09-15 (release run 34953365470); live verification: SPA fallback routes and /sw.js served as themselves",
   "authenticatedSmoke": {
-    "executedAt": "2026-09-15",
-    "environment": "live stack of release run 34966103795; real Chromium (playwright-core 1.63.0, chromium-1234) from the VPS, locale pl-PL, no fixture flags on the deployment",
+    "executedAt": "2026-09-15 (completed through the API-mailbox funnel; unauthenticated legs earlier the same day)",
+    "environment": "live stack of release run 35006642126 (main 8c824d5, carrying R18); real Chromium (playwright-core 1.63.0) from the VPS, locale pl-PL, no fixture flags on the deployment",
+    "funnel": {
+      "ownerApproval": "option A chosen by the owner 2026-09-15",
+      "tooling": "tools/smoke/mailbox.mjs (mail.tm throwaway mailboxes, fresh address per run: the issuance limiter is per address; credentials random, never secrets) + tools/smoke/auth-smoke.mjs (four-stage driver); committed as R18 #213 (PR #214)",
+      "foundDefect": "the funnel first signed-in walk exposed nine host gates crashing with React #310 (bare-component continuations); R18 fixed the nine call sites and armored the shared gate (ContinuationMount)"
+    },
     "legs": {
       "pwaShellRender": "PASS (title Kiero, 15 navigation entries, backend connected a3.0, zero console errors)",
       "serviceWorker": "PASS (registered at the web origin)",
       "providerAvailability": "PASS (emailCode true, google true; Google button rendered)",
-      "resendSend": "PASS (ordinary email-code request for wojtek@honestly.design answered: code sent, valid 15 minutes; fail-closed design means a provider rejection would surface as an error)",
+      "resendSend": "PASS, upgraded to delivered-end-to-end: the OTP physically arrived in a real mailbox (mail.tm) and was consumed by the app (staging-run1; the code value stays redacted)",
       "googleOauthRedirect": "PASS (accounts.google.com sign-in for fiery-raven-417.eu-west-1.convex.site with the pinned redirect_uri /api/auth/callback/google and client 932692636558-…)",
-      "googleLoginCompletion": "BLOCKED (owner credential step; persistent-profile Chromium staged on the VPS desktop via noVNC)",
-      "authenticatedAiCall": "BLOCKED (same owner step; then enterGmMode + one agent answer through the live providers)",
+      "authenticatedSignin": "PASS (ordinary email-code flow; driver stage 1)",
+      "companyCreation": "PASS (/firma, first administrator; driver stage 2)",
+      "sourceMessage": "PASS (message in the feed; driver stage 3)",
+      "agentAnswer": "PASS (substantive Polish answer with evidence bases (ev1), honest unknowns, ustalenie recorded in project memory; the DeepSeek loop through the live providers; driver stage 4, zero page errors)",
+      "gmInitialization": "PASS (KIERO_GM_EMAILS temporarily widened to owner+run address; TRYB GM AKTYWNY with the audited reason and the honest no-membership note; allow-list restored to the owner address alone)",
       "clientAssetLeakScan": "PASS (no secret names or credential shapes in the deployed bundle; benign 40-char matches identified; only the Convex URL and gateway origin baked in)"
     },
     "newObservation": "PWA update handshake (apps/web/src/pwa/update/handshake.ts) fetches <convex-site>/platform/health cross-origin; the Convex route emits no CORS headers, so the major-version gate is inert in the deployed topology (honest unavailable degradation). Recorded follow-up for J4/J6; not an I8 closure blocker.",
-    "blockedCase": {
-      "case": "Google login completion + GM initialization (enterGmMode for the allow-listed GM) + authenticated AI call",
-      "responsible": "owner",
-      "nextAction": "complete the Google tester sign-in in the prepared browser (noVNC desktop, profile /tmp/kiero-smoke/profile) or relay a fresh email-code OTP; the coordinator then finishes the authenticated leg",
-      "resumptionTrigger": "login observed in the profile or OTP relayed"
-    },
-    "postReviewCorrection": "The evidence PR advisory review corrected the executor URL record twice (see executorUrlAssignments in this file for the canonical telling): round 1 moved the images name off the media worker to the gateway; round 2 verified the consumer fetches verbatim and the live value gained /images/normalize. The same review found the export consumers disagree about the variable shape; that code conflict is owned by R17 #209."
+    "blockedCase": null,
+    "remaining": [
+      "The owner's own GM grant for wojtek@honestly.design is their one-click first login (the staged noVNC browser stays available); the staging GM machinery is proven by the audited smoke-address grant.",
+      "Full Google identity qualification belongs to B5; full media/backup/export behavior to D7/I10/I9."
+    ]
   },
   "executorUrlAssignments": {
     "setOn": "2026-09-15",
