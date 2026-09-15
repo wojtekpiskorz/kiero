@@ -281,6 +281,16 @@ export function validateTargetDescriptor(value) {
           if (entry.deferred !== undefined && typeof entry.deferred !== "boolean") {
             violations.push(`${where} runtimeSecrets deferred must be a boolean when present`);
           }
+          // R19: an optional `format` composes the injected value from the
+          // source (exactly one `{}` placeholder); the EU R2 endpoints are
+          // URLs built from the nonsecret account id, never committed whole.
+          if (entry.format !== undefined) {
+            if (typeof entry.format !== "string" || !entry.format.includes("{}")) {
+              violations.push(`${where} runtimeSecrets format must contain the {} placeholder`);
+            } else if (entry.format.indexOf("{}") !== entry.format.lastIndexOf("{}")) {
+              violations.push(`${where} runtimeSecrets format must contain exactly one {} placeholder`);
+            }
+          }
         }
       }
     }
