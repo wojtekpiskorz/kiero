@@ -626,7 +626,7 @@
       },
       "KIERO_EXPORT_EXECUTOR_URL": {
         "value": "https://kiero-staging-export-worker.wojtek-524.workers.dev",
-        "shape": "bare origin (BOTH consumers append their route through the shared exportExecutorUrl helper since R17 #210: build appends /exports/build, cleanup consumes EXPORT_CLEANUP_ROUTE)",
+        "shape": "bare origin (BOTH consumers append their route through the shared exportExecutorUrl helper since R17 #209 (PR #210): build appends /exports/build, cleanup consumes EXPORT_CLEANUP_ROUTE)",
         "status": "settled: R17 merged (PR #210, 2026-09-15); D7/I9 verify loudly at their first real runs"
       },
       "KIERO_BACKUP_WORKER_URL": {

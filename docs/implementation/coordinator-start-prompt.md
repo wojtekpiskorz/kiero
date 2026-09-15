@@ -95,7 +95,7 @@ Open positions to watch:
   POST /images/normalize) and the live value was corrected to the
   gateway on 2026-09-15 (candidate.json executorUrlAssignments). D7
   still verifies loudly at the first real normalize run. The export
-  name's consumer conflict is repaired (R17 #210: both sites derive
+  name's consumer conflict is repaired (R17 #209, PR #210: both sites derive
   their route from the bare origin through the shared helper); D7/I9
   verify loudly at their first real runs.
 - J4: physical iPhone+Android devices and VAPID at runtime are real
