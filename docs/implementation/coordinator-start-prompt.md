@@ -28,13 +28,13 @@ Start with:
 
 Baseline at the 2026-09-15 post-smoke handoff (verify, do not assume):
 
-- Main `13e26d4` plus the merged I8 evidence PR (smoke record +
-  owner-credential BLOCK). Audit remote PASS: 91 map entries after the M9-R18-M11
-  registrations, 210 core edges, 79 closed (I8 included),
-  12 open: I6 #58, J3 #62, J4 #63, J5 #64, I8 #133, B5 #134, D7 #135,
-  I9 #136, I10 #137, I11 #138, J6 #139, C6 #197. R17 #209 (the export
-  executor URL convention repair found by the #206 review) closed
-  through PR #210 and the M10 flip. One PR may be open for
+- Main is the post-M11 cache-flip merge. Audit remote PASS: 91 map
+  entries after the M9-R18-M11 registrations, 210 core edges, 80
+  closed (I8 and M11 included), 11 open: I6 #58, J3 #62, J4 #63,
+  J5 #64, B5 #134, D7 #135, I9 #136, I10 #137, I11 #138, J6 #139,
+  C6 #197. R17 #209 closed through PR #210 and the M10 flip; R18 #213
+  closed through PR #214; I8 #133 closed through PRs #204, #205, #206
+  and #215 with the M11 flip. One PR may be open for
   I8's evidence if the Actions outage delayed its merge.
 - The whole staging stack is LIVE end-to-end: web PWA (SPA fallback,
   sw.js) on kiero-staging-web.wojtek-524.workers.dev, gateway with a
