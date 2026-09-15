@@ -22,7 +22,7 @@ Start with:
 2. docs/implementation/README.md.
 3. This file (process rules) and docs/implementation/execution-charter.md.
 4. The newest checkpoint on #15 (the 2026-09-15 addenda: main session,
-   Calendar deferral, and the unblocking session — full staging stack
+   Calendar deferral, and the unblocking session: the full staging stack
    LIVE).
 5. `rtk proxy node docs/implementation/audit-map.mjs --remote`
 
@@ -49,14 +49,14 @@ Baseline at the 2026-09-15 post-smoke handoff (verify, do not assume):
   client-asset secret-leak scan. Record: docs/evidence/staging/
   (vps-2026-09-14.md smoke section, candidate.json authenticatedSmoke).
 
-First action — the OWNER STEP that gates everything: I8 #133 stays OPEN
+First action, the OWNER STEP that gates everything: I8 #133 stays OPEN
 on the authenticated smoke leg. Complete the tester Google login (the
 allow-listed GM is wojtek@honestly.design): a persistent-profile
 Chromium is staged at the sign-in card on the VPS desktop (Xvfb :99 via
 noVNC, profile /tmp/kiero-smoke/profile; relaunch with
 /tmp/kiero-smoke/launch-owner-browser.sh if the desktop restarted), or
 relay a fresh email-code OTP from the owner mailbox. With the session
-in the profile, finish the smoke: enterGmMode (the audited GM grant —
+in the profile, finish the smoke: enterGmMode (the audited GM grant , 
 the staging initialization), an ordinary invite/notification send, and
 one agent answer through the live providers. Then assess I8 for
 closure per its own criteria (its release/isolation/configuration scope
@@ -67,7 +67,7 @@ reservations of tenants, accounts, buckets and notification
 destinations before any live evidence), then I9/I10 → I6 → J6 →
 J3/J4 → J5 → C6. Qualify strictly by native blocked_by.
 
-Owner decisions — do NOT re-ask:
+Owner decisions, do not re-ask:
 
 - Chat/vision fallback: OpenRouter (glm-5.3-flash → gemini-3.8-flash),
   recorded on #170; STT/embeddings OpenRouter; chat/vision DeepSeek
@@ -81,32 +81,35 @@ Owner decisions — do NOT re-ask:
 - VPS: Convex/Wrangler CLIs are logged in; do NOT repeat provisioning
   (fiery-raven-417, R2 buckets, the GitHub staging environment, all
   STAGING_* secrets exist; the only deferred secret is
-  STAGING_CONVEX_BACKUP_ADMIN_KEY — I10's decision).
+  STAGING_CONVEX_BACKUP_ADMIN_KEY. I10's decision).
 
 Open positions to watch:
 
-- CONVEX_BACKUP_ADMIN_KEY (I10, deferred in the descriptor — keep the
+- CONVEX_BACKUP_ADMIN_KEY (I10, deferred in the descriptor; keep the
   flag).
-- Executor URL assignments (images→media-worker, purge→gateway) were
-  assumed from route ownership; D7 verifies them at the first real run
-  — fix loudly, never silently.
+- Executor URL assignments: the images name initially pointed at the
+  media worker on a route-ownership assumption; the #206 advisory
+  review caught it against the code (the gateway owns
+  POST /images/normalize) and the live value was corrected to the
+  gateway on 2026-09-15 (candidate.json executorUrlAssignments). D7
+  still verifies loudly at the first real normalize run.
 - J4: physical iPhone+Android devices and VAPID at runtime are real
   resources.
-- Alpha-production policy (reviewer/branch policy) — decide at J5.
+- Alpha-production policy (reviewer/branch policy): decide at J5.
 - Cache-flip pattern: closures need a bounded M-issue (M2-M9 precedent);
   tests/m1 fixtures pin the graph counts (87 entries / 203 edges after
   M9).
 - The PWA update handshake (client fetch of the Convex .site
-  /platform/health) is CORS-blocked in the deployed topology — honest
-  "unavailable" degradation, recorded as a J4/J6 follow-up, not an I8
+  /platform/health) is CORS-blocked in the deployed topology (an honest
+  "unavailable" degradation), recorded as a J4/J6 follow-up, not an I8
   blocker.
 
 Operational rules (expensive lessons from prior sessions):
 
 - Exact-SHA Checks gate: wait for completed/success on main's SHA
   BEFORE dispatching Release, or the run is refused.
-- No "echo" string in release.yml (R6 guard) — use printf.
-- After a squash-merge the branch conflicts — rebase or move the diff
+- No "echo" string in release.yml (R6 guard); use printf.
+- After a squash-merge the branch conflicts; rebase or move the diff
   onto fresh main.
 - Issue bodies are hashed in the manifest: a live edit = re-cache in
   the same admin PR (raw JSON, no jq string pass-through: extra \n).
@@ -119,7 +122,7 @@ Operational rules (expensive lessons from prior sessions):
   created no workflow runs while the API worked); if Checks refuse to
   start, verify with `gh api repos/…/actions/runs?head_sha=<sha>`,
   retrigger (synchronize push, PR close/reopen), and only merge once
-  the deterministic Checks actually ran — never without them.
+  the deterministic Checks actually ran, never without them.
 
 Read secrets only as names/presence. One task = one worktree and one
 PR. Serialize shared files, staging changes and integrations. Continue

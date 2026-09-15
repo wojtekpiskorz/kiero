@@ -6,7 +6,11 @@ The target remains a complete accepted core behind an unstyled Polish PWA. Final
 
 Start with the [live implementation map](https://github.com/wojtekpiskorz/kiero/issues/15) and [coordinator prompt](coordinator-start-prompt.md). Before selecting work, run `rtk proxy node docs/implementation/audit-map.mjs --remote` from a clean, current checkout. GitHub native blockers are readiness authority; this committed inventory is a dated cache.
 
-The [2026-09-14 VPS resumption record](vps-resumption-2026-09-14.md) supersedes older cloud-setup and provider assumptions. Staging resources and provider configuration names exist; application release and real-service qualification are still outstanding.
+The [2026-09-14 VPS resumption record](vps-resumption-2026-09-14.md) is
+historical: it superseded the older cloud-setup assumptions, and the
+2026-09-15 unblocking session then discharged the credential blockers and
+released the full staging stack. Application release is no longer
+outstanding; real-service qualification (B5/D7/I11 onward) is.
 
 ## Read for the selected task
 
@@ -21,7 +25,7 @@ The [2026-09-14 VPS resumption record](vps-resumption-2026-09-14.md) supersedes 
 
 ## Next implementation work
 
-M2 #166 through M8 #202 and M9 #207, R8 #167, R9 #168, R10 #171, R11 #169, R12 #181, R13 #182, E8 #170, R14 #187 and R15 #192 are closed with their PRs. **The Google Calendar integration is deferred beyond v1** (M7 #199 ADR): R16 #198 withholds the Calendar entry from the v1 composition, and C6 #197 owns the post-core release behind J5; the nine UX-CAL rows carry both owners as a visible deferral. The full staging stack is live (release run 34966103795 with runtime secrets); I8 #133 stays open only on its authenticated smoke leg — the owner's tester Google login is the single gating step, then B5, D7 and I11 follow in parallel with separate resource reservations. J6's open blockers are D7 and B5. Recheck native blockers and active ownership before dispatch.
+M2 #166 through M8 #202 and M9 #207, R8 #167, R9 #168, R10 #171, R11 #169, R12 #181, R13 #182, E8 #170, R14 #187 and R15 #192 are closed with their PRs. **The Google Calendar integration is deferred beyond v1** (M7 #199 ADR): R16 #198 withholds the Calendar entry from the v1 composition, and C6 #197 owns the post-core release behind J5; the nine UX-CAL rows carry both owners as a visible deferral. The full staging stack is live (release run 34966103795 with runtime secrets); I8 #133 stays open only on its authenticated smoke leg. the owner's tester Google login is the single gating step, then B5, D7 and I11 follow in parallel with separate resource reservations. J6's open blockers are D7 and B5. Recheck native blockers and active ownership before dispatch.
 
 R1-R3 repair clarification provenance, purge and push delivery; R2 and R3 are closed with their evidence. R4 protects source reassignment against stale editors. R5 fixes old-source links and is closed with its live-leg evidence. R6 replaces the broken/placeholder release path with executable tooling. R7 removes the known Calendar test timing flake while preserving timeout assertions.
 
