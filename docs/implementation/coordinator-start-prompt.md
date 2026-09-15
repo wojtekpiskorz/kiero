@@ -3,8 +3,8 @@
 Use this prompt for the remaining core implementation map. It grants the
 coordinator the Git lifecycle for the assigned map; implementation workers
 own only their bounded issue slice. This revision supersedes the
-2026-09-14 VPS-resumption wording: the staging stack is live and the map
-funnels through one owner step.
+2026-09-14 VPS-resumption wording: the staging stack is live and the ready
+frontier is B5/D7/I11 in parallel.
 
 ---
 
@@ -28,14 +28,13 @@ Start with:
 
 Baseline at the 2026-09-15 post-smoke handoff (verify, do not assume):
 
-- Main `13e26d4` plus the merged I8 evidence PR (smoke record +
-  owner-credential BLOCK). Audit remote PASS: 89 map entries after the M9, R17 and M10
-  registrations, 206 core edges, 77 closed (M9, R17 and M10 included),
-  12 open: I6 #58, J3 #62, J4 #63, J5 #64, I8 #133, B5 #134, D7 #135,
-  I9 #136, I10 #137, I11 #138, J6 #139, C6 #197. R17 #209 (the export
-  executor URL convention repair found by the #206 review) closed
-  through PR #210 and the M10 flip. One PR may be open for
-  I8's evidence if the Actions outage delayed its merge.
+- Main is the post-M11 cache-flip merge. Audit remote PASS: 91 map
+  entries after the M9-R18-M11 registrations, 210 core edges, 80
+  closed (I8 and M11 included), 11 open: I6 #58, J3 #62, J4 #63,
+  J5 #64, B5 #134, D7 #135, I9 #136, I10 #137, I11 #138, J6 #139,
+  C6 #197. R17 #209 closed through PR #210 and the M10 flip; R18 #213
+  closed through PR #214; I8 #133 closed through PRs #204, #205, #206
+  and #215 with the M11 flip.
 - The whole staging stack is LIVE end-to-end: web PWA (SPA fallback,
   sw.js) on kiero-staging-web.wojtek-524.workers.dev, gateway with a
   working bridge (/platform/health → backendReachable: true, 15 durable
@@ -43,31 +42,30 @@ Baseline at the 2026-09-15 post-smoke handoff (verify, do not assume):
   workers with runtime credentials. Release run 34966103795 + the
   descriptor-driven runtimeSecrets injector
   (infra/release/inject-worker-secrets.mjs).
-- The ordinary smoke's unauthenticated legs PASSED (real Chromium from
-  the VPS): PWA shell + service worker, provider availability
-  (emailCode + google), a real Resend send through the ordinary
-  email-code flow, the Google OAuth redirect (accounts.google.com
-  accepted the pinned client and /api/auth/callback/google), and the
-  client-asset secret-leak scan. Record: docs/evidence/staging/
-  (vps-2026-09-14.md smoke section, candidate.json authenticatedSmoke).
+- The ordinary authenticated smoke PASSED end to end through the
+  API-mailbox funnel (R18's committed tooling: tools/smoke/mailbox.mjs
+  throwaway mailboxes plus tools/smoke/auth-smoke.mjs, the four-stage
+  driver): delivered-OTP sign-in, company creation on /firma, one
+  source message, one live agent answer with evidence bases, and the
+  audited GM initialization (allow-list widened for the run, then
+  restored to the owner address alone). The unauthenticated legs
+  (PWA/SW, provider availability, the Google OAuth redirect, the leak
+  scan) passed earlier the same day. Record: docs/evidence/staging/
+  (vps-2026-09-14.md smoke sections, candidate.json authenticatedSmoke).
 
-First action, the OWNER STEP that gates everything: I8 #133 stays OPEN
-on the authenticated smoke leg. Complete the tester Google login (the
-allow-listed GM is wojtek@honestly.design): a persistent-profile
-Chromium is staged at the sign-in card on the VPS desktop (Xvfb :99 via
-noVNC, profile /tmp/kiero-smoke/profile; relaunch with
-/tmp/kiero-smoke/launch-owner-browser.sh if the desktop restarted), or
-relay a fresh email-code OTP from the owner mailbox. With the session
-in the profile, finish the smoke: enterGmMode (the audited GM grant,
-the staging initialization), an ordinary invite/notification send, and
-one agent answer through the live providers. Then assess I8 for
-closure per its own criteria (its release/isolation/configuration scope
-is complete).
+First action: the authenticated funnel is FULLY AUTOMATED (the owner
+approved option A on 2026-09-15). Run `node tools/smoke/auth-smoke.mjs
+--web <origin> --out <dir>` for the four-stage ordinary walk (fresh
+throwaway mailbox per run; the issuance limiter is per address). I8's
+smoke is complete and closed; the owner's own GM grant for
+wojtek@honestly.design remains their one-click first login (the staged
+noVNC browser stays, profile /tmp/kiero-smoke/profile).
 
-After I8 closes: B5 #134 / D7 #135 / I11 #138 in parallel (separate
+The ready frontier: B5 #134 / D7 #135 / I11 #138 in parallel (separate
 reservations of tenants, accounts, buckets and notification
-destinations before any live evidence), then I9/I10 → I6 → J6 →
-J3/J4 → J5 → C6. Qualify strictly by native blocked_by.
+destinations before any live evidence; the funnel serves their
+sessions), then I9/I10 → I6 → J6 → J3/J4 → J5 → C6. Qualify strictly
+by native blocked_by.
 
 Owner decisions, do not re-ask:
 
@@ -101,9 +99,9 @@ Open positions to watch:
 - J4: physical iPhone+Android devices and VAPID at runtime are real
   resources.
 - Alpha-production policy (reviewer/branch policy): decide at J5.
-- Cache-flip pattern: closures need a bounded M-issue (M2-M10 precedent);
-  tests/m1 fixtures pin the graph counts (89 entries / 206 edges after
-  M9 + R17 + M10).
+- Cache-flip pattern: closures need a bounded M-issue (M2-M11 precedent);
+  tests/m1 fixtures pin the graph counts (91 entries / 210 edges after
+  M9 + R17 + R18 + M11).
 - The PWA update handshake (client fetch of the Convex .site
   /platform/health) is CORS-blocked in the deployed topology (an honest
   "unavailable" degradation), recorded as a J4/J6 follow-up, not an I8

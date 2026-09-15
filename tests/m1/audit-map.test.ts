@@ -87,8 +87,8 @@ describe("M1 audit: derived map table content", () => {
     expect(run.status).toBe(0);
     expect(run.report.result).toBe("PASS");
     expect(run.report.errors).toEqual([]);
-    expect(run.report.entries).toBe(90);
-    expect(run.report.coreEdges).toBe(208);
+    expect(run.report.entries).toBe(91);
+    expect(run.report.coreEdges).toBe(210);
     expect(run.report.uxRows).toBe(61);
   });
 
@@ -121,13 +121,13 @@ describe("M1 audit: derived map table content", () => {
           file: "dependency-graph.md",
           mutate: content =>
             content.replace(
-              "| [I8 #133](https://github.com/wojtekpiskorz/kiero/issues/133) | OPEN |",
-              "| [I8 #133](https://github.com/wojtekpiskorz/kiero/issues/133) | CLOSED |",
+              "| [B5 #134](https://github.com/wojtekpiskorz/kiero/issues/134) | OPEN |",
+              "| [B5 #134](https://github.com/wojtekpiskorz/kiero/issues/134) | CLOSED |",
             ),
         },
       ],
     });
-    expectFail(run, "I8: graph table state CLOSED differs from cached OPEN");
+    expectFail(run, "B5: graph table state CLOSED differs from cached OPEN");
   });
 
   it("fails on a stale integrated-table remaining owner (M1-P1)", () => {
@@ -151,7 +151,7 @@ describe("M1 audit: derived map table content", () => {
       tables: [
         {
           file: "dependency-graph.md",
-          mutate: content => content.replace('  I8["I8 #133"]\n', '  I8["I8 #133"]\n  R5["R5 #130"]\n'),
+          mutate: content => content.replace('  B5["B5 #134"]\n', '  B5["B5 #134"]\n  R5["R5 #130"]\n'),
         },
       ],
     });
