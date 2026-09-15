@@ -1,5 +1,39 @@
 # Staging qualification environment evidence (I8 #133)
 
+Current provisioning is recorded in [the 2026-09-14 VPS checkpoint](vps-2026-09-14.md).
+The named EU staging deployment, GitHub staging environment, release credential,
+session-signing keys and EU R2 buckets now exist. The owner selected Workers
+Static Assets for the web host, direct DeepSeek API for chat/vision, and retained
+OpenRouter for transcription and embeddings; Google, Resend, DeepSeek and
+OpenRouter configuration names are present in both server stores. The full staging release completed 2026-09-15 (run 34953365470); provider qualification (B5/D7/I11 lanes) remains outstanding. The sections below preserve
+the 2026-09-12 baseline; use the current checkpoint for discharged actions and
+corrected CLI procedures.
+
+Resumption update (2026-09-14, later session): the FIRST REAL STAGING RELEASE
+was dispatched through the actual Release workflow — run 34874172423 on main
+`3cf9f6e`. Every gate passed (rehearsal, verify-target, exact-SHA Checks) and
+the run then refused everything honestly: the five wrangler components blocked
+`missing-configuration` on the owner-PENDING `STAGING_CLOUDFLARE_*` secrets,
+and `convex-functions` blocked `target-verification-failed` on a newly found
+R9 parser defect (non-TTY CI spinner line false-mismatches the URL of the
+CORRECT pinned target; zero mutations ran — `function-spec` shows
+`functions: []`). The `STAGING_GATEWAY_URL` variable was provisioned and the
+VAPID name trio injected into both stores. Full record: the resumption
+section of [vps-2026-09-14.md](vps-2026-09-14.md) and `releaseAttempts` in
+[candidate.json](candidate.json). No successful application release exists
+yet; the two exact resumption triggers are the owner Cloudflare deploy
+credentials and the R9 parser repair.
+
+Follow-up update (2026-09-14 evening): R15 #194 repaired the parser defect,
+and the SECOND release run (34880906636, main `5780d80`) DEPLOYED the Convex
+functions to `fiery-raven-417` through the checked, identity-pinned pipeline
+(digest `ff07541bdb67…`, 301 files; `function-spec` went from 0 to 644
+functions; the public OIDC discovery and JWKS endpoints and the query API
+answer HTTPS — see the follow-up section of the checkpoint). The five
+wrangler components still block honestly on the owner-PENDING Cloudflare
+credentials, which remain the single resumption trigger for the web/gateway
+half of the release and the authenticated user-path smoke.
+
 Status date: 2026-09-12. Worktree branch `codex/kiero-i8` from `main` at
 `1ffb4dbc3966024270987da22893fb24f02b4df3`. The machine-readable candidate
 manifest is [candidate.json](candidate.json); the living contract for
@@ -193,3 +227,16 @@ value found in client assets is a FAIL.
 No quota workaround was attempted or proposed; no Convex project was
 created; no production activation occurred; no secret value was written to
 any file, command or log in this work.
+
+## Full release update (2026-09-15)
+
+The unblocking session discharged the owner-side credentials (Cloudflare
+CI deploy token, account ID, three bucket-scoped R2 pairs, Axiom token
+and dataset; GM and alert identities decided). Release run 34953365470
+on main c9698bc completed: rehearsal PASS, staging deploy SUCCESS, every
+component deployed. Live verification: the web origin serves the PWA
+(SPA fallback, /sw.js), the gateway answers /platform/health with status
+ok (the backend bridge flips to reachable once the next release ships
+this branch's CONVEX_SITE_URL fill), and the Convex function list stays
+non-empty. I8 closes after the post-merge release verifies the bridge
+and the smoke record lands.

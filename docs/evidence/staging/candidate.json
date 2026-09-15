@@ -13,8 +13,11 @@
   "environment": {
     "label": "staging",
     "githubEnvironment": "staging",
-    "runtimeLabels": ["ENVIRONMENT=staging", "KIERO_ENVIRONMENT=staging"],
-    "webOrigin": "https://kiero-staging-web.pages.dev"
+    "runtimeLabels": [
+      "ENVIRONMENT=staging",
+      "KIERO_ENVIRONMENT=staging"
+    ],
+    "webOrigin": "https://kiero-staging-web.wojtek-524.workers.dev"
   },
   "convex": {
     "team": "wojtek-piskorz-jr",
@@ -25,63 +28,460 @@
     "deploymentType": "prod",
     "region": "eu",
     "isDefault": false,
-    "deploymentSlug": "PENDING creation (record here when provisioned)",
-    "deploymentUrl": "PENDING (<slug>.eu-west-1.convex.cloud)"
+    "deploymentSlug": "fiery-raven-417",
+    "deploymentId": 5477316,
+    "deploymentUrl": "https://fiery-raven-417.eu-west-1.convex.cloud",
+    "httpActionsUrl": "https://fiery-raven-417.eu-west-1.convex.site",
+    "provisionedAt": "2026-09-14",
+    "observedRegion": "aws-eu-west-1",
+    "applicationReleaseStatus": "released: functions deployed 2026-09-14 (run 34880906636), redeployed by the full staging release 2026-09-15 (run 34953365470)"
   },
   "cloudflare": {
     "accountSameAsDev": true,
-    "pagesProject": "kiero-staging-web",
+    "webHosting": {
+      "kind": "workers-static-assets",
+      "workerName": "kiero-staging-web",
+      "status": "deployed 2026-09-15 (release run 34953365470); live-verified SPA fallback and /sw.js"
+    },
     "workers": [
+      "kiero-staging-web",
       "kiero-staging-gateway",
       "kiero-staging-media-worker",
       "kiero-staging-export-worker",
       "kiero-staging-backup-worker"
     ],
     "r2Buckets": [
-      { "name": "kiero-staging-media", "jurisdiction": "eu", "location": "weur" },
-      { "name": "kiero-staging-backup", "jurisdiction": "eu", "location": "weur" }
+      {
+        "name": "kiero-staging-media",
+        "jurisdiction": "eu",
+        "status": "created 2026-09-14"
+      },
+      {
+        "name": "kiero-staging-backup",
+        "jurisdiction": "eu",
+        "status": "created 2026-09-14"
+      }
     ],
-    "corsAllowListOrigins": ["https://kiero-staging-web.pages.dev"]
+    "corsAllowListOrigins": [
+      "https://kiero-staging-web.wojtek-524.workers.dev"
+    ],
+    "workerReleaseStatus": "released 2026-09-15 (run 34953365470): web, gateway, media/export/backup workers all deployed; the gateway backend bridge reports bridge_not_configured until the next release ships this branch's CONVEX_SITE_URL staging fill",
+    "r2LocationNote": "Wrangler 4.130.0 rejects combining --jurisdiction and --location. Created with --jurisdiction eu; no narrower placement is claimed."
   },
   "githubConfiguration": {
     "environmentVariables": [
-      { "name": "STAGING_CONVEX_URL", "context": "vars", "consumer": "VITE_CONVEX_URL build input" }
+      {
+        "name": "STAGING_CONVEX_URL",
+        "context": "vars",
+        "consumer": "VITE_CONVEX_URL build input"
+      },
+      {
+        "name": "STAGING_GATEWAY_URL",
+        "context": "vars",
+        "consumer": "VITE_GATEWAY_URL build input (R8); created 2026-09-14 with the gateway Worker's public workers.dev URL; first release run observed the web component receiving it"
+      },
+      {
+        "name": "STAGING_GOOGLE_PROJECT_ID",
+        "context": "vars",
+        "consumer": "Google project kiero-508611 identity record (non-secret)"
+      },
+      {
+        "name": "STAGING_AXIOM_DATASET",
+        "context": "vars",
+        "consumer": "telemetry dataset name (nonsecret)"
+      }
     ],
     "environmentSecrets": [
-      { "name": "STAGING_CONVEX_DEPLOYMENT", "consumer": "CONVEX_DEPLOYMENT (deployment reference)" },
-      { "name": "STAGING_CONVEX_DEPLOY_KEY", "consumer": "CONVEX_DEPLOY_KEY (deployment-scoped deploy key; see evidence runbook R4 for the workflow mapping status)" },
-      { "name": "STAGING_CLOUDFLARE_API_TOKEN", "consumer": "CLOUDFLARE_API_TOKEN (wrangler)" },
-      { "name": "STAGING_CLOUDFLARE_ACCOUNT_ID", "consumer": "CLOUDFLARE_ACCOUNT_ID (wrangler)" },
-      { "name": "STAGING_OPENROUTER_API_KEY", "consumer": "Convex env OPENROUTER_API_KEY" },
-      { "name": "STAGING_RESEND_API_KEY", "consumer": "Convex env RESEND_API_KEY" },
-      { "name": "STAGING_RESEND_FROM", "consumer": "Convex env RESEND_FROM" },
-      { "name": "STAGING_AUTH_GOOGLE_ID", "consumer": "Convex env AUTH_GOOGLE_ID" },
-      { "name": "STAGING_AUTH_GOOGLE_SECRET", "consumer": "Convex env AUTH_GOOGLE_SECRET" },
-      { "name": "STAGING_WEB_PUSH_VAPID_PUBLIC_KEY", "consumer": "Convex env WEB_PUSH_VAPID_PUBLIC_KEY" },
-      { "name": "STAGING_WEB_PUSH_VAPID_PRIVATE_KEY", "consumer": "Convex env WEB_PUSH_VAPID_PRIVATE_KEY" },
-      { "name": "STAGING_WEB_PUSH_VAPID_SUBJECT", "consumer": "Convex env WEB_PUSH_VAPID_SUBJECT" },
-      { "name": "STAGING_AXIOM_API_TOKEN", "consumer": "Convex env + worker secret AXIOM_API_TOKEN" },
-      { "name": "STAGING_R2_MEDIA_ACCESS_KEY_ID", "consumer": "media/export container env R2_MEDIA_ACCESS_KEY_ID" },
-      { "name": "STAGING_R2_MEDIA_SECRET_ACCESS_KEY", "consumer": "media/export container env R2_MEDIA_SECRET_ACCESS_KEY" },
-      { "name": "STAGING_R2_BACKUP_ACCESS_KEY_ID", "consumer": "backup container env R2_BACKUP_ACCESS_KEY_ID" },
-      { "name": "STAGING_R2_BACKUP_SECRET_ACCESS_KEY", "consumer": "backup container env R2_BACKUP_SECRET_ACCESS_KEY" },
-      { "name": "STAGING_R2_MEDIA_READ_ACCESS_KEY_ID", "consumer": "backup container env R2_MEDIA_READ_ACCESS_KEY_ID (read-only media token)" },
-      { "name": "STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY", "consumer": "backup container env R2_MEDIA_READ_SECRET_ACCESS_KEY" },
-      { "name": "STAGING_KIERO_SERVICE_TOKEN", "consumer": "Convex env + worker secrets KIERO_SERVICE_TOKEN" },
-      { "name": "STAGING_KIERO_MEDIA_WORKER_TOKEN", "consumer": "Convex env KIERO_MEDIA_WORKER_TOKEN / worker secret MEDIA_SEGMENT_TOKEN" },
-      { "name": "STAGING_KIERO_CALENDAR_TOKEN_KEY", "consumer": "Convex env KIERO_CALENDAR_TOKEN_KEY" },
-      { "name": "STAGING_CONVEX_BACKUP_ADMIN_KEY", "consumer": "backup container env CONVEX_BACKUP_ADMIN_KEY" }
+      {
+        "name": "STAGING_CONVEX_DEPLOYMENT",
+        "consumer": "CONVEX_DEPLOYMENT (deployment reference)"
+      },
+      {
+        "name": "STAGING_CONVEX_DEPLOY_KEY",
+        "consumer": "CONVEX_DEPLOY_KEY (deployment-scoped deploy key; see evidence runbook R4 for the workflow mapping status)"
+      },
+      {
+        "name": "STAGING_CLOUDFLARE_API_TOKEN",
+        "consumer": "CLOUDFLARE_API_TOKEN (wrangler)"
+      },
+      {
+        "name": "STAGING_CLOUDFLARE_ACCOUNT_ID",
+        "consumer": "CLOUDFLARE_ACCOUNT_ID (wrangler)"
+      },
+      {
+        "name": "STAGING_DEEPSEEK_API_KEY",
+        "consumer": "Convex env DEEPSEEK_API_KEY; E8 implements the direct chat/vision client"
+      },
+      {
+        "name": "STAGING_OPENROUTER_API_KEY",
+        "consumer": "Convex env OPENROUTER_API_KEY; retained for STT and embeddings per the final owner split"
+      },
+      {
+        "name": "STAGING_JWT_PRIVATE_KEY",
+        "consumer": "Convex Auth session signing"
+      },
+      {
+        "name": "STAGING_JWKS",
+        "consumer": "Convex Auth public verification keys"
+      },
+      {
+        "name": "STAGING_RESEND_API_KEY",
+        "consumer": "Convex env RESEND_API_KEY"
+      },
+      {
+        "name": "STAGING_RESEND_FROM",
+        "consumer": "Convex env RESEND_FROM"
+      },
+      {
+        "name": "STAGING_AUTH_GOOGLE_ID",
+        "consumer": "Convex env AUTH_GOOGLE_ID"
+      },
+      {
+        "name": "STAGING_AUTH_GOOGLE_SECRET",
+        "consumer": "Convex env AUTH_GOOGLE_SECRET"
+      },
+      {
+        "name": "STAGING_WEB_PUSH_VAPID_PUBLIC_KEY",
+        "consumer": "Convex env WEB_PUSH_VAPID_PUBLIC_KEY"
+      },
+      {
+        "name": "STAGING_WEB_PUSH_VAPID_PRIVATE_KEY",
+        "consumer": "Convex env WEB_PUSH_VAPID_PRIVATE_KEY"
+      },
+      {
+        "name": "STAGING_WEB_PUSH_VAPID_SUBJECT",
+        "consumer": "Convex env WEB_PUSH_VAPID_SUBJECT"
+      },
+      {
+        "name": "STAGING_AXIOM_API_TOKEN",
+        "consumer": "Convex env + worker secret AXIOM_API_TOKEN"
+      },
+      {
+        "name": "STAGING_R2_MEDIA_ACCESS_KEY_ID",
+        "consumer": "media/export container env R2_MEDIA_ACCESS_KEY_ID"
+      },
+      {
+        "name": "STAGING_R2_MEDIA_SECRET_ACCESS_KEY",
+        "consumer": "media/export container env R2_MEDIA_SECRET_ACCESS_KEY"
+      },
+      {
+        "name": "STAGING_R2_BACKUP_ACCESS_KEY_ID",
+        "consumer": "backup container env R2_BACKUP_ACCESS_KEY_ID"
+      },
+      {
+        "name": "STAGING_R2_BACKUP_SECRET_ACCESS_KEY",
+        "consumer": "backup container env R2_BACKUP_SECRET_ACCESS_KEY"
+      },
+      {
+        "name": "STAGING_R2_MEDIA_READ_ACCESS_KEY_ID",
+        "consumer": "backup container env R2_MEDIA_READ_ACCESS_KEY_ID (read-only media token)"
+      },
+      {
+        "name": "STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY",
+        "consumer": "backup container env R2_MEDIA_READ_SECRET_ACCESS_KEY"
+      },
+      {
+        "name": "STAGING_KIERO_SERVICE_TOKEN",
+        "consumer": "Convex env + worker secrets KIERO_SERVICE_TOKEN"
+      },
+      {
+        "name": "STAGING_KIERO_MEDIA_WORKER_TOKEN",
+        "consumer": "Convex env KIERO_MEDIA_WORKER_TOKEN / worker secret MEDIA_SEGMENT_TOKEN"
+      },
+      {
+        "name": "STAGING_KIERO_CALENDAR_TOKEN_KEY",
+        "consumer": "Convex env KIERO_CALENDAR_TOKEN_KEY"
+      },
+      {
+        "name": "STAGING_CONVEX_BACKUP_ADMIN_KEY",
+        "consumer": "backup container env CONVEX_BACKUP_ADMIN_KEY"
+      }
     ]
   },
   "oauthPins": {
-    "googleWebOrigin": "https://kiero-staging-web.pages.dev",
-    "calendarRedirectUri": "PENDING owner Google OAuth client; must be registered for the staging origin only, distinct from any dev client",
-    "note": "separate staging Google OAuth client (or separate redirect URIs); staging credentials are never reused from dev"
+    "googleWebOrigin": "https://kiero-staging-web.wojtek-524.workers.dev",
+    "googleSignInRedirectUri": "https://fiery-raven-417.eu-west-1.convex.site/api/auth/callback/google",
+    "calendarRedirectUri": "https://fiery-raven-417.eu-west-1.convex.site/calendar/oauth/callback",
+    "status": "Google Web OAuth client created in project kiero-508611 (External/Testing, one test user); credential names stored. Runtime callback behavior unverified until release.",
+    "note": "Use a separate staging Google OAuth client. Provider callbacks use the Convex HTTP Actions origin; SITE_URL and KIERO_CALENDAR_APP_BASE_URL use the web origin."
   },
+  "providerDecision": {
+    "date": "2026-09-14",
+    "chatAndVisionProvider": "DeepSeek API, direct",
+    "model": "deepseek-flash",
+    "observedModelRelease": "DeepSeek-V4.1-Flash, 2026-09-10",
+    "audioAndEmbeddingsProvider": "OpenRouter, retained",
+    "audioModels": "MAI-Transcribe-2 with Whisper backup",
+    "embeddingModel": "Qwen3-Embedding-8B, 4096 dimensions",
+    "status": "final owner split; credential names for both providers stored. E8 implements the direct DeepSeek client; actual availability of every model is unverified"
+  },
+  "provisioningEvidence": "vps-2026-09-14.md",
+  "observedSecretPresence": {
+    "checkedAt": "2026-09-14 (names-only reads, after the resumption session)",
+    "githubStagingSet": [
+      "STAGING_CONVEX_DEPLOYMENT",
+      "STAGING_CONVEX_DEPLOY_KEY",
+      "STAGING_DEEPSEEK_API_KEY",
+      "STAGING_OPENROUTER_API_KEY",
+      "STAGING_RESEND_API_KEY",
+      "STAGING_RESEND_FROM",
+      "STAGING_AUTH_GOOGLE_ID",
+      "STAGING_AUTH_GOOGLE_SECRET",
+      "STAGING_JWT_PRIVATE_KEY",
+      "STAGING_JWKS",
+      "STAGING_KIERO_SERVICE_TOKEN",
+      "STAGING_KIERO_MEDIA_WORKER_TOKEN",
+      "STAGING_KIERO_CALENDAR_TOKEN_KEY",
+      "STAGING_WEB_PUSH_VAPID_PUBLIC_KEY",
+      "STAGING_WEB_PUSH_VAPID_PRIVATE_KEY",
+      "STAGING_WEB_PUSH_VAPID_SUBJECT"
+    ],
+    "githubStagingPendingOwner": [
+      "STAGING_CLOUDFLARE_API_TOKEN",
+      "STAGING_CLOUDFLARE_ACCOUNT_ID",
+      "STAGING_AXIOM_API_TOKEN",
+      "STAGING_R2_MEDIA_ACCESS_KEY_ID",
+      "STAGING_R2_MEDIA_SECRET_ACCESS_KEY",
+      "STAGING_R2_BACKUP_ACCESS_KEY_ID",
+      "STAGING_R2_BACKUP_SECRET_ACCESS_KEY",
+      "STAGING_R2_MEDIA_READ_ACCESS_KEY_ID",
+      "STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY",
+      "STAGING_CONVEX_BACKUP_ADMIN_KEY"
+    ],
+    "convexStagingSet": [
+      "AUTH_GOOGLE_ID",
+      "AUTH_GOOGLE_SECRET",
+      "DEEPSEEK_API_KEY",
+      "OPENROUTER_API_KEY",
+      "RESEND_API_KEY",
+      "RESEND_FROM",
+      "JWT_PRIVATE_KEY",
+      "JWKS",
+      "KIERO_SERVICE_TOKEN",
+      "KIERO_MEDIA_WORKER_TOKEN",
+      "KIERO_CALENDAR_TOKEN_KEY",
+      "SITE_URL",
+      "KIERO_CALENDAR_APP_BASE_URL",
+      "KIERO_CALENDAR_REDIRECT_URI",
+      "KIERO_ENVIRONMENT",
+      "KIERO_DEPLOYMENT_LABEL",
+      "WEB_PUSH_VAPID_PUBLIC_KEY",
+      "WEB_PUSH_VAPID_PRIVATE_KEY",
+      "WEB_PUSH_VAPID_SUBJECT"
+    ],
+    "convexStagingPendingOwner": [
+      "AXIOM_API_TOKEN",
+      "AXIOM_DATASET",
+      "KIERO_GM_EMAILS",
+      "CONVEX_BACKUP_ADMIN_KEY (backup runtime)",
+      "executor URLs (KIERO_MEDIA_WORKER_URL, KIERO_IMAGES_EXECUTOR_URL, KIERO_EXPORT_EXECUTOR_URL, KIERO_BACKUP_WORKER_URL, KIERO_PURGE_EXECUTOR_URL) until the staging Workers exist"
+    ],
+    "vapIdNote": "VAPID trio generated 2026-09-14 by the I8 session (fresh P-256 pair, RFC 8292 shapes validated in memory; subject = the public staging web origin); values never printed, stored via --from-file on tmpfs"
+  },
+  "releaseAttempts": [
+    {
+      "runId": 34874172423,
+      "url": "https://github.com/wojtekpiskorz/kiero/actions/runs/34874172423",
+      "target": "staging",
+      "dispatchedAt": "2026-09-14T17:20:41Z",
+      "conclusion": "failure (honest: blocked components fail the job while uploading evidence)",
+      "gates": {
+        "rehearse": "PASS (rehearsal 9 PASS, tests/i7 green)",
+        "verifyTarget": "PASS",
+        "checksExactSha": "PASS (GitHub API observed Checks success on exactly 3cf9f6e, run 34873210524)"
+      },
+      "componentOutcomes": [
+        {
+          "component": "web",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ],
+          "note": "VITE_CONVEX_URL and VITE_GATEWAY_URL were both present"
+        },
+        {
+          "component": "convex-functions",
+          "outcome": "blocked",
+          "reason": "target-verification-failed",
+          "note": "R9 parser false-mismatch: provider-observed identity matched the pin on every field except url, which carried the CLI spinner's trailing ellipsis (convex 1.45.0 deploy2.ts showSpinner 'Deploying to <url>... [dry run]' reaches stderr in non-TTY CI and parseConvexAnnouncement prefers it over the announcement line). No mutation ran"
+        },
+        {
+          "component": "gateway",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        },
+        {
+          "component": "media-worker",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        },
+        {
+          "component": "export-worker",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        },
+        {
+          "component": "backup-worker",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        }
+      ],
+      "providerObservedConvexIdentity": {
+        "source": "deploy-outcomes.json artifact (release-evidence-staging), provider-observed through the R9 read-only probe",
+        "type": "prod",
+        "teamSlug": "wojtek-piskorz-jr",
+        "projectSlug": "kiero-dev-core",
+        "reference": "staging",
+        "slug": "fiery-raven-417",
+        "url": "https://fiery-raven-417.eu-west-1.convex.cloud... (CLI truncation artifact; the pinned URL is the exact form)",
+        "region": null,
+        "isDefault": false,
+        "postRunFunctionSpec": "functions: [] — the refusal was pre-mutation"
+      },
+      "evidenceArtifact": "release-evidence-staging (releases.jsonl ledger row, deploy-outcomes.json, checks-report.json)",
+      "headSha": "3cf9f6e27ffed0d2e7a730068a69ad3798fe8274"
+    },
+    {
+      "runId": 34880906636,
+      "url": "https://github.com/wojtekpiskorz/kiero/actions/runs/34880906636",
+      "target": "staging",
+      "dispatchedAt": "2026-09-14T18:27:24Z",
+      "context": "re-dispatch after the R15 parser repair (#194, merged in this revision)",
+      "conclusion": "failure (the five wrangler components block the job; the Convex component DEPLOYED)",
+      "gates": {
+        "rehearse": "PASS (rehearsal 9 PASS, tests/i7 green)",
+        "verifyTarget": "PASS",
+        "checksExactSha": "PASS (GitHub API observed Checks success on exactly 5780d80, run 34880443066; dispatch waited for its completion)"
+      },
+      "componentOutcomes": [
+        {
+          "component": "web",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ],
+          "note": "VITE_CONVEX_URL and VITE_GATEWAY_URL present again"
+        },
+        {
+          "component": "convex-functions",
+          "outcome": "deployed",
+          "digest": "ff07541bdb67957845bba85bca3658196ee0b95f25a9be93cd1e26c3da2f468d",
+          "fileCount": 301,
+          "note": "identity verification passed after R15; first real functions push to staging"
+        },
+        {
+          "component": "gateway",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        },
+        {
+          "component": "media-worker",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        },
+        {
+          "component": "export-worker",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        },
+        {
+          "component": "backup-worker",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        }
+      ],
+      "providerObservedConvexIdentity": {
+        "source": "deploy-outcomes.json artifact (release-evidence-staging), provider-observed by the transport's announcement re-parse",
+        "kind": "convex-deployment",
+        "id": "wojtek-piskorz-jr:kiero-dev-core:staging",
+        "slug": "fiery-raven-417",
+        "url": "https://fiery-raven-417.eu-west-1.convex.cloud",
+        "type": "prod",
+        "region": "eu-west-1",
+        "isDefault": false,
+        "identitySource": "provider-observed",
+        "note": "exact match of the descriptor pin on every field; region parses cleanly post-R15 (run 34874172423 observed region null from the spinner-line artifact)"
+      },
+      "postDeployVerification": {
+        "functionSpec": "functions: [] before -> 644 after (auth HTTP routes, public OIDC discovery and JWKS endpoints, calendar callbacks; dev proof routes present as code with runtime authorization unset on staging)",
+        "clientUrlHttps": "GET / -> HTTP 200, 0.15 s",
+        "oidcDiscovery": "GET /.well-known/openid-configuration -> HTTP 200, 0.27 s, valid document",
+        "jwks": "GET /.well-known/jwks.json -> HTTP 200, 0.24 s, exactly 1 RSA signing key (shape only)",
+        "queryApiTypedError": "POST /api/query bogus path -> HTTP 200 typed error with request id"
+      },
+      "evidenceArtifact": "release-evidence-staging (releases.jsonl ledger row, deploy-outcomes.json, checks-report.json)",
+      "headSha": "5780d80983710a3370093166b73648833d6b0e7e"
+    },
+    {
+      "runId": 34953365470,
+      "url": "https://github.com/wojtekpiskorz/kiero/actions/runs/34953365470",
+      "target": "staging",
+      "dispatchedAt": "2026-09-15",
+      "context": "unblocking session: CI deploy token + account ID ingested; Axiom wired",
+      "conclusion": "SUCCESS: rehearsal PASS and the staging deploy job completed; every component deployed",
+      "gates": {
+        "rehearsal": "PASS",
+        "verifyTarget": "PASS",
+        "exactShaChecks": "PASS (c9698bc)"
+      },
+      "componentOutcomes": {
+        "rehearsal": "PASS",
+        "convexFunctions": "deployed (redeployed on this run)",
+        "webWorker": "deployed; https://kiero-staging-web.wojtek-524.workers.dev serves /, /zrodlo, /praca, /co-teraz as 200 text/html (SPA fallback) and /sw.js as 200 text/javascript",
+        "gatewayWorker": "deployed; /platform/health answers gateway status ok (runtimeVersion a3.0) but backendReachable=false bridge_not_configured: this run shipped from main before the CONVEX_SITE_URL staging fills on this branch landed; the next release carries them",
+        "containerWorkers": "deployed per pipeline outcome"
+      },
+      "postDeployVerification": "curl probes recorded in vps-2026-09-14.md follow-up section; convex function-spec non-empty",
+      "headSha": "c9698bc1da8ceafb117835c7639b27b9a5349d9d"
+    }
+  ],
   "isolation": {
     "mechanism": "named Convex deployment inside kiero-dev-core (per-deployment data, credentials, scheduler, storage) + kiero-staging-* Cloudflare resources + STAGING_-prefixed GitHub secrets",
-    "perDeploymentBoundaries": ["database", "environment-variables-and-auth-keys", "scheduler", "file-storage"],
-    "sharedWithDev": ["Convex project plan usage quota (accepted by the owner instruction; not a defect; no workarounds permitted)"],
+    "perDeploymentBoundaries": [
+      "database",
+      "environment-variables-and-auth-keys",
+      "scheduler",
+      "file-storage"
+    ],
+    "sharedWithDev": [
+      "Convex project plan usage quota (accepted by the owner instruction; not a defect; no workarounds permitted)"
+    ],
     "fixtureAuthorizationOnQualificationPath": "must remain unset on the staging deployment: KIERO_B1_PROOF_ENABLED, KIERO_B2_PROOF_ENABLED, KIERO_B3_PROOF_ENABLED, KIERO_B4_PROOF_ENABLED, KIERO_C1_PROOF_ENABLED, KIERO_C4_PROOF_ENABLED, KIERO_E5_PROOF_ENABLED, KIERO_F3_PROOF_ENABLED, KIERO_G1_PROOF_ENABLED, KIERO_G2_PROOF_ENABLED, KIERO_G3_PROOF_ENABLED, KIERO_H3_PROOF_ENABLED, KIERO_H4_PROOF_ENABLED, KIERO_PROBE_ENABLED, KIERO_ECHO_TARGET, KIERO_CALENDAR_GOOGLE_API_BASE_OVERRIDE, KIERO_CALENDAR_TOKEN_ENDPOINT_OVERRIDE"
   },
   "localProbes": [
@@ -136,14 +536,32 @@
     }
   ],
   "pendingOwnerActions": [
-    "verify kiero-dev-core deployment inventory, plan headroom for a second prod-type deployment and month-quota state (dashboard)",
-    "create deployment wojtek-piskorz-jr:kiero-dev-core:staging --type prod --region eu (never --default) and record slug/URL here",
-    "generate a deployment-scoped Convex deploy key for staging and store it as GitHub environment secret STAGING_CONVEX_DEPLOY_KEY",
-    "execute evidence runbook R4: the release.yml + staging.json CONVEX_DEPLOY_KEY mapping follow-up (R6-owned files; note only, not edited by I8)",
-    "create R2 buckets kiero-staging-media / kiero-staging-backup (--jurisdiction eu --location weur) and their scoped tokens",
-    "create Pages project kiero-staging-web",
-    "create the GitHub staging environment + vars/secrets; configure alpha-production protection with a single gh api -X PUT repos/wojtekpiskorz/kiero/environments/alpha-production --input call whose body carries {\"deployment_branch_policy\":{\"restricted\":true},\"reviewers\":[{\"type\":\"User\",\"id\":<owner-user-id>}]} (no separate reviewers endpoint exists)",
-    "set runtime env vars on the staging Convex deployment per-deployment only (names only, per the runbook); never via convex env default, and the prod-type default list must stay empty",
-    "dispatch the first real staging Release run and attach run id + deployment identifiers here; verify the reported Convex deployment slug/URL matches this manifest's deploymentReference"
-  ]
+    "RESOLVED 2026-09-15: staging GM and owner alert recipient decided (wojtek@honestly.design) and telemetry decided (Axiom, ingested). Kept for history.",
+    "RESOLVED 2026-09-15: the owner issued the Cloudflare CI deploy token and the account ID was recorded; ingested through the unblock wizard (kept for history)",
+    "RESOLVED 2026-09-15: the owner issued the three bucket-scoped R2 token pairs; all six STAGING_R2_* secrets exist (kept for history)",
+    "RESOLVED 2026-09-14 evening: the R9 CI parser defect was repaired by R15 #194 (merged 5780d80); run 34880906636 then deployed the Convex leg with an exact identity match — kept for history, no longer pending",
+    "RESOLVED 2026-09-15: the Release workflow re-dispatched and completed: run 34953365470, rehearsal PASS, staging deploy SUCCESS, all components deployed (kept for history)",
+    "RESOLVED 2026-09-15: Axiom decided and provisioned: AXIOM_API_TOKEN/AXIOM_DATASET stored on Convex staging and GitHub staging (kept for history)",
+    "PARTIALLY RESOLVED 2026-09-15: staging GM and the alert recipient are decided (wojtek@honestly.design); CONVEX_BACKUP_ADMIN_KEY remains an owner choice, unset (kept for history).",
+    "configure alpha-production reviewers and branch policy using protected_branches/custom_branch_policies and the separate deployment branch-policy endpoint after the owner identity decision",
+    "re-run the release, then the ordinary authenticated smoke (Google sign-in via the pinned redirect URIs, Resend OTP/invite send with the owner-chosen recipient, DeepSeek chat/vision + OpenRouter STT/embeddings calls from the deployed staging functions, web origin SPA/sw.js, gateway health)"
+  ],
+  "ownerDecisions": {
+    "stagingGm": {
+      "email": "wojtek@honestly.design",
+      "decided": "2026-09-15",
+      "note": "Owner decision in the unblocking session; the GM role is granted during staging initialization."
+    },
+    "ownerAlertRecipient": {
+      "email": "wojtek@honestly.design",
+      "decided": "2026-09-15",
+      "note": "Same address as GM; I11 cost-threshold (PLN 400/500) and incident alerts destination."
+    },
+    "telemetry": {
+      "provider": "Axiom",
+      "decided": "2026-09-15",
+      "note": "Owner creates the account, dataset and ingest token; ingested through the unblock wizard."
+    }
+  },
+  "webOriginStatus": "deployed 2026-09-15 (release run 34953365470); live verification: SPA fallback routes and /sw.js served as themselves"
 }
