@@ -115,9 +115,7 @@
         // (rightly) forbids outside evidence docs. The endpoints are
         // injected at deploy time from the same store as the owner-PENDING
         // per-bucket R2 credentials (I8 decision, 2026-09-14).
-        "R2_BACKUP_ENDPOINT": "",
         "R2_MEDIA_BUCKET": "kiero-staging-media",
-        "R2_MEDIA_ENDPOINT": "",
         // I8 runbook R10 fill (2026-09-14): the staging deployment
         // fiery-raven-417 HTTP actions origin (public URL, not a secret).
         "CONVEX_SITE_URL": "https://fiery-raven-417.eu-west-1.convex.site",
