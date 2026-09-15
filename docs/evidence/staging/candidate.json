@@ -599,7 +599,7 @@
       "pwaShellRender": "PASS (title Kiero, 15 navigation entries, backend connected a3.0, zero console errors)",
       "serviceWorker": "PASS (registered at the web origin)",
       "providerAvailability": "PASS (emailCode true, google true; Google button rendered)",
-      "resendSend": "PASS, upgraded to delivered-end-to-end: the OTP physically arrived in a real mailbox (mail.tm) and was consumed by the app (staging-run1 code 79929844)",
+      "resendSend": "PASS, upgraded to delivered-end-to-end: the OTP physically arrived in a real mailbox (mail.tm) and was consumed by the app (staging-run1; the code value stays redacted)",
       "googleOauthRedirect": "PASS (accounts.google.com sign-in for fiery-raven-417.eu-west-1.convex.site with the pinned redirect_uri /api/auth/callback/google and client 932692636558-…)",
       "authenticatedSignin": "PASS (ordinary email-code flow; driver stage 1)",
       "companyCreation": "PASS (/firma, first administrator; driver stage 2)",
