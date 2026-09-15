@@ -34,7 +34,7 @@
     "httpActionsUrl": "https://fiery-raven-417.eu-west-1.convex.site",
     "provisionedAt": "2026-09-14",
     "observedRegion": "aws-eu-west-1",
-    "applicationReleaseStatus": "released: functions deployed 2026-09-14 (run 34880906636), redeployed by the full staging release 2026-09-15 (run 34953365470)"
+    "applicationReleaseStatus": "released and live: functions deployed (644 verified read-only), runtime env complete incl. executor URLs (set 2026-09-15; the images assignment was corrected the same day after the PR #206 advisory review caught it against route ownership — see executorUrlAssignments)"
   },
   "cloudflare": {
     "accountSameAsDev": true,
@@ -65,7 +65,7 @@
     "corsAllowListOrigins": [
       "https://kiero-staging-web.wojtek-524.workers.dev"
     ],
-    "workerReleaseStatus": "released 2026-09-15 (run 34953365470): web, gateway, media/export/backup workers all deployed; the gateway backend bridge reports bridge_not_configured until the next release ships this branch's CONVEX_SITE_URL staging fill",
+    "workerReleaseStatus": "released 2026-09-15 (runs 34953365470, 34958408793, 34966103795): all components deployed AND runtime secrets injected through the descriptor-driven injector; the gateway backend bridge is live (backendReachable true)",
     "r2LocationNote": "Wrangler 4.130.0 rejects combining --jurisdiction and --location. Created with --jurisdiction eu; no narrower placement is claimed."
   },
   "githubConfiguration": {
@@ -217,7 +217,7 @@
   },
   "provisioningEvidence": "vps-2026-09-14.md",
   "observedSecretPresence": {
-    "checkedAt": "2026-09-15 (names-only reads, after the unblocking session and the successful releases)",
+    "checkedAt": "2026-09-15 (after the full-stack release with runtime secret injection)",
     "githubStagingSet": [
       "STAGING_CONVEX_DEPLOYMENT",
       "STAGING_CONVEX_DEPLOY_KEY",
@@ -273,8 +273,7 @@
     ],
     "convexStagingPendingOwner": [
       "KIERO_GM_EMAILS (owner allow-list value, granted during staging initialization)",
-      "CONVEX_BACKUP_ADMIN_KEY (backup runtime; I10)",
-      "executor URLs (KIERO_MEDIA_WORKER_URL, KIERO_IMAGES_EXECUTOR_URL, KIERO_EXPORT_EXECUTOR_URL, KIERO_BACKUP_WORKER_URL, KIERO_PURGE_EXECUTOR_URL): the staging workers exist since run 34953365470; the fills are recorded for the next configuration round"
+      "CONVEX_BACKUP_ADMIN_KEY (backup runtime; I10)"
     ],
     "vapIdNote": "VAPID trio generated 2026-09-14 by the I8 session (fresh P-256 pair, RFC 8292 shapes validated in memory; subject = the public staging web origin); values never printed, stored via --from-file on tmpfs",
     "note": "Pending-owner lists reflect the 2026-09-15 state; only CONVEX_BACKUP_ADMIN_KEY remains a live owner ask on GitHub staging."
@@ -470,6 +469,29 @@
       },
       "postDeployVerification": "curl probes recorded in vps-2026-09-14.md follow-up section; convex function-spec non-empty",
       "headSha": "c9698bc1da8ceafb117835c7639b27b9a5349d9d"
+    },
+    {
+      "runId": 34966103795,
+      "url": "https://github.com/wojtekpiskorz/kiero/actions/runs/34966103795",
+      "target": "staging",
+      "dispatchedAt": "2026-09-15",
+      "context": "runtime secret injection ships (descriptor runtimeSecrets + committed injector); bridge expected reachable",
+      "conclusion": "SUCCESS: full stack live for the first time",
+      "gates": {
+        "rehearsal": "PASS (9)",
+        "verifyTarget": "PASS",
+        "exactShaChecks": "PASS (13e26d4)"
+      },
+      "componentOutcomes": {
+        "web": "deployed",
+        "gateway": "deployed + 2 secrets injected (KIERO_SERVICE_TOKEN, AXIOM_API_TOKEN)",
+        "convexFunctions": "deployed",
+        "mediaWorker": "deployed + 4 secrets injected",
+        "exportWorker": "deployed + 4 secrets injected",
+        "backupWorker": "deployed + 6 secrets injected; CONVEX_BACKUP_ADMIN_KEY deferred (I10 owner decision)"
+      },
+      "postDeployVerification": "/platform/health: backendReachable TRUE against fiery-raven-417 with 15 durable executors registered, outbox counters and honest observability blind spots; ledger record carries the runtimeSecrets outcome rows",
+      "headSha": "13e26d46f596e0b3add2860c5176844b61db9f92"
     }
   ],
   "isolation": {
@@ -564,5 +586,59 @@
       "note": "Owner creates the account, dataset and ingest token; ingested through the unblock wizard."
     }
   },
-  "webOriginStatus": "deployed 2026-09-15 (release run 34953365470); live verification: SPA fallback routes and /sw.js served as themselves"
+  "webOriginStatus": "deployed 2026-09-15 (release run 34953365470); live verification: SPA fallback routes and /sw.js served as themselves",
+  "authenticatedSmoke": {
+    "executedAt": "2026-09-15",
+    "environment": "live stack of release run 34966103795; real Chromium (playwright-core 1.63.0, chromium-1234) from the VPS, locale pl-PL, no fixture flags on the deployment",
+    "legs": {
+      "pwaShellRender": "PASS (title Kiero, 15 navigation entries, backend connected a3.0, zero console errors)",
+      "serviceWorker": "PASS (registered at the web origin)",
+      "providerAvailability": "PASS (emailCode true, google true; Google button rendered)",
+      "resendSend": "PASS (ordinary email-code request for wojtek@honestly.design answered: code sent, valid 15 minutes; fail-closed design means a provider rejection would surface as an error)",
+      "googleOauthRedirect": "PASS (accounts.google.com sign-in for fiery-raven-417.eu-west-1.convex.site with the pinned redirect_uri /api/auth/callback/google and client 932692636558-…)",
+      "googleLoginCompletion": "BLOCKED (owner credential step; persistent-profile Chromium staged on the VPS desktop via noVNC)",
+      "authenticatedAiCall": "BLOCKED (same owner step; then enterGmMode + one agent answer through the live providers)",
+      "clientAssetLeakScan": "PASS (no secret names or credential shapes in the deployed bundle; benign 40-char matches identified; only the Convex URL and gateway origin baked in)"
+    },
+    "newObservation": "PWA update handshake (apps/web/src/pwa/update/handshake.ts) fetches <convex-site>/platform/health cross-origin; the Convex route emits no CORS headers, so the major-version gate is inert in the deployed topology (honest unavailable degradation). Recorded follow-up for J4/J6; not an I8 closure blocker.",
+    "blockedCase": {
+      "case": "Google login completion + GM initialization (enterGmMode for the allow-listed GM) + authenticated AI call",
+      "responsible": "owner",
+      "nextAction": "complete the Google tester sign-in in the prepared browser (noVNC desktop, profile /tmp/kiero-smoke/profile) or relay a fresh email-code OTP; the coordinator then finishes the authenticated leg",
+      "resumptionTrigger": "login observed in the profile or OTP relayed"
+    },
+    "postReviewCorrection": "The evidence PR advisory review corrected the executor URL record twice (see executorUrlAssignments in this file for the canonical telling): round 1 moved the images name off the media worker to the gateway; round 2 verified the consumer fetches verbatim and the live value gained /images/normalize. The same review found the export consumers disagree about the variable shape; that code conflict is owned by R17 #209."
+  },
+  "executorUrlAssignments": {
+    "setOn": "2026-09-15",
+    "correctedOn": "2026-09-15 (round 1: images moved off the media worker; round 2: images value gained its route path after verifying the consumer fetches verbatim)",
+    "convention": "Three consumers append their route in code, so those values are bare origins; two fetch the value verbatim, so those values carry the full URL including the route. Each row records the exact settable value.",
+    "assignments": {
+      "KIERO_MEDIA_WORKER_URL": {
+        "value": "https://kiero-staging-media-worker.wojtek-524.workers.dev",
+        "shape": "bare origin (consumer appends /probe, /segment)",
+        "status": "settled"
+      },
+      "KIERO_IMAGES_EXECUTOR_URL": {
+        "value": "https://kiero-staging-gateway.wojtek-524.workers.dev/images/normalize",
+        "shape": "FULL URL (convex/processing/images/executor.ts:77-89 fetches the value verbatim; the D5 live proof pins origin + /images/normalize)",
+        "status": "corrected live 2026-09-15; probe: POST without bearer answers 401 service_credential_invalid on the gateway (route exists) while the media worker 404s the same path"
+      },
+      "KIERO_EXPORT_EXECUTOR_URL": {
+        "value": "https://kiero-staging-export-worker.wojtek-524.workers.dev",
+        "shape": "CONFLICT, unresolved by any single value: convex/operations/exports/executor.ts:78 fetches verbatim (needs origin + /exports/build) while convex/operations/exports/functions.ts:380 appends /exports/cleanup (needs bare origin)",
+        "status": "known consumer conflict; repair owned by R17 #209 (registered as a native blocker of I9); the bare origin is set so cleanup works and the build drive is expected to 404 no_such_route until R17 lands"
+      },
+      "KIERO_BACKUP_WORKER_URL": {
+        "value": "https://kiero-staging-backup-worker.wojtek-524.workers.dev",
+        "shape": "bare origin (consumer appends /run per the I5 protocol)",
+        "status": "settled"
+      },
+      "KIERO_PURGE_EXECUTOR_URL": {
+        "value": "https://kiero-staging-gateway.wojtek-524.workers.dev",
+        "shape": "bare origin (consumer appends /purge/media)",
+        "status": "settled"
+      }
+    }
+  }
 }
