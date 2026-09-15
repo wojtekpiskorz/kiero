@@ -22,6 +22,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   callExportExecutor,
   EXPORT_BUILD_ROUTE,
+  EXPORT_CLEANUP_ROUTE,
   exportExecutorUrl,
 } from "../../convex/operations/exports/executor";
 
@@ -55,7 +56,7 @@ describe("exportExecutorUrl (R17 shared derivation)", () => {
     expect(exportExecutorUrl(base, EXPORT_BUILD_ROUTE)).toBe(
       "https://export-worker.example/exports/build",
     );
-    expect(exportExecutorUrl(base, "/exports/cleanup")).toBe(
+    expect(exportExecutorUrl(base, EXPORT_CLEANUP_ROUTE)).toBe(
       "https://export-worker.example/exports/cleanup",
     );
   });
@@ -65,7 +66,7 @@ describe("exportExecutorUrl (R17 shared derivation)", () => {
     expect(exportExecutorUrl(base, EXPORT_BUILD_ROUTE)).toBe(
       "https://export-worker.example/exports/build",
     );
-    expect(exportExecutorUrl(base, "/exports/cleanup")).toBe(
+    expect(exportExecutorUrl(base, EXPORT_CLEANUP_ROUTE)).toBe(
       "https://export-worker.example/exports/cleanup",
     );
   });

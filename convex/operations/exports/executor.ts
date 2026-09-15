@@ -67,6 +67,9 @@ export type BuildClassification =
 /** The build route the executor Worker serves (container-main.ts). */
 export const EXPORT_BUILD_ROUTE = "/exports/build";
 
+/** The cleanup route the executor Worker serves (container-main.ts). */
+export const EXPORT_CLEANUP_ROUTE = "/exports/cleanup";
+
 /**
  * Derives one executor route URL from the deployment's bare-origin
  * `KIERO_EXPORT_EXECUTOR_URL` (R17): every consumer appends its route in
