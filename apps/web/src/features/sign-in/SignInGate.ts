@@ -247,5 +247,21 @@ function SessionBootstrap({ continuation }: {
   if (sessionId === null) {
     return createElement("p", { role: "status" }, signInCopy.verifying);
   }
+  return createElement(ContinuationMount, { continuation, sessionId });
+}
+
+/**
+ * R18 armor: the continuation is invoked inside this DEDICATED leaf
+ * fiber, never inside SessionBootstrap's own. A gate that passes a bare
+ * component (the shape that caused React #310 nine times) then has its
+ * hooks counted in a fiber that mounts fresh when the session resolves
+ * and keeps a stable hook list across re-renders, instead of changing
+ * SessionBootstrap's hook count mid-life. Element-returning continuations
+ * (the preferred shape) are untouched by this mount.
+ */
+function ContinuationMount({ continuation, sessionId }: {
+  readonly continuation: (sessionId: string) => ReactNode;
+  readonly sessionId: string;
+}): ReactNode {
   return continuation(sessionId);
 }
