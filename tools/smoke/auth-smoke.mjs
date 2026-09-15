@@ -105,7 +105,7 @@ if ((await ask.count()) < 1) throw new Error("ask-agent control missing on the s
 await ask.first().click();
 await page.waitForTimeout(25000);
 const afterAgent = await snap("4-agent");
-const agentAnswered = /odpowiedź|Odpowiedź|ustaleń|Nie udało się uzyskać odpowiedzi|agent/.test(afterAgent);
+const agentAnswered = /odpowied|Odpowied|ustale|Nie udało si|gave-up|provider/.test(afterAgent);
 console.log(`[agent] ${agentAnswered ? "PASS: agent answer rendered (or its honest refusal)" : "STATE: no agent output"}`);
 console.log(`[agent] page errors: ${errors.length === 0 ? "none" : errors.slice(0, 3).join(" | ")}`);
 writeFileSync(`${OUT}/summary.json`, JSON.stringify({

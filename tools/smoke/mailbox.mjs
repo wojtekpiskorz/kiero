@@ -25,6 +25,9 @@
  * credentials themselves.
  */
 
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 const API = "https://api.mail.tm";
 const OTP_SUBJECT_PREFIX = "Kiero — kod do logowania";
 const CODE_PATTERN = /(\d{8})/;
@@ -87,7 +90,8 @@ export function extractLoginCode(text) {
 async function commandAccount(args) {
   const outIndex = args.indexOf("--out");
   const domainIndex = args.indexOf("--domain");
-  const domains = Array.isArray(await api("/domains?page=1")) ? await api("/domains?page=1") : [];
+  const domainsResponse = await api("/domains?page=1");
+  const domains = Array.isArray(domainsResponse) ? domainsResponse : (domainsResponse["hydra:member"] ?? []);
   const domain = domainIndex >= 0 ? args[domainIndex + 1] : domains.find((d) => d.isActive)?.domain;
   if (domain === undefined) {
     fail("no active mail.tm domain");
@@ -161,12 +165,15 @@ async function commandLatest(args) {
 }
 
 const [command, ...rest] = process.argv.slice(2);
-if (command === "account") {
-  await commandAccount(rest);
-} else if (command === "wait-code") {
-  await commandWaitCode(rest);
-} else if (command === "latest") {
-  await commandLatest(rest);
-} else {
-  fail("usage: mailbox.mjs account | wait-code | latest (see the header comment)");
+const isCliEntry = process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isCliEntry) {
+  if (command === "account") {
+    await commandAccount(rest);
+  } else if (command === "wait-code") {
+    await commandWaitCode(rest);
+  } else if (command === "latest") {
+    await commandLatest(rest);
+  } else {
+    fail("usage: mailbox.mjs account | wait-code | latest (see the header comment)");
+  }
 }
