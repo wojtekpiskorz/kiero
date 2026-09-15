@@ -56,7 +56,7 @@ Chromium is staged at the sign-in card on the VPS desktop (Xvfb :99 via
 noVNC, profile /tmp/kiero-smoke/profile; relaunch with
 /tmp/kiero-smoke/launch-owner-browser.sh if the desktop restarted), or
 relay a fresh email-code OTP from the owner mailbox. With the session
-in the profile, finish the smoke: enterGmMode (the audited GM grant , 
+in the profile, finish the smoke: enterGmMode (the audited GM grant,
 the staging initialization), an ordinary invite/notification send, and
 one agent answer through the live providers. Then assess I8 for
 closure per its own criteria (its release/isolation/configuration scope
