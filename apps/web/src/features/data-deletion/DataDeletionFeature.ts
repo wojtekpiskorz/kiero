@@ -93,7 +93,7 @@ function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): Rea
 }
 
 function DeletionGate(): ReactNode {
-  return createElement(AuthenticatedGate, { continuation: DeletionSurface });
+  return createElement(AuthenticatedGate, { continuation: () => createElement(DeletionSurface) });
 }
 
 function DeletionSurface(): ReactNode {

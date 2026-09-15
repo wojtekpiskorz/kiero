@@ -71,7 +71,7 @@ function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): Rea
 }
 
 function CalendarGate(): ReactNode {
-  return createElement(AuthenticatedGate, { continuation: CalendarSurface });
+  return createElement(AuthenticatedGate, { continuation: () => createElement(CalendarSurface) });
 }
 
 // ---------------------------------------------------------------------------

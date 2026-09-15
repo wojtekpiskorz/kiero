@@ -131,7 +131,7 @@ function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): Rea
 /** Authentication gate: B1's shared sign-in surface; members continue here. */
 function MembershipGate(): ReactNode {
   return createElement(AuthenticatedGate, {
-    continuation: MembershipSurface,
+    continuation: () => createElement(MembershipSurface),
   });
 }
 

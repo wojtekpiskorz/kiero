@@ -54,7 +54,7 @@ function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): Rea
 }
 
 function ExportsGate(): ReactNode {
-  return createElement(AuthenticatedGate, { continuation: ExportsSurface });
+  return createElement(AuthenticatedGate, { continuation: () => createElement(ExportsSurface) });
 }
 
 interface StatusRow {

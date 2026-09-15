@@ -64,7 +64,7 @@ function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): Rea
 }
 
 function NotificationsGate(): ReactNode {
-  return createElement(AuthenticatedGate, { continuation: NotificationsSurface });
+  return createElement(AuthenticatedGate, { continuation: () => createElement(NotificationsSurface) });
 }
 
 function NotificationsSurface(): ReactNode {
