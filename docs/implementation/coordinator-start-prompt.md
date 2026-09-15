@@ -30,7 +30,7 @@ Baseline at the 2026-09-15 post-smoke handoff (verify, do not assume):
 
 - Main `13e26d4` plus the merged I8 evidence PR (smoke record +
   owner-credential BLOCK). Audit remote PASS: 89 map entries after the M9, R17 and M10
-  registrations, 206 core edges, 76 closed (M9, R17 and M10 included),
+  registrations, 206 core edges, 77 closed (M9, R17 and M10 included),
   12 open: I6 #58, J3 #62, J4 #63, J5 #64, I8 #133, B5 #134, D7 #135,
   I9 #136, I10 #137, I11 #138, J6 #139, C6 #197. R17 #209 (the export
   executor URL convention repair found by the #206 review) closed
@@ -101,7 +101,7 @@ Open positions to watch:
 - J4: physical iPhone+Android devices and VAPID at runtime are real
   resources.
 - Alpha-production policy (reviewer/branch policy): decide at J5.
-- Cache-flip pattern: closures need a bounded M-issue (M2-M9 precedent);
+- Cache-flip pattern: closures need a bounded M-issue (M2-M10 precedent);
   tests/m1 fixtures pin the graph counts (89 entries / 206 edges after
   M9 + R17 + M10).
 - The PWA update handshake (client fetch of the Convex .site
