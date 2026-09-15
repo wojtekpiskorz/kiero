@@ -158,16 +158,19 @@ jobs:
       - name: Inject worker runtime secrets (descriptor-driven; values over stdin)
         if: steps.deploy.outcome == 'success'
         env:
-          GATEWAY_SERVICE_TOKEN: ${{ secrets.STAGING_KIERO_SERVICE_TOKEN }}
-          WORKER_MEDIA_SEGMENT_TOKEN: ${{ secrets.STAGING_KIERO_MEDIA_WORKER_TOKEN }}
-          WORKER_AXIOM_API_TOKEN: ${{ secrets.STAGING_AXIOM_API_TOKEN }}
-          WORKER_R2_MEDIA_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_MEDIA_ACCESS_KEY_ID }}
-          WORKER_R2_MEDIA_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_MEDIA_SECRET_ACCESS_KEY }}
-          WORKER_R2_BACKUP_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_BACKUP_ACCESS_KEY_ID }}
-          WORKER_R2_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_BACKUP_SECRET_ACCESS_KEY }}
-          WORKER_R2_MEDIA_READ_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_MEDIA_READ_ACCESS_KEY_ID }}
-          WORKER_R2_MEDIA_READ_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY }}
-          WORKER_CONVEX_BACKUP_ADMIN_KEY: ${{ secrets.STAGING_CONVEX_BACKUP_ADMIN_KEY }}
+          # The injector reads process.env[<descriptor source>], so the env
+          # keys ARE the descriptor's STAGING_ source names (the
+          # release-guards cross-check pins this wiring).
+          STAGING_KIERO_SERVICE_TOKEN: ${{ secrets.STAGING_KIERO_SERVICE_TOKEN }}
+          STAGING_KIERO_MEDIA_WORKER_TOKEN: ${{ secrets.STAGING_KIERO_MEDIA_WORKER_TOKEN }}
+          STAGING_AXIOM_API_TOKEN: ${{ secrets.STAGING_AXIOM_API_TOKEN }}
+          STAGING_R2_MEDIA_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_MEDIA_ACCESS_KEY_ID }}
+          STAGING_R2_MEDIA_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_MEDIA_SECRET_ACCESS_KEY }}
+          STAGING_R2_BACKUP_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_BACKUP_ACCESS_KEY_ID }}
+          STAGING_R2_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_BACKUP_SECRET_ACCESS_KEY }}
+          STAGING_R2_MEDIA_READ_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_MEDIA_READ_ACCESS_KEY_ID }}
+          STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY }}
+          STAGING_CONVEX_BACKUP_ADMIN_KEY: ${{ secrets.STAGING_CONVEX_BACKUP_ADMIN_KEY }}
         run: >
           node infra/release/inject-worker-secrets.mjs
           --descriptor infra/release/targets/staging.json
@@ -182,6 +185,7 @@ jobs:
           --rehearsal-rows "$(jq -r .rows rehearsal-summary.json)"
           --runtime-version a3.0 --client-version i7.1
           --migration-ledger rehearsal-ledger.jsonl
+          --runtime-secrets runtime-secrets-outcomes.json
       - name: Upload the evidence ledger and outcomes (blocked runs fail while uploading evidence)
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

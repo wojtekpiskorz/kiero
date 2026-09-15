@@ -45,6 +45,10 @@ export function buildReleaseRecord({
   descriptorId = null,
   notes = null,
   migrationLedgerText = null,
+  // I8: the worker runtime-secret injection outcomes (names-only rows
+  // written by inject-worker-secrets.mjs), or null when the injection
+  // step never ran (deploy refused before it).
+  runtimeSecretsOutcomes = null,
   recordedAtIso = new Date().toISOString(),
 }) {
   return {
@@ -60,6 +64,18 @@ export function buildReleaseRecord({
     ...(migrationLedgerText === null
       ? {}
       : { migrationLedgerSha256: sha256Hex(migrationLedgerText) }),
+    ...(runtimeSecretsOutcomes === null
+      ? {}
+      : {
+          runtimeSecrets: runtimeSecretsOutcomes.map((row) => ({
+            outcome: row.outcome,
+            worker: row.worker,
+            ...(row.count === undefined ? {} : { count: row.count }),
+            ...(row.name === undefined ? {} : { name: row.name }),
+            ...(row.source === undefined ? {} : { source: row.source }),
+            ...(row.reason === undefined ? {} : { reason: row.reason }),
+          })),
+        }),
   };
 }
 
@@ -168,6 +184,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       "notes",
       "ledger",
       "migration-ledger",
+      "runtime-secrets",
     ],
   });
   if (error !== undefined) {
@@ -184,6 +201,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const notes = args.notes ?? null;
   const ledgerPath = args.ledger;
   const migrationLedgerPath = args.migrationLedger;
+  const runtimeSecretsPath = args.runtimeSecrets;
   if (target === undefined) {
     console.error(USAGE);
     process.exit(2);
@@ -217,6 +235,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     notes,
     migrationLedgerText:
       migrationLedgerPath === undefined ? null : readFileSync(migrationLedgerPath, "utf8"),
+    runtimeSecretsOutcomes:
+      runtimeSecretsPath === undefined || !existsSync(runtimeSecretsPath)
+        ? null
+        : JSON.parse(readFileSync(runtimeSecretsPath, "utf8")),
   });
   appendReleaseRecord(record, ledgerPath ?? undefined);
   console.log(`release evidence recorded: ${JSON.stringify(record)}`);

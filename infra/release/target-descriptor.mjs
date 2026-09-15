@@ -241,6 +241,14 @@ export function validateTargetDescriptor(value) {
     } else if (new Set(component.requiredConfig).size !== component.requiredConfig.length) {
       violations.push(`${where} requiredConfig contains duplicated names`);
     }
+    if (
+      component.runtimeSecrets !== undefined &&
+      component.transport.kind !== "wrangler-deploy"
+    ) {
+      violations.push(
+        `${where} runtimeSecrets is only implemented for wrangler-deploy transports`,
+      );
+    }
     if (component.runtimeSecrets !== undefined) {
       // I8: the worker RUNTIME secret plane. Names follow the binding
       // docs; sources are the deployment-scoped store names (GitHub

@@ -18,10 +18,12 @@
  *                                an explicitly recorded pending owner
  *                                decision (e.g. CONVEX_BACKUP_ADMIN_KEY
  *                                until I10), not a silent skip
- * - refused   { worker, name, source } a non-deferred secret whose
- *                                source is unset: the process EXITS 1,
- *                                because a green release must mean the
- *                                runtime carries its service bearers
+ * - refused   { worker, ... }      either a non-deferred secret whose
+ *                                source is unset ({ name, source }) or a
+ *                                failed bulk call ({ reason, exitCode,
+ *                                outputTail }); both EXIT 1, because a
+ *                                green release must mean the runtime
+ *                                carries its service bearers
  *
  * Usage:
  *   node infra/release/inject-worker-secrets.mjs

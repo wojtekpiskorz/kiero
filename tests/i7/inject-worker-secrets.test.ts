@@ -196,3 +196,27 @@ describe("the injector (fake wrangler boundary)", () => {
     expect(JSON.parse(calls[0].stdin)).toEqual({ KIERO_SERVICE_TOKEN: "value-service" });
   });
 });
+
+describe("workflow wiring matches the descriptor sources", () => {
+  it("every non-deferred staging runtimeSecrets source is mapped in the staging job's env", () => {
+    const workflow = readFileSync(
+      fileURLToPath(new URL("../../.github/workflows/release.yml", import.meta.url)),
+      "utf8",
+    );
+    const stagingJob = workflow.slice(
+      workflow.indexOf("Deploy synthetic staging"),
+      workflow.indexOf("Deploy alpha production"),
+    );
+    const sources = REAL_DESCRIPTOR.components
+      .flatMap((c) => c.runtimeSecrets ?? [])
+      .filter((e) => e.deferred !== true)
+      .map((e) => e.source);
+    expect(new Set(sources).size).toBeGreaterThan(0);
+    for (const source of sources) {
+      // The injector reads process.env[<source>], so the step env key MUST
+      // equal the descriptor source name; the STAGING_ prefix guard keeps
+      // the value server-side.
+      expect(stagingJob).toContain(`${source}: \${{ secrets.${source} }}`);
+    }
+  });
+});
