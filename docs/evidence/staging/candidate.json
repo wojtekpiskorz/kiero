@@ -13,7 +13,10 @@
   "environment": {
     "label": "staging",
     "githubEnvironment": "staging",
-    "runtimeLabels": ["ENVIRONMENT=staging", "KIERO_ENVIRONMENT=staging"],
+    "runtimeLabels": [
+      "ENVIRONMENT=staging",
+      "KIERO_ENVIRONMENT=staging"
+    ],
     "webOrigin": "https://kiero-staging-web.wojtek-524.workers.dev",
     "webOriginStatus": "planned Workers Static Assets host; not deployed"
   },
@@ -49,46 +52,151 @@
       "kiero-staging-backup-worker"
     ],
     "r2Buckets": [
-      { "name": "kiero-staging-media", "jurisdiction": "eu", "status": "created 2026-09-14" },
-      { "name": "kiero-staging-backup", "jurisdiction": "eu", "status": "created 2026-09-14" }
+      {
+        "name": "kiero-staging-media",
+        "jurisdiction": "eu",
+        "status": "created 2026-09-14"
+      },
+      {
+        "name": "kiero-staging-backup",
+        "jurisdiction": "eu",
+        "status": "created 2026-09-14"
+      }
     ],
-    "corsAllowListOrigins": ["https://kiero-staging-web.wojtek-524.workers.dev"],
+    "corsAllowListOrigins": [
+      "https://kiero-staging-web.wojtek-524.workers.dev"
+    ],
     "workerReleaseStatus": "NOT RUN",
     "r2LocationNote": "Wrangler 4.130.0 rejects combining --jurisdiction and --location. Created with --jurisdiction eu; no narrower placement is claimed."
   },
   "githubConfiguration": {
     "environmentVariables": [
-      { "name": "STAGING_CONVEX_URL", "context": "vars", "consumer": "VITE_CONVEX_URL build input" },
-      { "name": "STAGING_GATEWAY_URL", "context": "vars", "consumer": "VITE_GATEWAY_URL build input (R8); created 2026-09-14 with the gateway Worker's public workers.dev URL; first release run observed the web component receiving it" },
-      { "name": "STAGING_GOOGLE_PROJECT_ID", "context": "vars", "consumer": "Google project kiero-508611 identity record (non-secret)" }
+      {
+        "name": "STAGING_CONVEX_URL",
+        "context": "vars",
+        "consumer": "VITE_CONVEX_URL build input"
+      },
+      {
+        "name": "STAGING_GATEWAY_URL",
+        "context": "vars",
+        "consumer": "VITE_GATEWAY_URL build input (R8); created 2026-09-14 with the gateway Worker's public workers.dev URL; first release run observed the web component receiving it"
+      },
+      {
+        "name": "STAGING_GOOGLE_PROJECT_ID",
+        "context": "vars",
+        "consumer": "Google project kiero-508611 identity record (non-secret)"
+      },
+      {
+        "name": "STAGING_AXIOM_DATASET",
+        "context": "vars",
+        "consumer": "telemetry dataset name (nonsecret)"
+      }
     ],
     "environmentSecrets": [
-      { "name": "STAGING_CONVEX_DEPLOYMENT", "consumer": "CONVEX_DEPLOYMENT (deployment reference)" },
-      { "name": "STAGING_CONVEX_DEPLOY_KEY", "consumer": "CONVEX_DEPLOY_KEY (deployment-scoped deploy key; see evidence runbook R4 for the workflow mapping status)" },
-      { "name": "STAGING_CLOUDFLARE_API_TOKEN", "consumer": "CLOUDFLARE_API_TOKEN (wrangler)" },
-      { "name": "STAGING_CLOUDFLARE_ACCOUNT_ID", "consumer": "CLOUDFLARE_ACCOUNT_ID (wrangler)" },
-      { "name": "STAGING_DEEPSEEK_API_KEY", "consumer": "Convex env DEEPSEEK_API_KEY; E8 implements the direct chat/vision client" },
-      { "name": "STAGING_OPENROUTER_API_KEY", "consumer": "Convex env OPENROUTER_API_KEY; retained for STT and embeddings per the final owner split" },
-      { "name": "STAGING_JWT_PRIVATE_KEY", "consumer": "Convex Auth session signing" },
-      { "name": "STAGING_JWKS", "consumer": "Convex Auth public verification keys" },
-      { "name": "STAGING_RESEND_API_KEY", "consumer": "Convex env RESEND_API_KEY" },
-      { "name": "STAGING_RESEND_FROM", "consumer": "Convex env RESEND_FROM" },
-      { "name": "STAGING_AUTH_GOOGLE_ID", "consumer": "Convex env AUTH_GOOGLE_ID" },
-      { "name": "STAGING_AUTH_GOOGLE_SECRET", "consumer": "Convex env AUTH_GOOGLE_SECRET" },
-      { "name": "STAGING_WEB_PUSH_VAPID_PUBLIC_KEY", "consumer": "Convex env WEB_PUSH_VAPID_PUBLIC_KEY" },
-      { "name": "STAGING_WEB_PUSH_VAPID_PRIVATE_KEY", "consumer": "Convex env WEB_PUSH_VAPID_PRIVATE_KEY" },
-      { "name": "STAGING_WEB_PUSH_VAPID_SUBJECT", "consumer": "Convex env WEB_PUSH_VAPID_SUBJECT" },
-      { "name": "STAGING_AXIOM_API_TOKEN", "consumer": "Convex env + worker secret AXIOM_API_TOKEN" },
-      { "name": "STAGING_R2_MEDIA_ACCESS_KEY_ID", "consumer": "media/export container env R2_MEDIA_ACCESS_KEY_ID" },
-      { "name": "STAGING_R2_MEDIA_SECRET_ACCESS_KEY", "consumer": "media/export container env R2_MEDIA_SECRET_ACCESS_KEY" },
-      { "name": "STAGING_R2_BACKUP_ACCESS_KEY_ID", "consumer": "backup container env R2_BACKUP_ACCESS_KEY_ID" },
-      { "name": "STAGING_R2_BACKUP_SECRET_ACCESS_KEY", "consumer": "backup container env R2_BACKUP_SECRET_ACCESS_KEY" },
-      { "name": "STAGING_R2_MEDIA_READ_ACCESS_KEY_ID", "consumer": "backup container env R2_MEDIA_READ_ACCESS_KEY_ID (read-only media token)" },
-      { "name": "STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY", "consumer": "backup container env R2_MEDIA_READ_SECRET_ACCESS_KEY" },
-      { "name": "STAGING_KIERO_SERVICE_TOKEN", "consumer": "Convex env + worker secrets KIERO_SERVICE_TOKEN" },
-      { "name": "STAGING_KIERO_MEDIA_WORKER_TOKEN", "consumer": "Convex env KIERO_MEDIA_WORKER_TOKEN / worker secret MEDIA_SEGMENT_TOKEN" },
-      { "name": "STAGING_KIERO_CALENDAR_TOKEN_KEY", "consumer": "Convex env KIERO_CALENDAR_TOKEN_KEY" },
-      { "name": "STAGING_CONVEX_BACKUP_ADMIN_KEY", "consumer": "backup container env CONVEX_BACKUP_ADMIN_KEY" }
+      {
+        "name": "STAGING_CONVEX_DEPLOYMENT",
+        "consumer": "CONVEX_DEPLOYMENT (deployment reference)"
+      },
+      {
+        "name": "STAGING_CONVEX_DEPLOY_KEY",
+        "consumer": "CONVEX_DEPLOY_KEY (deployment-scoped deploy key; see evidence runbook R4 for the workflow mapping status)"
+      },
+      {
+        "name": "STAGING_CLOUDFLARE_API_TOKEN",
+        "consumer": "CLOUDFLARE_API_TOKEN (wrangler)"
+      },
+      {
+        "name": "STAGING_CLOUDFLARE_ACCOUNT_ID",
+        "consumer": "CLOUDFLARE_ACCOUNT_ID (wrangler)"
+      },
+      {
+        "name": "STAGING_DEEPSEEK_API_KEY",
+        "consumer": "Convex env DEEPSEEK_API_KEY; E8 implements the direct chat/vision client"
+      },
+      {
+        "name": "STAGING_OPENROUTER_API_KEY",
+        "consumer": "Convex env OPENROUTER_API_KEY; retained for STT and embeddings per the final owner split"
+      },
+      {
+        "name": "STAGING_JWT_PRIVATE_KEY",
+        "consumer": "Convex Auth session signing"
+      },
+      {
+        "name": "STAGING_JWKS",
+        "consumer": "Convex Auth public verification keys"
+      },
+      {
+        "name": "STAGING_RESEND_API_KEY",
+        "consumer": "Convex env RESEND_API_KEY"
+      },
+      {
+        "name": "STAGING_RESEND_FROM",
+        "consumer": "Convex env RESEND_FROM"
+      },
+      {
+        "name": "STAGING_AUTH_GOOGLE_ID",
+        "consumer": "Convex env AUTH_GOOGLE_ID"
+      },
+      {
+        "name": "STAGING_AUTH_GOOGLE_SECRET",
+        "consumer": "Convex env AUTH_GOOGLE_SECRET"
+      },
+      {
+        "name": "STAGING_WEB_PUSH_VAPID_PUBLIC_KEY",
+        "consumer": "Convex env WEB_PUSH_VAPID_PUBLIC_KEY"
+      },
+      {
+        "name": "STAGING_WEB_PUSH_VAPID_PRIVATE_KEY",
+        "consumer": "Convex env WEB_PUSH_VAPID_PRIVATE_KEY"
+      },
+      {
+        "name": "STAGING_WEB_PUSH_VAPID_SUBJECT",
+        "consumer": "Convex env WEB_PUSH_VAPID_SUBJECT"
+      },
+      {
+        "name": "STAGING_AXIOM_API_TOKEN",
+        "consumer": "Convex env + worker secret AXIOM_API_TOKEN"
+      },
+      {
+        "name": "STAGING_R2_MEDIA_ACCESS_KEY_ID",
+        "consumer": "media/export container env R2_MEDIA_ACCESS_KEY_ID"
+      },
+      {
+        "name": "STAGING_R2_MEDIA_SECRET_ACCESS_KEY",
+        "consumer": "media/export container env R2_MEDIA_SECRET_ACCESS_KEY"
+      },
+      {
+        "name": "STAGING_R2_BACKUP_ACCESS_KEY_ID",
+        "consumer": "backup container env R2_BACKUP_ACCESS_KEY_ID"
+      },
+      {
+        "name": "STAGING_R2_BACKUP_SECRET_ACCESS_KEY",
+        "consumer": "backup container env R2_BACKUP_SECRET_ACCESS_KEY"
+      },
+      {
+        "name": "STAGING_R2_MEDIA_READ_ACCESS_KEY_ID",
+        "consumer": "backup container env R2_MEDIA_READ_ACCESS_KEY_ID (read-only media token)"
+      },
+      {
+        "name": "STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY",
+        "consumer": "backup container env R2_MEDIA_READ_SECRET_ACCESS_KEY"
+      },
+      {
+        "name": "STAGING_KIERO_SERVICE_TOKEN",
+        "consumer": "Convex env + worker secrets KIERO_SERVICE_TOKEN"
+      },
+      {
+        "name": "STAGING_KIERO_MEDIA_WORKER_TOKEN",
+        "consumer": "Convex env KIERO_MEDIA_WORKER_TOKEN / worker secret MEDIA_SEGMENT_TOKEN"
+      },
+      {
+        "name": "STAGING_KIERO_CALENDAR_TOKEN_KEY",
+        "consumer": "Convex env KIERO_CALENDAR_TOKEN_KEY"
+      },
+      {
+        "name": "STAGING_CONVEX_BACKUP_ADMIN_KEY",
+        "consumer": "backup container env CONVEX_BACKUP_ADMIN_KEY"
+      }
     ]
   },
   "oauthPins": {
@@ -112,30 +220,61 @@
   "observedSecretPresence": {
     "checkedAt": "2026-09-14 (names-only reads, after the resumption session)",
     "githubStagingSet": [
-      "STAGING_CONVEX_DEPLOYMENT", "STAGING_CONVEX_DEPLOY_KEY", "STAGING_DEEPSEEK_API_KEY",
-      "STAGING_OPENROUTER_API_KEY", "STAGING_RESEND_API_KEY", "STAGING_RESEND_FROM",
-      "STAGING_AUTH_GOOGLE_ID", "STAGING_AUTH_GOOGLE_SECRET", "STAGING_JWT_PRIVATE_KEY",
-      "STAGING_JWKS", "STAGING_KIERO_SERVICE_TOKEN", "STAGING_KIERO_MEDIA_WORKER_TOKEN",
-      "STAGING_KIERO_CALENDAR_TOKEN_KEY", "STAGING_WEB_PUSH_VAPID_PUBLIC_KEY",
-      "STAGING_WEB_PUSH_VAPID_PRIVATE_KEY", "STAGING_WEB_PUSH_VAPID_SUBJECT"
+      "STAGING_CONVEX_DEPLOYMENT",
+      "STAGING_CONVEX_DEPLOY_KEY",
+      "STAGING_DEEPSEEK_API_KEY",
+      "STAGING_OPENROUTER_API_KEY",
+      "STAGING_RESEND_API_KEY",
+      "STAGING_RESEND_FROM",
+      "STAGING_AUTH_GOOGLE_ID",
+      "STAGING_AUTH_GOOGLE_SECRET",
+      "STAGING_JWT_PRIVATE_KEY",
+      "STAGING_JWKS",
+      "STAGING_KIERO_SERVICE_TOKEN",
+      "STAGING_KIERO_MEDIA_WORKER_TOKEN",
+      "STAGING_KIERO_CALENDAR_TOKEN_KEY",
+      "STAGING_WEB_PUSH_VAPID_PUBLIC_KEY",
+      "STAGING_WEB_PUSH_VAPID_PRIVATE_KEY",
+      "STAGING_WEB_PUSH_VAPID_SUBJECT"
     ],
     "githubStagingPendingOwner": [
-      "STAGING_CLOUDFLARE_API_TOKEN", "STAGING_CLOUDFLARE_ACCOUNT_ID",
-      "STAGING_AXIOM_API_TOKEN", "STAGING_R2_MEDIA_ACCESS_KEY_ID",
-      "STAGING_R2_MEDIA_SECRET_ACCESS_KEY", "STAGING_R2_BACKUP_ACCESS_KEY_ID",
-      "STAGING_R2_BACKUP_SECRET_ACCESS_KEY", "STAGING_R2_MEDIA_READ_ACCESS_KEY_ID",
-      "STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY", "STAGING_CONVEX_BACKUP_ADMIN_KEY"
+      "STAGING_CLOUDFLARE_API_TOKEN",
+      "STAGING_CLOUDFLARE_ACCOUNT_ID",
+      "STAGING_AXIOM_API_TOKEN",
+      "STAGING_R2_MEDIA_ACCESS_KEY_ID",
+      "STAGING_R2_MEDIA_SECRET_ACCESS_KEY",
+      "STAGING_R2_BACKUP_ACCESS_KEY_ID",
+      "STAGING_R2_BACKUP_SECRET_ACCESS_KEY",
+      "STAGING_R2_MEDIA_READ_ACCESS_KEY_ID",
+      "STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY",
+      "STAGING_CONVEX_BACKUP_ADMIN_KEY"
     ],
     "convexStagingSet": [
-      "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET", "DEEPSEEK_API_KEY", "OPENROUTER_API_KEY",
-      "RESEND_API_KEY", "RESEND_FROM", "JWT_PRIVATE_KEY", "JWKS", "KIERO_SERVICE_TOKEN",
-      "KIERO_MEDIA_WORKER_TOKEN", "KIERO_CALENDAR_TOKEN_KEY", "SITE_URL",
-      "KIERO_CALENDAR_APP_BASE_URL", "KIERO_CALENDAR_REDIRECT_URI", "KIERO_ENVIRONMENT",
-      "KIERO_DEPLOYMENT_LABEL", "WEB_PUSH_VAPID_PUBLIC_KEY", "WEB_PUSH_VAPID_PRIVATE_KEY",
+      "AUTH_GOOGLE_ID",
+      "AUTH_GOOGLE_SECRET",
+      "DEEPSEEK_API_KEY",
+      "OPENROUTER_API_KEY",
+      "RESEND_API_KEY",
+      "RESEND_FROM",
+      "JWT_PRIVATE_KEY",
+      "JWKS",
+      "KIERO_SERVICE_TOKEN",
+      "KIERO_MEDIA_WORKER_TOKEN",
+      "KIERO_CALENDAR_TOKEN_KEY",
+      "SITE_URL",
+      "KIERO_CALENDAR_APP_BASE_URL",
+      "KIERO_CALENDAR_REDIRECT_URI",
+      "KIERO_ENVIRONMENT",
+      "KIERO_DEPLOYMENT_LABEL",
+      "WEB_PUSH_VAPID_PUBLIC_KEY",
+      "WEB_PUSH_VAPID_PRIVATE_KEY",
       "WEB_PUSH_VAPID_SUBJECT"
     ],
     "convexStagingPendingOwner": [
-      "AXIOM_API_TOKEN", "AXIOM_DATASET", "KIERO_GM_EMAILS", "CONVEX_BACKUP_ADMIN_KEY (backup runtime)",
+      "AXIOM_API_TOKEN",
+      "AXIOM_DATASET",
+      "KIERO_GM_EMAILS",
+      "CONVEX_BACKUP_ADMIN_KEY (backup runtime)",
       "executor URLs (KIERO_MEDIA_WORKER_URL, KIERO_IMAGES_EXECUTOR_URL, KIERO_EXPORT_EXECUTOR_URL, KIERO_BACKUP_WORKER_URL, KIERO_PURGE_EXECUTOR_URL) until the staging Workers exist"
     ],
     "vapIdNote": "VAPID trio generated 2026-09-14 by the I8 session (fresh P-256 pair, RFC 8292 shapes validated in memory; subject = the public staging web origin); values never printed, stored via --from-file on tmpfs"
@@ -154,12 +293,58 @@
         "checksExactSha": "PASS (GitHub API observed Checks success on exactly 3cf9f6e, run 34873210524)"
       },
       "componentOutcomes": [
-        { "component": "web", "outcome": "blocked", "reason": "missing-configuration", "missingConfigNames": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"], "note": "VITE_CONVEX_URL and VITE_GATEWAY_URL were both present" },
-        { "component": "convex-functions", "outcome": "blocked", "reason": "target-verification-failed", "note": "R9 parser false-mismatch: provider-observed identity matched the pin on every field except url, which carried the CLI spinner's trailing ellipsis (convex 1.45.0 deploy2.ts showSpinner 'Deploying to <url>... [dry run]' reaches stderr in non-TTY CI and parseConvexAnnouncement prefers it over the announcement line). No mutation ran" },
-        { "component": "gateway", "outcome": "blocked", "reason": "missing-configuration", "missingConfigNames": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"] },
-        { "component": "media-worker", "outcome": "blocked", "reason": "missing-configuration", "missingConfigNames": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"] },
-        { "component": "export-worker", "outcome": "blocked", "reason": "missing-configuration", "missingConfigNames": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"] },
-        { "component": "backup-worker", "outcome": "blocked", "reason": "missing-configuration", "missingConfigNames": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"] }
+        {
+          "component": "web",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ],
+          "note": "VITE_CONVEX_URL and VITE_GATEWAY_URL were both present"
+        },
+        {
+          "component": "convex-functions",
+          "outcome": "blocked",
+          "reason": "target-verification-failed",
+          "note": "R9 parser false-mismatch: provider-observed identity matched the pin on every field except url, which carried the CLI spinner's trailing ellipsis (convex 1.45.0 deploy2.ts showSpinner 'Deploying to <url>... [dry run]' reaches stderr in non-TTY CI and parseConvexAnnouncement prefers it over the announcement line). No mutation ran"
+        },
+        {
+          "component": "gateway",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        },
+        {
+          "component": "media-worker",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        },
+        {
+          "component": "export-worker",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        },
+        {
+          "component": "backup-worker",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        }
       ],
       "providerObservedConvexIdentity": {
         "source": "deploy-outcomes.json artifact (release-evidence-staging), provider-observed through the R9 read-only probe",
@@ -189,12 +374,59 @@
         "checksExactSha": "PASS (GitHub API observed Checks success on exactly 5780d80, run 34880443066; dispatch waited for its completion)"
       },
       "componentOutcomes": [
-        { "component": "web", "outcome": "blocked", "reason": "missing-configuration", "missingConfigNames": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"], "note": "VITE_CONVEX_URL and VITE_GATEWAY_URL present again" },
-        { "component": "convex-functions", "outcome": "deployed", "digest": "ff07541bdb67957845bba85bca3658196ee0b95f25a9be93cd1e26c3da2f468d", "fileCount": 301, "note": "identity verification passed after R15; first real functions push to staging" },
-        { "component": "gateway", "outcome": "blocked", "reason": "missing-configuration", "missingConfigNames": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"] },
-        { "component": "media-worker", "outcome": "blocked", "reason": "missing-configuration", "missingConfigNames": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"] },
-        { "component": "export-worker", "outcome": "blocked", "reason": "missing-configuration", "missingConfigNames": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"] },
-        { "component": "backup-worker", "outcome": "blocked", "reason": "missing-configuration", "missingConfigNames": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"] }
+        {
+          "component": "web",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ],
+          "note": "VITE_CONVEX_URL and VITE_GATEWAY_URL present again"
+        },
+        {
+          "component": "convex-functions",
+          "outcome": "deployed",
+          "digest": "ff07541bdb67957845bba85bca3658196ee0b95f25a9be93cd1e26c3da2f468d",
+          "fileCount": 301,
+          "note": "identity verification passed after R15; first real functions push to staging"
+        },
+        {
+          "component": "gateway",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        },
+        {
+          "component": "media-worker",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        },
+        {
+          "component": "export-worker",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        },
+        {
+          "component": "backup-worker",
+          "outcome": "blocked",
+          "reason": "missing-configuration",
+          "missingConfigNames": [
+            "CLOUDFLARE_API_TOKEN",
+            "CLOUDFLARE_ACCOUNT_ID"
+          ]
+        }
       ],
       "providerObservedConvexIdentity": {
         "source": "deploy-outcomes.json artifact (release-evidence-staging), provider-observed by the transport's announcement re-parse",
@@ -220,8 +452,15 @@
   ],
   "isolation": {
     "mechanism": "named Convex deployment inside kiero-dev-core (per-deployment data, credentials, scheduler, storage) + kiero-staging-* Cloudflare resources + STAGING_-prefixed GitHub secrets",
-    "perDeploymentBoundaries": ["database", "environment-variables-and-auth-keys", "scheduler", "file-storage"],
-    "sharedWithDev": ["Convex project plan usage quota (accepted by the owner instruction; not a defect; no workarounds permitted)"],
+    "perDeploymentBoundaries": [
+      "database",
+      "environment-variables-and-auth-keys",
+      "scheduler",
+      "file-storage"
+    ],
+    "sharedWithDev": [
+      "Convex project plan usage quota (accepted by the owner instruction; not a defect; no workarounds permitted)"
+    ],
     "fixtureAuthorizationOnQualificationPath": "must remain unset on the staging deployment: KIERO_B1_PROOF_ENABLED, KIERO_B2_PROOF_ENABLED, KIERO_B3_PROOF_ENABLED, KIERO_B4_PROOF_ENABLED, KIERO_C1_PROOF_ENABLED, KIERO_C4_PROOF_ENABLED, KIERO_E5_PROOF_ENABLED, KIERO_F3_PROOF_ENABLED, KIERO_G1_PROOF_ENABLED, KIERO_G2_PROOF_ENABLED, KIERO_G3_PROOF_ENABLED, KIERO_H3_PROOF_ENABLED, KIERO_H4_PROOF_ENABLED, KIERO_PROBE_ENABLED, KIERO_ECHO_TARGET, KIERO_CALENDAR_GOOGLE_API_BASE_OVERRIDE, KIERO_CALENDAR_TOKEN_ENDPOINT_OVERRIDE"
   },
   "localProbes": [
@@ -284,5 +523,22 @@
     "KIERO_GM_EMAILS (staging GM allow-list), alert recipient and CONVEX_BACKUP_ADMIN_KEY: owner choices, unset",
     "configure alpha-production reviewers and branch policy using protected_branches/custom_branch_policies and the separate deployment branch-policy endpoint after the owner identity decision",
     "re-run the release, then the ordinary authenticated smoke (Google sign-in via the pinned redirect URIs, Resend OTP/invite send with the owner-chosen recipient, DeepSeek chat/vision + OpenRouter STT/embeddings calls from the deployed staging functions, web origin SPA/sw.js, gateway health)"
-  ]
+  ],
+  "ownerDecisions": {
+    "stagingGm": {
+      "email": "wojtek@honestly.design",
+      "decided": "2026-09-15",
+      "note": "Owner decision in the unblocking session; the GM role is granted during staging initialization."
+    },
+    "ownerAlertRecipient": {
+      "email": "wojtek@honestly.design",
+      "decided": "2026-09-15",
+      "note": "Same address as GM; I11 cost-threshold (PLN 400/500) and incident alerts destination."
+    },
+    "telemetry": {
+      "provider": "Axiom",
+      "decided": "2026-09-15",
+      "note": "Owner creates the account, dataset and ingest token; ingested through the unblock wizard."
+    }
+  }
 }
