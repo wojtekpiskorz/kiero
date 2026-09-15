@@ -29,11 +29,11 @@ M2 #166 through M11 #216, R8 #167, R9 #168, R10 #171, R11 #169, R12 #181, R13 #1
 
 R1-R3 repair clarification provenance, purge and push delivery; R2 and R3 are closed with their evidence. R4 protects source reassignment against stale editors. R5 fixes old-source links and is closed with its live-leg evidence. R6 replaces the broken/placeholder release path with executable tooling. R7 removes the known Calendar test timing flake while preserving timeout assertions.
 
-I8 completes the isolated qualification environment and actual release after the new repairs. B5, D7 and I11 then prove actual identity, media and alert delivery. I9 proves export, I10 proves complete scheduled backups, I6 proves quarantined restore, and J6 rechecks the joined repaired application. J3 and J4 qualify AI and physical devices/Google. J5 audits complete core delivery.
+I8 completed the isolated qualification environment and the actual release. B5, D7 and I11 now prove actual identity, media and alert delivery. I9 proves export, I10 proves complete scheduled backups, I6 proves quarantined restore, and J6 rechecks the joined repaired application. J3 and J4 qualify AI and physical devices/Google. J5 audits complete core delivery.
 
 ## Resources and unresolved external work
 
-The owner's later [Convex instruction](https://github.com/wojtekpiskorz/kiero/issues/15#issuecomment-5618841487) keeps proof refs under the existing `kiero-dev-core` project and forbids creating projects to escape quota. I8 must prove equivalent staging isolation within that constraint; I6 must prove quarantine isolation. If impossible, keep the owning issue OPEN/BLOCKED with the exact owner decision required.
+The owner's later [Convex instruction](https://github.com/wojtekpiskorz/kiero/issues/15#issuecomment-5618841487) keeps proof refs under the existing `kiero-dev-core` project and forbids creating projects to escape quota. I8 proved equivalent staging isolation within that constraint; I6 must prove quarantine isolation. If impossible, keep the owning issue OPEN/BLOCKED with the exact owner decision required.
 
 Real credentials, two Google accounts, tester handsets plus iPhone/Android coverage, configured alert destinations and more than seven elapsed days are explicit task prerequisites. Credential presence is not runtime proof. Provision only within the task's authorized scope and use server-side secret stores. The implementation sequence cannot compress the required Google observation interval.
 
