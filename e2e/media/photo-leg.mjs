@@ -46,8 +46,14 @@ console.log("[fixtures]", JSON.stringify(Object.fromEntries(Object.entries(fixtu
 const mailbox = JSON.parse((await run("node", [join(root, "tools", "smoke", "mailbox.mjs"), "account", "--out", `${OUT}/mailbox.json`])).stdout);
 console.log(`[mailbox] ${mailbox.address}`);
 
-const browser = await chromium.launch({ executablePath: CHROMIUM, headless: true });
-const page = await (await browser.newContext({ locale: "pl-PL" })).newPage();
+const PROFILE = value("--profile", "/tmp/kiero-smoke/d7/profile");
+const browser = await chromium.launchPersistentContext(PROFILE, {
+  executablePath: CHROMIUM,
+  headless: true,
+  locale: "pl-PL",
+  viewport: { width: 1400, height: 900 },
+});
+const page = await browser.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
 const snap = async (tag) => {
@@ -57,26 +63,49 @@ const snap = async (tag) => {
   return body;
 };
 
-// Session through the funnel (sign-in, company).
+// Session: reuse the persistent profile's session when it still resolves;
+// otherwise a fresh funnel login (patient, mail.tm latency varies).
+async function signedIn() {
+  const text = await page.evaluate(() => document.body?.innerText ?? "");
+  return !text.includes("Zaloguj się do Kiero") && /Firma|Rozmowa firmy/.test(text);
+}
 await page.goto(WEB, { waitUntil: "domcontentloaded" });
-await page.waitForTimeout(2000);
-await page.getByLabel("Adres e-mail").fill(mailbox.address);
-const since = new Date().toISOString();
-await page.getByRole("button", { name: "Wyślij kod" }).click();
-await page.waitForTimeout(2000);
-const { stdout } = await run("node", [
-  join(root, "tools", "smoke", "mailbox.mjs"), "wait-code",
-  "--address", mailbox.address, "--password", mailbox.password, "--since", since, "--timeout", "420",
-]);
-await page.getByLabel("Kod z wiadomości").fill(/CODE=(\d{8})/.exec(stdout)[1]);
-await page.getByRole("button", { name: "Zaloguj się kodem" }).click();
-await page.waitForTimeout(6000);
+await page.waitForTimeout(3000);
+if (await signedIn()) {
+  console.log("[session] reused persistent profile");
+} else {
+  let signed = false;
+  for (let attempt = 1; attempt <= 3 && !signed; attempt++) {
+    console.log(`[session] funnel login attempt ${attempt}`);
+    await page.getByLabel("Adres e-mail").fill(mailbox.address);
+    const since = new Date().toISOString();
+    await page.getByRole("button", { name: "Wyślij kod" }).click();
+    await page.waitForTimeout(2000);
+    const { stdout } = await run("node", [
+      join(root, "tools", "smoke", "mailbox.mjs"), "wait-code",
+      "--address", mailbox.address, "--password", mailbox.password, "--since", since, "--timeout", "420",
+    ]).catch(() => ({ stdout: "" }));
+    const code = /CODE=(\d{8})/.exec(stdout)?.[1];
+    if (code === undefined) { console.log("[session] code did not arrive; retrying"); continue; }
+    await page.getByLabel("Kod z wiadomości").fill(code);
+    await page.getByRole("button", { name: "Zaloguj się kodem" }).click();
+    await page.waitForTimeout(6000);
+    signed = await signedIn();
+  }
+  if (!signed) throw new Error("funnel login failed after 3 attempts");
+}
+const mailboxRecord = JSON.parse(await (await import("node:fs/promises")).readFile(`${OUT}/mailbox.json`, "utf8"));
 await page.goto(`${WEB}/firma`, { waitUntil: "domcontentloaded" });
 await page.waitForTimeout(3000);
-await page.getByLabel("Nazwa firmy").fill("Firma Media D7");
-await page.getByRole("button", { name: "Załóż firmę" }).click();
-await page.waitForTimeout(6000);
-console.log("[firma]", (await snap("1-firma")).includes("Jesteś administratorem tej firmy") ? "PASS" : "STATE?");
+const firmaText = await page.evaluate(() => document.body?.innerText ?? "");
+if (firmaText.includes("Jesteś administratorem tej firmy")) {
+  console.log("[firma] PASS: existing company reused");
+} else {
+  await page.getByLabel("Nazwa firmy").fill("Firma Media D7");
+  await page.getByRole("button", { name: "Załóż firmę" }).click();
+  await page.waitForTimeout(6000);
+  console.log("[firma]", (await snap("1-firma")).includes("Jesteś administratorem tej firmy") ? "PASS" : "STATE?");
+}
 
 // The composer walk.
 await page.goto(WEB, { waitUntil: "domcontentloaded" });
@@ -122,9 +151,11 @@ try {
 // Stage 4b: the full dossier page (/zrodlo permalink) with real media rendering.
 const perma = dossier.match(/https:\/\/[^\s]+\/zrodlo\?zrodlo=[a-z0-9]+/)?.[0]
   ?? (await page.evaluate(() => Array.from(document.querySelectorAll('a[href*="/zrodlo?"]')).map((a) => a.getAttribute("href")))).at(-1);
+console.log("[media] perma:", String(perma).slice(0, 120));
 if (perma !== undefined) {
-  const u = perma.startsWith("http") ? new URL(perma) : new URL(perma, WEB);
-  await page.goto(`${u.pathname}${u.search}`, { waitUntil: "domcontentloaded" });
+  let u;
+  try { u = perma.startsWith("http") ? new URL(perma) : new URL(perma, WEB); } catch { u = new URL("/zrodlo", WEB); }
+  await page.goto(u.href, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(7000);
   const mediaInfo = await page.evaluate(async () => {
     const imgs = Array.from(document.querySelectorAll("img")).map((i) => i.getAttribute("src") ?? "");
@@ -150,17 +181,20 @@ try {
 await page.goto(WEB, { waitUntil: "domcontentloaded" });
 await page.waitForTimeout(4000);
 const ask = page.getByRole("button", { name: "Zapytaj agenta o tę wiadomość" });
+console.log("[agent] ask button count:", await ask.count());
 if ((await ask.count()) >= 1) {
   await ask.first().click();
   let afterAsk = "";
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 18; i++) {
     await page.waitForTimeout(10_000);
     afterAsk = await page.evaluate(() => document.body?.innerText ?? "");
     if (/Odpowiedź agenta|Nie udało się uzyskać odpowiedzi/.test(afterAsk)) break;
   }
   await page.screenshot({ path: `${OUT}/4c-agent.png`, fullPage: true });
+  const { writeFileSync } = await import("node:fs");
+  writeFileSync(`${OUT}/4c-agent.txt`, afterAsk);
   const m = afterAsk.match(/(Odpowiedź agenta|Nie udało si[^\n]*)[\s\S]{0,1100}/);
-  console.log("[agent answer]", m ? m[0].replace(/\n/g, " | ").slice(0, 900) : "not rendered after 120s");
+  console.log("[agent answer]", m ? m[0].replace(/\n/g, " | ").slice(0, 900) : "not rendered after 180s");
 }
 
 } catch (e) { console.log("[agent] STAGE_ERROR:", String(e).slice(0, 300)); }

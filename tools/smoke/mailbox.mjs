@@ -145,6 +145,44 @@ async function commandWaitCode(args) {
   }
 }
 
+async function commandInvitationCode(args) {
+  const value = (flag) => {
+    const at = args.indexOf(flag);
+    return at >= 0 ? args[at + 1] : undefined;
+  };
+  const address = value("--address") ?? fail("--address is required");
+  const password = value("--password") ?? fail("--password is required");
+  const timeoutMs = (Number(value("--timeout") ?? 420)) * 1000;
+  const startedAt = Date.now();
+  for (;;) {
+    const messages = await fetchMessages(address, password);
+    const candidates = messages.filter((m) => (m.subject ?? "").startsWith("Kiero — zaproszenie"));
+    if (candidates.length > 0) {
+      const newest = candidates.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+      const token = await loginToken(address, password);
+      const full = await api(newest["@id"] ?? `/messages/${newest.id}`, { headers: { authorization: `Bearer ${token}` } });
+      const codes = candidates
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+        .map((m) => ({ id: m.id, at: m.createdAt }));
+      const collected = [];
+      for (const c of codes) {
+        const token2 = await loginToken(address, password);
+        const full2 = await api(`/messages/${c.id}`, { headers: { authorization: `Bearer ${token2}` } });
+        const code = /Kod zaproszenia:\s*(\d{8})/.exec(full2.text ?? "")?.[1] ?? /(\d{8})/.exec(full2.text ?? "")?.[1];
+        if (code !== undefined) collected.push(code);
+      }
+      if (collected.length > 0) {
+        console.log(`CODES=${collected.join(",")}`);
+        return;
+      }
+    }
+    if (Date.now() - startedAt > timeoutMs) {
+      fail(`no invitation mail within ${timeoutMs / 1000}s`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 4000));
+  }
+}
+
 async function commandLatest(args) {
   const value = (flag) => {
     const at = args.indexOf(flag);
@@ -173,7 +211,9 @@ if (isCliEntry) {
     await commandWaitCode(rest);
   } else if (command === "latest") {
     await commandLatest(rest);
+  } else if (command === "invitation-code") {
+    await commandInvitationCode(rest);
   } else {
-    fail("usage: mailbox.mjs account | wait-code | latest (see the header comment)");
+    fail("usage: mailbox.mjs account | wait-code | latest | invitation-code (see the header comment)");
   }
 }
