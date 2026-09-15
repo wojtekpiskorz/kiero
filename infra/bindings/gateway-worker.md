@@ -19,6 +19,7 @@ media upload/playback/export routes). Configuration skeleton:
 
 | Name | Purpose | Injected via | Status |
 | --- | --- | --- | --- |
+| `KIERO_SERVICE_TOKEN` | Service bearer the verified Convex protocol routes require (`/platform/bridge`, `/operations/*`); the gateway bridge guards BOTH this and `CONVEX_SITE_URL` | release workflow injection step (`infra/release/inject-worker-secrets.mjs`, descriptor `runtimeSecrets`); matching value is the Convex deployment variable of the same name | INJECTED by the staging release (I8) |
 | `AXIOM_API_TOKEN` | Axiom ingestion for redacted diagnostics and Cloudflare Worker telemetry | `wrangler secret put AXIOM_API_TOKEN --config apps/gateway/wrangler.jsonc [--env <env>]` | PENDING owner account provisioning (I2 consumer implemented; without it the gateway falls back to the Convex ingest endpoint) |
 
 ## Notes

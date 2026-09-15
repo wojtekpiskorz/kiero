@@ -40,7 +40,10 @@
           "isDefault": false
         }
       },
-      "requiredConfig": ["CONVEX_DEPLOYMENT", "CONVEX_DEPLOY_KEY"]
+      "requiredConfig": [
+        "CONVEX_DEPLOYMENT",
+        "CONVEX_DEPLOY_KEY"
+      ]
     },
     {
       "id": "gateway",
@@ -53,7 +56,20 @@
         "wranglerEnv": "staging",
         "workerName": "kiero-staging-gateway"
       },
-      "requiredConfig": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+      "requiredConfig": [
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID"
+      ],
+      "runtimeSecrets": [
+        {
+          "name": "KIERO_SERVICE_TOKEN",
+          "source": "STAGING_KIERO_SERVICE_TOKEN"
+        },
+        {
+          "name": "AXIOM_API_TOKEN",
+          "source": "STAGING_AXIOM_API_TOKEN"
+        }
+      ]
     },
     {
       "id": "media-worker",
@@ -66,7 +82,28 @@
         "wranglerEnv": "staging",
         "workerName": "kiero-staging-media-worker"
       },
-      "requiredConfig": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+      "requiredConfig": [
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID"
+      ],
+      "runtimeSecrets": [
+        {
+          "name": "MEDIA_SEGMENT_TOKEN",
+          "source": "STAGING_KIERO_MEDIA_WORKER_TOKEN"
+        },
+        {
+          "name": "R2_MEDIA_ACCESS_KEY_ID",
+          "source": "STAGING_R2_MEDIA_ACCESS_KEY_ID"
+        },
+        {
+          "name": "R2_MEDIA_SECRET_ACCESS_KEY",
+          "source": "STAGING_R2_MEDIA_SECRET_ACCESS_KEY"
+        },
+        {
+          "name": "AXIOM_API_TOKEN",
+          "source": "STAGING_AXIOM_API_TOKEN"
+        }
+      ]
     },
     {
       "id": "export-worker",
@@ -79,7 +116,28 @@
         "wranglerEnv": "staging",
         "workerName": "kiero-staging-export-worker"
       },
-      "requiredConfig": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+      "requiredConfig": [
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID"
+      ],
+      "runtimeSecrets": [
+        {
+          "name": "KIERO_SERVICE_TOKEN",
+          "source": "STAGING_KIERO_SERVICE_TOKEN"
+        },
+        {
+          "name": "R2_MEDIA_ACCESS_KEY_ID",
+          "source": "STAGING_R2_MEDIA_ACCESS_KEY_ID"
+        },
+        {
+          "name": "R2_MEDIA_SECRET_ACCESS_KEY",
+          "source": "STAGING_R2_MEDIA_SECRET_ACCESS_KEY"
+        },
+        {
+          "name": "AXIOM_API_TOKEN",
+          "source": "STAGING_AXIOM_API_TOKEN"
+        }
+      ]
     },
     {
       "id": "backup-worker",
@@ -92,7 +150,41 @@
         "wranglerEnv": "staging",
         "workerName": "kiero-staging-backup-worker"
       },
-      "requiredConfig": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+      "requiredConfig": [
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID"
+      ],
+      "runtimeSecrets": [
+        {
+          "name": "R2_BACKUP_ACCESS_KEY_ID",
+          "source": "STAGING_R2_BACKUP_ACCESS_KEY_ID"
+        },
+        {
+          "name": "R2_BACKUP_SECRET_ACCESS_KEY",
+          "source": "STAGING_R2_BACKUP_SECRET_ACCESS_KEY"
+        },
+        {
+          "name": "R2_MEDIA_READ_ACCESS_KEY_ID",
+          "source": "STAGING_R2_MEDIA_READ_ACCESS_KEY_ID"
+        },
+        {
+          "name": "R2_MEDIA_READ_SECRET_ACCESS_KEY",
+          "source": "STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY"
+        },
+        {
+          "name": "KIERO_SERVICE_TOKEN",
+          "source": "STAGING_KIERO_SERVICE_TOKEN"
+        },
+        {
+          "name": "AXIOM_API_TOKEN",
+          "source": "STAGING_AXIOM_API_TOKEN"
+        },
+        {
+          "name": "CONVEX_BACKUP_ADMIN_KEY",
+          "source": "STAGING_CONVEX_BACKUP_ADMIN_KEY",
+          "deferred": true
+        }
+      ]
     }
   ]
 }

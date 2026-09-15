@@ -272,9 +272,9 @@
       "AXIOM_DATASET"
     ],
     "convexStagingPendingOwner": [
-      "KIERO_GM_EMAILS",
-      "CONVEX_BACKUP_ADMIN_KEY (backup runtime)",
-      "executor URLs (KIERO_MEDIA_WORKER_URL, KIERO_IMAGES_EXECUTOR_URL, KIERO_EXPORT_EXECUTOR_URL, KIERO_BACKUP_WORKER_URL, KIERO_PURGE_EXECUTOR_URL) until the staging Workers exist"
+      "KIERO_GM_EMAILS (owner allow-list value, granted during staging initialization)",
+      "CONVEX_BACKUP_ADMIN_KEY (backup runtime; I10)",
+      "executor URLs (KIERO_MEDIA_WORKER_URL, KIERO_IMAGES_EXECUTOR_URL, KIERO_EXPORT_EXECUTOR_URL, KIERO_BACKUP_WORKER_URL, KIERO_PURGE_EXECUTOR_URL): the staging workers exist since run 34953365470; the fills are recorded for the next configuration round"
     ],
     "vapIdNote": "VAPID trio generated 2026-09-14 by the I8 session (fresh P-256 pair, RFC 8292 shapes validated in memory; subject = the public staging web origin); values never printed, stored via --from-file on tmpfs",
     "note": "Pending-owner lists reflect the 2026-09-15 state; only CONVEX_BACKUP_ADMIN_KEY remains a live owner ask on GitHub staging."
