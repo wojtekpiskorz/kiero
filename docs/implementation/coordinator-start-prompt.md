@@ -29,10 +29,13 @@ Start with:
 Baseline at the 2026-09-15 post-smoke handoff (verify, do not assume):
 
 - Main `13e26d4` plus the merged I8 evidence PR (smoke record +
-  owner-credential BLOCK). Audit remote PASS: 87 map entries after the
-  M9 registration, 203 core edges, 74 closed before M9's own closure,
-  12 open: I6 #58, J3 #62, J4 #63, J5 #64, I8 #133, B5 #134, D7 #135,
-  I9 #136, I10 #137, I11 #138, J6 #139, C6 #197. One PR may be open for
+  owner-credential BLOCK). Audit remote PASS: 88 map entries after the
+  M9 and R17 registrations, 204 core edges, 74 closed before M9's own
+  closure,
+  13 open: I6 #58, J3 #62, J4 #63, J5 #64, I8 #133, B5 #134, D7 #135,
+  I9 #136, I10 #137, I11 #138, J6 #139, C6 #197 and R17 #209 (the
+  export executor URL convention repair found by the #206 review; a new
+  ready root that blocks I9). One PR may be open for
   I8's evidence if the Actions outage delayed its merge.
 - The whole staging stack is LIVE end-to-end: web PWA (SPA fallback,
   sw.js) on kiero-staging-web.wojtek-524.workers.dev, gateway with a
@@ -92,13 +95,16 @@ Open positions to watch:
   review caught it against the code (the gateway owns
   POST /images/normalize) and the live value was corrected to the
   gateway on 2026-09-15 (candidate.json executorUrlAssignments). D7
-  still verifies loudly at the first real normalize run.
+  still verifies loudly at the first real normalize run. The export
+  name has a known consumer conflict (verbatim fetch vs appended route)
+  owned by R17 #209, a native blocker of I9; the bare origin is set so
+  cleanup works and the build drive 404s until R17 lands.
 - J4: physical iPhone+Android devices and VAPID at runtime are real
   resources.
 - Alpha-production policy (reviewer/branch policy): decide at J5.
 - Cache-flip pattern: closures need a bounded M-issue (M2-M9 precedent);
-  tests/m1 fixtures pin the graph counts (87 entries / 203 edges after
-  M9).
+  tests/m1 fixtures pin the graph counts (88 entries / 204 edges after
+  M9 + R17).
 - The PWA update handshake (client fetch of the Convex .site
   /platform/health) is CORS-blocked in the deployed topology (an honest
   "unavailable" degradation), recorded as a J4/J6 follow-up, not an I8
