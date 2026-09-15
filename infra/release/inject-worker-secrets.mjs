@@ -87,12 +87,8 @@ let failed = false;
 for (const component of descriptor.components) {
   if (component.included !== true) continue;
   if ((component.runtimeSecrets ?? []).length === 0) continue;
-  if (component.transport.kind !== "wrangler-deploy") {
-    process.stderr.write(
-      `component ${component.id}: runtimeSecrets is only implemented for wrangler-deploy transports\n`,
-    );
-    process.exit(2);
-  }
+  // parseTargetDescriptor already rejects runtimeSecrets on non
+  // wrangler-deploy transports, so the worker name is present here.
   const { payload, deferred, refused } = planComponent(component);
   outcomes.push(...deferred.map((d) => ({ outcome: "deferred", ...d })));
   if (refused.length > 0) {

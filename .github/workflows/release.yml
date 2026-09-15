@@ -160,7 +160,8 @@ jobs:
         env:
           # The injector reads process.env[<descriptor source>], so the env
           # keys ARE the descriptor's STAGING_ source names (the
-          # release-guards cross-check pins this wiring).
+          # tests/i7/inject-worker-secrets.test.ts cross-check pins this
+          # wiring).
           STAGING_KIERO_SERVICE_TOKEN: ${{ secrets.STAGING_KIERO_SERVICE_TOKEN }}
           STAGING_KIERO_MEDIA_WORKER_TOKEN: ${{ secrets.STAGING_KIERO_MEDIA_WORKER_TOKEN }}
           STAGING_AXIOM_API_TOKEN: ${{ secrets.STAGING_AXIOM_API_TOKEN }}
