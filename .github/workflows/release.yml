@@ -110,6 +110,18 @@ jobs:
       CONVEX_DEPLOY_KEY: ${{ secrets.STAGING_CONVEX_DEPLOY_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
+      # I8 worker-secret sources (values server-side; consumed by the
+      # injection step over stdin only). Names follow the binding docs.
+      GATEWAY_SERVICE_TOKEN: ${{ secrets.STAGING_KIERO_SERVICE_TOKEN }}
+      WORKER_MEDIA_SEGMENT_TOKEN: ${{ secrets.STAGING_KIERO_MEDIA_WORKER_TOKEN }}
+      WORKER_AXIOM_API_TOKEN: ${{ secrets.STAGING_AXIOM_API_TOKEN }}
+      WORKER_R2_MEDIA_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_MEDIA_ACCESS_KEY_ID }}
+      WORKER_R2_MEDIA_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_MEDIA_SECRET_ACCESS_KEY }}
+      WORKER_R2_BACKUP_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_BACKUP_ACCESS_KEY_ID }}
+      WORKER_R2_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_BACKUP_SECRET_ACCESS_KEY }}
+      WORKER_R2_MEDIA_READ_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_MEDIA_READ_ACCESS_KEY_ID }}
+      WORKER_R2_MEDIA_READ_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY }}
+      WORKER_CONVEX_BACKUP_ADMIN_KEY: ${{ secrets.STAGING_CONVEX_BACKUP_ADMIN_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -137,6 +149,7 @@ jobs:
           --descriptor infra/release/targets/staging.json
           --token-env CHECKS_GITHUB_TOKEN --out checks-report.json
       - name: Deploy every descriptor component through the checked adapter
+        id: deploy
         if: ${{ always() }}
         run: >
           node infra/release/deploy-component.mjs
@@ -144,6 +157,44 @@ jobs:
           --revision "$GITHUB_SHA" --checks-report checks-report.json
           --ledger infra/release/evidence/releases.jsonl
           --outcomes deploy-outcomes.json
+      # I8: worker RUNTIME secret injection. The transports above deploy
+      # code and config (vars) only; the worker SECRETS (service bearer,
+      # media segment token, per-bucket R2 keys, telemetry) are a separate
+      # Cloudflare plane that must be set per worker after it exists.
+      # Values flow GitHub secret -> env -> stdin; wrangler never prints
+      # the value (it reads stdin) so the log stays names-only. An unset
+      # source skips that name with a names-only note (e.g.
+      # CONVEX_BACKUP_ADMIN_KEY until I10).
+      - name: Inject worker runtime secrets (names only; values over stdin)
+        if: steps.deploy.outcome == 'success'
+        run: |
+          set -eu
+          inject() {
+            WORKER="$1"; NAME="$2"; VALUE="$3"
+            if [ -z "$VALUE" ]; then
+              printf 'skip %s/%s: source unset\n' "$WORKER" "$NAME"
+              return 0
+            fi
+            printf '%s' "$VALUE" | npx --no-install wrangler secret put "$NAME" --name "$WORKER"
+            printf 'injected %s/%s\n' "$WORKER" "$NAME"
+          }
+          inject kiero-staging-gateway KIERO_SERVICE_TOKEN "$GATEWAY_SERVICE_TOKEN"
+          inject kiero-staging-gateway AXIOM_API_TOKEN "$WORKER_AXIOM_API_TOKEN"
+          inject kiero-staging-media-worker MEDIA_SEGMENT_TOKEN "$WORKER_MEDIA_SEGMENT_TOKEN"
+          inject kiero-staging-media-worker R2_MEDIA_ACCESS_KEY_ID "$WORKER_R2_MEDIA_ACCESS_KEY_ID"
+          inject kiero-staging-media-worker R2_MEDIA_SECRET_ACCESS_KEY "$WORKER_R2_MEDIA_SECRET_ACCESS_KEY"
+          inject kiero-staging-media-worker AXIOM_API_TOKEN "$WORKER_AXIOM_API_TOKEN"
+          inject kiero-staging-export-worker KIERO_SERVICE_TOKEN "$GATEWAY_SERVICE_TOKEN"
+          inject kiero-staging-export-worker R2_MEDIA_ACCESS_KEY_ID "$WORKER_R2_MEDIA_ACCESS_KEY_ID"
+          inject kiero-staging-export-worker R2_MEDIA_SECRET_ACCESS_KEY "$WORKER_R2_MEDIA_SECRET_ACCESS_KEY"
+          inject kiero-staging-export-worker AXIOM_API_TOKEN "$WORKER_AXIOM_API_TOKEN"
+          inject kiero-staging-backup-worker R2_BACKUP_ACCESS_KEY_ID "$WORKER_R2_BACKUP_ACCESS_KEY_ID"
+          inject kiero-staging-backup-worker R2_BACKUP_SECRET_ACCESS_KEY "$WORKER_R2_BACKUP_SECRET_ACCESS_KEY"
+          inject kiero-staging-backup-worker R2_MEDIA_READ_ACCESS_KEY_ID "$WORKER_R2_MEDIA_READ_ACCESS_KEY_ID"
+          inject kiero-staging-backup-worker R2_MEDIA_READ_SECRET_ACCESS_KEY "$WORKER_R2_MEDIA_READ_SECRET_ACCESS_KEY"
+          inject kiero-staging-backup-worker KIERO_SERVICE_TOKEN "$GATEWAY_SERVICE_TOKEN"
+          inject kiero-staging-backup-worker AXIOM_API_TOKEN "$WORKER_AXIOM_API_TOKEN"
+          inject kiero-staging-backup-worker CONVEX_BACKUP_ADMIN_KEY "$WORKER_CONVEX_BACKUP_ADMIN_KEY"
       - name: Record the release attempt (append-only, digests only)
         if: ${{ always() }}
         run: >
