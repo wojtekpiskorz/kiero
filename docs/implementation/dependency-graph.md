@@ -1,6 +1,6 @@
 # Core dependency graph
 
-Snapshot reconciled on 2026-09-15. Historical reviewed application `4aa1cc64b3ecab669c76ffa672832d4c5638ac68`. Native GitHub blockers determine current readiness. There are 204 core edges and one external planning edge, A0 blocked by completed #13.
+Snapshot reconciled on 2026-09-15. Historical reviewed application `4aa1cc64b3ecab669c76ffa672832d4c5638ac68`. Native GitHub blockers determine current readiness. There are 206 core edges and one external planning edge, A0 blocked by completed #13.
 
 ## Remaining work
 
@@ -20,7 +20,6 @@ flowchart TD
   I11["I11 #138"]
   J6["J6 #139"]
   C6["C6 #197"]
-  R17["R17 #209"]
   I10 --> I6
   J6 --> J3
   J6 --> J4
@@ -32,7 +31,6 @@ flowchart TD
   I8 --> B5
   I8 --> D7
   D7 --> I9
-  R17 --> I9
   D7 --> I10
   I8 --> I11
   D7 --> J6
@@ -101,7 +99,7 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [J2 #61](https://github.com/wojtekpiskorz/kiero/issues/61) | CLOSED | [D4 #32](https://github.com/wojtekpiskorz/kiero/issues/32), [E4 #38](https://github.com/wojtekpiskorz/kiero/issues/38), [E6 #40](https://github.com/wojtekpiskorz/kiero/issues/40), [H2 #50](https://github.com/wojtekpiskorz/kiero/issues/50), [H3 #51](https://github.com/wojtekpiskorz/kiero/issues/51), [H4 #52](https://github.com/wojtekpiskorz/kiero/issues/52), [H1 #49](https://github.com/wojtekpiskorz/kiero/issues/49) | Historical implementation |
 | [J3 #62](https://github.com/wojtekpiskorz/kiero/issues/62) | OPEN | [J2 #61](https://github.com/wojtekpiskorz/kiero/issues/61), [J6 #139](https://github.com/wojtekpiskorz/kiero/issues/139) | Remaining execution |
 | [J4 #63](https://github.com/wojtekpiskorz/kiero/issues/63) | OPEN | [J2 #61](https://github.com/wojtekpiskorz/kiero/issues/61), [G4 #48](https://github.com/wojtekpiskorz/kiero/issues/48), [G5 #107](https://github.com/wojtekpiskorz/kiero/issues/107), [I7 #59](https://github.com/wojtekpiskorz/kiero/issues/59), [J6 #139](https://github.com/wojtekpiskorz/kiero/issues/139) | Remaining execution |
-| [J5 #64](https://github.com/wojtekpiskorz/kiero/issues/64) | OPEN | [I6 #58](https://github.com/wojtekpiskorz/kiero/issues/58), [J3 #62](https://github.com/wojtekpiskorz/kiero/issues/62), [J4 #63](https://github.com/wojtekpiskorz/kiero/issues/63), [I9 #136](https://github.com/wojtekpiskorz/kiero/issues/136), [I11 #138](https://github.com/wojtekpiskorz/kiero/issues/138), [M1 #141](https://github.com/wojtekpiskorz/kiero/issues/141), [M2 #166](https://github.com/wojtekpiskorz/kiero/issues/166), [M3 #175](https://github.com/wojtekpiskorz/kiero/issues/175), [M4 #183](https://github.com/wojtekpiskorz/kiero/issues/183), [M5 #190](https://github.com/wojtekpiskorz/kiero/issues/190), [M6 #195](https://github.com/wojtekpiskorz/kiero/issues/195), [M7 #199](https://github.com/wojtekpiskorz/kiero/issues/199), [M8 #202](https://github.com/wojtekpiskorz/kiero/issues/202), [M9 #207](https://github.com/wojtekpiskorz/kiero/issues/207) | Remaining execution |
+| [J5 #64](https://github.com/wojtekpiskorz/kiero/issues/64) | OPEN | [I6 #58](https://github.com/wojtekpiskorz/kiero/issues/58), [J3 #62](https://github.com/wojtekpiskorz/kiero/issues/62), [J4 #63](https://github.com/wojtekpiskorz/kiero/issues/63), [I9 #136](https://github.com/wojtekpiskorz/kiero/issues/136), [I11 #138](https://github.com/wojtekpiskorz/kiero/issues/138), [M1 #141](https://github.com/wojtekpiskorz/kiero/issues/141), [M2 #166](https://github.com/wojtekpiskorz/kiero/issues/166), [M3 #175](https://github.com/wojtekpiskorz/kiero/issues/175), [M4 #183](https://github.com/wojtekpiskorz/kiero/issues/183), [M5 #190](https://github.com/wojtekpiskorz/kiero/issues/190), [M6 #195](https://github.com/wojtekpiskorz/kiero/issues/195), [M7 #199](https://github.com/wojtekpiskorz/kiero/issues/199), [M8 #202](https://github.com/wojtekpiskorz/kiero/issues/202), [M9 #207](https://github.com/wojtekpiskorz/kiero/issues/207), [M10 #211](https://github.com/wojtekpiskorz/kiero/issues/211) | Remaining execution |
 | [G5 #107](https://github.com/wojtekpiskorz/kiero/issues/107) | CLOSED | [G2 #46](https://github.com/wojtekpiskorz/kiero/issues/46), [G4 #48](https://github.com/wojtekpiskorz/kiero/issues/48) | Historical implementation |
 | [E7 #115](https://github.com/wojtekpiskorz/kiero/issues/115) | CLOSED | [C5 #28](https://github.com/wojtekpiskorz/kiero/issues/28), [H3 #51](https://github.com/wojtekpiskorz/kiero/issues/51) | Historical implementation |
 | [R1 #126](https://github.com/wojtekpiskorz/kiero/issues/126) | CLOSED | [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125), [C2 #25](https://github.com/wojtekpiskorz/kiero/issues/25), [E6 #40](https://github.com/wojtekpiskorz/kiero/issues/40), [H1 #49](https://github.com/wojtekpiskorz/kiero/issues/49), [H2 #50](https://github.com/wojtekpiskorz/kiero/issues/50) | Remaining execution |
@@ -128,6 +126,7 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [M7 #199](https://github.com/wojtekpiskorz/kiero/issues/199) | CLOSED | [M6 #195](https://github.com/wojtekpiskorz/kiero/issues/195) | Map administration |
 | [M8 #202](https://github.com/wojtekpiskorz/kiero/issues/202) | CLOSED | [M7 #199](https://github.com/wojtekpiskorz/kiero/issues/199) | Map administration |
 | [M9 #207](https://github.com/wojtekpiskorz/kiero/issues/207) | CLOSED | [M8 #202](https://github.com/wojtekpiskorz/kiero/issues/202) | Map administration |
+| [M10 #211](https://github.com/wojtekpiskorz/kiero/issues/211) | CLOSED | [M9 #207](https://github.com/wojtekpiskorz/kiero/issues/207) | Map administration |
 | [R8 #167](https://github.com/wojtekpiskorz/kiero/issues/167) | CLOSED | [M2 #166](https://github.com/wojtekpiskorz/kiero/issues/166), [R6 #131](https://github.com/wojtekpiskorz/kiero/issues/131), [I1 #53](https://github.com/wojtekpiskorz/kiero/issues/53), [A4 #19](https://github.com/wojtekpiskorz/kiero/issues/19) | Remaining execution |
 | [R9 #168](https://github.com/wojtekpiskorz/kiero/issues/168) | CLOSED | [R8 #167](https://github.com/wojtekpiskorz/kiero/issues/167), [R6 #131](https://github.com/wojtekpiskorz/kiero/issues/131) | Remaining execution |
 | [R11 #169](https://github.com/wojtekpiskorz/kiero/issues/169) | CLOSED | [M2 #166](https://github.com/wojtekpiskorz/kiero/issues/166), [B1 #20](https://github.com/wojtekpiskorz/kiero/issues/20) | Remaining execution |
@@ -139,6 +138,6 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [R15 #192](https://github.com/wojtekpiskorz/kiero/issues/192) | CLOSED | [R9 #168](https://github.com/wojtekpiskorz/kiero/issues/168) | Remaining execution |
 | [C6 #197](https://github.com/wojtekpiskorz/kiero/issues/197) | OPEN | [J5 #64](https://github.com/wojtekpiskorz/kiero/issues/64) | Remaining execution |
 | [R16 #198](https://github.com/wojtekpiskorz/kiero/issues/198) | CLOSED | None | Remaining execution |
-| [R17 #209](https://github.com/wojtekpiskorz/kiero/issues/209) | OPEN | None | Repair |
+| [R17 #209](https://github.com/wojtekpiskorz/kiero/issues/209) | CLOSED | None | Repair |
 
 Administration rows are documentation work, not core features. Their cached states change only through bounded administration PRs that rerun the audit and keep every derived cell equal to the manifest.

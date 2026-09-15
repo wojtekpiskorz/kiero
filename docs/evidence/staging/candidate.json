@@ -626,8 +626,8 @@
       },
       "KIERO_EXPORT_EXECUTOR_URL": {
         "value": "https://kiero-staging-export-worker.wojtek-524.workers.dev",
-        "shape": "CONFLICT, unresolved by any single value: convex/operations/exports/executor.ts:78 fetches verbatim (needs origin + /exports/build) while convex/operations/exports/functions.ts:380 appends /exports/cleanup (needs bare origin)",
-        "status": "known consumer conflict; repair owned by R17 #209 (registered as a native blocker of I9); the bare origin is set so cleanup works and the build drive is expected to 404 no_such_route until R17 lands"
+        "shape": "bare origin (BOTH consumers append their route through the shared exportExecutorUrl helper since R17 #210: build appends /exports/build, cleanup consumes EXPORT_CLEANUP_ROUTE)",
+        "status": "settled: R17 merged (PR #210, 2026-09-15); D7/I9 verify loudly at their first real runs"
       },
       "KIERO_BACKUP_WORKER_URL": {
         "value": "https://kiero-staging-backup-worker.wojtek-524.workers.dev",
