@@ -241,6 +241,49 @@ export function validateTargetDescriptor(value) {
     } else if (new Set(component.requiredConfig).size !== component.requiredConfig.length) {
       violations.push(`${where} requiredConfig contains duplicated names`);
     }
+    if (
+      component.runtimeSecrets !== undefined &&
+      component.transport.kind !== "wrangler-deploy"
+    ) {
+      violations.push(
+        `${where} runtimeSecrets is only implemented for wrangler-deploy transports`,
+      );
+    }
+    if (component.runtimeSecrets !== undefined) {
+      // I8: the worker RUNTIME secret plane. Names follow the binding
+      // docs; sources are the deployment-scoped store names (GitHub
+      // environment secrets). `deferred` marks names whose value is an
+      // explicitly recorded owner decision still pending (e.g.
+      // CONVEX_BACKUP_ADMIN_KEY until I10): the injector records them
+      // instead of refusing.
+      if (!Array.isArray(component.runtimeSecrets) || component.runtimeSecrets.length === 0) {
+        violations.push(`${where} runtimeSecrets must be a non-empty array when present`);
+      } else {
+        const seenSecretNames = new Set();
+        for (const entry of component.runtimeSecrets) {
+          if (!isPlainObject(entry)) {
+            violations.push(`${where} runtimeSecrets entries must be objects`);
+            continue;
+          }
+          if (typeof entry.name !== "string" || !CONFIG_NAME_PATTERN.test(entry.name)) {
+            violations.push(
+              `${where} runtimeSecrets name must match ${CONFIG_NAME_PATTERN.source}`,
+            );
+          } else if (seenSecretNames.has(entry.name)) {
+            violations.push(`${where} runtimeSecrets contains duplicated name ${entry.name}`);
+          }
+          seenSecretNames.add(entry.name);
+          if (typeof entry.source !== "string" || !CONFIG_NAME_PATTERN.test(entry.source)) {
+            violations.push(
+              `${where} runtimeSecrets source must match ${CONFIG_NAME_PATTERN.source}`,
+            );
+          }
+          if (entry.deferred !== undefined && typeof entry.deferred !== "boolean") {
+            violations.push(`${where} runtimeSecrets deferred must be a boolean when present`);
+          }
+        }
+      }
+    }
   }
   return violations;
 }

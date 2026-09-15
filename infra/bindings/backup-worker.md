@@ -25,13 +25,13 @@ dev proof state. Full configuration and owner actions:
 
 | Name | Purpose | Injected via | Status |
 | --- | --- | --- | --- |
-| `R2_BACKUP_ACCESS_KEY_ID` | Access key id of an R2 API token scoped to the BACKUP bucket only | dedicated per-bucket R2 API token from the Cloudflare dashboard; wrangler cannot manage R2 API tokens | PENDING (owner; name and usage finalized by I5) |
-| `R2_BACKUP_SECRET_ACCESS_KEY` | Secret access key paired with the id above | same token | PENDING (owner) |
-| `R2_MEDIA_READ_ACCESS_KEY_ID` | Access key id of a READ-ONLY media-bucket token held ONLY by the backup worker (the copy source; distinct from the media worker's token) | dashboard-issued per-bucket token | PENDING (owner; I5 addition) |
-| `R2_MEDIA_READ_SECRET_ACCESS_KEY` | Secret access key paired with the id above | same token | PENDING (owner; I5 addition) |
+| `R2_BACKUP_ACCESS_KEY_ID` | Access key id of an R2 API token scoped to the BACKUP bucket only | dedicated per-bucket R2 API token (owner-issued 2026-09-15); release workflow injection (descriptor `runtimeSecrets`) | INJECTED by the staging release (I8) |
+| `R2_BACKUP_SECRET_ACCESS_KEY` | Secret access key paired with the id above | same token, same delivery | INJECTED by the staging release (I8) |
+| `R2_MEDIA_READ_ACCESS_KEY_ID` | Access key id of a READ-ONLY media-bucket token held ONLY by the backup worker (the copy source; distinct from the media worker's token) | dashboard-issued per-bucket token (owner-issued 2026-09-15); release workflow injection (descriptor `runtimeSecrets`) | INJECTED by the staging release (I8) |
+| `R2_MEDIA_READ_SECRET_ACCESS_KEY` | Secret access key paired with the id above | same token, same delivery | INJECTED by the staging release (I8) |
 | `CONVEX_BACKUP_ADMIN_KEY` | Mechanism FINALIZED by I5: a Convex access token driving the pinned documented export (the image's globally pre-installed `convex@1.45.0` binary, invoked directly as `convex export`) headless; the executor writes it to the CLI's runtime config, never to the repo | stored only in the backup runtime environment | PENDING (owner) |
-| `KIERO_SERVICE_TOKEN` | Shared service bearer for the verified Convex protocol routes (`/operations/backups/*`) | Convex deployment variable + worker secret | set on dev/i5 by the I5 proof; PENDING for staging/alpha |
-| `AXIOM_API_TOKEN` | Redacted diagnostics ingestion | deploy flow | PENDING (I2) |
+| `KIERO_SERVICE_TOKEN` | Shared service bearer for the verified Convex protocol routes (`/operations/backups/*`) | release workflow injection (descriptor `runtimeSecrets`); matching value is the Convex deployment variable | set on dev/i5 by the I5 proof; INJECTED on staging by the release (I8) |
+| `AXIOM_API_TOKEN` | Redacted diagnostics ingestion | release workflow injection (descriptor `runtimeSecrets`) | INJECTED by the staging release (I8) |
 
 ## Isolation rules
 

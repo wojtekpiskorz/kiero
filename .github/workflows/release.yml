@@ -137,6 +137,7 @@ jobs:
           --descriptor infra/release/targets/staging.json
           --token-env CHECKS_GITHUB_TOKEN --out checks-report.json
       - name: Deploy every descriptor component through the checked adapter
+        id: deploy
         if: ${{ always() }}
         run: >
           node infra/release/deploy-component.mjs
@@ -144,6 +145,37 @@ jobs:
           --revision "$GITHUB_SHA" --checks-report checks-report.json
           --ledger infra/release/evidence/releases.jsonl
           --outcomes deploy-outcomes.json
+      # I8: worker RUNTIME secret injection. The transports above deploy
+      # code and config (vars) only; the worker SECRETS are a separate
+      # Cloudflare plane the committed injector owns: names and worker
+      # assignments come from the descriptor's runtimeSecrets map,
+      # values flow step env -> stdin of `wrangler secret bulk` (never
+      # argv, never logged), and every outcome lands in the outcomes file
+      # beside the deploy outcomes. An unset source REFUSES the release
+      # unless the descriptor marks the name deferred (an explicitly
+      # recorded pending owner decision, e.g. CONVEX_BACKUP_ADMIN_KEY
+      # until I10).
+      - name: Inject worker runtime secrets (descriptor-driven; values over stdin)
+        if: steps.deploy.outcome == 'success'
+        env:
+          # The injector reads process.env[<descriptor source>], so the env
+          # keys ARE the descriptor's STAGING_ source names (the
+          # tests/i7/inject-worker-secrets.test.ts cross-check pins this
+          # wiring).
+          STAGING_KIERO_SERVICE_TOKEN: ${{ secrets.STAGING_KIERO_SERVICE_TOKEN }}
+          STAGING_KIERO_MEDIA_WORKER_TOKEN: ${{ secrets.STAGING_KIERO_MEDIA_WORKER_TOKEN }}
+          STAGING_AXIOM_API_TOKEN: ${{ secrets.STAGING_AXIOM_API_TOKEN }}
+          STAGING_R2_MEDIA_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_MEDIA_ACCESS_KEY_ID }}
+          STAGING_R2_MEDIA_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_MEDIA_SECRET_ACCESS_KEY }}
+          STAGING_R2_BACKUP_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_BACKUP_ACCESS_KEY_ID }}
+          STAGING_R2_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_BACKUP_SECRET_ACCESS_KEY }}
+          STAGING_R2_MEDIA_READ_ACCESS_KEY_ID: ${{ secrets.STAGING_R2_MEDIA_READ_ACCESS_KEY_ID }}
+          STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY: ${{ secrets.STAGING_R2_MEDIA_READ_SECRET_ACCESS_KEY }}
+          STAGING_CONVEX_BACKUP_ADMIN_KEY: ${{ secrets.STAGING_CONVEX_BACKUP_ADMIN_KEY }}
+        run: >
+          node infra/release/inject-worker-secrets.mjs
+          --descriptor infra/release/targets/staging.json
+          --outcomes runtime-secrets-outcomes.json
       - name: Record the release attempt (append-only, digests only)
         if: ${{ always() }}
         run: >
@@ -154,6 +186,7 @@ jobs:
           --rehearsal-rows "$(jq -r .rows rehearsal-summary.json)"
           --runtime-version a3.0 --client-version i7.1
           --migration-ledger rehearsal-ledger.jsonl
+          --runtime-secrets runtime-secrets-outcomes.json
       - name: Upload the evidence ledger and outcomes (blocked runs fail while uploading evidence)
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -162,6 +195,7 @@ jobs:
           path: |
             infra/release/evidence/releases.jsonl
             deploy-outcomes.json
+            runtime-secrets-outcomes.json
             checks-report.json
           if-no-files-found: error
 
