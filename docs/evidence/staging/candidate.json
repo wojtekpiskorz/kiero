@@ -607,18 +607,38 @@
       "nextAction": "complete the Google tester sign-in in the prepared browser (noVNC desktop, profile /tmp/kiero-smoke/profile) or relay a fresh email-code OTP; the coordinator then finishes the authenticated leg",
       "resumptionTrigger": "login observed in the profile or OTP relayed"
     },
-    "postReviewCorrection": "The advisory review of the evidence PR (#206, round 1) caught KIERO_IMAGES_EXECUTOR_URL pointing at the media worker; corrected live to the gateway origin (see executorUrlAssignments)."
+    "postReviewCorrection": "The evidence PR advisory review corrected the executor URL record twice (see executorUrlAssignments in this file for the canonical telling): round 1 moved the images name off the media worker to the gateway; round 2 verified the consumer fetches verbatim and the live value gained /images/normalize. The same review found the export consumers disagree about the variable shape; that code conflict is owned by R17 #209."
   },
   "executorUrlAssignments": {
     "setOn": "2026-09-15",
-    "correctedOn": "2026-09-15",
-    "correction": "The initial fill pointed KIERO_IMAGES_EXECUTOR_URL at the media worker (route-ownership assumption). The PR #206 advisory review showed the code disagrees: the gateway owns the images lane (apps/gateway/src/images/routes.ts POST /images/normalize; the Convex caller drives \"the gateway's images executor\", convex/processing/images/executor.ts; the media worker serves only /healthz, /probe, /segment; the D5 live proof pins the name to the gateway origin). The live value was corrected to the gateway the same day: npx convex env set KIERO_IMAGES_EXECUTOR_URL https://kiero-staging-gateway.wojtek-524.workers.dev --deployment wojtek-piskorz-jr:kiero-dev-core:staging. D7 still verifies loudly at the first real normalize run.",
+    "correctedOn": "2026-09-15 (round 1: images moved off the media worker; round 2: images value gained its route path after verifying the consumer fetches verbatim)",
+    "convention": "Three consumers append their route in code, so those values are bare origins; two fetch the value verbatim, so those values carry the full URL including the route. Each row records the exact settable value.",
     "assignments": {
-      "KIERO_MEDIA_WORKER_URL": "https://kiero-staging-media-worker.wojtek-524.workers.dev (media worker: /probe, /segment)",
-      "KIERO_IMAGES_EXECUTOR_URL": "https://kiero-staging-gateway.wojtek-524.workers.dev (gateway images lane: POST /images/normalize, /images/reconcile) — CORRECTED from the media worker on 2026-09-15",
-      "KIERO_EXPORT_EXECUTOR_URL": "https://kiero-staging-export-worker.wojtek-524.workers.dev (export worker)",
-      "KIERO_BACKUP_WORKER_URL": "https://kiero-staging-backup-worker.wojtek-524.workers.dev (backup worker)",
-      "KIERO_PURGE_EXECUTOR_URL": "https://kiero-staging-gateway.wojtek-524.workers.dev (gateway purge lane)"
+      "KIERO_MEDIA_WORKER_URL": {
+        "value": "https://kiero-staging-media-worker.wojtek-524.workers.dev",
+        "shape": "bare origin (consumer appends /probe, /segment)",
+        "status": "settled"
+      },
+      "KIERO_IMAGES_EXECUTOR_URL": {
+        "value": "https://kiero-staging-gateway.wojtek-524.workers.dev/images/normalize",
+        "shape": "FULL URL (convex/processing/images/executor.ts:77-89 fetches the value verbatim; the D5 live proof pins origin + /images/normalize)",
+        "status": "corrected live 2026-09-15; probe: POST without bearer answers 401 service_credential_invalid on the gateway (route exists) while the media worker 404s the same path"
+      },
+      "KIERO_EXPORT_EXECUTOR_URL": {
+        "value": "https://kiero-staging-export-worker.wojtek-524.workers.dev",
+        "shape": "CONFLICT, unresolved by any single value: convex/operations/exports/executor.ts:78 fetches verbatim (needs origin + /exports/build) while convex/operations/exports/functions.ts:380 appends /exports/cleanup (needs bare origin)",
+        "status": "known consumer conflict; repair owned by R17 #209 (registered as a native blocker of I9); the bare origin is set so cleanup works and the build drive is expected to 404 no_such_route until R17 lands"
+      },
+      "KIERO_BACKUP_WORKER_URL": {
+        "value": "https://kiero-staging-backup-worker.wojtek-524.workers.dev",
+        "shape": "bare origin (consumer appends /run per the I5 protocol)",
+        "status": "settled"
+      },
+      "KIERO_PURGE_EXECUTOR_URL": {
+        "value": "https://kiero-staging-gateway.wojtek-524.workers.dev",
+        "shape": "bare origin (consumer appends /purge/media)",
+        "status": "settled"
+      }
     }
   }
 }
