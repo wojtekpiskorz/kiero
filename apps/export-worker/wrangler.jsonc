@@ -99,12 +99,10 @@
       "vars": {
         "ENVIRONMENT": "staging",
         "R2_MEDIA_BUCKET": "kiero-staging-media",
-        // R2_MEDIA_ENDPOINT stays EMPTY in committed config: the EU S3
-        // endpoint embeds the account id, which the shape-check secret-leak
-        // heuristic (rightly) forbids outside evidence docs. The endpoint is
-        // injected at deploy time from the same store as the owner-PENDING
-        // per-bucket R2 credentials (I8 decision, 2026-09-14).
-        "R2_MEDIA_ENDPOINT": "",
+        // R20: the endpoint names on staging are owned by the SECRET plane
+        // (the descriptor's runtimeSecrets compose the EU S3 URLs from the
+        // nonsecret account id at deploy time); a committed empty var would
+        // collide with the secret binding (Cloudflare code 10053).
         // I8 runbook R10 fill (2026-09-14): the staging deployment
         // fiery-raven-417 HTTP actions origin (public URL, not a secret).
         "CONVEX_SITE_URL": "https://fiery-raven-417.eu-west-1.convex.site"
