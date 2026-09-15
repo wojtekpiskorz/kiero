@@ -448,6 +448,20 @@
         "queryApiTypedError": "POST /api/query bogus path -> HTTP 200 typed error with request id"
       },
       "evidenceArtifact": "release-evidence-staging (releases.jsonl ledger row, deploy-outcomes.json, checks-report.json)"
+    },
+    {
+      "runId": 34953365470,
+      "date": "2026-09-15",
+      "headSha": "c9698bc1da8ceafb117835c7639b27b9a5349d9d",
+      "trigger": "unblocking session: CI deploy token + account ID ingested; Axiom wired",
+      "outcome": {
+        "rehearsal": "PASS",
+        "convexFunctions": "deployed (redeployed on this run)",
+        "webWorker": "deployed; https://kiero-staging-web.wojtek-524.workers.dev serves /, /zrodlo, /praca, /co-teraz as 200 text/html (SPA fallback) and /sw.js as 200 text/javascript",
+        "gatewayWorker": "deployed; /platform/health answers gateway status ok (runtimeVersion a3.0) but backendReachable=false bridge_not_configured: this run shipped from main before the CONVEX_SITE_URL staging fills on this branch landed; the next release carries them",
+        "containerWorkers": "deployed per pipeline outcome"
+      },
+      "verification": "curl probes recorded in vps-2026-09-14.md follow-up section; convex function-spec non-empty"
     }
   ],
   "isolation": {
