@@ -5,8 +5,7 @@ The named EU staging deployment, GitHub staging environment, release credential,
 session-signing keys and EU R2 buckets now exist. The owner selected Workers
 Static Assets for the web host, direct DeepSeek API for chat/vision, and retained
 OpenRouter for transcription and embeddings; Google, Resend, DeepSeek and
-OpenRouter configuration names are present in both server stores. Application
-release and provider qualification remain outstanding. The sections below preserve
+OpenRouter configuration names are present in both server stores. The full staging release completed 2026-09-15 (run 34953365470); provider qualification (B5/D7/I11 lanes) remains outstanding. The sections below preserve
 the 2026-09-12 baseline; use the current checkpoint for discharged actions and
 corrected CLI procedures.
 
@@ -228,3 +227,16 @@ value found in client assets is a FAIL.
 No quota workaround was attempted or proposed; no Convex project was
 created; no production activation occurred; no secret value was written to
 any file, command or log in this work.
+
+## Full release update (2026-09-15)
+
+The unblocking session discharged the owner-side credentials (Cloudflare
+CI deploy token, account ID, three bucket-scoped R2 pairs, Axiom token
+and dataset; GM and alert identities decided). Release run 34953365470
+on main c9698bc completed: rehearsal PASS, staging deploy SUCCESS, every
+component deployed. Live verification: the web origin serves the PWA
+(SPA fallback, /sw.js), the gateway answers /platform/health with status
+ok (the backend bridge flips to reachable once the next release ships
+this branch's CONVEX_SITE_URL fill), and the Convex function list stays
+non-empty. I8 closes after the post-merge release verifies the bridge
+and the smoke record lands.

@@ -35,7 +35,7 @@
     "httpActionsUrl": "https://fiery-raven-417.eu-west-1.convex.site",
     "provisionedAt": "2026-09-14",
     "observedRegion": "aws-eu-west-1",
-    "applicationReleaseStatus": "PARTIAL 2026-09-14: run 34880906636 deployed the Convex functions (644 functions, identity-pinned, digest-recorded) through the checked pipeline; the five Cloudflare components remain blocked on owner-PENDING credentials (see releaseAttempts[1]); no web/gateway bytes exist yet"
+    "applicationReleaseStatus": "released: functions deployed 2026-09-14 (run 34880906636), redeployed by the full staging release 2026-09-15 (run 34953365470)"
   },
   "cloudflare": {
     "accountSameAsDev": true,
@@ -66,7 +66,7 @@
     "corsAllowListOrigins": [
       "https://kiero-staging-web.wojtek-524.workers.dev"
     ],
-    "workerReleaseStatus": "NOT RUN",
+    "workerReleaseStatus": "released 2026-09-15 (run 34953365470): web, gateway, media/export/backup workers all deployed; the gateway backend bridge reports bridge_not_configured until the next release ships this branch's CONVEX_SITE_URL staging fill",
     "r2LocationNote": "Wrangler 4.130.0 rejects combining --jurisdiction and --location. Created with --jurisdiction eu; no narrower placement is claimed."
   },
   "githubConfiguration": {
@@ -284,7 +284,6 @@
       "runId": 34874172423,
       "url": "https://github.com/wojtekpiskorz/kiero/actions/runs/34874172423",
       "target": "staging",
-      "revision": "3cf9f6e27ffed0d2e7a730068a69ad3798fe8274",
       "dispatchedAt": "2026-09-14T17:20:41Z",
       "conclusion": "failure (honest: blocked components fail the job while uploading evidence)",
       "gates": {
@@ -358,13 +357,13 @@
         "isDefault": false,
         "postRunFunctionSpec": "functions: [] — the refusal was pre-mutation"
       },
-      "evidenceArtifact": "release-evidence-staging (releases.jsonl ledger row, deploy-outcomes.json, checks-report.json)"
+      "evidenceArtifact": "release-evidence-staging (releases.jsonl ledger row, deploy-outcomes.json, checks-report.json)",
+      "headSha": "3cf9f6e27ffed0d2e7a730068a69ad3798fe8274"
     },
     {
       "runId": 34880906636,
       "url": "https://github.com/wojtekpiskorz/kiero/actions/runs/34880906636",
       "target": "staging",
-      "revision": "5780d80983710a3370093166b73648833d6b0e7e",
       "dispatchedAt": "2026-09-14T18:27:24Z",
       "context": "re-dispatch after the R15 parser repair (#194, merged in this revision)",
       "conclusion": "failure (the five wrangler components block the job; the Convex component DEPLOYED)",
@@ -447,7 +446,8 @@
         "jwks": "GET /.well-known/jwks.json -> HTTP 200, 0.24 s, exactly 1 RSA signing key (shape only)",
         "queryApiTypedError": "POST /api/query bogus path -> HTTP 200 typed error with request id"
       },
-      "evidenceArtifact": "release-evidence-staging (releases.jsonl ledger row, deploy-outcomes.json, checks-report.json)"
+      "evidenceArtifact": "release-evidence-staging (releases.jsonl ledger row, deploy-outcomes.json, checks-report.json)",
+      "headSha": "5780d80983710a3370093166b73648833d6b0e7e"
     },
     {
       "runId": 34953365470,
@@ -529,6 +529,7 @@
     }
   ],
   "pendingOwnerActions": [
+    "RESOLVED 2026-09-15: staging GM and owner alert recipient decided (wojtek@honestly.design) and telemetry decided (Axiom, ingested). Kept for history.",
     "issue the Cloudflare deploy credentials (Workers Scripts/Deployments token, the staging-named account-scoped class the amendment accepts for wrangler) and store STAGING_CLOUDFLARE_API_TOKEN + STAGING_CLOUDFLARE_ACCOUNT_ID: token management returned 403 to every non-owner session; all five wrangler legs of release run 34874172423 blocked on exactly these two names",
     "issue the three bucket-scoped R2 token pairs (kiero-staging-media RW, kiero-staging-backup RW, kiero-staging-media RO for the backup executor) and inject them with the EU S3 endpoints into the container runtimes; the account-level token is never reused for containers",
     "RESOLVED 2026-09-14 evening: the R9 CI parser defect was repaired by R15 #194 (merged 5780d80); run 34880906636 then deployed the Convex leg with an exact identity match — kept for history, no longer pending",
@@ -554,5 +555,6 @@
       "decided": "2026-09-15",
       "note": "Owner creates the account, dataset and ingest token; ingested through the unblock wizard."
     }
-  }
+  },
+  "webOriginStatus": "deployed 2026-09-15 (release run 34953365470); live verification: SPA fallback routes and /sw.js served as themselves"
 }
