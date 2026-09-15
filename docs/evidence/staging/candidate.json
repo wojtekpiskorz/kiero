@@ -34,7 +34,7 @@
     "httpActionsUrl": "https://fiery-raven-417.eu-west-1.convex.site",
     "provisionedAt": "2026-09-14",
     "observedRegion": "aws-eu-west-1",
-    "applicationReleaseStatus": "released and live: functions deployed (644 verified read-only), runtime env complete incl. executor URLs (set 2026-09-15: KIERO_MEDIA_WORKER_URL and KIERO_IMAGES_EXECUTOR_URL -> media worker, KIERO_EXPORT_EXECUTOR_URL -> export worker, KIERO_BACKUP_WORKER_URL -> backup worker, KIERO_PURGE_EXECUTOR_URL -> gateway; the media/export/backup assignments follow the worker names, images/purge follow route ownership and verify loudly at D7 first real run)"
+    "applicationReleaseStatus": "released and live: functions deployed (644 verified read-only), runtime env complete incl. executor URLs (set 2026-09-15; the images assignment was corrected the same day after the PR #206 advisory review caught it against route ownership — see executorUrlAssignments)"
   },
   "cloudflare": {
     "accountSameAsDev": true,
@@ -606,6 +606,19 @@
       "responsible": "owner",
       "nextAction": "complete the Google tester sign-in in the prepared browser (noVNC desktop, profile /tmp/kiero-smoke/profile) or relay a fresh email-code OTP; the coordinator then finishes the authenticated leg",
       "resumptionTrigger": "login observed in the profile or OTP relayed"
+    },
+    "postReviewCorrection": "The advisory review of the evidence PR (#206, round 1) caught KIERO_IMAGES_EXECUTOR_URL pointing at the media worker; corrected live to the gateway origin (see executorUrlAssignments)."
+  },
+  "executorUrlAssignments": {
+    "setOn": "2026-09-15",
+    "correctedOn": "2026-09-15",
+    "correction": "The initial fill pointed KIERO_IMAGES_EXECUTOR_URL at the media worker (route-ownership assumption). The PR #206 advisory review showed the code disagrees: the gateway owns the images lane (apps/gateway/src/images/routes.ts POST /images/normalize; the Convex caller drives \"the gateway's images executor\", convex/processing/images/executor.ts; the media worker serves only /healthz, /probe, /segment; the D5 live proof pins the name to the gateway origin). The live value was corrected to the gateway the same day: npx convex env set KIERO_IMAGES_EXECUTOR_URL https://kiero-staging-gateway.wojtek-524.workers.dev --deployment wojtek-piskorz-jr:kiero-dev-core:staging. D7 still verifies loudly at the first real normalize run.",
+    "assignments": {
+      "KIERO_MEDIA_WORKER_URL": "https://kiero-staging-media-worker.wojtek-524.workers.dev (media worker: /probe, /segment)",
+      "KIERO_IMAGES_EXECUTOR_URL": "https://kiero-staging-gateway.wojtek-524.workers.dev (gateway images lane: POST /images/normalize, /images/reconcile) — CORRECTED from the media worker on 2026-09-15",
+      "KIERO_EXPORT_EXECUTOR_URL": "https://kiero-staging-export-worker.wojtek-524.workers.dev (export worker)",
+      "KIERO_BACKUP_WORKER_URL": "https://kiero-staging-backup-worker.wojtek-524.workers.dev (backup worker)",
+      "KIERO_PURGE_EXECUTOR_URL": "https://kiero-staging-gateway.wojtek-524.workers.dev (gateway purge lane)"
     }
   }
 }
