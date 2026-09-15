@@ -64,7 +64,13 @@ function planComponent(component) {
   const deferred = [];
   const refused = [];
   for (const entry of entries) {
-    const value = process.env[entry.source];
+    const raw = process.env[entry.source];
+    // R19: `format` composes the value (exactly one {} placeholder,
+    // validated by the descriptor) — e.g. the EU R2 endpoint URL from the
+    // nonsecret account id. Without it the source value passes as-is.
+    const value = raw === undefined || raw === "" || entry.format === undefined
+      ? raw
+      : entry.format.replace("{}", raw);
     if (value === undefined || value === "") {
       if (entry.deferred === true) {
         deferred.push({ worker: component.transport.workerName, name: entry.name });

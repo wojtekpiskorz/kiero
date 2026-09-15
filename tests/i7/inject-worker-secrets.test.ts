@@ -36,7 +36,7 @@ const REAL_DESCRIPTOR = JSON.parse(
   components: Array<{
     id: string;
     included: boolean;
-    runtimeSecrets?: Array<{ name: string; source: string; deferred?: boolean }>;
+    runtimeSecrets?: Array<{ name: string; source: string; deferred?: boolean; format?: string }>;
     transport: { kind: string; workerName?: string; cwd?: string };
   }>;
 };
@@ -194,6 +194,60 @@ describe("the injector (fake wrangler boundary)", () => {
     ]);
     const calls = readFileSync(join(directory, "calls.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
     expect(JSON.parse(calls[0].stdin)).toEqual({ KIERO_SERVICE_TOKEN: "value-service" });
+  });
+});
+
+describe("R19: endpoint composition and coverage", () => {
+  it("every EU R2 endpoint entry composes from the account id with the {} placeholder", () => {
+    const endpoints = REAL_DESCRIPTOR.components
+      .flatMap((c) => (c.runtimeSecrets ?? []).map((e) => ({ worker: c.id, ...e })))
+      .filter((e) => e.name.endsWith("_ENDPOINT"));
+    expect(new Set(endpoints.map((e) => e.worker))).toEqual(
+      new Set(["media-worker", "export-worker", "backup-worker"]),
+    );
+    for (const e of endpoints) {
+      expect(e.source).toBe("STAGING_CLOUDFLARE_ACCOUNT_ID");
+      expect(e.format).toBe("https://{}.eu.r2.cloudflarestorage.com");
+    }
+  });
+
+  it("format composes the value and reaches the payload (fake wrangler)", () => {
+    const directory = mkdtempSync(join(tmpdir(), "kiero-inject-"));
+    fakeWranglerBin(directory, join(directory, "calls.jsonl"));
+    writeFileSync(
+      join(directory, "descriptor.json"),
+      JSON.stringify(
+        fixtureDescriptor({
+          runtimeSecrets: [
+            { name: "R2_MEDIA_ENDPOINT", source: "SRC_R19_ACCOUNT", format: "https://{}.eu.r2.cloudflarestorage.com" } as never,
+          ],
+        }),
+      ),
+    );
+    const { result } = runInjector(directory, { SRC_R19_ACCOUNT: "abc123account" });
+    expect(result.status).toBe(0);
+    const calls = readFileSync(join(directory, "calls.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    expect(JSON.parse(calls[0].stdin)).toEqual({
+      R2_MEDIA_ENDPOINT: "https://abc123account.eu.r2.cloudflarestorage.com",
+    });
+  });
+
+  it("rejects a format without the placeholder and with two placeholders", () => {
+    for (const format of ["https://eu.r2.cloudflarestorage.com", "https://{}{}.eu.r2.cloudflarestorage.com"]) {
+      const violations = parseTargetDescriptor(
+        JSON.stringify({
+          descriptorId: "t", target: "staging", githubEnvironment: "staging", secretPrefix: "STAGING_", checksName: "c",
+          components: [
+            {
+              id: "media-worker", included: true, requiredConfig: [],
+              transport: { kind: "wrangler-deploy", workerName: "w", cwd: "apps/media-worker" },
+              runtimeSecrets: [{ name: "R2_MEDIA_ENDPOINT", source: "S", format }],
+            },
+          ],
+        }),
+      ).violations;
+      expect(violations?.length ?? 0).toBeGreaterThan(0);
+    }
   });
 });
 

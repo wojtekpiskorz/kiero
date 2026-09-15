@@ -102,6 +102,11 @@
         {
           "name": "AXIOM_API_TOKEN",
           "source": "STAGING_AXIOM_API_TOKEN"
+        },
+        {
+          "name": "R2_MEDIA_ENDPOINT",
+          "source": "STAGING_CLOUDFLARE_ACCOUNT_ID",
+          "format": "https://{}.eu.r2.cloudflarestorage.com"
         }
       ]
     },
@@ -136,6 +141,11 @@
         {
           "name": "AXIOM_API_TOKEN",
           "source": "STAGING_AXIOM_API_TOKEN"
+        },
+        {
+          "name": "R2_MEDIA_ENDPOINT",
+          "source": "STAGING_CLOUDFLARE_ACCOUNT_ID",
+          "format": "https://{}.eu.r2.cloudflarestorage.com"
         }
       ]
     },
@@ -183,6 +193,16 @@
           "name": "CONVEX_BACKUP_ADMIN_KEY",
           "source": "STAGING_CONVEX_BACKUP_ADMIN_KEY",
           "deferred": true
+        },
+        {
+          "name": "R2_BACKUP_ENDPOINT",
+          "source": "STAGING_CLOUDFLARE_ACCOUNT_ID",
+          "format": "https://{}.eu.r2.cloudflarestorage.com"
+        },
+        {
+          "name": "R2_MEDIA_ENDPOINT",
+          "source": "STAGING_CLOUDFLARE_ACCOUNT_ID",
+          "format": "https://{}.eu.r2.cloudflarestorage.com"
         }
       ]
     }
