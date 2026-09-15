@@ -17,8 +17,7 @@
       "ENVIRONMENT=staging",
       "KIERO_ENVIRONMENT=staging"
     ],
-    "webOrigin": "https://kiero-staging-web.wojtek-524.workers.dev",
-    "webOriginStatus": "planned Workers Static Assets host; not deployed"
+    "webOrigin": "https://kiero-staging-web.wojtek-524.workers.dev"
   },
   "convex": {
     "team": "wojtek-piskorz-jr",
@@ -42,7 +41,7 @@
     "webHosting": {
       "kind": "workers-static-assets",
       "workerName": "kiero-staging-web",
-      "status": "owner-selected; release configuration prerequisite outstanding"
+      "status": "deployed 2026-09-15 (release run 34953365470); live-verified SPA fallback and /sw.js"
     },
     "workers": [
       "kiero-staging-web",
@@ -451,17 +450,25 @@
     },
     {
       "runId": 34953365470,
-      "date": "2026-09-15",
-      "headSha": "c9698bc1da8ceafb117835c7639b27b9a5349d9d",
-      "trigger": "unblocking session: CI deploy token + account ID ingested; Axiom wired",
-      "outcome": {
+      "url": "https://github.com/wojtekpiskorz/kiero/actions/runs/34953365470",
+      "target": "staging",
+      "dispatchedAt": "2026-09-15",
+      "context": "unblocking session: CI deploy token + account ID ingested; Axiom wired",
+      "conclusion": "SUCCESS: rehearsal PASS and the staging deploy job completed; every component deployed",
+      "gates": {
+        "rehearsal": "PASS",
+        "verifyTarget": "PASS",
+        "exactShaChecks": "PASS (c9698bc)"
+      },
+      "componentOutcomes": {
         "rehearsal": "PASS",
         "convexFunctions": "deployed (redeployed on this run)",
         "webWorker": "deployed; https://kiero-staging-web.wojtek-524.workers.dev serves /, /zrodlo, /praca, /co-teraz as 200 text/html (SPA fallback) and /sw.js as 200 text/javascript",
         "gatewayWorker": "deployed; /platform/health answers gateway status ok (runtimeVersion a3.0) but backendReachable=false bridge_not_configured: this run shipped from main before the CONVEX_SITE_URL staging fills on this branch landed; the next release carries them",
         "containerWorkers": "deployed per pipeline outcome"
       },
-      "verification": "curl probes recorded in vps-2026-09-14.md follow-up section; convex function-spec non-empty"
+      "postDeployVerification": "curl probes recorded in vps-2026-09-14.md follow-up section; convex function-spec non-empty",
+      "headSha": "c9698bc1da8ceafb117835c7639b27b9a5349d9d"
     }
   ],
   "isolation": {
@@ -530,12 +537,12 @@
   ],
   "pendingOwnerActions": [
     "RESOLVED 2026-09-15: staging GM and owner alert recipient decided (wojtek@honestly.design) and telemetry decided (Axiom, ingested). Kept for history.",
-    "issue the Cloudflare deploy credentials (Workers Scripts/Deployments token, the staging-named account-scoped class the amendment accepts for wrangler) and store STAGING_CLOUDFLARE_API_TOKEN + STAGING_CLOUDFLARE_ACCOUNT_ID: token management returned 403 to every non-owner session; all five wrangler legs of release run 34874172423 blocked on exactly these two names",
-    "issue the three bucket-scoped R2 token pairs (kiero-staging-media RW, kiero-staging-backup RW, kiero-staging-media RO for the backup executor) and inject them with the EU S3 endpoints into the container runtimes; the account-level token is never reused for containers",
+    "RESOLVED 2026-09-15: the owner issued the Cloudflare CI deploy token and the account ID was recorded; ingested through the unblock wizard (kept for history)",
+    "RESOLVED 2026-09-15: the owner issued the three bucket-scoped R2 token pairs; all six STAGING_R2_* secrets exist (kept for history)",
     "RESOLVED 2026-09-14 evening: the R9 CI parser defect was repaired by R15 #194 (merged 5780d80); run 34880906636 then deployed the Convex leg with an exact identity match — kept for history, no longer pending",
-    "after the Cloudflare credentials clear, re-dispatch the Release workflow: every gate (rehearsal, verify-target, exact-SHA Checks) and the Convex leg already pass end to end",
-    "telemetry: decide Axiom provisioning (AXIOM_API_TOKEN/AXIOM_DATASET) or keep the Convex-ingest fallback; names unset on staging",
-    "KIERO_GM_EMAILS (staging GM allow-list), alert recipient and CONVEX_BACKUP_ADMIN_KEY: owner choices, unset",
+    "RESOLVED 2026-09-15: the Release workflow re-dispatched and completed: run 34953365470, rehearsal PASS, staging deploy SUCCESS, all components deployed (kept for history)",
+    "RESOLVED 2026-09-15: Axiom decided and provisioned: AXIOM_API_TOKEN/AXIOM_DATASET stored on Convex staging and GitHub staging (kept for history)",
+    "PARTIALLY RESOLVED 2026-09-15: staging GM and the alert recipient are decided (wojtek@honestly.design); CONVEX_BACKUP_ADMIN_KEY remains an owner choice, unset (kept for history).",
     "configure alpha-production reviewers and branch policy using protected_branches/custom_branch_policies and the separate deployment branch-policy endpoint after the owner identity decision",
     "re-run the release, then the ordinary authenticated smoke (Google sign-in via the pinned redirect URIs, Resend OTP/invite send with the owner-chosen recipient, DeepSeek chat/vision + OpenRouter STT/embeddings calls from the deployed staging functions, web origin SPA/sw.js, gateway health)"
   ],
