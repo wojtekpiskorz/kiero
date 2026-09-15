@@ -282,7 +282,7 @@ export function validateTargetDescriptor(value) {
             violations.push(`${where} runtimeSecrets deferred must be a boolean when present`);
           }
           // R19: an optional `format` composes the injected value from the
-          // source (exactly one `{}` placeholder) — the EU R2 endpoints are
+          // source (exactly one `{}` placeholder); the EU R2 endpoints are
           // URLs built from the nonsecret account id, never committed whole.
           if (entry.format !== undefined) {
             if (typeof entry.format !== "string" || !entry.format.includes("{}")) {

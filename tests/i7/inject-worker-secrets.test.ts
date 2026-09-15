@@ -58,7 +58,7 @@ appendFileSync(${JSON.stringify(callsFile)}, JSON.stringify({ argv: process.argv
 }
 
 function fixtureDescriptor(overrides: {
-  runtimeSecrets?: Array<{ name: string; source: string; deferred?: boolean }>;
+  runtimeSecrets?: Array<{ name: string; source: string; deferred?: boolean; format?: string }>;
 }) {
   return {
     descriptorId: "fixture@2026-09-15",
@@ -219,7 +219,7 @@ describe("R19: endpoint composition and coverage", () => {
       JSON.stringify(
         fixtureDescriptor({
           runtimeSecrets: [
-            { name: "R2_MEDIA_ENDPOINT", source: "SRC_R19_ACCOUNT", format: "https://{}.eu.r2.cloudflarestorage.com" } as never,
+            { name: "R2_MEDIA_ENDPOINT", source: "SRC_R19_ACCOUNT", format: "https://{}.eu.r2.cloudflarestorage.com" },
           ],
         }),
       ),
