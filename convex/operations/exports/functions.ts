@@ -42,6 +42,7 @@ import {
   resolveAccessContextWithProvisioning,
 } from "../../access/identity/resolution";
 import { requestExportCore, publishArchiveCore, failBuildCore, markCleanedCore, expireExportCore, invalidateExportCore, invalidateExportsForSourceCore } from "./lifecycle";
+import { exportExecutorUrl } from "./executor";
 import { readCompanySnapshot, snapshotDb } from "./snapshot";
 import { resolveExportAccess, exportAccessDb } from "./access";
 import { EXPORT_STATE_LABELS } from "./protocol";
@@ -377,7 +378,7 @@ export const cleanupExport = internalAction({
     const deadline = setTimeout(() => controller.abort(), 30_000);
     let response: Response;
     try {
-      response = await fetch(`${url.replace(/\/$/, "")}/exports/cleanup`, {
+      response = await fetch(exportExecutorUrl(url, "/exports/cleanup"), {
         method: "POST",
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
         body: JSON.stringify({ exportId: target.exportId, objectKey: target.objectKey }),

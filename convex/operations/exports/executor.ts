@@ -64,10 +64,25 @@ export type BuildClassification =
   | { readonly kind: "failed"; readonly retryable: boolean; readonly errorKind: string }
   | { readonly kind: "timeout" | "unknown"; readonly errorKind: string };
 
+/** The build route the executor Worker serves (container-main.ts). */
+export const EXPORT_BUILD_ROUTE = "/exports/build";
+
+/**
+ * Derives one executor route URL from the deployment's bare-origin
+ * `KIERO_EXPORT_EXECUTOR_URL` (R17): every consumer appends its route in
+ * code, so one origin value serves both the build drive and the cleanup
+ * drive. Trailing-slash tolerant.
+ */
+export function exportExecutorUrl(base: string, route: string): string {
+  return `${base.replace(/\/$/, "")}${route}`;
+}
+
 /**
  * THE one bounded HTTP call to the export executor. Shared by the
  * scheduled action and the guarded proof action. The Worker carries the
- * buildToken minted by this attempt; only it can publish.
+ * buildToken minted by this attempt; only it can publish. The env value
+ * is a bare origin with the route appended here; `urlOverride` is a full
+ * URL used verbatim (the guarded proofs point at exact endpoints).
  */
 export async function callExportExecutor(
   jobKey: string,
@@ -75,10 +90,11 @@ export async function callExportExecutor(
   buildToken: string,
   urlOverride?: string,
 ): Promise<BuildClassification> {
-  const target = urlOverride ?? process.env.KIERO_EXPORT_EXECUTOR_URL;
-  if (target === undefined || target === "") {
+  const base = urlOverride ?? process.env.KIERO_EXPORT_EXECUTOR_URL;
+  if (base === undefined || base === "") {
     return { kind: "failed", retryable: false, errorKind: "export_executor_not_configured" };
   }
+  const target = urlOverride ?? exportExecutorUrl(base, EXPORT_BUILD_ROUTE);
   const token = process.env.KIERO_SERVICE_TOKEN;
   if (token === undefined || token === "") {
     return { kind: "failed", retryable: false, errorKind: "service_credential_missing" };
