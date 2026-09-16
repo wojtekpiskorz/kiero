@@ -1,17 +1,17 @@
 # Observability qualification evidence (I11 #138)
 
-Issue [I11 #138]. prove actual owner alerts, diagnostic retention and
+Issue [I11 #138]: prove actual owner alerts, diagnostic retention and
 cost accounting against the LIVE staging stack. Proof ownership row P12;
 full-core closure stays with [J5 #64].
 
 - Candidate: see `results.json` (`candidate`, the worktree branch
-  `codex/kiero-i11-alerts`; drivers and evidence only. no product code
+  `codex/kiero-i11-alerts`; drivers and evidence only, no product code
   changed).
 - Environment: web `https://kiero-staging-web.wojtek-524.workers.dev`,
   gateway `https://kiero-staging-gateway.wojtek-524.workers.dev`, Convex
   `wojtek-piskorz-jr:kiero-dev-core:staging` (fiery-raven-417), Axiom
   dataset `kiero-staging` (EU; names `AXIOM_API_TOKEN`/`AXIOM_DATASET`
-  present. values never read).
+  present, values never read).
 - Constraints honored: `KIERO_GM_EMAILS` untouched (no GM-panel flow), no
   staging env var changed (the guarded proof/fixture flags stayed unset -
   `infra/bindings/convex-functions.md`), no wrangler deploy, nothing sent
@@ -49,10 +49,10 @@ self-report for the alert-side rows.
 - `ops.backup.stale` fires NATURALLY: 140/140 backup manifests fail
   `export_not_configured` (the owner-deferred
   `STAGING_CONVEX_BACKUP_ADMIN_KEY`), no snapshot ever verified, so the
-  freshness check reports `never_verified`. deduplicated to a single
+  freshness check reports `never_verified`, deduplicated to a single
   episode event (`backup_stale:0`). Nothing was fabricated.
 - The heartbeat ledger holds `backup.job` alone (ok/degraded pair per
-  15-minute slot. the run handler records `ok`, the fail handler
+  15-minute slot, the run handler records `ok`, the fail handler
   `degraded`); `gateway.worker`, `media.worker`, `export.worker` are
   honestly `never_seen` (their probers are not wired: the gateway Worker
   has no cron trigger on staging).
@@ -61,7 +61,7 @@ self-report for the alert-side rows.
   thresholds honestly false.
 - Zero events have ever been forwarded to Axiom Convex-side: all stored
   `diagnosticEvents` rows carry `forwardedAtMs: 0` while the tick runs
-  and the `AXIOM_*` names are present. the ingest leg fails invisibly
+  and the `AXIOM_*` names are present, the ingest leg fails invisibly
   (see defect F1).
 
 ## The task-reminder chain, end to end through designed surfaces (PASS)
@@ -76,11 +76,11 @@ with zero page errors (`runs/funnel-reminders.json`):
    `termin oddania wyceny 2026-09-16 (cały dzień, bez godziny)` plus a
    unique run marker and a deliberately fake `sk-proj-…` token.
 2. The agent published the project (`#1: I11 Obs <runId>`) AND the
-   temporal ustalenie. server truth:
+   temporal ustalenie, server truth:
    `semanticKey wycena_plytki_taras_termin`,
    `value {temporal, role:"agreed", shape day 2026-09-16}` (bindable as a
    deadline; the /projekty identification UI is honestly "W przygotowaniu",
-   so the agent's publication is the only live project source. defect F5).
+   so the agent's publication is the only live project source, defect F5).
 3. `/praca`: task `Wycena I11 <runId>` bound to that date ustalenie, plus
    `Zadanie bez terminu I11 <runId>` with none.
 4. The reminder evaluator's honest states, all in server truth:
@@ -104,7 +104,7 @@ with zero page errors (`runs/funnel-reminders.json`):
    - `/powiadomienia`: the server reports push configured (VAPID present
      server-side); "Włącz na tym urządzeniu" in headless Chromium lands on
      the honest permission-denied recovery copy; zero `pushSubscriptions`,
-     zero `pushDeliveries`. physical-device delivery stays J4's.
+     zero `pushDeliveries`, physical-device delivery stays J4's.
 5. The run marker, the fake `sk-proj-…` token and the mailbox address
    never appeared in any of the 292 live diagnostic events (the same
    content the sink payload carries).
@@ -116,7 +116,7 @@ expected, observed). Summary by acceptance criterion:
 
 | Criterion | Rows | Status |
 | --- | --- | --- |
-| Real emitted event reaches the Axiom dataset; fallback explicit | O3e, owner rows 1-2 | **BLOCKED** (owner-side verification; Convex-side marker proves the ingest leg never succeeded. nothing was ingested to verify) |
+| Real emitted event reaches the Axiom dataset; fallback explicit | O3e, owner rows 1-2 | **BLOCKED** (owner-side verification; Convex-side marker proves the ingest leg never succeeded, nothing was ingested to verify) |
 | Actual owner alerts for source-save failures, failed/stuck processing, stale backup, missing health; independent missing-heartbeat detector | O3h-O3l (Convex side PASS), owner rows 2-3, 6 | Convex side PASS; **alert delivery BLOCKED** (no monitors/destination exist); external prober **inert** (gateway cron not wired) |
 | 400/500 PLN thresholds with fixtures + actual metered costs; no shutdown at 500 | O3m, owner rows 4-5, [cost report](cost-report-2026-09.md) | Live accounting = 0 rows (producer gaps recorded); fixture crossing on staging **BLOCKED** (guarded); metered numbers **BLOCKED** (owner dashboards) |
 | Logs/sink payloads free of source bodies, media, credentials; retention/query access | O3a-O3d, O1 leak scan, R11 marker scan | **PASS** (live redaction + leak scans; retention within window; query access = export + public health) |
@@ -124,7 +124,7 @@ expected, observed). Summary by acceptance criterion:
 | Task-reminder intents, evaluator honest states, quiet-hours/snooze seams, web-push honest states | R1-R12 | **PASS** end to end through designed surfaces (delivered clamped prompt, pending overdue slot, no_deadline, snooze, permission-denied push copy); physical push delivery **NOT RUN** (J4) |
 | Reproducible operator procedure with expected alert/recipient/timing | this README + `runs/` + owner rows | **PASS** (procedures); delivery evidence **BLOCKED** owner-side |
 
-## Product defects found (recorded, not repaired. coordinator files)
+## Product defects found (recorded, not repaired by this lane)
 
 - **F1. Convex→Axiom transport failure is invisible.** `cronTick`'s
   `forwarded` summary (ok/reason) is returned but persisted nowhere: on
@@ -138,7 +138,7 @@ expected, observed). Summary by acceptance criterion:
   (`forwardRecentToSink`), no persistence of `SinkIngestResult`.
 - **F2. Actionable error kinds are redacted out of incident events.**
   Durable jobs fail with kinds like `unavailable:images_executor_unavailable`
-  (a colon. legal in the job's `lastErrorKind` vocabulary, illegal under
+  (a colon, legal in the job's `lastErrorKind` vocabulary, illegal under
   the `errorKind` metadata format `^[a-z][a-z0-9_]{1,63}$`), so every live
   `ops.job.attempts_exhausted` event on staging carries
   `errorKind: <redacted>` instead of the diagnosis the monitor would page
@@ -150,16 +150,16 @@ expected, observed). Summary by acceptance criterion:
   120+ real provider calls, zero `costEntries`, envelope lacks token/price
   data; `ops.provider.call` unwritten in production. The 400/500 PLN
   thresholds cannot fire from real spend.
-- **F4. monitors.json dataset drift (corrected in this PR).** The APL
+- **F4, monitors.json dataset drift (corrected in this PR).** The APL
   filters read the I2-era placeholder dataset `kiero-observability`; the
   owner provisioned `kiero-staging`. `infra/observability/monitors.json`
   and the README owner steps were corrected in this branch (owned path).
-- **F5. the /projekty identification UI is pending** ("W przygotowaniu"):
+- **F5, the /projekty identification UI is pending** ("W przygotowaniu"):
   projects arise only from the agent's publication, so a boss cannot
   create the project a task needs through the UI. Observed live during the
   funnel run; recorded for the owning lane.
 
-## Owner actions (BLOCKED rows. exact steps)
+## Owner actions (the BLOCKED rows, with exact steps)
 
 See `results.json` → `ownerRows` for the machine-readable list:
 

@@ -18,7 +18,7 @@ exactly three. `infra/observability/monitors.json`).
 | Step | Procedure | Expected | Observed 2026-09-16 |
 | --- | --- | --- | --- |
 | Trigger | Any durable job that exhausts `maxAttempts` (live: photo normalization against the unavailable images executor), a failed outbox delivery, a processing run stuck > 30 min, or a source save failure | `ops.job.attempts_exhausted` / `ops.outbox.delivery_failed` / `ops.processing.stuck` / `ops.save.failed`, one event per incident (dedup by jobKey/eventId/runId) | PASS: 11 failed jobs → 11 events, 0 jobs missing an event; 0 failed outbox rows; 0 stuck runs (23 runs) |
-| Tick | Automatic (every minute, `telemetry-tick`). no operator action | the scan emits on the first tick after the row lands | the live events carry minute-aligned timestamps matching the tick |
+| Tick | Automatic (every minute, `telemetry-tick`), no operator action | the scan emits on the first tick after the row lands | the live events carry minute-aligned timestamps matching the tick |
 | Convex read-back | `node e2e/observability/ops-surface.mjs` (row O3k) | counts match, no duplicates | PASS |
 | ALERT | monitor `kiero-processing-save-incidents` (count > 0, window 15 m, interval 5 m) | email at the destination within ~5 min of the event | **BLOCKED**: monitor not created (owner row 2); additionally the sink leg fails today (defect F1), so even a created monitor would see nothing |
 | Recovery | the operator resolves the job; the dedup key guarantees no re-page for the same incident; a NEW failing job pages again | no further alerts for the same jobKey | dedup verified live (single event per jobKey) |
@@ -29,7 +29,7 @@ exactly three. `infra/observability/monitors.json`).
 | --- | --- | --- | --- |
 | In-app layer | a service with heartbeat history stops: its newest heartbeat ages past 3× its cadence (gateway 5 min, backup/media/export 15 min) | `ops.health.silence_detected`, one event per silence episode (anchor = newest heartbeat atMs) | NOT RUN on staging: no natural gap (backup.job heartbeats every 15 min without fail); logic proven in `tests/i2` + dev round-1 |
 | never_seen lanes | a lane that never reported stays silent by design | no event (permanent noise avoided); the sink-side monitor owns this case | 3 of 4 services are honestly `never_seen` |
-| External layer | the gateway Worker cron prober posts `gateway.worker` heartbeats every 5 min; when they stop arriving at the sink, the backend is silent even if Convex itself is down | monitor `kiero-backend-silence` (heartbeat stream older than 15 m) pages | **INERT on staging**: `apps/gateway/wrangler.jsonc` has no `triggers.crons` block (owner row 6). the independent-of-the-application detector does not exist yet |
+| External layer | the gateway Worker cron prober posts `gateway.worker` heartbeats every 5 min; when they stop arriving at the sink, the backend is silent even if Convex itself is down | monitor `kiero-backend-silence` (heartbeat stream older than 15 m) pages | **INERT on staging**: `apps/gateway/wrangler.jsonc` has no `triggers.crons` block (owner row 6), the independent-of-the-application detector does not exist yet |
 | Recovery | the service resumes; the next heartbeat starts a fresh episode (new anchor) | the next silence gets a NEW dedup key and can page again | model-verified (`heartbeat.ts`); no live episode to show |
 
 ## 3. Stale complete backup
@@ -58,7 +58,7 @@ exactly three. `infra/observability/monitors.json`).
   window (rows stay stored 30 days regardless).
 - Live transport failure: **all** stored events on staging carry
   `forwardedAtMs: 0` while the tick demonstrably runs and the `AXIOM_*`
-  names are present. the leg fails and nobody can see why (defect F1).
+  names are present, the leg fails and nobody can see why (defect F1).
 - Delivery evidence + recovery state: owner-side once ingest works
   (owner row 1); record the first ingested event id + timestamp and the
   first delivered monitor email here.
