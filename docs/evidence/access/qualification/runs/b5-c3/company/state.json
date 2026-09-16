@@ -1,0 +1,19 @@
+{
+  "run": "b5-c3",
+  "company": "B5 b5-c3",
+  "mailboxes": {
+    "ma": {
+      "provider": "mail.tm",
+      "address": "kiero-b5-gqqqs7938ssq@uberip.com"
+    },
+    "mb": {
+      "provider": "mail.tm",
+      "address": "kiero-b5-8bw2dyndgiv2@uberip.com"
+    },
+    "mc": {
+      "provider": "mail.tm",
+      "address": "kiero-b5-sb7o3czb1qxy@uberip.com"
+    }
+  },
+  "pageErrors": []
+}

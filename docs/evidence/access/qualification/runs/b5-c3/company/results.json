@@ -1,0 +1,84 @@
+{
+  "run": "b5-c3",
+  "leg": "company-access",
+  "candidateSha": "d43fc27",
+  "environment": {
+    "web": "https://kiero-staging-web.wojtek-524.workers.dev",
+    "convexUrl": "https://fiery-raven-417.eu-west-1.convex.cloud"
+  },
+  "executedAt": "2026-09-16T20:35:07.748Z",
+  "results": [
+    {
+      "id": "company-founded-first-admin",
+      "status": "PASS",
+      "expected": "a fresh person creates the namespaced tenant \"B5 b5-c3\" and becomes its first (and only) administrator",
+      "observed": "company created; admin role copy present"
+    },
+    {
+      "id": "invitation-targeted-delivery",
+      "status": "PASS",
+      "expected": "the administrator's targeted invitation is created with the honest sent receipt and listed as pending, and its code is REALLY delivered to exactly that address",
+      "observed": "receipt shown: true; pending row listed: true (the delivered code is consumed in the acceptance case below)"
+    },
+    {
+      "id": "invitation-acceptance-member",
+      "status": "PASS",
+      "expected": "the invitee sees the invitation addressed to their email, accepts with the REAL delivered code, and joins as an ordinary member (not administrator)",
+      "observed": "invitation visible: true; accepted: true; role copy: member"
+    },
+    {
+      "id": "member-authored-message",
+      "status": "PASS",
+      "expected": "the member authors one conversation message before removal",
+      "observed": "message sent through the ordinary composer"
+    },
+    {
+      "id": "invitation-revocation-hostile-acceptance",
+      "status": "PASS",
+      "expected": "the invitation is delivered to the targeted address; a DIFFERENT member cannot accept it with the real code (not addressed to actor); a wrong code is refused; the administrator revokes it before acceptance (listed 'cofnięte'); acceptance after revocation is refused",
+      "observed": "delivery=sent; wrong-user accept=refused (undefined:invitation_not_addressed_to_actor); wrong-code accept=refused; revoke UI=true; post-revoke accept=refused (undefined:invitation_not_addressed_to_actor)"
+    },
+    {
+      "id": "invitation-second-acceptance-refused",
+      "status": "PASS",
+      "expected": "a member with an active company cannot accept a second invitation (one-active-company rule; exactly one valid outcome commits)",
+      "observed": "second acceptance refused (undefined:verification_code_mismatch)"
+    },
+    {
+      "id": "last-administrator-constraints",
+      "status": "PASS",
+      "expected": "the final administrator cannot leave, and cannot demote self: both attempts are refused with the last-admin guard and the company keeps its administrator",
+      "observed": "leave attempt: refused with last-admin copy; self-demotion: refused (undefined:last_administrator); role after: admin"
+    },
+    {
+      "id": "administrator-transfer",
+      "status": "PASS",
+      "expected": "the administrator transfers administration to the member in one confirmed act: the target becomes administrator, the actor becomes an ordinary member",
+      "observed": "UI copy: true; MA role after: member"
+    },
+    {
+      "id": "administrator-transfer-race",
+      "status": "PASS",
+      "expected": "two concurrent last-admin transfers serialize through optimistic concurrency: exactly one commits, the loser is typed-refused, and the company retains at least one administrator",
+      "observed": "outcomes: committed ; refused (undefined:requires_admin); final administrators: 1 (kiero-b5-gqqqs7938ssq@uberip.com)"
+    },
+    {
+      "id": "membership-removal-old-session-denial",
+      "status": "PASS",
+      "expected": "removing the member immediately ends their access: the open browser session loses the company (session-ended / no-company view), the still-verifying token's protected reads are denied, while their authored message stays in the company history",
+      "observed": "removal copy: true; open-session reaction: live session-ended view on the open conversation; after reload denied: true; API read: denied ([Request ID: 2d9bd4884ce7f2e2] Server Error); authorship kept: true"
+    },
+    {
+      "id": "logout-old-token-denied",
+      "status": "PASS",
+      "expected": "explicit logout ends the device's upstream session: the UI returns to the sign-in surface and the old token's protected reads are denied (upstream session gone — the token alone never grants access)",
+      "observed": "UI signed out: true; old-token read: denied ([Request ID: 497f3468ca4b8dc0] Server Error)"
+    },
+    {
+      "id": "page-errors-zero",
+      "status": "PASS",
+      "expected": "no pageerror events across the leg's browser sessions",
+      "observed": "none"
+    }
+  ]
+}

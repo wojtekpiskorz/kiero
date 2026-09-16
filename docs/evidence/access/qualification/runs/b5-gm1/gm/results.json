@@ -1,0 +1,24 @@
+{
+  "run": "b5-gm1",
+  "leg": "gm-entry",
+  "candidateSha": "d43fc27",
+  "environment": {
+    "web": "https://kiero-staging-web.wojtek-524.workers.dev",
+    "convexUrl": "https://fiery-raven-417.eu-west-1.convex.cloud"
+  },
+  "executedAt": "2026-09-16T20:11:02.175Z",
+  "results": [
+    {
+      "id": "gm-entry-non-designated-refused",
+      "status": "PASS",
+      "expected": "a real signed-in account NOT on the operator allow-list cannot enter GM mode: the /gm panel answers the honest Polish refusal copy, the checked action refuses (forbidden gm_not_designated), and the overview stays not_gm — no env var was read or touched by the driver",
+      "observed": "panel surface: true; refusal copy: true; mode still inactive: true; action: refused (undefined:gm_not_designated); overview state: not_gm"
+    },
+    {
+      "id": "page-errors-zero",
+      "status": "PASS",
+      "expected": "no pageerror events in the GM refusal session",
+      "observed": "none"
+    }
+  ]
+}
