@@ -70,10 +70,10 @@ artifacts under `/tmp`.
 See `results.json` for every case with status, criterion mapping,
 independently expected result, observed result, environment and the
 repeatable command. Summary by acceptance criterion — final live runs
-`b5-i4` (identity), `b5-c3` (company), `b5-gm1` (GM refusal); overall
-34 PASS, 1 FAIL (defect D1's user-visible copy), 2 BLOCKED (Google
-legs), 3 NOT RUN (real-time requirements + the coordinator-pending GM
-walk):
+`b5-i4` (identity), `b5-c3` (company), `b5-gm1` (GM refusal), `b5-gm-entry2`
+(GM audited entry, executed by the coordinator in the serialized allow-list
+window); overall 35 PASS, 1 FAIL (defect D1's user-visible copy), 2 BLOCKED
+(Google legs), 2 NOT RUN (real-time requirements):
 
 - **AC1 email-code matrix + Google**: delivery PASS (real Resend ->
   mail.tm -> consumed in the real form); wrong code refused but with the
@@ -103,7 +103,9 @@ walk):
   one committed + one typed-refused, >= 1 admin retained) PASS; 7-day
   invitation expiry NOT RUN (real-time; boundary pinned by tests/b3); GM
   entry refused for non-designated accounts PASS (live); the audited GM
-  walk NOT RUN — coordinator-pending allow-list mutation.
+  walk PASS (run b5-gm-entry2, candidate 0e6d782: banner with the stated
+  basis, audited inspection of an alpha company, byte-identical boss
+  metrics across the walk, honest inactive panel after exit).
 - **AC4 revocation effects + inactivity**: membership removal denies the
   removed member's OLD open browser session immediately (the live
   conversation subscription surfaced the session-ended view without a

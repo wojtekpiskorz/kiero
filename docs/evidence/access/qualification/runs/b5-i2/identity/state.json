@@ -1,0 +1,24 @@
+{
+  "run": "b5-i2",
+  "mailboxes": {
+    "m1": {
+      "provider": "mail.tm",
+      "address": "kiero-b5-0kwlaz5f7kw4@uberip.com"
+    },
+    "m3": {
+      "provider": "mail.tm",
+      "address": "kiero-b5-0pa23x1abcrj@uberip.com"
+    },
+    "m4": {
+      "provider": "mail.tm",
+      "address": "kiero-b5-iidq12ryst5g@uberip.com"
+    }
+  },
+  "sessionIds": {
+    "a": "th71jjtvhjsbzpyna0gvghq6kd8ehdnz",
+    "b": "th77b844g599y8cfcgpc2as4498ehnxr",
+    "c": "th73n6201nj02vpq1k0kk5a5498eg9a5",
+    "d": "th75jz0gbtndn9etvjyfwyaxj98eh7g9"
+  },
+  "pageErrors": []
+}

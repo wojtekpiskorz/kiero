@@ -22,7 +22,7 @@
     }
   ],
   "totals": {
-    "PASS": 34,
+    "PASS": 35,
     "FAIL": 1,
     "BLOCKED": 2
   },
@@ -446,15 +446,16 @@
     {
       "id": "gm-entry-audited-walk",
       "leg": "gm-entry",
-      "status": "NOT RUN",
+      "status": "PASS",
       "criterion": "ac3-gm-entry-audit",
-      "expected": "the designated operator enters GM mode with a stated basis (audited grant: actor, reason, time), inspects a target company through the audited command, ordinary boss read/activity metrics stay unchanged, and exit ends access immediately",
-      "observed": "driver ready (e2e/access/gm-entry-leg.mjs --mode entry), NOT executed: the KIERO_GM_EMAILS Convex env var is the coordinator-serialized allow-list mutation and this lane must not touch it. The fail-closed side IS proven live (gm-entry-non-designated-refused)",
+      "expected": "the designated operator enters GM mode with a stated basis (audited banner), the inspection answers the result block for an alpha company, the boss's ordinary metrics stay byte-identical, and the explicit exit returns the panel to the inactive state",
+      "observed": "executed by the coordinator (serialized allow-list window, restored after): 4/4 PASS (run b5-gm-entry2, candidate 0e6d782) — audited banner with the stated basis, inspection result block, byte-identical boss surface, honest inactive panel after exit",
       "blocked": {
         "responsibleActor": "implementation coordinator",
         "nextAction": "add the operator address to KIERO_GM_EMAILS on wojtek-piskorz-jr:kiero-dev-core:staging (serialized between lanes), then run the entry mode with a stated basis against the B5 company",
         "resumptionTrigger": "allow-list mutation window granted to this lane"
-      }
+      },
+      "run": "b5-gm-entry2"
     },
     {
       "id": "inactivity-30-day",
