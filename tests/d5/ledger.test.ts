@@ -41,7 +41,6 @@ let ctx: FakeCtx;
 
 const tx = () => asTx(ctx);
 
-/** Seeds one running normalize job for a source's attachments. */
 /** The recorded normalized outcome shape the gateway executor sends. */
 function normalizedOutcome(companyId: string, attachmentId: string, hash: string, thumbHash: string) {
   return {

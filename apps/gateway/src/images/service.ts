@@ -389,7 +389,7 @@ async function normalizeRecordAndVerify(
   if (!normalized.ok) {
     return normalized;
   }
-  const recorded = await recordOutcomeStep(env, jobKey, plan.attachmentId, outcomeOf(normalized.result));
+  const recorded = await recordOutcomeStep(env, jobKey, plan.attachmentId, normalized.result.outcome);
   if (recorded._tag === "error") {
     return { ok: false, error: recorded };
   }
@@ -411,11 +411,6 @@ async function normalizeRecordAndVerify(
     ok: true,
     outcome: { attachmentId: plan.attachmentId, state: "cleaned", outcome: "normalized" },
   };
-}
-
-/** The record-step payload of one normalization result. */
-function outcomeOf(result: NormalizationResult): RecordOutcome {
-  return result.outcome;
 }
 
 /**
