@@ -131,12 +131,14 @@ const nameField = page.getByLabel("Nazwa firmy");
 if ((await nameField.count()) !== 1) throw new Error("/firma did not render the creation form");
 await nameField.fill(COMPANY_NAME);
 const timezoneField = page.locator("#create-company-timezone");
-if ((await timezoneField.count()) === 1) {
+// Hoisted BEFORE the submit click: the creation form unmounts on success,
+// so counting the field afterwards would always read "absent".
+const timezoneSet = (await timezoneField.count()) === 1;
+if (timezoneSet) {
   await timezoneField.fill(COMPANY_TIMEZONE);
 }
 await page.getByRole("button", { name: "Załóż firmę" }).click();
 await page.waitForTimeout(6000);
-const timezoneSet = (await timezoneField.count()) === 1;
 const afterCompany = await snap("r2-company");
 const companyOk = afterCompany.includes("Jesteś administratorem tej firmy");
 rec[companyOk ? "pass" : "fail"](
@@ -180,7 +182,7 @@ if ((await ask.count()) >= 1) {
     ? `agent output rendered: ${excerpt(afterAgent, 160)}`
     : "no agent output in the window";
 }
-// The matcher must see the ANSWER BLOCK or the honest refusal copy — never
+// The matcher must see the ANSWER BLOCK or the honest refusal copy, never
 // the composer's own message text (the "ustale" class matched R3's source).
 const answered = ANSWER_OR_REFUSAL.test(
   await page.evaluate(() => document.body?.innerText ?? ""),
@@ -250,7 +252,7 @@ rec[taskSaved && datedBound ? "pass" : "fail"](
   taskSaved
     ? datedBound
       ? `${DATED_TASK} created with deadline binding: ${JSON.stringify(datedLabel)}`
-      : `${DATED_TASK} created but NO date-labelled ustalenie option existed (deadline left empty — the binding did not happen)`
+      : `${DATED_TASK} created but NO date-labelled ustalenie option existed (deadline left empty; the binding did not happen)`
     : firstLine(afterTask),
 );
 
@@ -443,9 +445,6 @@ function firstLine(text) {
 function excerpt(text, length) {
   const flat = String(text).replace(/\s+/g, " ");
   return flat.length > length ? `${flat.slice(0, length)}…` : flat;
-}
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 /** A snooze moment ~6h out, formatted for the datetime-local input. */
 function snoozeValueInCompanyZone() {

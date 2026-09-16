@@ -80,7 +80,7 @@ function metaOf(event) {
 
 /**
  * One PASS/FAIL/NOTE row. A purpose-built contract for this lane (the two
- * existing recorders — e2e/helpers.mjs and e2e/access/lib/funnel.mjs —
+ * existing recorders (e2e/helpers.mjs and e2e/access/lib/funnel.mjs)
  * differ from each other already; consolidation is a follow-up for whichever
  * lane touches them next).
  */
