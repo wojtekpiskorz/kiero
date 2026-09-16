@@ -17,10 +17,11 @@
  * exactly ONE ranged read of that window — a 10-hour recording is segmented
  * with two bounded reads per segment, never a gigabyte in an isolate.
  * `image` (E4's vision byte channel, R22) reads ONE capped window: the
- * vision adapter takes inline png/jpeg/webp of retained-representation size
- * (≤4096px edge), so anything beyond the cap answers `object_too_large`
- * instead of entering the isolate, and non-image bytes answer
- * `format_unsupported` after a magic-byte sniff — never a served guess.
+ * vision adapter takes inline png/jpeg/webp of retained-representation
+ * size, anything beyond the cap answers `object_too_large` instead of
+ * entering the isolate (see MAX_IMAGE_BYTES for the retained-original
+ * exception), and non-image bytes answer `format_unsupported` after a
+ * magic-byte sniff — never a served guess.
  *
  * The byte source is INJECTED (`readObject`, inclusive HTTP-style ranges):
  * the S3-credential R2 reader (./s3r2.ts) in production, in-memory readers
@@ -87,12 +88,19 @@ export type SegmentRefusal =
 export const HEAD_WINDOW_BYTES = 8_192;
 
 /**
- * The largest object the `image` op will read (inclusive window). Retained
- * representations are normalized to a ≤4096px edge at q85 (JPEG/PNG/WebP),
- * which lands far below this; the cap exists so a mis-retained original
- * (or a hostile object) can never enter the isolate as a base64 payload.
+ * The largest object the `image` op will read (inclusive window): the twin
+ * of D5's `MAX_INPUT_BYTES` (convex/processing/images/protocol.ts — the
+ * container build boundary blocks importing it here, so the value is
+ * documented, not shared). Normalized retained representations (≤4096px
+ * edge, q85) land far below it. The retained-original exception row is
+ * UNBOUNDED by design (`oversized_input` keeps the original), so an
+ * oversized original answers `object_too_large` and the vision order pends
+ * honestly on `image_read_channel_refused:413` — the accepted partial
+ * state: no OCR, while the photo itself stays viewable through the secure
+ * channel. The cap keeps any mis-retained or hostile object from entering
+ * the isolate as a base64 payload.
  */
-export const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
+export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 
 /** Sniffs the three supported image signatures (null when none match). */
 export function sniffImageMime(bytes: Uint8Array): ImageMime | null {
