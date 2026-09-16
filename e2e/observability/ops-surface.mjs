@@ -94,11 +94,14 @@ try {
   const response = await fetch(`${GATEWAY}/platform/health`);
   const body = await response.json();
   writeJson(join(OUT, "o2-gateway-health.json"), body);
-  const flat = JSON.stringify(body);
-  rec.pass(
+  // The status is DERIVED: a non-200 or an unreachable backend must be able
+  // to fail this row (backendReachable read as the field it is).
+  const backendReachable = body?.backendReachable === true;
+  const healthy = response.status === 200 && backendReachable;
+  rec[healthy ? "pass" : "fail"](
     "O2 gateway health",
-    "HTTP 200 from the staging gateway",
-    `HTTP ${response.status}, backendReachable ${/true/.test(flat) ? "true" : excerpt(flat, 120)}`,
+    "HTTP 200 from the staging gateway with backendReachable true",
+    `HTTP ${response.status}, backendReachable ${String(backendReachable)}`,
   );
 } catch (error) {
   rec.fail("O2 gateway health", "HTTP 200", `fetch failed: ${error.message}`);

@@ -11,7 +11,7 @@ Destination identifier (owner decision 2026-09-15,
 `docs/evidence/staging/candidate.json` `ownerDecisions.ownerAlertRecipient`):
 the owner mailbox `wojtek@honestly.design`, attached as the email
 notification channel of all three Axiom monitors (Axiom Personal permits
-exactly three. `infra/observability/monitors.json`).
+exactly three, `infra/observability/monitors.json`).
 
 ## 1. Processing/save incidents
 
@@ -39,7 +39,7 @@ exactly three. `infra/observability/monitors.json`).
 | Trigger | the newest VERIFIED snapshot ages past one hour, or attempts exist but none ever verified | `ops.backup.stale` with `state=stale\|never_verified`, deduped per newest-verified anchor | PASS, naturally: 140/140 manifests failed `export_not_configured` (deferred `STAGING_CONVEX_BACKUP_ADMIN_KEY`) → 1 `never_verified` episode event (`backup_stale:0`); no backup was fabricated |
 | Tick | automatic (every 15 min, `backup-schedule-tick`) | freshness from SNAPSHOT time, never completion time | verified by the driver recomputing freshness from the manifest rows |
 | ALERT | monitor `kiero-backend-silence` (the same stream) | email on the stale/silence stream | **BLOCKED** (owner rows 2-3 + defect F1) |
-| Recovery | a snapshot verifies again → freshness `fresh` → no further stale events; a later regression opens a NEW episode (new anchor) | state transition observable in `/platform/telemetry/health` | the transition itself is NOT RUN (no verification possible until the backup admin key lands. I10's decision) |
+| Recovery | a snapshot verifies again → freshness `fresh` → no further stale events; a later regression opens a NEW episode (new anchor) | state transition observable in `/platform/telemetry/health` | the transition itself is NOT RUN (no verification possible until the backup admin key lands per I10's decision) |
 
 ## 4. Cost thresholds (400/500 PLN)
 
