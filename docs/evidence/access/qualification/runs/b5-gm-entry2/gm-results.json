@@ -1,0 +1,36 @@
+{
+  "run": "b5-gm-entry2",
+  "leg": "gm-entry",
+  "candidateSha": "0e6d782",
+  "environment": {
+    "web": "https://kiero-staging-web.wojtek-524.workers.dev",
+    "convexUrl": "https://fiery-raven-417.eu-west-1.convex.cloud"
+  },
+  "executedAt": "2026-09-16T22:02:14.226Z",
+  "results": [
+    {
+      "id": "gm-entry-audited",
+      "status": "PASS",
+      "expected": "the designated operator enters GM mode with a stated basis; the unmistakable banner records the basis, actor email and start time (the audited grant)",
+      "observed": "banner TRYB GM AKTYWNY with the stated basis rendered"
+    },
+    {
+      "id": "gm-inspect-audited",
+      "status": "PASS",
+      "expected": "the GM inspection command answers with the company result block (an audited GM read of the target company)",
+      "observed": "result block rendered"
+    },
+    {
+      "id": "gm-ordinary-metrics-unchanged",
+      "status": "PASS",
+      "expected": "the boss's own conversation surface (read states, unread counts, activity) is byte-identical before and after the GM entry+inspection",
+      "observed": "identical"
+    },
+    {
+      "id": "gm-exit",
+      "status": "PASS",
+      "expected": "explicit exit ends GM access immediately; the audit entry remains",
+      "observed": "exit confirmed"
+    }
+  ]
+}

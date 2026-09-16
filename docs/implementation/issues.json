@@ -26,9 +26,10 @@
     "R21",
     "R22",
     "R23",
-    "R24"
+    "R24",
+    "R26"
   ],
-  "nativeCoreEdges": 216,
+  "nativeCoreEdges": 217,
   "externalEdges": 1,
   "entries": [
     {
@@ -4742,14 +4743,16 @@
         "B2",
         "B3",
         "B4",
-        "R18"
+        "R18",
+        "R26"
       ],
       "declaredPrerequisites": [
         "I8",
         "B2",
         "B3",
         "B4",
-        "R18"
+        "R18",
+        "R26"
       ],
       "ownedPaths": [
         "e2e/access/**",
@@ -6162,6 +6165,42 @@
         ],
         "remaining": [
           "The post-release photo walk verifies the vision order becomes validatable (complete with observations, or the honest failure naming the binding status)."
+        ]
+      }
+    },
+    {
+      "key": "R26",
+      "title": "[R26] Classify identity refusals by structured error data, not sanitized message strings",
+      "blockedBy": [],
+      "declaredPrerequisites": [],
+      "ownedPaths": [
+        "convex/access/**",
+        "apps/web/src/features/sign-in/**",
+        "apps/web/src/features/company/**",
+        "tests/b1/**",
+        "tests/b2/**",
+        "e2e/access/limiter-copy-probe.mjs"
+      ],
+      "proofs": [],
+      "sources": [
+        "b5-live-qualification-2026-09-16-prod-sanitization-strips-message-markers"
+      ],
+      "problem": "## Problem\n\nB5's live qualification (staging, candidate d43fc27; evidence `docs/evidence/access/qualification/`, run `b5-i2`) found the sign-in surface's fail-closed behavior CORRECT everywhere but its honest Polish copy unreachable in production-type deployments: the client classifies server refusals by regexing/matching the ERROR MESSAGE STRING — markers like `[kiero:issuance_rate_limited]`, `[kiero:method_conflict]`, `[kiero:link_rejected][code]`, \"Could not verify code\", \"Too many failed attempts\" — while the code paths throw plain `Error` / string-payload `ConvexError`, which Convex's production-type deployment sanitizes to \"Server Error\". The user sees the generic „Coś nie zadziałało. Spróbuj ponownie.\" instead of the designed copies (the rate-limit copy with its „Wyślij kod ponownie\" affordance never appears). Minimal repros and sanitized traces: `runs/b5-i2/identity/a6-wrong-code.txt`, `runs/b5-i2/identity/a3-issuance-limit.txt`, `/tmp/kiero-smoke/b5/limiter-copy-probe/` (the probe driver `e2e/access/limiter-copy-probe.mjs` is committed alongside).\n\nThis is a B1/B2-lane defect (the identity surfaces' closed-error contract), not an access-qualification one: the classification must ride STRUCTURED data that survives production sanitization, not the message string.\n\n## Bounded solution\n\nCarry the closed refusal codes as structured error data end to end:\n\n- server: throw `ConvexError` with its DATA field carrying the closed code (Convex preserves `error.data` through production sanitization) at every refusal site whose copy the UI classifies today (sign-in issuance/verification limits, code verification, method conflicts, linking refusals);\n- client: classify by the decoded data field (closed vocabulary, typed), falling back to the existing hint map; no message-string regex remains load-bearing;\n- the Polish copy and the „Wyślij kod ponownie\" affordance render again on staging exactly as the fixtures promised.\n\n## Acceptance criteria\n\n- [ ] Unit tests: the refusal sites carry the structured code (server side) and the classifier maps each code to its copy without reading `.message` (client side); typecheck/shape/guards green.\n- [ ] Live: `node e2e/access/limiter-copy-probe.mjs` against staging shows the specific Polish copies (rate limit + wrong code at minimum) where it showed the generic one; the B5 FAIL row (`otp-wrong-code`) re-runs PASS.\n\n## Verification case\n\nUnit (b1/b2 suites) + the live probe driver (committed).\n\n## Owned paths\n\n- `convex/access/**` (the refusal sites)\n- `apps/web/src/features/sign-in/**`, `apps/web/src/features/company/**` (the classifiers/copy)\n- `tests/b1/**`, `tests/b2/**`\n- `e2e/access/limiter-copy-probe.mjs`\n\n## Blocked by\n\nNone. Registered as a native blocker of B5 #134 (the FAIL row's repair).\n\nPart of [core implementation map #15](https://github.com/wojtekpiskorz/kiero/issues/15).\n",
+      "solution": "## Problem\n\nB5's live qualification (staging, candidate d43fc27; evidence `docs/evidence/access/qualification/`, run `b5-i2`) found the sign-in surface's fail-closed behavior CORRECT everywhere but its honest Polish copy unreachable in production-type deployments: the client classifies server refusals by regexing/matching the ERROR MESSAGE STRING — markers like `[kiero:issuance_rate_limited]`, `[kiero:method_conflict]`, `[kiero:link_rejected][code]`, \"Could not verify code\", \"Too many failed attempts\" — while the code paths throw plain `Error` / string-payload `ConvexError`, which Convex's production-type deployment sanitizes to \"Server Error\". The user sees the generic „Coś nie zadziałało. Spróbuj ponownie.\" instead of the designed copies (the rate-limit copy with its „Wyślij kod ponownie\" affordance never appears). Minimal repros and sanitized traces: `runs/b5-i2/identity/a6-wrong-code.txt`, `runs/b5-i2/identity/a3-issuance-limit.txt`, `/tmp/kiero-smoke/b5/limiter-copy-probe/` (the probe driver `e2e/access/limiter-copy-probe.mjs` is committed alongside).\n\nThis is a B1/B2-lane defect (the identity surfaces' closed-error contract), not an access-qualification one: the classification must ride STRUCTURED data that survives production sanitization, not the message string.\n\n## Bounded solution\n\nCarry the closed refusal codes as structured error data end to end:\n\n- server: throw `ConvexError` with its DATA field carrying the closed code (Convex preserves `error.data` through production sanitization) at every refusal site whose copy the UI classifies today (sign-in issuance/verification limits, code verification, method conflicts, linking refusals);\n- client: classify by the decoded data field (closed vocabulary, typed), falling back to the existing hint map; no message-string regex remains load-bearing;\n- the Polish copy and the „Wyślij kod ponownie\" affordance render again on staging exactly as the fixtures promised.\n\n## Acceptance criteria\n\n- [ ] Unit tests: the refusal sites carry the structured code (server side) and the classifier maps each code to its copy without reading `.message` (client side); typecheck/shape/guards green.\n- [ ] Live: `node e2e/access/limiter-copy-probe.mjs` against staging shows the specific Polish copies (rate limit + wrong code at minimum) where it showed the generic one; the B5 FAIL row (`otp-wrong-code`) re-runs PASS.\n\n## Verification case\n\nUnit (b1/b2 suites) + the live probe driver (committed).\n\n## Owned paths\n\n- `convex/access/**` (the refusal sites)\n- `apps/web/src/features/sign-in/**`, `apps/web/src/features/company/**` (the classifiers/copy)\n- `tests/b1/**`, `tests/b2/**`\n- `e2e/access/limiter-copy-probe.mjs`\n\n## Blocked by\n\nNone. Registered as a native blocker of B5 #134 (the FAIL row's repair).\n\nPart of [core implementation map #15](https://github.com/wojtekpiskorz/kiero/issues/15).\n",
+      "issueNumber": 232,
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/232",
+      "state": "OPEN",
+      "body": "## Problem\n\nB5's live qualification (staging, candidate d43fc27; evidence `docs/evidence/access/qualification/`, run `b5-i2`) found the sign-in surface's fail-closed behavior CORRECT everywhere but its honest Polish copy unreachable in production-type deployments: the client classifies server refusals by regexing/matching the ERROR MESSAGE STRING — markers like `[kiero:issuance_rate_limited]`, `[kiero:method_conflict]`, `[kiero:link_rejected][code]`, \"Could not verify code\", \"Too many failed attempts\" — while the code paths throw plain `Error` / string-payload `ConvexError`, which Convex's production-type deployment sanitizes to \"Server Error\". The user sees the generic „Coś nie zadziałało. Spróbuj ponownie.\" instead of the designed copies (the rate-limit copy with its „Wyślij kod ponownie\" affordance never appears). Minimal repros and sanitized traces: `runs/b5-i2/identity/a6-wrong-code.txt`, `runs/b5-i2/identity/a3-issuance-limit.txt`, `/tmp/kiero-smoke/b5/limiter-copy-probe/` (the probe driver `e2e/access/limiter-copy-probe.mjs` is committed alongside).\n\nThis is a B1/B2-lane defect (the identity surfaces' closed-error contract), not an access-qualification one: the classification must ride STRUCTURED data that survives production sanitization, not the message string.\n\n## Bounded solution\n\nCarry the closed refusal codes as structured error data end to end:\n\n- server: throw `ConvexError` with its DATA field carrying the closed code (Convex preserves `error.data` through production sanitization) at every refusal site whose copy the UI classifies today (sign-in issuance/verification limits, code verification, method conflicts, linking refusals);\n- client: classify by the decoded data field (closed vocabulary, typed), falling back to the existing hint map; no message-string regex remains load-bearing;\n- the Polish copy and the „Wyślij kod ponownie\" affordance render again on staging exactly as the fixtures promised.\n\n## Acceptance criteria\n\n- [ ] Unit tests: the refusal sites carry the structured code (server side) and the classifier maps each code to its copy without reading `.message` (client side); typecheck/shape/guards green.\n- [ ] Live: `node e2e/access/limiter-copy-probe.mjs` against staging shows the specific Polish copies (rate limit + wrong code at minimum) where it showed the generic one; the B5 FAIL row (`otp-wrong-code`) re-runs PASS.\n\n## Verification case\n\nUnit (b1/b2 suites) + the live probe driver (committed).\n\n## Owned paths\n\n- `convex/access/**` (the refusal sites)\n- `apps/web/src/features/sign-in/**`, `apps/web/src/features/company/**` (the classifiers/copy)\n- `tests/b1/**`, `tests/b2/**`\n- `e2e/access/limiter-copy-probe.mjs`\n\n## Blocked by\n\nNone. Registered as a native blocker of B5 #134 (the FAIL row's repair).\n\nPart of [core implementation map #15](https://github.com/wojtekpiskorz/kiero/issues/15).\n",
+      "bodySha256": "657cf4c5786cef0d7c7e1a0bc7bded6fcaf4af41b81d74f00e8df38d570be334",
+      "audit": {
+        "mergedPr": null,
+        "mergeCommit": null,
+        "implemented": "Not implemented yet: B5's live matrix recorded the defect (fail-closed behavior correct, the honest Polish copies unreachable in production-type sanitization); the structured-data classification repair lands through this issue's own PR.",
+        "evidence": [
+          "https://github.com/wojtekpiskorz/kiero/pull/233"
+        ],
+        "remaining": [
+          "The refusal sites carry the closed code as ConvexError data; the client classifies by the decoded field; the live copy probe re-runs PASS."
         ]
       }
     },
