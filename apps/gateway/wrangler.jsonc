@@ -52,6 +52,13 @@
   "env": {
     "staging": {
       "name": "kiero-staging-gateway",
+      // R21 (owner decision 2026-09-15): Images TRANSFORMATIONS ONLY, no
+      // storage — the bytes pipeline (input().transform().output()) behind
+      // the Images Transformed metric; media bytes stay in the project's own
+      // R2 buckets. The binding is NOT inherited into named environments.
+      "images": {
+        "binding": "IMAGES"
+      },
       "r2_buckets": [
         {
           "binding": "MEDIA_BUCKET",
