@@ -47,7 +47,7 @@ const OWNER_ROWS = [
     status: "BLOCKED",
     actor: "owner",
     action:
-      "Create the three monitors exactly as infra/observability/monitors.json defines (Axiom Personal permits exactly three), replace OWNER_PLACEHOLDER with the owner-decided recipient (wojtek@honestly.design, docs/evidence/staging/candidate.json ownerDecisions), and point the APL dataset filter at the live dataset name. The committed APL still reads ['kiero-observability']; the provisioned dataset is kiero-staging.",
+      "Create the three monitors exactly as infra/observability/monitors.json defines (Axiom Personal permits exactly three), replace OWNER_PLACEHOLDER with the owner-decided recipient (wojtek@honestly.design, docs/evidence/staging/candidate.json ownerDecisions), and point the APL dataset filter at the live dataset name. The committed APL reads kiero-staging (corrected in this lane); verify it still matches the provisioned dataset before creating the monitors.",
     resumption: "Axiom account access (owner)",
   },
   {

@@ -136,13 +136,14 @@ if ((await timezoneField.count()) === 1) {
 }
 await page.getByRole("button", { name: "Załóż firmę" }).click();
 await page.waitForTimeout(6000);
+const timezoneSet = (await timezoneField.count()) === 1;
 const afterCompany = await snap("r2-company");
 const companyOk = afterCompany.includes("Jesteś administratorem tej firmy");
 rec[companyOk ? "pass" : "fail"](
   "R2 company created",
   `first administrator copy; timezone ${COMPANY_TIMEZONE}`,
   companyOk
-    ? `created as administrator (timezone ${COMPANY_TIMEZONE}, local date ${deadlineDate})`
+    ? `created as administrator (timezone ${timezoneSet ? COMPANY_TIMEZONE : "not set (field absent)"}, local date ${deadlineDate})`
     : firstLine(afterCompany),
 );
 
@@ -166,6 +167,8 @@ rec[afterMessage.includes(MARKER) ? "pass" : "fail"](
 );
 
 // --- R4: the live agent answer -------------------------------------------------
+// The answer block or its honest refusal copy (H1's rendering vocabulary).
+const ANSWER_OR_REFUSAL = /Odpowiedź agenta|Nie udało się uzyskać odpowiedzi|Dostawca modelu nie odpowiedział/;
 await page.waitForTimeout(8000);
 const ask = page.getByRole("button", { name: "Zapytaj agenta o tę wiadomość" });
 let agentOutcome = "ask control missing";
@@ -173,11 +176,13 @@ if ((await ask.count()) >= 1) {
   await ask.first().click();
   await page.waitForTimeout(35000);
   const afterAgent = await snap("r4-agent");
-  agentOutcome = /odpowied|Odpowied|ustale|Nie udało si|gave-up|provider/.test(afterAgent)
+  agentOutcome = ANSWER_OR_REFUSAL.test(afterAgent)
     ? `agent output rendered: ${excerpt(afterAgent, 160)}`
     : "no agent output in the window";
 }
-const answered = /odpowied|Odpowied|ustale|Nie udało si|gave-up|provider/.test(
+// The matcher must see the ANSWER BLOCK or the honest refusal copy — never
+// the composer's own message text (the "ustale" class matched R3's source).
+const answered = ANSWER_OR_REFUSAL.test(
   await page.evaluate(() => document.body?.innerText ?? ""),
 );
 rec[answered ? "pass" : "fail"](
@@ -226,20 +231,26 @@ const deadlineOptions = await deadlineSelect.locator("option").allTextContents()
 const bindable = deadlineOptions.filter(
   (label) => !/nowe zadanie|brak ustaleń|bez terminu|^\(brak\)$|—/.test(label.trim()),
 );
+// A bindable option must be a real date label, selected by VALUE (never a
+// positional index): the pass condition includes the binding itself.
+const datedLabel = bindable.find((label) => /\d{2}\.\d{2}\.\d{4}|\d{4}-\d{2}-\d{2}/.test(label)) ?? null;
 let datedBound = false;
-if (bindable.length > 0) {
-  await deadlineSelect.selectOption({ index: 1 });
+if (datedLabel !== null) {
+  await deadlineSelect.selectOption({ label: datedLabel });
   datedBound = true;
 }
 await page.locator("#task-edit-title").fill(DATED_TASK);
 await page.getByRole("button", { name: "Zapisz zadanie" }).click();
 await page.waitForTimeout(5000);
 let afterTask = await snap("r6-dated-task");
-rec[afterTask.includes(DATED_TASK) ? "pass" : "fail"](
+const taskSaved = afterTask.includes(DATED_TASK);
+rec[taskSaved && datedBound ? "pass" : "fail"](
   "R6 dated task saved",
-  "task created (deadline bound when a temporal ustalenie exists)",
-  afterTask.includes(DATED_TASK)
-    ? `${DATED_TASK} created${datedBound ? ` with deadline binding: ${JSON.stringify(bindable[0])}` : "; NO temporal ustalenie was available (deadline left empty)"}`
+  "task created with the deadline bound to the temporal ustalenie",
+  taskSaved
+    ? datedBound
+      ? `${DATED_TASK} created with deadline binding: ${JSON.stringify(datedLabel)}`
+      : `${DATED_TASK} created but NO date-labelled ustalenie option existed (deadline left empty — the binding did not happen)`
     : firstLine(afterTask),
 );
 

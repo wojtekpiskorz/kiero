@@ -78,7 +78,12 @@ function metaOf(event) {
   return map;
 }
 
-/** One PASS/FAIL/NOTE row of the recorder convention (e2e/helpers.mjs). */
+/**
+ * One PASS/FAIL/NOTE row. A purpose-built contract for this lane (the two
+ * existing recorders — e2e/helpers.mjs and e2e/access/lib/funnel.mjs —
+ * differ from each other already; consolidation is a follow-up for whichever
+ * lane touches them next).
+ */
 export function recorder() {
   const rows = [];
   const push = (status, id, expected, observed) => {

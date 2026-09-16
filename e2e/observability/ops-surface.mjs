@@ -63,7 +63,7 @@ try {
   rec.note(
     "O1 honesty block",
     "the observability honesty block is present",
-    excerpt(honesty ?? "absent", 220),
+    excerpt(honesty, 220),
   );
   const services = telemetry.health?.services ?? [];
   rec.note(
