@@ -172,8 +172,8 @@ export interface AnchoredVisionOrder {
 /** What the image view renders for one attachment. */
 export type ImagePresentation =
   | { readonly state: "none" }
-  | { readonly state: "image" }
-  | { readonly state: "imageWithOverlays"; readonly order: AnchoredVisionOrder };
+  | { readonly state: "image"; readonly objectUrl: string }
+  | { readonly state: "imageWithOverlays"; readonly objectUrl: string; readonly order: AnchoredVisionOrder };
 
 /**
  * Decides what the secure-channel image view shows. The photo itself renders
@@ -191,7 +191,7 @@ export function imagePresentation(
     return { state: "none" };
   }
   if (anchoredOrder === null) {
-    return { state: "image" };
+    return { state: "image", objectUrl };
   }
-  return { state: "imageWithOverlays", order: anchoredOrder };
+  return { state: "imageWithOverlays", objectUrl, order: anchoredOrder };
 }

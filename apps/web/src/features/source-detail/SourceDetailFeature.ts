@@ -686,7 +686,7 @@ function ImageAttachmentView({
     // R23: the photo renders on authorized bytes alone; the OCR highlight
     // boxes attach only under the completed order that pins this
     // representation's pixel space (a pending/failed order hides nothing).
-    presentation.state === "none" || objectUrl === null
+    presentation.state === "none"
       ? null
       : createElement(
           "div",
@@ -695,7 +695,7 @@ function ImageAttachmentView({
             "data-testid": `image-canvas-${attachmentId}`,
           },
           createElement("img", {
-            src: objectUrl,
+            src: presentation.objectUrl,
             alt: "Zdjęcie źródłowe",
             style: { maxWidth: "100%", display: "block" },
           }),

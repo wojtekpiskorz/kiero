@@ -631,12 +631,13 @@ describe("the secure-channel image presentation (R23: the photo never waits for 
   });
 
   it("renders the photo on authorized bytes ALONE — a pending or failed OCR order hides nothing", () => {
-    expect(imagePresentation("blob:loaded", null)).toEqual({ state: "image" });
+    expect(imagePresentation("blob:loaded", null)).toEqual({ state: "image", objectUrl: "blob:loaded" });
   });
 
   it("attaches the OCR overlays only under the completed order that pins the space", () => {
     expect(imagePresentation("blob:loaded", order)).toEqual({
       state: "imageWithOverlays",
+      objectUrl: "blob:loaded",
       order,
     });
   });
