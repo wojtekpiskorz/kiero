@@ -75,6 +75,7 @@ import { ReassignControl } from "./reassign";
 import { WithdrawControl, WithdrawnRecord } from "./withdrawal";
 import {
   attachmentMediaUrl,
+  imagePresentation,
   loadAuthorizedMedia,
   mediaTimestamp,
   probeAuthorizedRange,
@@ -668,6 +669,7 @@ function ImageAttachmentView({
   }
 
   const attachment = row.attachments.find((a) => a.attachmentId === attachmentId);
+  const presentation = imagePresentation(objectUrl, anchoredOrder);
   return createElement(
     "article",
     { "data-testid": `image-${attachmentId}` },
@@ -681,7 +683,10 @@ function ImageAttachmentView({
     state === "denied" ? createElement("p", { role: "alert" }, copy.mediaDenied) : null,
     state === "unavailable" ? createElement("p", { role: "alert" }, copy.mediaUnavailable) : null,
     attachment === undefined ? null : createElement(RepresentationList, { representations: attachment.representations }),
-    objectUrl === null || anchoredOrder === null
+    // R23: the photo renders on authorized bytes alone; the OCR highlight
+    // boxes attach only under the completed order that pins this
+    // representation's pixel space (a pending/failed order hides nothing).
+    presentation.state === "none"
       ? null
       : createElement(
           "div",
@@ -690,32 +695,34 @@ function ImageAttachmentView({
             "data-testid": `image-canvas-${attachmentId}`,
           },
           createElement("img", {
-            src: objectUrl,
+            src: presentation.objectUrl,
             alt: "Zdjęcie źródłowe",
             style: { maxWidth: "100%", display: "block" },
           }),
-          ...anchoredOrder.observations.map((observation, index) => {
-            const box = regionBoxStyle(observation.region, {
-              width: anchoredOrder.spaceWidth,
-              height: anchoredOrder.spaceHeight,
-            });
-            return box === null
-              ? null
-              : createElement("div", {
-                  key: index,
-                  title: observation.text,
-                  "data-testid": `image-highlight-${index}`,
-                  "aria-label": `${copy.ocrHighlightLabel}: ${observation.text}`,
-                  style: {
-                    position: "absolute",
-                    left: box.left,
-                    top: box.top,
-                    width: box.width,
-                    height: box.height,
-                    outline: "2px solid #d33",
-                  },
+          ...(presentation.state === "imageWithOverlays"
+            ? presentation.order.observations.map((observation, index) => {
+                const box = regionBoxStyle(observation.region, {
+                  width: presentation.order.spaceWidth,
+                  height: presentation.order.spaceHeight,
                 });
-          }),
+                return box === null
+                  ? null
+                  : createElement("div", {
+                      key: index,
+                      title: observation.text,
+                      "data-testid": `image-highlight-${index}`,
+                      "aria-label": `${copy.ocrHighlightLabel}: ${observation.text}`,
+                      style: {
+                        position: "absolute",
+                        left: box.left,
+                        top: box.top,
+                        width: box.width,
+                        height: box.height,
+                        outline: "2px solid #d33",
+                      },
+                    });
+              })
+            : []),
         ),
   );
 }

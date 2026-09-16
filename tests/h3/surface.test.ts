@@ -42,6 +42,7 @@ import { sourceDetailFeatureEntry } from "../../apps/web/src/app/features/source
 import {
   attachmentMediaUrl,
   bearerOf,
+  imagePresentation,
   loadAuthorizedMedia,
   mediaTimestamp,
   probeAuthorizedRange,
@@ -611,6 +612,33 @@ describe("the authorized media loader (failure paths and request shape)", () => 
     const down = recordingFetch(() => null);
     expect(await probeAuthorizedRange(down.fetch, audioUrl, "tok", "bytes=0-1")).toEqual({
       state: "unavailable",
+    });
+  });
+});
+
+describe("the secure-channel image presentation (R23: the photo never waits for OCR)", () => {
+  const order = {
+    observations: [
+      { text: "Faktura 1234", region: { x: 10, y: 20, width: 100, height: 40 } },
+    ],
+    spaceWidth: 1000,
+    spaceHeight: 800,
+  };
+
+  it("renders nothing without loaded bytes, whatever the OCR state", () => {
+    expect(imagePresentation(null, null)).toEqual({ state: "none" });
+    expect(imagePresentation(null, order)).toEqual({ state: "none" });
+  });
+
+  it("renders the photo on authorized bytes ALONE — a pending or failed OCR order hides nothing", () => {
+    expect(imagePresentation("blob:loaded", null)).toEqual({ state: "image", objectUrl: "blob:loaded" });
+  });
+
+  it("attaches the OCR overlays only under the completed order that pins the space", () => {
+    expect(imagePresentation("blob:loaded", order)).toEqual({
+      state: "imageWithOverlays",
+      objectUrl: "blob:loaded",
+      order,
     });
   });
 });

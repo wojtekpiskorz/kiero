@@ -154,3 +154,44 @@ export function mediaTimestamp(ms: number): string {
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
+
+// ---------------------------------------------------------------------------
+// The secure-channel image presentation (R23)
+// ---------------------------------------------------------------------------
+
+/** The completed-order shape the image presentation overlays consume. */
+export interface AnchoredVisionOrder {
+  readonly observations: ReadonlyArray<{
+    readonly text: string;
+    readonly region: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  }>;
+  readonly spaceWidth: number | null;
+  readonly spaceHeight: number | null;
+}
+
+/** What the image view renders for one attachment. */
+export type ImagePresentation =
+  | { readonly state: "none" }
+  | { readonly state: "image"; readonly objectUrl: string }
+  | { readonly state: "imageWithOverlays"; readonly objectUrl: string; readonly order: AnchoredVisionOrder };
+
+/**
+ * Decides what the secure-channel image view shows. The photo itself renders
+ * on authorized bytes ALONE — a pending or failed OCR order must never hide
+ * the boss's own retained photo (the R23 defect: the whole `<img>` was gated
+ * on a completed order). The OCR highlight boxes attach only when a completed
+ * order pins this attachment's representation, because only that order's
+ * coordinate space makes the boxes mean anything.
+ */
+export function imagePresentation(
+  objectUrl: string | null,
+  anchoredOrder: AnchoredVisionOrder | null,
+): ImagePresentation {
+  if (objectUrl === null) {
+    return { state: "none" };
+  }
+  if (anchoredOrder === null) {
+    return { state: "image", objectUrl };
+  }
+  return { state: "imageWithOverlays", objectUrl, order: anchoredOrder };
+}

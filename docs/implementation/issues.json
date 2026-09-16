@@ -24,9 +24,10 @@
     "R19",
     "R20",
     "R21",
-    "R22"
+    "R22",
+    "R23"
   ],
-  "nativeCoreEdges": 214,
+  "nativeCoreEdges": 215,
   "externalEdges": 1,
   "entries": [
     {
@@ -4815,7 +4816,8 @@
         "R19",
         "R20",
         "R21",
-        "R22"
+        "R22",
+        "R23"
       ],
       "declaredPrerequisites": [
         "I8",
@@ -4826,7 +4828,8 @@
         "R19",
         "R20",
         "R21",
-        "R22"
+        "R22",
+        "R23"
       ],
       "ownedPaths": [
         "e2e/media/**",
@@ -6090,6 +6093,38 @@
         ],
         "remaining": [
           "The post-release photo walk verifies the vision order leaves pending (complete with observations, or the honest provider failure)."
+        ]
+      }
+    },
+    {
+      "key": "R23",
+      "title": "[R23] Render the secure-channel photo independently of OCR completion",
+      "blockedBy": [],
+      "declaredPrerequisites": [],
+      "ownedPaths": [
+        "apps/web/src/features/source-detail/**",
+        "tests/h3/**"
+      ],
+      "proofs": [],
+      "sources": [
+        "d7-live-diagnosis-2026-09-16-img-gated-on-completed-vision-order"
+      ],
+      "problem": "## Problem\n\nD7's live diagnosis (2026-09-16): on `/zrodlo`, the secure-channel control „Pokaż zdjęcie (bezpieczny kanał)\" loads the authorized bytes but renders no `<img>` and no error state — the whole image element is gated on `anchoredOrder !== null` (`apps/web/src/features/source-detail/SourceDetailFeature.ts`, `ImageAttachmentView`), i.e. on a COMPLETED vision order. While OCR is pending (R22's channel refusal era, any honest provider failure, or an unanalyzable photo) the boss can never see their own retained photo through the secure channel, even though the authorized load succeeded and the bytes are in memory. The product concept (Zdjęcie źródłowe) keeps the retained photo viewable regardless of OCR; only the OCR highlight overlays depend on a completed order pinning the representation's coordinate space.\n\n## Bounded solution\n\nDecouple the two concerns in `ImageAttachmentView`:\n\n- the `<img>` renders whenever authorized bytes are loaded (`objectUrl !== null`);\n- the region highlight boxes render only when a completed vision order pins this attachment's representation (the existing per-attachment correlation stays).\n\nThe decision becomes a small pure helper (`imagePresentation`) in the feature's media module so the behavior is testable in the repo's no-DOM idiom, red-first: on main the helper's imports cannot resolve.\n\n## Acceptance criteria\n\n- [ ] Unit tests pin the three presentation states: no bytes → nothing; loaded bytes without a completed order → the image renders, no overlays; loaded bytes with a completed order → the image plus its highlight boxes. Typecheck and the existing H3 suites stay green.\n- [ ] Live: `/zrodlo` renders the photo after the fix even while OCR is still pending, and renders the highlight boxes once OCR completes (the D7 photo walk after R22 deploys).\n\n## Verification case\n\nUnit: the H3 surface suite (the new presentation-state cases). Live: the D7 photo walk's `/zrodlo` dossier checks with the OCR state read before and after completion.\n\n## Owned paths\n\n- `apps/web/src/features/source-detail/**`\n- `tests/h3/**`\n\n## Blocked by\n\nNone. Registered as a native blocker of D7 #135.\n\nPart of [core implementation map #15](https://github.com/wojtekpiskorz/kiero/issues/15).\n\n",
+      "solution": "## Problem\n\nD7's live diagnosis (2026-09-16): on `/zrodlo`, the secure-channel control „Pokaż zdjęcie (bezpieczny kanał)\" loads the authorized bytes but renders no `<img>` and no error state — the whole image element is gated on `anchoredOrder !== null` (`apps/web/src/features/source-detail/SourceDetailFeature.ts`, `ImageAttachmentView`), i.e. on a COMPLETED vision order. While OCR is pending (R22's channel refusal era, any honest provider failure, or an unanalyzable photo) the boss can never see their own retained photo through the secure channel, even though the authorized load succeeded and the bytes are in memory. The product concept (Zdjęcie źródłowe) keeps the retained photo viewable regardless of OCR; only the OCR highlight overlays depend on a completed order pinning the representation's coordinate space.\n\n## Bounded solution\n\nDecouple the two concerns in `ImageAttachmentView`:\n\n- the `<img>` renders whenever authorized bytes are loaded (`objectUrl !== null`);\n- the region highlight boxes render only when a completed vision order pins this attachment's representation (the existing per-attachment correlation stays).\n\nThe decision becomes a small pure helper (`imagePresentation`) in the feature's media module so the behavior is testable in the repo's no-DOM idiom, red-first: on main the helper's imports cannot resolve.\n\n## Acceptance criteria\n\n- [ ] Unit tests pin the three presentation states: no bytes → nothing; loaded bytes without a completed order → the image renders, no overlays; loaded bytes with a completed order → the image plus its highlight boxes. Typecheck and the existing H3 suites stay green.\n- [ ] Live: `/zrodlo` renders the photo after the fix even while OCR is still pending, and renders the highlight boxes once OCR completes (the D7 photo walk after R22 deploys).\n\n## Verification case\n\nUnit: the H3 surface suite (the new presentation-state cases). Live: the D7 photo walk's `/zrodlo` dossier checks with the OCR state read before and after completion.\n\n## Owned paths\n\n- `apps/web/src/features/source-detail/**`\n- `tests/h3/**`\n\n## Blocked by\n\nNone. Registered as a native blocker of D7 #135.\n\nPart of [core implementation map #15](https://github.com/wojtekpiskorz/kiero/issues/15).\n\n",
+      "issueNumber": 225,
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/225",
+      "state": "CLOSED",
+      "body": "## Problem\n\nD7's live diagnosis (2026-09-16): on `/zrodlo`, the secure-channel control „Pokaż zdjęcie (bezpieczny kanał)\" loads the authorized bytes but renders no `<img>` and no error state — the whole image element is gated on `anchoredOrder !== null` (`apps/web/src/features/source-detail/SourceDetailFeature.ts`, `ImageAttachmentView`), i.e. on a COMPLETED vision order. While OCR is pending (R22's channel refusal era, any honest provider failure, or an unanalyzable photo) the boss can never see their own retained photo through the secure channel, even though the authorized load succeeded and the bytes are in memory. The product concept (Zdjęcie źródłowe) keeps the retained photo viewable regardless of OCR; only the OCR highlight overlays depend on a completed order pinning the representation's coordinate space.\n\n## Bounded solution\n\nDecouple the two concerns in `ImageAttachmentView`:\n\n- the `<img>` renders whenever authorized bytes are loaded (`objectUrl !== null`);\n- the region highlight boxes render only when a completed vision order pins this attachment's representation (the existing per-attachment correlation stays).\n\nThe decision becomes a small pure helper (`imagePresentation`) in the feature's media module so the behavior is testable in the repo's no-DOM idiom, red-first: on main the helper's imports cannot resolve.\n\n## Acceptance criteria\n\n- [ ] Unit tests pin the three presentation states: no bytes → nothing; loaded bytes without a completed order → the image renders, no overlays; loaded bytes with a completed order → the image plus its highlight boxes. Typecheck and the existing H3 suites stay green.\n- [ ] Live: `/zrodlo` renders the photo after the fix even while OCR is still pending, and renders the highlight boxes once OCR completes (the D7 photo walk after R22 deploys).\n\n## Verification case\n\nUnit: the H3 surface suite (the new presentation-state cases). Live: the D7 photo walk's `/zrodlo` dossier checks with the OCR state read before and after completion.\n\n## Owned paths\n\n- `apps/web/src/features/source-detail/**`\n- `tests/h3/**`\n\n## Blocked by\n\nNone. Registered as a native blocker of D7 #135.\n\nPart of [core implementation map #15](https://github.com/wojtekpiskorz/kiero/issues/15).\n\n",
+      "bodySha256": "cfd03ed253a386ead8cdffdee7395798a08361f1470e8f4c1cc0cf6fd01a2480",
+      "audit": {
+        "mergedPr": 227,
+        "mergeCommit": null,
+        "implemented": "ImageAttachmentView renders the <img> on authorized bytes alone through the pure imagePresentation helper; the OCR highlight boxes attach only under the completed order that pins the representation's pixel space. The PR number is recorded on merge.",
+        "evidence": [
+          "https://github.com/wojtekpiskorz/kiero/issues/135#issuecomment-5703809138"
+        ],
+        "remaining": [
+          "The post-release photo walk verifies the photo renders while OCR is pending and gains overlays once OCR completes."
         ]
       }
     },
