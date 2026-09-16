@@ -21,6 +21,7 @@
 
 import { errorResult, type ResultEnvelope } from "@kiero/contracts";
 import { unavailableError } from "@kiero/runtime";
+import { decodeImageDimensions } from "./dimensions";
 import type {
   NormalizationPlan,
   SniffedFormat,
@@ -30,7 +31,9 @@ import type {
 export interface NormalizerRequest {
   /** Which derived representation this is (archival or presentation). */
   readonly kind: "retained" | "thumbnail";
-  readonly bytes: Uint8Array;
+  /** ArrayBuffer-backed: both adapters move the bytes into transports that
+   * require it (the remote POST body; the binding's stream enqueue). */
+  readonly bytes: Uint8Array<ArrayBuffer>;
   /** Longest-edge bound; downscale only, never upscale. */
   readonly maxEdge: number;
   readonly quality: number;
@@ -98,12 +101,21 @@ export function imagesBindingNormalizer(binding: ImagesBindingLike): PhotoNormal
         .output({ format: "image/webp", quality: request.quality })
         .response();
       if (!response.ok) {
+        // The status rides the message out (R24): the drive's conversion
+        // failure record names WHY the executor refused — entitlement and
+        // decode failures stop being indistinguishable.
         throw new Error(`images binding transform failed: ${response.status}`);
       }
       const output = new Uint8Array(await response.arrayBuffer());
-      // The binding's response does not report output dimensions; the drive
-      // decodes them from the output bytes for the recorded evidence.
-      return { bytes: output, width: 0, height: 0, mimeType: "image/webp" };
+      // The binding's response does not report output dimensions, so the
+      // adapter decodes its own WebP output (R24: the drive's recorded
+      // evidence needs the real pixel space; an undecodable own output is
+      // a conversion failure, never a 0x0 stand-in).
+      const dimensions = decodeImageDimensions(output);
+      if (dimensions === null || output.length === 0) {
+        throw new Error("images binding output undecodable");
+      }
+      return { bytes: output, width: dimensions.width, height: dimensions.height, mimeType: "image/webp" };
     },
   };
 }

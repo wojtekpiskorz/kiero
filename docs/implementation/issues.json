@@ -25,9 +25,10 @@
     "R20",
     "R21",
     "R22",
-    "R23"
+    "R23",
+    "R24"
   ],
-  "nativeCoreEdges": 215,
+  "nativeCoreEdges": 216,
   "externalEdges": 1,
   "entries": [
     {
@@ -4817,7 +4818,8 @@
         "R20",
         "R21",
         "R22",
-        "R23"
+        "R23",
+        "R24"
       ],
       "declaredPrerequisites": [
         "I8",
@@ -4829,7 +4831,8 @@
         "R20",
         "R21",
         "R22",
-        "R23"
+        "R23",
+        "R24"
       ],
       "ownedPaths": [
         "e2e/media/**",
@@ -6125,6 +6128,39 @@
         ],
         "remaining": [
           "The post-release photo walk verifies the photo renders while OCR is pending and gains overlays once OCR completes."
+        ]
+      }
+    },
+    {
+      "key": "R24",
+      "title": "[R24] Carry real dimensions and the binding failure status through the images drive",
+      "blockedBy": [],
+      "declaredPrerequisites": [],
+      "ownedPaths": [
+        "apps/gateway/src/images/**",
+        "convex/processing/images/**",
+        "tests/d5/**"
+      ],
+      "proofs": [],
+      "sources": [
+        "d7-live-diagnosis-2026-09-16-space-invalid-and-conversion-failed"
+      ],
+      "problem": "## Problem\n\nD7's post-R22 live diagnosis (Convex export 2026-09-16, companies mh7847ndwc / mh79m6sv): the vision byte channel works (R22) and the DeepSeek vision attempt SUCCEEDS, but every vision order still pends — now with `image_region_invalid:space_invalid`: `validateImageRegion` sees `representation.width/height < 1`. Two roots, both in the D5 images drive:\n\n1. **`imagesBindingNormalizer` returns `width: 0, height: 0`** with a comment claiming \"the drive decodes them from the output bytes for the recorded evidence\" — no such decode exists anywhere (`encode` passes the adapter output straight through). Even a successful binding transform would record a 0×0 retained row, permanently failing every region validation.\n2. **The retained-original exception rows carry no dimensions at all.** The current staging reality: every photo normalizes to the `conversion_failed` exception (the binding's `response()` is non-OK — the status is swallowed by the bare `catch` in `normalizeAttachment`, so entitlement-vs-decode is invisible), the exception row has no width/height, and `decideRetainedSelection` hands exactly that row to the vision order. OCR over the honest fallback is structurally impossible.\n\n## Bounded solution\n\nAll in the images drive (gateway + the recording protocol):\n\n- A pure bounded dimension decoder (`apps/gateway/src/images/dimensions.ts`): JPEG SOF scan, PNG IHDR, WebP (VP8X/VP8L/VP8) — decodes from a bounded head window, returns null when undecodable (graceful omit, never a guess).\n- The binding adapter decodes its own OUTPUT dimensions (WebP) — the adapter contract returns real dimensions and the misleading comment goes.\n- `normalizeAttachment`: the conversion-failure path surfaces the binding's HTTP status (a number only — closed, sanitized) on the exception result; the exception results (oversized/unsupported/conversion_failed/quality_unresolved) carry the INPUT's decoded dimensions when available from the bounded window.\n- `RecordOutcome` gains optional `width`/`height`/`failureStatus` on the exception variant (additive; transform versions unchanged); `recordNormalizationTransaction` records the dimensions on the exception row so `decideRetainedSelection` → vision orders get a valid coordinate space over the retained original.\n\n## Acceptance criteria\n\n- [ ] Unit tests over synthetic byte fixtures: the three decoders (happy + undecodable), the binding adapter's decoded output dimensions, the exception result carrying input dimensions + failure status, the ledger's exception row recording them; typecheck/shape/guards green.\n- [ ] The next Release deploys it; a fresh D7 photo walk shows either a NORMALIZED retained row with real dimensions (binding healthy) or the retained-original exception WITH dimensions and `failureStatus` naming the binding's answer — and in BOTH cases the vision order becomes validatable (complete with observations/fragments, or the honest provider failure).\n\n## Verification case\n\nUnit: tests/d5 (decoder + adapter + ledger rows). Live: the post-release photo walk (GM inspect: the representation row's width/height; the vision order's state; `/zrodlo` OCR section).\n\n## Owned paths\n\n- `apps/gateway/src/images/**`\n- `convex/processing/images/**`\n- `tests/d5/**`\n\n## Blocked by\n\nNone. Registered as a native blocker of D7 #135.\n\nPart of [core implementation map #15](https://github.com/wojtekpiskorz/kiero/issues/15).\n",
+      "solution": "## Problem\n\nD7's post-R22 live diagnosis (Convex export 2026-09-16, companies mh7847ndwc / mh79m6sv): the vision byte channel works (R22) and the DeepSeek vision attempt SUCCEEDS, but every vision order still pends — now with `image_region_invalid:space_invalid`: `validateImageRegion` sees `representation.width/height < 1`. Two roots, both in the D5 images drive:\n\n1. **`imagesBindingNormalizer` returns `width: 0, height: 0`** with a comment claiming \"the drive decodes them from the output bytes for the recorded evidence\" — no such decode exists anywhere (`encode` passes the adapter output straight through). Even a successful binding transform would record a 0×0 retained row, permanently failing every region validation.\n2. **The retained-original exception rows carry no dimensions at all.** The current staging reality: every photo normalizes to the `conversion_failed` exception (the binding's `response()` is non-OK — the status is swallowed by the bare `catch` in `normalizeAttachment`, so entitlement-vs-decode is invisible), the exception row has no width/height, and `decideRetainedSelection` hands exactly that row to the vision order. OCR over the honest fallback is structurally impossible.\n\n## Bounded solution\n\nAll in the images drive (gateway + the recording protocol):\n\n- A pure bounded dimension decoder (`apps/gateway/src/images/dimensions.ts`): JPEG SOF scan, PNG IHDR, WebP (VP8X/VP8L/VP8) — decodes from a bounded head window, returns null when undecodable (graceful omit, never a guess).\n- The binding adapter decodes its own OUTPUT dimensions (WebP) — the adapter contract returns real dimensions and the misleading comment goes.\n- `normalizeAttachment`: the conversion-failure path surfaces the binding's HTTP status (a number only — closed, sanitized) on the exception result; the exception results (oversized/unsupported/conversion_failed/quality_unresolved) carry the INPUT's decoded dimensions when available from the bounded window.\n- `RecordOutcome` gains optional `width`/`height`/`failureStatus` on the exception variant (additive; transform versions unchanged); `recordNormalizationTransaction` records the dimensions on the exception row so `decideRetainedSelection` → vision orders get a valid coordinate space over the retained original.\n\n## Acceptance criteria\n\n- [ ] Unit tests over synthetic byte fixtures: the three decoders (happy + undecodable), the binding adapter's decoded output dimensions, the exception result carrying input dimensions + failure status, the ledger's exception row recording them; typecheck/shape/guards green.\n- [ ] The next Release deploys it; a fresh D7 photo walk shows either a NORMALIZED retained row with real dimensions (binding healthy) or the retained-original exception WITH dimensions and `failureStatus` naming the binding's answer — and in BOTH cases the vision order becomes validatable (complete with observations/fragments, or the honest provider failure).\n\n## Verification case\n\nUnit: tests/d5 (decoder + adapter + ledger rows). Live: the post-release photo walk (GM inspect: the representation row's width/height; the vision order's state; `/zrodlo` OCR section).\n\n## Owned paths\n\n- `apps/gateway/src/images/**`\n- `convex/processing/images/**`\n- `tests/d5/**`\n\n## Blocked by\n\nNone. Registered as a native blocker of D7 #135.\n\nPart of [core implementation map #15](https://github.com/wojtekpiskorz/kiero/issues/15).\n",
+      "issueNumber": 229,
+      "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/229",
+      "state": "CLOSED",
+      "body": "## Problem\n\nD7's post-R22 live diagnosis (Convex export 2026-09-16, companies mh7847ndwc / mh79m6sv): the vision byte channel works (R22) and the DeepSeek vision attempt SUCCEEDS, but every vision order still pends — now with `image_region_invalid:space_invalid`: `validateImageRegion` sees `representation.width/height < 1`. Two roots, both in the D5 images drive:\n\n1. **`imagesBindingNormalizer` returns `width: 0, height: 0`** with a comment claiming \"the drive decodes them from the output bytes for the recorded evidence\" — no such decode exists anywhere (`encode` passes the adapter output straight through). Even a successful binding transform would record a 0×0 retained row, permanently failing every region validation.\n2. **The retained-original exception rows carry no dimensions at all.** The current staging reality: every photo normalizes to the `conversion_failed` exception (the binding's `response()` is non-OK — the status is swallowed by the bare `catch` in `normalizeAttachment`, so entitlement-vs-decode is invisible), the exception row has no width/height, and `decideRetainedSelection` hands exactly that row to the vision order. OCR over the honest fallback is structurally impossible.\n\n## Bounded solution\n\nAll in the images drive (gateway + the recording protocol):\n\n- A pure bounded dimension decoder (`apps/gateway/src/images/dimensions.ts`): JPEG SOF scan, PNG IHDR, WebP (VP8X/VP8L/VP8) — decodes from a bounded head window, returns null when undecodable (graceful omit, never a guess).\n- The binding adapter decodes its own OUTPUT dimensions (WebP) — the adapter contract returns real dimensions and the misleading comment goes.\n- `normalizeAttachment`: the conversion-failure path surfaces the binding's HTTP status (a number only — closed, sanitized) on the exception result; the exception results (oversized/unsupported/conversion_failed/quality_unresolved) carry the INPUT's decoded dimensions when available from the bounded window.\n- `RecordOutcome` gains optional `width`/`height`/`failureStatus` on the exception variant (additive; transform versions unchanged); `recordNormalizationTransaction` records the dimensions on the exception row so `decideRetainedSelection` → vision orders get a valid coordinate space over the retained original.\n\n## Acceptance criteria\n\n- [ ] Unit tests over synthetic byte fixtures: the three decoders (happy + undecodable), the binding adapter's decoded output dimensions, the exception result carrying input dimensions + failure status, the ledger's exception row recording them; typecheck/shape/guards green.\n- [ ] The next Release deploys it; a fresh D7 photo walk shows either a NORMALIZED retained row with real dimensions (binding healthy) or the retained-original exception WITH dimensions and `failureStatus` naming the binding's answer — and in BOTH cases the vision order becomes validatable (complete with observations/fragments, or the honest provider failure).\n\n## Verification case\n\nUnit: tests/d5 (decoder + adapter + ledger rows). Live: the post-release photo walk (GM inspect: the representation row's width/height; the vision order's state; `/zrodlo` OCR section).\n\n## Owned paths\n\n- `apps/gateway/src/images/**`\n- `convex/processing/images/**`\n- `tests/d5/**`\n\n## Blocked by\n\nNone. Registered as a native blocker of D7 #135.\n\nPart of [core implementation map #15](https://github.com/wojtekpiskorz/kiero/issues/15).\n",
+      "bodySha256": "f9455d3eca46226469e1e47c72a8a246d6ce1de6c72974f7d50e7e569df860c2",
+      "audit": {
+        "mergedPr": null,
+        "mergeCommit": null,
+        "implemented": "The images drive decodes real pixel dimensions (a bounded jpeg/png/webp header decoder): the binding adapter's own WebP output, and the received original's space on every retained-original exception row; conversion_failed records the executor's HTTP status. The PR number is recorded on merge.",
+        "evidence": [
+          "https://github.com/wojtekpiskorz/kiero/issues/135#issuecomment-5703809138"
+        ],
+        "remaining": [
+          "The post-release photo walk verifies the vision order becomes validatable (complete with observations, or the honest failure naming the binding status)."
         ]
       }
     },
