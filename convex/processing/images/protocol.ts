@@ -568,6 +568,24 @@ export const RecordedRepresentation = Schema.Struct({
 });
 export type RecordedRepresentation = Schema.Schema.Type<typeof RecordedRepresentation>;
 
+/**
+ * The received original's pixel space on an exception row (R24): decoded
+ * from the original bytes when the bounded header resolves, absent when it
+ * does not — never a stand-in. Vision region validation over a
+ * retained-original fallback needs exactly this coordinate space.
+ */
+export const RecordedOriginalSpace = Schema.Struct({
+  width: Schema.Number.pipe(
+    Schema.check(Schema.isInt()),
+    Schema.check(Schema.isGreaterThan(0)),
+  ),
+  height: Schema.Number.pipe(
+    Schema.check(Schema.isInt()),
+    Schema.check(Schema.isGreaterThan(0)),
+  ),
+});
+export type RecordedOriginalSpace = Schema.Schema.Type<typeof RecordedOriginalSpace>;
+
 /** One attachment's typed outcome for the record step. */
 export const RecordOutcome = Schema.Union([
   Schema.Struct({
@@ -578,6 +596,17 @@ export const RecordOutcome = Schema.Union([
   Schema.Struct({
     _tag: Schema.Literals(["exception"]),
     exceptionKind: RetentionExceptionKind,
+    // The original's decoded pixel space, when the bounded header resolved.
+    originalSpace: Schema.optional(RecordedOriginalSpace),
+    // conversion_failed only: the executor's HTTP status (entitlement and
+    // decode failures become distinguishable in the durable record).
+    failureStatus: Schema.optional(
+      Schema.Number.pipe(
+        Schema.check(Schema.isInt()),
+        Schema.check(Schema.isGreaterThan(99)),
+        Schema.check(Schema.isLessThan(600)),
+      ),
+    ),
   }),
 ]);
 export type RecordOutcome = Schema.Schema.Type<typeof RecordOutcome>;

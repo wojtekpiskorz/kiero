@@ -28,75 +28,18 @@ import {
   THUMBNAIL_TRANSFORM_VERSION,
 } from "../../convex/processing/images/protocol";
 import { asTx, errorOf, fakeCtx, seedActor, valueOf, type FakeCtx } from "../d2/harness";
+import { seedImageOn, seedJobOn } from "./ledger-seeding";
+
+// The shared seeding module is ctx-explicit; this suite's call sites keep
+// their historical ctx-less shape through two thin bindings.
+const seedImage = (label: string, options?: { readonly company?: string }) =>
+  seedImageOn(ctx, label, options);
+const seedJob = (companyId: string, sourceId: string, attachmentIds: string[]) =>
+  seedJobOn(ctx, companyId, sourceId, attachmentIds);
 
 let ctx: FakeCtx;
 
 const tx = () => asTx(ctx);
-
-const RUN = "d5ledger";
-
-/** Seeds one accepted image attachment + its verified received representation. */
-async function seedImage(label: string, options?: { readonly company?: string }) {
-  const companyId = options?.company;
-  const uploadId = await ctx.db.insert("uploads", {
-    companyId,
-    userId: "u-any",
-    stage: "finalized",
-    partCount: 1,
-    createdAtMs: 1,
-    acceptedSourceId: "placeholder",
-  });
-  const sourceId = await ctx.db.insert("sources", {
-    companyId,
-    authorUserId: "u-any",
-    authorText: `wifi ${label}`,
-    sentAtMs: 1,
-    sentAtTimezone: "Europe/Warsaw",
-    fullyAcceptedAtMs: 1,
-    lifecycle: "active",
-  });
-  const attachmentId = await ctx.db.insert("attachments", {
-    uploadId,
-    sourceId,
-    kind: "image",
-    objectKey: `companies/${companyId}/uploads/${uploadId}/0-${label}`,
-    receivedBytes: 1024,
-    contentHash: "r2:etag:received",
-    createdAtMs: 1,
-    completedAtMs: 1,
-    r2ObjectEtag: "etag-received",
-  });
-  await ctx.db.insert("mediaRepresentations", {
-    attachmentId,
-    role: "received",
-    objectKey: `companies/${companyId}/uploads/${uploadId}/0-${label}`,
-    contentHash: "r2:etag:received",
-    transformVersion: "d2.received/1",
-    verifiedAtMs: 1,
-    createdAtMs: 1,
-  });
-  await ctx.db.patch(uploadId, { acceptedSourceId: sourceId });
-  return { uploadId, sourceId, attachmentId, companyId };
-}
-
-/** Seeds one running normalize job for a source's attachments. */
-async function seedJob(companyId: string, sourceId: string, attachmentIds: string[]) {
-  const jobKey = `job_${sourceId}_${RUN}`;
-  const jobId = await ctx.db.insert("durableJobs", {
-    jobKey,
-    kind: "processing.normalize_photo",
-    companyId,
-    sourceId,
-    dedupKey: `processing.normalize_photo:${sourceId}`,
-    inputJson: JSON.stringify({ sourceId, attachmentIds }),
-    state: "running",
-    attempts: 1,
-    maxAttempts: 3,
-    createdAtMs: 1,
-    updatedAtMs: 1,
-  });
-  return { jobId, jobKey, sourceId, dedupKey: `processing.normalize_photo:${sourceId}` };
-}
 
 /** The recorded normalized outcome shape the gateway executor sends. */
 function normalizedOutcome(companyId: string, attachmentId: string, hash: string, thumbHash: string) {

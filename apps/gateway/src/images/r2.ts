@@ -41,7 +41,7 @@ export async function readHead(
 export async function readAll(
   bucket: R2Bucket,
   objectKey: string,
-): Promise<{ bytes: Uint8Array; sha256Hex: string } | null> {
+): Promise<{ bytes: Uint8Array<ArrayBuffer>; sha256Hex: string } | null> {
   const object = await bucket.get(objectKey);
   if (object === null) {
     return null;

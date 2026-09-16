@@ -42,6 +42,8 @@ import type { BridgeEnv } from "../platform/bridge";
 import { imagesStep } from "./bridge";
 import { resolveNormalizer, type NormalizerEnv, type PhotoNormalizer } from "./normalizer";
 import { deleteObject, objectAbsent, putObject, readAll, readHead, sha256Hex, verifyObject } from "./r2";
+import { decodeImageDimensions, DIMENSION_HEAD_WINDOW_BYTES } from "./dimensions";
+import { NormalizerFailure } from "./normalizer";
 import {
   MAX_INPUT_BYTES,
   RETAINED_MAX_EDGE,
@@ -130,7 +132,7 @@ async function collectEvidence(env: ImagesEnv, plan: AttachmentPlan): Promise<Ev
 async function encode(
   normalizer: PhotoNormalizer,
   kind: "retained" | "thumbnail",
-  bytes: Uint8Array,
+  bytes: Uint8Array<ArrayBuffer>,
 ): Promise<{ bytes: Uint8Array; width: number; height: number; mimeType: string }> {
   return normalizer.normalize({
     kind,
@@ -157,12 +159,30 @@ async function writeAndProve(
 
 /** What one completed normalization produced. */
 type NormalizationResult =
-  | { readonly kind: "exception"; readonly exceptionKind: RetentionExceptionKind }
+  | {
+      readonly kind: "exception";
+      // The record step's own outcome shape, verbatim (R24: no parallel
+      // copies to hand-sync; the optional originalSpace/failureStatus live
+      // exactly where the ledger transaction reads them).
+      readonly outcome: RecordOutcome & { readonly _tag: "exception" };
+    }
   | {
       readonly kind: "normalized";
       readonly outcome: RecordOutcome;
       readonly evidence: EvidencePair;
     };
+
+/** The received original's pixel space from a bounded head window (or null). */
+async function originalSpaceOf(
+  env: ImagesEnv,
+  plan: AttachmentPlan,
+): Promise<{ readonly width: number; readonly height: number } | null> {
+  const window = await readHead(env.MEDIA_BUCKET, plan.receivedObjectKey, DIMENSION_HEAD_WINDOW_BYTES);
+  if (window === null) {
+    return null;
+  }
+  return decodeImageDimensions(window);
+}
 
 /**
  * Runs the whole normalization of one attachment: decide (pure), encode,
@@ -178,7 +198,18 @@ async function normalizeAttachment(
   plan: AttachmentPlan,
 ): Promise<{ ok: true; result: NormalizationResult } | { ok: false; error: ResultEnvelope }> {
   if (plan.receivedBytes > MAX_INPUT_BYTES) {
-    return { ok: true, result: { kind: "exception", exceptionKind: "oversized_input" } };
+    const originalSpace = await originalSpaceOf(env, plan);
+    return {
+      ok: true,
+      result: {
+        kind: "exception",
+        outcome: {
+          _tag: "exception",
+          exceptionKind: "oversized_input",
+          ...(originalSpace === null ? {} : { originalSpace }),
+        },
+      },
+    };
   }
   const head = await readHead(env.MEDIA_BUCKET, plan.receivedObjectKey, 64);
   if (head === null) {
@@ -190,7 +221,18 @@ async function normalizeAttachment(
     supportedFormats: normalizer.supportedFormats as readonly SniffedFormat[],
   });
   if (decision.decision === "retain_original") {
-    return { ok: true, result: { kind: "exception", exceptionKind: decision.exceptionKind } };
+    const originalSpace = await originalSpaceOf(env, plan);
+    return {
+      ok: true,
+      result: {
+        kind: "exception",
+        outcome: {
+          _tag: "exception",
+          exceptionKind: decision.exceptionKind,
+          ...(originalSpace === null ? {} : { originalSpace }),
+        },
+      },
+    };
   }
   const input = await readAll(env.MEDIA_BUCKET, plan.receivedObjectKey);
   if (input === null) {
@@ -201,10 +243,25 @@ async function normalizeAttachment(
   try {
     retainedOutput = await encode(normalizer, "retained", input.bytes);
     thumbnailOutput = await encode(normalizer, "thumbnail", input.bytes);
-  } catch {
+  } catch (cause) {
     // The executor failed to decode or encode: a typed conversion failure
-    // keeps the received original as the inspectable exception.
-    return { ok: true, result: { kind: "exception", exceptionKind: "conversion_failed" } };
+    // keeps the received original as the inspectable exception. R24: the
+    // typed refusal's status field (never its prose) and the original's
+    // pixel space ride along on the durable record.
+    const status = cause instanceof NormalizerFailure ? cause.status : undefined;
+    const originalSpace = decodeImageDimensions(input.bytes);
+    return {
+      ok: true,
+      result: {
+        kind: "exception",
+        outcome: {
+          _tag: "exception",
+          exceptionKind: "conversion_failed",
+          ...(originalSpace === null ? {} : { originalSpace }),
+          ...(status === undefined ? {} : { failureStatus: status }),
+        },
+      },
+    };
   }
   const quality = decideConversionQuality({
     inputBytes: input.bytes.length,
@@ -214,7 +271,18 @@ async function normalizeAttachment(
     plannedMaxEdge: RETAINED_MAX_EDGE,
   });
   if (!quality.resolved) {
-    return { ok: true, result: { kind: "exception", exceptionKind: "quality_unresolved" } };
+    const originalSpace = decodeImageDimensions(input.bytes);
+    return {
+      ok: true,
+      result: {
+        kind: "exception",
+        outcome: {
+          _tag: "exception",
+          exceptionKind: "quality_unresolved",
+          ...(originalSpace === null ? {} : { originalSpace }),
+        },
+      },
+    };
   }
   try {
     const retainedEvidence = await writeAndProve(env, plan.retainedObjectKey, retainedOutput);
@@ -321,14 +389,14 @@ async function normalizeRecordAndVerify(
   if (!normalized.ok) {
     return normalized;
   }
-  const recorded = await recordOutcomeStep(env, jobKey, plan.attachmentId, outcomeOf(normalized.result));
+  const recorded = await recordOutcomeStep(env, jobKey, plan.attachmentId, normalized.result.outcome);
   if (recorded._tag === "error") {
     return { ok: false, error: recorded };
   }
   if (normalized.result.kind === "exception") {
     return {
       ok: true,
-      outcome: { attachmentId: plan.attachmentId, state: "exception", outcome: normalized.result.exceptionKind },
+      outcome: { attachmentId: plan.attachmentId, state: "exception", outcome: normalized.result.outcome.exceptionKind },
     };
   }
   if (crashAfter === "record") {
@@ -343,13 +411,6 @@ async function normalizeRecordAndVerify(
     ok: true,
     outcome: { attachmentId: plan.attachmentId, state: "cleaned", outcome: "normalized" },
   };
-}
-
-/** The record-step payload of one normalization result. */
-function outcomeOf(result: NormalizationResult): RecordOutcome {
-  return result.kind === "exception"
-    ? { _tag: "exception", exceptionKind: result.exceptionKind }
-    : result.outcome;
 }
 
 /**
