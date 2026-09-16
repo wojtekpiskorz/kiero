@@ -1,0 +1,307 @@
+{
+  "run": "funnel-reminders",
+  "at": "2026-09-16T23:01:13.545Z",
+  "web": "https://kiero-staging-web.wojtek-524.workers.dev",
+  "deployment": "wojtek-piskorz-jr:kiero-dev-core:staging",
+  "runId": "256caa8f",
+  "marker": "I11OBS256caa8f",
+  "company": "Firma I11 Obs 256caa8f",
+  "timezone": "America/Los_Angeles",
+  "deadlineDate": "2026-09-16",
+  "mailbox": "kiero-smoke-w4qy85sxtiyk@uberip.com",
+  "pageErrors": [],
+  "rows": [
+    {
+      "status": "PASS",
+      "id": "R1 OTP sign-in",
+      "expected": "delivered code signs in; no company yet",
+      "observed": "signed in (no company yet)"
+    },
+    {
+      "status": "PASS",
+      "id": "R2 company created",
+      "expected": "first administrator copy; timezone America/Los_Angeles",
+      "observed": "created as administrator (timezone America/Los_Angeles, local date 2026-09-16)"
+    },
+    {
+      "status": "PASS",
+      "id": "R3 source message",
+      "expected": "message visible in the feed",
+      "observed": "sent and visible (marker present)"
+    },
+    {
+      "status": "PASS",
+      "id": "R4 agent answer",
+      "expected": "a live agent answer or its honest refusal",
+      "observed": "agent output rendered: Przejdź do treści głównej Kiero Rozmowa firmy Pamięć Szukaj Źródło Eksport Co teraz Praca Dodatkowe informacje Projekty Firma GM GM — przetwarzanie Powiadomieni…"
+    },
+    {
+      "status": "PASS",
+      "id": "R5 project published by the agent",
+      "expected": "a project exists after the source message (the /projekty UI is pending; projects come from the agent)",
+      "observed": "task form ready; project options: [\"#1: I11 Obs 256caa8f\"]"
+    },
+    {
+      "status": "PASS",
+      "id": "R6 dated task saved",
+      "expected": "task created (deadline bound when a temporal ustalenie exists)",
+      "observed": "Wycena I11 256caa8f created with deadline binding: \"(brak)\""
+    },
+    {
+      "status": "PASS",
+      "id": "R7 undated task saved",
+      "expected": "second task created without a deadline",
+      "observed": "Zadanie bez terminu I11 256caa8f created (no deadline)"
+    },
+    {
+      "status": "NOTE",
+      "id": "R8 server push keys",
+      "expected": "VAPID present server-side (no serverNotConfigured copy)",
+      "observed": "server reports push configured; screen rendered"
+    },
+    {
+      "status": "NOTE",
+      "id": "R8 enable push on this device",
+      "expected": "the designed enable path; headless Chromium cannot hold a real subscription",
+      "observed": "honest permission-denied recovery copy"
+    },
+    {
+      "status": "NOTE",
+      "id": "R9 reminder projection (dated task)",
+      "expected": "the personal reminder line of the dated task",
+      "observed": "przypomnienie zaplanowane na 17.09.2026, 14:00:00"
+    },
+    {
+      "status": "NOTE",
+      "id": "R9 reminder projection (undated task)",
+      "expected": "the personal reminder line of the undated task",
+      "observed": "brak zaplanowanych przypomnień"
+    },
+    {
+      "status": "PASS",
+      "id": "R10 snooze",
+      "expected": "snoozed-until copy after the command",
+      "observed": "reminders snoozed for this boss only"
+    },
+    {
+      "status": "NOTE",
+      "id": "R11 evaluator outcome (dated task)",
+      "expected": "the reminder line settles (delivered/suppressed/scheduled) within the evaluator window",
+      "observed": "przypomnienie zaplanowane na 17.09.2026, 14:00:00 after the wait"
+    },
+    {
+      "status": "PASS",
+      "id": "R11 session company found",
+      "expected": "the namespaced company exists exactly once",
+      "observed": "mh7fdjdhzdca8dcfk1segtek0n8eh26d"
+    },
+    {
+      "status": "PASS",
+      "id": "R11 tasks in server truth",
+      "expected": "both tasks stored with their deadline shape",
+      "observed": "dated: [{\"hasDeadline\":true,\"state\":\"todo\"}]; undated: [{\"hasDeadline\":false}]"
+    },
+    {
+      "status": "NOTE",
+      "id": "R11 reminder schedules",
+      "expected": "per-task schedule anchors with their status vocabulary",
+      "observed": "[{\"taskId\":\"8egpke\",\"status\":\"scheduled\"},{\"taskId\":\"8ehhwe\",\"status\":\"no_deadline\"}]"
+    },
+    {
+      "status": "NOTE",
+      "id": "R11 task-reminder intents",
+      "expected": "intent states for this company (dedup keys + delivery)",
+      "observed": "[{\"state\":\"pending\",\"suppressedReason\":null,\"delivered\":false,\"dedupKey\":\"task_reminder:overdue:v170r7rf032czbh1cegvrqwpnd8egpke:v97dewwxp6s9jdq7v65mjdh6zh8egsen:e0:2026-09-17\"},{\"state\":\"delivered\",\"suppressedReason\":null,\"delivered\":true,\"dedupKey\":\"task_reminder:pre_due:v170r7rf032czbh1cegvrqwpnd8egpke:v97dewwxp6s9jdq7v65mjdh6zh8egsen:e0\"}]"
+    },
+    {
+      "status": "NOTE",
+      "id": "R11 push rows",
+      "expected": "no synthetic push rows (physical delivery is J4's)",
+      "observed": "subscriptions 0, deliveries 0"
+    },
+    {
+      "status": "PASS",
+      "id": "R11 session marker leak scan",
+      "expected": "the run marker, fake token and mailbox address never reach diagnostic events",
+      "observed": "clean"
+    },
+    {
+      "status": "PASS",
+      "id": "R12 zero page errors",
+      "expected": "no pageerror events during the whole session",
+      "observed": "none"
+    }
+  ],
+  "allPassed": true,
+  "summary": {
+    "snapshotAt": "2026-09-16T23:01:13.528Z",
+    "diagnosticEvents": {
+      "total": 292,
+      "byKind": {
+        "ops.health.heartbeat": 280,
+        "ops.job.attempts_exhausted": 11,
+        "ops.backup.stale": 1
+      },
+      "unknownKinds": [],
+      "forwarded": 0,
+      "unforwarded": 292,
+      "missingRedactionVersion": 0,
+      "oversizedMetadataValues": 0,
+      "oldestAgeDays": 1.45,
+      "withinRetentionWindow": true,
+      "leakHits": []
+    },
+    "heartbeats": {
+      "ledgerRows": 20,
+      "services": [
+        {
+          "serviceName": "gateway.worker",
+          "state": "never_seen"
+        },
+        {
+          "serviceName": "backup.job",
+          "state": "ok",
+          "ageMs": 47946,
+          "lastStatus": "degraded",
+          "atMs": 1789599625584
+        },
+        {
+          "serviceName": "media.worker",
+          "state": "never_seen"
+        },
+        {
+          "serviceName": "export.worker",
+          "state": "never_seen"
+        }
+      ],
+      "silenceEvents": 0
+    },
+    "backups": {
+      "manifests": 140,
+      "manifestStates": {
+        "failed": 140
+      },
+      "failureReasons": {
+        "export_not_configured": 140
+      },
+      "newestVerifiedAtMs": null,
+      "newestFailedAtMs": 1789599625352,
+      "freshness": {
+        "state": "never_verified",
+        "emittedKind": "ops.backup.stale"
+      },
+      "staleEvents": [
+        {
+          "atMs": 1789475425065,
+          "state": "never_verified",
+          "ageMs": "0",
+          "dedupKey": "backup_stale:0"
+        }
+      ]
+    },
+    "incidents": {
+      "exhaustedJobs": 11,
+      "attemptsExhaustedEvents": 11,
+      "distinctEventJobKeys": 11,
+      "exhaustedJobsWithoutEvent": 0,
+      "failedOutboxRows": 0,
+      "outboxDeliveryFailedEvents": 0,
+      "stuckRuns": 0,
+      "processingStuckEvents": 0,
+      "processingRuns": 27
+    },
+    "costs": {
+      "period": "2026-09",
+      "entries": 0,
+      "byProvider": {},
+      "totalMinor": 0,
+      "alertStates": [],
+      "providerCallEvents": 135
+    },
+    "notifications": {
+      "intents": 13,
+      "intentsBy": {
+        "clarification:pending": 6,
+        "clarification:suppressed": 1,
+        "source_entry:pending": 3,
+        "task_reminder:pending": 1,
+        "clarification:delivered": 1,
+        "task_reminder:delivered": 1
+      },
+      "reminderSchedules": 2,
+      "schedulesByStatus": {
+        "scheduled": 1,
+        "no_deadline": 1
+      },
+      "pushSubscriptions": 0,
+      "pushDeliveries": 0,
+      "pushByState": {},
+      "snoozes": 1
+    },
+    "session": {
+      "companyId": "mh7fdjdhzdca8dcfk1segtek0n8eh26d",
+      "tasks": [
+        {
+          "taskId": "v170r7rf032czbh1cegvrqwpnd8egpke",
+          "title": "Wycena I11 256caa8f",
+          "state": "todo",
+          "hasDeadline": true,
+          "coordinatorAssigned": false,
+          "createdAtMs": 1789599589728.6438
+        },
+        {
+          "taskId": "v178b6h54ytgke6agxz90dhqqh8ehhwe",
+          "title": "Zadanie bez terminu I11 256caa8f",
+          "state": "todo",
+          "hasDeadline": false,
+          "coordinatorAssigned": false,
+          "createdAtMs": 1789599594947.6445
+        }
+      ],
+      "reminderSchedules": [
+        {
+          "taskId": "v170r7rf032czbh1cegvrqwpnd8egpke",
+          "status": "scheduled",
+          "scheduleEpoch": 0,
+          "pendingKeys": [
+            "task_reminder:pre_due:v170r7rf032czbh1cegvrqwpnd8egpke:v97dewwxp6s9jdq7v65mjdh6zh8egsen:e0",
+            "task_reminder:overdue:v170r7rf032czbh1cegvrqwpnd8egpke:v97dewwxp6s9jdq7v65mjdh6zh8egsen:e0:2026-09-17"
+          ]
+        },
+        {
+          "taskId": "v178b6h54ytgke6agxz90dhqqh8ehhwe",
+          "status": "no_deadline",
+          "scheduleEpoch": 0,
+          "pendingKeys": []
+        }
+      ],
+      "reminderIntents": [
+        {
+          "intentId": "r97403drh6m6stmj9t5d87kemx8eghax",
+          "state": "pending",
+          "dueAtMs": 1789653600000,
+          "deliveredAtMs": null,
+          "suppressedReason": null,
+          "dedupKey": "task_reminder:overdue:v170r7rf032czbh1cegvrqwpnd8egpke:v97dewwxp6s9jdq7v65mjdh6zh8egsen:e0:2026-09-17",
+          "deliveryJson": null,
+          "lastEvaluatedAtMs": null
+        },
+        {
+          "intentId": "r976dy3fzs0vpce0kxydh2drxd8eg7xk",
+          "state": "delivered",
+          "dueAtMs": 1789599590812,
+          "deliveredAtMs": 1789599590812,
+          "suppressedReason": null,
+          "dedupKey": "task_reminder:pre_due:v170r7rf032czbh1cegvrqwpnd8egpke:v97dewwxp6s9jdq7v65mjdh6zh8egsen:e0",
+          "deliveryJson": "{\"semanticKind\":\"task_reminder\",\"bucket\":\"task_reminders\",\"taskIds\":[\"v170r7rf032czbh1cegvrqwpnd8egpke\"],\"reminderKinds\":[\"pre_due\"],\"deliveredAtMs\":1789599590812}",
+          "lastEvaluatedAtMs": 1789599590812
+        }
+      ],
+      "otherIntents": [],
+      "snoozes": 1,
+      "pushSubscriptions": 0,
+      "pushDeliveries": 0,
+      "markerLeakHits": []
+    }
+  }
+}

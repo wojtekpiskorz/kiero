@@ -1,0 +1,246 @@
+{
+  "run": "ops-surface",
+  "at": "2026-09-16T23:03:47.977Z",
+  "deployment": "wojtek-piskorz-jr:kiero-dev-core:staging",
+  "site": "https://fiery-raven-417.eu-west-1.convex.site",
+  "gateway": "https://kiero-staging-gateway.wojtek-524.workers.dev",
+  "markers": [
+    "I11OBS256caa8f",
+    "sk-proj-I11OBS<synthetic-marker>"
+  ],
+  "rows": [
+    {
+      "status": "PASS",
+      "id": "O1 telemetry health",
+      "expected": "HTTP 200, platform status ok",
+      "observed": "HTTP 200, platform ok, deployment \"fiery-raven-417\""
+    },
+    {
+      "status": "NOTE",
+      "id": "O1 honesty block",
+      "expected": "the observability honesty block is present",
+      "observed": "{\"applicationEvents\":\"explicit_redacted_events_only\",\"authority\":\"domain_tables_canonical_telemetry_best_effort\",\"blindSpots\":[\"convex_platform_logs (native log streaming requires Pro)\",\"cloudflare_worker_console_logs (n…"
+    },
+    {
+      "status": "NOTE",
+      "id": "O1 heartbeat states",
+      "expected": "per-service states rendered (anySilent includes never-wired lanes)",
+      "observed": "anySilent true: gateway.worker=never_seen, backup.job=ok(degraded), media.worker=never_seen, export.worker=never_seen"
+    },
+    {
+      "status": "NOTE",
+      "id": "O1 cost thresholds",
+      "expected": "current period totals + threshold states",
+      "observed": "{\"alertStates\":[],\"perProvider\":{},\"period\":\"2026-09\",\"thresholds\":{\"alert\":false,\"warning\":false},\"totalMinor\":0}"
+    },
+    {
+      "status": "PASS",
+      "id": "O2 gateway health",
+      "expected": "HTTP 200 from the staging gateway",
+      "observed": "HTTP 200, backendReachable true"
+    },
+    {
+      "status": "PASS",
+      "id": "O3a closed vocabulary",
+      "expected": "every stored kind is in infra/observability/events.json",
+      "observed": "unknown kinds: [] over 292 events"
+    },
+    {
+      "status": "PASS",
+      "id": "O3b redaction invariants",
+      "expected": "every row carries redactionVersion, values <= 64 chars",
+      "observed": "missing version: 0, oversized values: 0"
+    },
+    {
+      "status": "PASS",
+      "id": "O3c sink payload leak scan",
+      "expected": "no credential shapes, media payload prefixes or email addresses in any stored event",
+      "observed": "clean over 292 events"
+    },
+    {
+      "status": "PASS",
+      "id": "O3d retention window",
+      "expected": "no stored diagnostic older than the 30-day window",
+      "observed": "oldest row age 1.45 days over 292 events"
+    },
+    {
+      "status": "NOTE",
+      "id": "O3e sink transport state",
+      "expected": "rows marked forwarded after a successful Axiom ingest",
+      "observed": "forwarded 0, unforwarded 292 of 292"
+    },
+    {
+      "status": "NOTE",
+      "id": "O3f heartbeat gateway.worker",
+      "expected": "state from the shared silence rule",
+      "observed": "never_seen"
+    },
+    {
+      "status": "NOTE",
+      "id": "O3f heartbeat backup.job",
+      "expected": "state from the shared silence rule",
+      "observed": "ok (age 3 min, last degraded)"
+    },
+    {
+      "status": "NOTE",
+      "id": "O3f heartbeat media.worker",
+      "expected": "state from the shared silence rule",
+      "observed": "never_seen"
+    },
+    {
+      "status": "NOTE",
+      "id": "O3f heartbeat export.worker",
+      "expected": "state from the shared silence rule",
+      "observed": "never_seen"
+    },
+    {
+      "status": "NOTE",
+      "id": "O3g silence events",
+      "expected": "in-app silence episodes emitted (deduped per episode)",
+      "observed": "0 ops.health.silence_detected events"
+    },
+    {
+      "status": "PASS",
+      "id": "O3h backup manifests observed",
+      "expected": "the 15-minute backup cadence writes manifest rows",
+      "observed": "140 manifests, states {\"failed\":140}, failure reasons {\"export_not_configured\":140}"
+    },
+    {
+      "status": "NOTE",
+      "id": "O3i backup freshness verdict",
+      "expected": "freshness from the newest VERIFIED snapshot",
+      "observed": "never_verified"
+    },
+    {
+      "status": "PASS",
+      "id": "O3j ops.backup.stale emitted",
+      "expected": "the stale/never_verified diagnostic fires through the real chain",
+      "observed": "1 event(s): [{\"atMs\":1789475425065,\"state\":\"never_verified\",\"ageMs\":\"0\",\"dedupKey\":\"backup_stale:0\"}]"
+    },
+    {
+      "status": "PASS",
+      "id": "O3k incident scan dedup",
+      "expected": "every attempts-exhausted job diagnosed exactly once",
+      "observed": "11 exhausted jobs, 11 distinct event jobKeys, 0 jobs without an event"
+    },
+    {
+      "status": "NOTE",
+      "id": "O3l incident coverage",
+      "expected": "failed outbox rows and stuck runs diagnosed",
+      "observed": "outbox failed rows 0 -> 0 events; stuck runs 0 -> 0 events (of 27 runs)"
+    },
+    {
+      "status": "NOTE",
+      "id": "O3m live cost accounting",
+      "expected": "costEntries/costAlertStates accrued by the live pipeline",
+      "observed": "0 entries (total 0 minor) in 2026-09, alert states [], while 135 integrations.providerCallCompleted envelopes exist"
+    }
+  ],
+  "allPassed": true,
+  "summary": {
+    "snapshotAt": "2026-09-16T23:03:47.966Z",
+    "diagnosticEvents": {
+      "total": 292,
+      "byKind": {
+        "ops.health.heartbeat": 280,
+        "ops.job.attempts_exhausted": 11,
+        "ops.backup.stale": 1
+      },
+      "unknownKinds": [],
+      "forwarded": 0,
+      "unforwarded": 292,
+      "missingRedactionVersion": 0,
+      "oversizedMetadataValues": 0,
+      "oldestAgeDays": 1.45,
+      "withinRetentionWindow": true,
+      "leakHits": []
+    },
+    "heartbeats": {
+      "ledgerRows": 20,
+      "services": [
+        {
+          "serviceName": "gateway.worker",
+          "state": "never_seen"
+        },
+        {
+          "serviceName": "backup.job",
+          "state": "ok",
+          "ageMs": 202383,
+          "lastStatus": "degraded",
+          "atMs": 1789599625584
+        },
+        {
+          "serviceName": "media.worker",
+          "state": "never_seen"
+        },
+        {
+          "serviceName": "export.worker",
+          "state": "never_seen"
+        }
+      ],
+      "silenceEvents": 0
+    },
+    "backups": {
+      "manifests": 140,
+      "manifestStates": {
+        "failed": 140
+      },
+      "failureReasons": {
+        "export_not_configured": 140
+      },
+      "newestVerifiedAtMs": null,
+      "newestFailedAtMs": 1789599625352,
+      "freshness": {
+        "state": "never_verified",
+        "emittedKind": "ops.backup.stale"
+      },
+      "staleEvents": [
+        {
+          "atMs": 1789475425065,
+          "state": "never_verified",
+          "ageMs": "0",
+          "dedupKey": "backup_stale:0"
+        }
+      ]
+    },
+    "incidents": {
+      "exhaustedJobs": 11,
+      "attemptsExhaustedEvents": 11,
+      "distinctEventJobKeys": 11,
+      "exhaustedJobsWithoutEvent": 0,
+      "failedOutboxRows": 0,
+      "outboxDeliveryFailedEvents": 0,
+      "stuckRuns": 0,
+      "processingStuckEvents": 0,
+      "processingRuns": 27
+    },
+    "costs": {
+      "period": "2026-09",
+      "entries": 0,
+      "byProvider": {},
+      "totalMinor": 0,
+      "alertStates": [],
+      "providerCallEvents": 135
+    },
+    "notifications": {
+      "intents": 13,
+      "intentsBy": {
+        "clarification:pending": 6,
+        "clarification:suppressed": 1,
+        "source_entry:pending": 3,
+        "task_reminder:pending": 1,
+        "clarification:delivered": 1,
+        "task_reminder:delivered": 1
+      },
+      "reminderSchedules": 2,
+      "schedulesByStatus": {
+        "scheduled": 1,
+        "no_deadline": 1
+      },
+      "pushSubscriptions": 0,
+      "pushDeliveries": 0,
+      "pushByState": {},
+      "snoozes": 1
+    }
+  }
+}

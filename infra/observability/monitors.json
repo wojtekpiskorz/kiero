@@ -1,10 +1,10 @@
 {
-  "description": "The three Axiom monitor groups (I2), matching the accepted architecture: processing/save incidents, recovery/health including external backend-silence detection, and costs/limits with the 400/500 PLN alerts. Axiom Personal permits at most three monitors - these are all three. PROVISIONING IS PENDING (see README.md): no Axiom account exists yet; the APL queries and notification channels below are the exact definitions to create once the owner provisions the account.",
+  "description": "The three Axiom monitor groups (I2), matching the accepted architecture: processing/save incidents, recovery/health including external backend-silence detection, and costs/limits with the 400/500 PLN alerts. Axiom Personal permits at most three monitors - these are all three. I11 amendment (2026-09-16): the owner provisioned the Axiom account with dataset kiero-staging (EU) and injected AXIOM_API_TOKEN/AXIOM_DATASET into the Convex staging deployment and the workers; every APL dataset filter below was corrected from the I2-era placeholder kiero-observability to the live name. The monitors themselves and the email destination remain owner actions (see README.md).",
   "monitors": [
     {
       "id": "kiero-processing-save-incidents",
       "group": "processing/save incidents",
-      "apl": "['kiero-observability'] | where kind in ['ops.processing.failed', 'ops.processing.stuck', 'ops.save.failed', 'ops.job.attempts_exhausted', 'ops.outbox.delivery_failed'] | summarize count() by kind",
+      "apl": "['kiero-staging'] | where kind in ['ops.processing.failed', 'ops.processing.stuck', 'ops.save.failed', 'ops.job.attempts_exhausted', 'ops.outbox.delivery_failed'] | summarize count() by kind",
       "trigger": { "operator": ">", "threshold": 0, "window": "15m", "interval": "5m" },
       "notifications": [
         { "channel": "email", "target": "OWNER_PLACEHOLDER", "status": "PENDING owner configures the destination" }
@@ -14,22 +14,22 @@
     {
       "id": "kiero-backend-silence",
       "group": "recovery/health",
-      "apl": "['kiero-observability'] | where kind in ['ops.health.heartbeat', 'ops.health.silence_detected', 'ops.backup.stale'] | summarize latest = max(_time), silence_events = count(kind == 'ops.health.silence_detected')",
+      "apl": "['kiero-staging'] | where kind in ['ops.health.heartbeat', 'ops.health.silence_detected', 'ops.backup.stale'] | summarize latest = max(_time), silence_events = count(kind == 'ops.health.silence_detected')",
       "trigger": { "operator": "older_than", "threshold": "15m", "window": "15m", "interval": "5m" },
       "notifications": [
         { "channel": "email", "target": "OWNER_PLACEHOLDER", "status": "PENDING owner configures the destination" }
       ],
-      "covers": "Total backend silence detected OUTSIDE Convex: the gateway cron (external prober) records heartbeats whose events reach the sink; when they stop arriving, the backend (or the whole delivery path) is silent even though no application event can report it. The in-app second layer closes the loop Convex-side: the telemetry tick emits ops.health.silence_detected (deduped per silence episode) for services whose latest heartbeat is beyond threshold, and this monitor surfaces those events too. Backup freshness for I5 rides ops.health.heartbeat of backup.job plus the recovery manifest state, and the I5 freshness check emits ops.backup.stale (snapshot age beyond one hour, or runs that never verify) into this same stream. I5 append (issue #57, flagged shared-file change)."
+      "covers": "Total backend silence detected OUTSIDE Convex: the gateway cron (external prober) records heartbeats whose events reach the sink; when they stop arriving, the backend (or the whole delivery path) is silent even though no application event can report it. The in-app second layer closes the loop Convex-side: the telemetry tick emits ops.health.silence_detected (deduped per silence episode) for services whose latest heartbeat is beyond threshold, and this monitor surfaces those events too. Backup freshness for I5 rides ops.health.heartbeat of backup.job plus the recovery manifest state, and the I5 freshness check emits ops.backup.stale (snapshot age beyond one hour, or runs that never verify) into this same stream. I5 append (issue #57, flagged shared-file change). I11 note (2026-09-16): the gateway Worker cron trigger is still not wired on staging (no triggers.crons in apps/gateway/wrangler.jsonc), so gateway.worker heartbeat events do not flow yet; only backup.job heartbeats reach the stream."
     },
     {
       "id": "kiero-cost-thresholds",
       "group": "costs/limits",
-      "apl": "['kiero-observability'] | where kind in ['ops.cost.threshold_warning', 'ops.cost.threshold_alert'] | summarize count() by level",
+      "apl": "['kiero-staging'] | where kind in ['ops.cost.threshold_warning', 'ops.cost.threshold_alert'] | summarize count() by level",
       "trigger": { "operator": ">", "threshold": 0, "window": "1h", "interval": "15m" },
       "notifications": [
         { "channel": "email", "target": "OWNER_PLACEHOLDER", "status": "PENDING owner configures the destination" }
       ],
-      "covers": "All-in monthly infrastructure + AI spend crossing 400 PLN (warning) and 500 PLN (stronger alert). Threshold evaluation and per-level 24h cooldown run Convex-side (costs.ts, evaluateCostAlerts); this monitor only notifies on the emitted alert events. No automatic product shutdown at 500 PLN (accepted alpha contract)."
+      "covers": "All-in monthly infrastructure + AI spend crossing 400 PLN (warning) and 500 PLN (stronger alert). Threshold evaluation and per-level 24h cooldown run Convex-side (costs.ts, evaluateCostAlerts); this monitor only notifies on the emitted alert events. No automatic product shutdown at 500 PLN (accepted alpha contract). I11 note (2026-09-16): no production writer records AI/media/provider spend into costEntries yet (only the backup lane writes zero-amount rows on verified snapshots), so the thresholds cannot fire from real spend until that producer lands."
     }
   ]
 }

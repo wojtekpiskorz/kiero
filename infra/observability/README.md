@@ -32,31 +32,43 @@ what requires OWNER action is stated exactly.
 
 ## PENDING owner actions (exact steps)
 
-No Axiom account or alert destination exists; no `AXIOM_API_TOKEN` is
-present in any environment (checked by name only, 2026-09-09). The owner
-must:
+I11 amendment (2026-09-16): steps 1-2 are DONE by the owner - the Axiom
+account exists, the dataset is `kiero-staging` (EU), and the names
+`AXIOM_API_TOKEN` / `AXIOM_DATASET` are present on the Convex staging
+deployment `wojtek-piskorz-jr:kiero-dev-core:staging` (verified by name
+only). Steps 3-5 remain open and own the actual alert delivery:
 
-1. **Create the Axiom Personal account** (free plan: 1 user, 3 datasets,
-   3 monitors, 30-day retention) and create the dataset
-   `kiero-observability`.
-2. **Set the credentials by name** (values never in the repository):
-   - Convex deployments: `npx --yes convex@1.45.0 env set AXIOM_API_TOKEN`
-     and `env set AXIOM_DATASET kiero-observability` per deployment.
-   - Gateway Worker: `wrangler secret put AXIOM_API_TOKEN --config
-     apps/gateway/wrangler.jsonc` plus var `AXIOM_DATASET`.
-   Until then the sink reports `axiom_not_configured` and delivery falls
-   back to the Convex ingest path (dev) - honest, never simulated.
+1. ~~Create the Axiom Personal account and the dataset~~ (DONE 2026-09-15:
+   dataset `kiero-staging`, EU).
+2. ~~Set the credentials by name~~ (DONE: names present on the staging
+   Convex deployment and injected into the workers by the release flow).
+   LIVE CAVEAT (I11, 2026-09-16): every stored `diagnosticEvents` row on
+   staging still carries `forwardedAtMs: 0` (288/288 at the evidence run)
+   while the every-minute telemetry tick demonstrably runs, so the
+   Convex-to-Axiom ingest leg has never succeeded within the one-hour
+   forward window. The failure reason (token rejected, dataset missing,
+   unreachable) is not persisted anywhere observable; the owner's first
+   dashboard action should be to check ingest in Axiom and correct the
+   token/dataset if needed.
 3. **Create the three monitors** exactly as defined in [monitors.json](monitors.json)
-   against the `kiero-observability` dataset (Axiom Personal permits exactly
-   three - all are allocated).
-4. **Configure the email alert destination(s)** for all three monitors
-   (owner mailbox), replacing `OWNER_PLACEHOLDER` in monitors.json.
-5. **Add the gateway cron trigger** (`*/5 * * * *`) to the gateway wrangler
-   config when it is created by its owning ticket, activating the Worker's
-   external-prober role (the handler already exists: `scheduled` in the
-   Worker entry).
+   against the `kiero-staging` dataset (Axiom Personal permits exactly
+   three - all are allocated). The APL dataset filters were corrected from
+   the I2-era `kiero-observability` placeholder to `kiero-staging` on
+   2026-09-16.
+4. **Configure the email alert destination(s)** for all three monitors,
+   replacing `OWNER_PLACEHOLDER` in monitors.json. The owner-decided
+   recipient is recorded in `docs/evidence/staging/candidate.json`
+   (`ownerDecisions.ownerAlertRecipient`, 2026-09-15).
+5. **Add the gateway cron trigger** (`*/5 * * * *`) to the staging env
+   block of `apps/gateway/wrangler.jsonc` (file owned by the gateway lane,
+   not this issue), activating the Worker's external-prober role (the
+   handler already exists: `scheduled` in the Worker entry). Until then
+   `gateway.worker` stays honestly `never_seen` and the external
+   heartbeat-prober layer of backend-silence detection is inert.
 
-Until steps 1-4 are done, alert delivery is BLOCKED (threshold evaluation
+Until steps 3-4 are done, alert delivery is BLOCKED (threshold evaluation
 and alert events still emit Convex-side and are readable through the query
-surface); until step 5, heartbeat silence detection runs only through
-manual/external probers hitting `POST /platform/telemetry/heartbeat`.
+surface and the snapshot export); until step 5, heartbeat silence
+detection runs only through the in-app tick plus any external prober
+holding `KIERO_SERVICE_TOKEN` hitting
+`POST /platform/telemetry/heartbeat`.
