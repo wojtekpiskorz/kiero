@@ -212,7 +212,9 @@ if (MODE === "refusal") {
   await persona.page.getByRole("button", { name: "Zakończ tryb GM" }).click();
   await persona.page.waitForTimeout(7000);
   const exited = await snap(persona.page, "4-gm-exited");
-  const exitOk = exited.includes("Tryb GM zakończony.");
+  // Exit returns the panel to the honest inactive state (the entry form with
+  // "Tryb GM nieaktywny"); the audited entry stays in the protected log.
+  const exitOk = exited.includes("Tryb GM nieaktywny") && exited.includes("Podstawa wejścia w tryb GM");
   rec.record(
     "gm-exit",
     exitOk ? "PASS" : "FAIL",
