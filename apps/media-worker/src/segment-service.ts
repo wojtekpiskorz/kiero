@@ -4,17 +4,23 @@
  * (./index.ts), the EU container's Node server (./container-main.ts) and the
  * container's Durable Object proxy, so the three surfaces cannot drift.
  *
- * TWO operations over retained object bytes, both answered as JSON:
+ * THREE operations over retained object bytes, all answered as JSON:
  *
  * - `probe`  {objectKey}            -> {format, durationMs, sampleRate?}
  * - `segment` {objectKey, startMs, endMs}
  *        -> {format: "wav", audioBase64, durationMs}
+ * - `image`  {objectKey}            -> {format: "image", imageBase64, mimeType, bytes}
  *
  * Byte discipline (the review-round-1 structural fix): NOTHING reads whole
- * objects. `probe` parses headers from an 8 KiB window; `segment` computes
- * the frame-aligned byte window for the asked interval and issues exactly
- * ONE ranged read of that window — a 10-hour recording is segmented with
- * two bounded reads per segment, never a gigabyte in an isolate.
+ * objects unbounded. `probe` parses headers from an 8 KiB window; `segment`
+ * computes the frame-aligned byte window for the asked interval and issues
+ * exactly ONE ranged read of that window — a 10-hour recording is segmented
+ * with two bounded reads per segment, never a gigabyte in an isolate.
+ * `image` (E4's vision byte channel, R22) reads ONE capped window: the
+ * vision adapter takes inline png/jpeg/webp of retained-representation size
+ * (≤4096px edge), so anything beyond the cap answers `object_too_large`
+ * instead of entering the isolate, and non-image bytes answer
+ * `format_unsupported` after a magic-byte sniff — never a served guess.
  *
  * The byte source is INJECTED (`readObject`, inclusive HTTP-style ranges):
  * the S3-credential R2 reader (./s3r2.ts) in production, in-memory readers
@@ -55,12 +61,17 @@ export interface MediaWorkerEnv {
 /** One protocol request (already JSON-parsed at the HTTP boundary). */
 export type SegmentRequest =
   | { op: "probe"; objectKey: string }
-  | { op: "segment"; objectKey: string; startMs: number; endMs: number };
+  | { op: "segment"; objectKey: string; startMs: number; endMs: number }
+  | { op: "image"; objectKey: string };
+
+/** The image mime types the vision adapter accepts (E2's inline set). */
+export type ImageMime = "image/png" | "image/jpeg" | "image/webp";
 
 /** Every protocol response; refusals carry a closed code only. */
 export type SegmentResponse =
   | { ok: true; format: "wav"; durationMs: number; sampleRate?: number }
   | { ok: true; format: "wav"; audioBase64: string; durationMs: number }
+  | { ok: true; format: "image"; imageBase64: string; mimeType: ImageMime; bytes: number }
   | { ok: false; code: SegmentRefusal };
 
 export type SegmentRefusal =
@@ -68,10 +79,40 @@ export type SegmentRefusal =
   | "object_not_found"
   | "object_read_failed"
   | "format_requires_container"
-  | "interval_out_of_range";
+  | "interval_out_of_range"
+  | "object_too_large"
+  | "format_unsupported";
 
 /** The window the header walk needs (fmt + data chunk headers live here). */
 export const HEAD_WINDOW_BYTES = 8_192;
+
+/**
+ * The largest object the `image` op will read (inclusive window). Retained
+ * representations are normalized to a ≤4096px edge at q85 (JPEG/PNG/WebP),
+ * which lands far below this; the cap exists so a mis-retained original
+ * (or a hostile object) can never enter the isolate as a base64 payload.
+ */
+export const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
+
+/** Sniffs the three supported image signatures (null when none match). */
+export function sniffImageMime(bytes: Uint8Array): ImageMime | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+  ) {
+    return "image/png";
+  }
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+  return null;
+}
 
 /** Serves one protocol request over the injected byte source. */
 export async function serveSegmentRequest(
@@ -102,6 +143,25 @@ export async function serveSegmentRequest(
       durationMs: wavDurationMs(parsed.header),
       sampleRate: parsed.header.sampleRate,
     };
+  }
+  if (value.op === "image") {
+    // ONE capped window (inclusive end): a full window means the object is
+    // larger than the vision channel will ever serve — refuse, never read on.
+    const bytes = await readObject(value.objectKey, { start: 0, end: MAX_IMAGE_BYTES });
+    if (bytes === null) {
+      return { ok: false, code: "object_not_found" };
+    }
+    if (bytes.length > MAX_IMAGE_BYTES) {
+      return { ok: false, code: "object_too_large" };
+    }
+    if (bytes.length === 0) {
+      return { ok: false, code: "object_read_failed" };
+    }
+    const mimeType = sniffImageMime(bytes);
+    if (mimeType === null) {
+      return { ok: false, code: "format_unsupported" };
+    }
+    return { ok: true, format: "image", imageBase64: bytesToBase64(bytes), mimeType, bytes: bytes.length };
   }
   if (value.op === "segment") {
     if (typeof value.startMs !== "number" || typeof value.endMs !== "number") {
@@ -167,6 +227,9 @@ function protocolStatus(response: SegmentResponse): number {
   if (response.code === "object_not_found") {
     return 404;
   }
+  if (response.code === "object_too_large") {
+    return 413;
+  }
   return 422;
 }
 
@@ -190,7 +253,10 @@ export async function handleMediaProtocol(
       ffmpegConversion: "container-pending",
     }, 200);
   }
-  if (request.method !== "POST" || (url.pathname !== "/probe" && url.pathname !== "/segment")) {
+  if (
+    request.method !== "POST" ||
+    (url.pathname !== "/probe" && url.pathname !== "/segment" && url.pathname !== "/image")
+  ) {
     return jsonResponse({ ok: false, code: "unknown_route" }, 404);
   }
   const expected = env.MEDIA_SEGMENT_TOKEN ?? "";

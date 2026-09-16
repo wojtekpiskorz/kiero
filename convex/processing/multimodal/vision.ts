@@ -130,8 +130,8 @@ function visionMimeOf(mimeType: string | undefined): VisionMime | null {
 /**
  * Resolves one representation's bytes through the order's channel. The
  * production channel asks the configured media executor for an image read
- * (`op: "image"`, the named prerequisite extension); its closed protocol
- * refuses unknown ops today, which maps to the typed resumable refusal.
+ * (`op: "image"`, served by the media protocol since R22); its closed
+ * refusals (404/413/422) map to the typed resumable state below.
  */
 async function resolveImageBytes(
   channel: "media_worker" | "proof_inline",

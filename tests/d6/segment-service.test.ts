@@ -14,6 +14,7 @@
 import { describe, expect, it } from "vitest";
 import {
   HEAD_WINDOW_BYTES,
+  MAX_IMAGE_BYTES,
   serveSegmentRequest,
   handleMediaProtocol,
   type ObjectReader,
@@ -40,7 +41,7 @@ describe("ranged byte discipline", () => {
     const reader = recordingReader(FIXTURE, log);
     const probed = await serveSegmentRequest(reader, { op: "probe", objectKey: "k" });
     expect(probed).toMatchObject({ ok: true, format: "wav" });
-    if (!probed.ok) {
+    if (!probed.ok || !("durationMs" in probed)) {
       return;
     }
     expect(probed.durationMs).toBeCloseTo(6_000, 3);
@@ -180,5 +181,83 @@ describe("the ONE shared HTTP boundary", () => {
     });
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({ ok: false, code: "unknown_route" });
+    // The unknown-op refusal sits in the protocol layer (the HTTP boundary
+    // answers the credential refusal before parsing any body).
+    const log: { start: number; end: number }[] = [];
+    const reader = recordingReader(FIXTURE, log);
+    expect(await serveSegmentRequest(reader, { op: "bogus", objectKey: "k" } as never)).toMatchObject({
+      ok: false,
+      code: "malformed_request",
+    });
+  });
+
+  it("/image passes the route guard (the credential refusal, never unknown_route)", async () => {
+    const response = await handleMediaProtocol(
+      request("/image", { method: "POST", body: JSON.stringify({ op: "image", objectKey: "k" }) }),
+      { MEDIA_SEGMENT_TOKEN: token },
+    );
+    // No S3 credentials in this env: the route exists (past the allowlist),
+    // the refusal is the honest not_configured — not unknown_route.
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ ok: false, code: "not_configured" });
+  });
+});
+
+describe("the image byte channel (R22: E4's vision read)", () => {
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]);
+  const webp = new Uint8Array([
+    0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x20,
+  ]);
+
+  it("serves jpeg/png/webp with the sniffed mime and byte-identical base64", async () => {
+    for (const [bytes, mimeType] of [
+      [jpeg, "image/jpeg"],
+      [png, "image/png"],
+      [webp, "image/webp"],
+    ] as const) {
+      const log: { start: number; end: number }[] = [];
+      const reader = recordingReader(bytes, log);
+      const served = await serveSegmentRequest(reader, { op: "image", objectKey: "k" });
+      expect(served).toMatchObject({ ok: true, format: "image", mimeType, bytes: bytes.length });
+      if (!served.ok || !("imageBase64" in served)) {
+        throw new Error("expected ok image");
+      }
+      expect(base64ToBytes(served.imageBase64)).toEqual(bytes);
+      // ONE capped window, never an unbounded whole-object read.
+      expect(log).toEqual([{ start: 0, end: MAX_IMAGE_BYTES }]);
+    }
+  });
+
+  it("refuses non-image bytes with format_unsupported (a retained WAV is not an image)", async () => {
+    const log: { start: number; end: number }[] = [];
+    const reader = recordingReader(FIXTURE, log);
+    expect(await serveSegmentRequest(reader, { op: "image", objectKey: "k" })).toMatchObject({
+      ok: false,
+      code: "format_unsupported",
+    });
+  });
+
+  it("refuses objects beyond the cap with object_too_large, reading only the cap window", async () => {
+    const log: { start: number; end: number }[] = [];
+    const oversized = new Uint8Array(MAX_IMAGE_BYTES + 1);
+    oversized.set([0xff, 0xd8, 0xff], 0);
+    const reader = recordingReader(oversized, log);
+    expect(await serveSegmentRequest(reader, { op: "image", objectKey: "k" })).toMatchObject({
+      ok: false,
+      code: "object_too_large",
+    });
+    expect(log).toEqual([{ start: 0, end: MAX_IMAGE_BYTES }]);
+  });
+
+  it("refuses missing and empty objects with closed codes", async () => {
+    const missing: ObjectReader = async () => null;
+    expect(await serveSegmentRequest(missing, { op: "image", objectKey: "gone" })).toMatchObject({
+      code: "object_not_found",
+    });
+    const empty: ObjectReader = async () => new Uint8Array(0);
+    expect(await serveSegmentRequest(empty, { op: "image", objectKey: "k" })).toMatchObject({
+      code: "object_read_failed",
+    });
   });
 });
