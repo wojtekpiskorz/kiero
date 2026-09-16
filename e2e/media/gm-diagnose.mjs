@@ -15,7 +15,7 @@ const CLI = "/projects/kiero-worktrees/d7-media/tools/smoke/mailbox.mjs";
 const OUT = `/tmp/kiero-smoke/d7/gm-${process.env.KIERO_DIAG_RUN ?? Date.now().toString(36)}`;
 const PROFILE = `${OUT}/profile`; // fresh per run: no session carryover
 const CHROMIUM = "/root/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome";
-const FIXTURE = "/projects/kiero-worktrees/d7-media/e2e/media/fixtures/voice-note-pl.wav";
+const FIXTURE = "/projects/kiero-worktrees/d7-media/e2e/media/fixtures/normal-note.jpg";
 const DEPLOYMENT = "wojtek-piskorz-jr:kiero-dev-core:staging";
 const OWNER_GM = "wojtek@honestly.design";
 mkdirSync(OUT, { recursive: true });
@@ -117,14 +117,13 @@ console.log("[firma]", body.includes("Jesteś administratorem tej firmy") ? "adm
 // 5. One photo message inside that company.
 await page.goto(WEB, { waitUntil: "domcontentloaded" });
 await page.waitForTimeout(3000);
-await page.getByRole("button", { name: "Nagraj głos" }).click();
-await page.waitForTimeout(12000);
-await page.getByRole("button", { name: "Zatrzymaj nagrywanie" }).click();
-await page.waitForTimeout(3000);
+await page.getByLabel("Treść wiadomości").fill("Diagnoza: faktura ze zdjęcia.");
+await page.locator('input[type="file"][accept="image/*"]').setInputFiles([FIXTURE]);
+await page.waitForTimeout(2500);
 await page.getByRole("button", { name: "Wyślij" }).click();
 await page.waitForTimeout(75000);
 await snap("4-sent");
-console.log("[sent] voice captured");
+console.log("[sent] photo captured");
 
 // 6. GM inspect the company.
 await page.goto(`${WEB}/gm`, { waitUntil: "domcontentloaded" });
