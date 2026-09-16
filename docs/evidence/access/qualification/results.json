@@ -1,22 +1,40 @@
 {
-  "candidateSha": "d43fc27",
-  "collectedAt": "2026-09-16T21:37:02.875Z",
+  "defaultCandidateSha": "d43fc27",
+  "collectedAt": "2026-09-16T22:34:01.465Z",
+  "note": "every live row carries its OWN run's candidateSha (runs executed at different candidates stay correctly attributed); totals counts the live rows, totalsAll counts every row in this matrix",
   "environments": [
+    {
+      "run": "b5-i2",
+      "leg": "identity-email",
+      "candidateSha": "d43fc27",
+      "web": "https://kiero-staging-web.wojtek-524.workers.dev",
+      "convexUrl": "https://fiery-raven-417.eu-west-1.convex.cloud"
+    },
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "web": "https://kiero-staging-web.wojtek-524.workers.dev",
       "convexUrl": "https://fiery-raven-417.eu-west-1.convex.cloud"
     },
     {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "web": "https://kiero-staging-web.wojtek-524.workers.dev",
       "convexUrl": "https://fiery-raven-417.eu-west-1.convex.cloud"
     },
     {
       "run": "b5-gm1",
       "leg": "gm-entry",
+      "candidateSha": "d43fc27",
+      "web": "https://kiero-staging-web.wojtek-524.workers.dev",
+      "convexUrl": "https://fiery-raven-417.eu-west-1.convex.cloud"
+    },
+    {
+      "run": "b5-gm-entry2",
+      "leg": "gm-entry",
+      "candidateSha": "0e6d782",
       "web": "https://kiero-staging-web.wojtek-524.workers.dev",
       "convexUrl": "https://fiery-raven-417.eu-west-1.convex.cloud"
     }
@@ -26,11 +44,18 @@
     "FAIL": 1,
     "BLOCKED": 2
   },
-  "staticRows": 4,
+  "totalsAll": {
+    "PASS": 35,
+    "FAIL": 1,
+    "BLOCKED": 3,
+    "NOT RUN": 2
+  },
+  "staticRows": 3,
   "results": [
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "google-entry-present",
       "status": "PASS",
       "expected": "sign-in card offers Google (providerAvailability.google true on staging)",
@@ -42,6 +67,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "otp-delivery",
       "status": "PASS",
       "expected": "real Resend delivery to a real mail.tm mailbox signs the persona in (no fixture codes on staging)",
@@ -54,6 +80,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "session-recovery-reload",
       "status": "PASS",
       "expected": "a full reload of the persistent profile keeps the live session (no re-authentication prompt)",
@@ -64,6 +91,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "otp-issuance-limit",
       "status": "PASS",
       "expected": "5 code requests on one address all issue; the 6th rapid request is refused by the per-address issuance limiter (marker [kiero:issuance_rate_limited], copy 'Zbyt wiele próśb o kod na ten adres. Odczekaj kilka minut i spróbuj ponownie.')",
@@ -74,6 +102,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "sameemail-resume-second-device",
       "status": "PASS",
       "expected": "same-email email-code sign-in on an independent device RESUMES the same account (no method-conflict, no duplicate identity): both devices see one shared session registry",
@@ -84,6 +113,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "independent-browser-sessions",
       "status": "PASS",
       "expected": "both device sessions exist under ONE account (the second device's session list contains the first device's session)",
@@ -108,6 +138,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "device-revocation-immediate-denial",
       "status": "PASS",
       "expected": "revoking one device's session ends ONLY that device: the revoked profile shows the Polish session-ended view, its token's protected reads fail, the revoking device stays live",
@@ -118,6 +149,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "otp-wrong-code",
       "status": "FAIL",
       "expected": "a wrong 8-digit code is refused with the Polish copy 'Kod jest nieprawidłowy lub wygasł. Poproś o nowy kod.' and the resend control appears; no session is created",
@@ -128,6 +160,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "otp-onetime-use-replay-refused",
       "status": "PASS",
       "expected": "after a code consummates a sign-in, submitting the SAME code again from a fresh unauthenticated client is refused (one-time use; no second session)",
@@ -138,6 +171,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "otp-expiry",
       "status": "PASS",
       "expected": "a delivered code submitted after its 15-minute validity (16 min real wait) is refused",
@@ -151,6 +185,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "calendar-entry-absent",
       "status": "PASS",
       "expected": "no Calendar entry point in the v1 host (navigation has no Kalendarz; /kalendarz is the not-found screen) — the whole Google Calendar integration is deferred beyond v1 per docs/adr/calendar-deferral-2026-09.md",
@@ -162,6 +197,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "link-concurrent-begin",
       "status": "PASS",
       "expected": "two PARALLEL begin attempts for the same address serialize: exactly one ceremony commits (the canonical status shows one open ceremony on the email leg) and the other is refused — never two active ceremonies; the refusal's typed [ceremony_in_progress] code is unobservable through the sanitized prod error channel (defect D1), pinned by tests/b2",
@@ -172,6 +208,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "link-ceremony-opened",
       "status": "PASS",
       "expected": "linkingStatus shows the active google-target ceremony: state awaiting_first_proof, next leg email_code (the initiating email method must re-prove first)",
@@ -182,6 +219,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "link-wrong-code-unstaged",
       "status": "PASS",
       "expected": "verifying a proof code while none is staged is refused and the ceremony is left unchanged (no partial state); the typed [code_wrong_or_expired] code is unobservable through the sanitized prod error channel (defect D1), pinned by tests/b2",
@@ -192,6 +230,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "link-email-leg-delivered",
       "status": "PASS",
       "expected": "the ceremony's emailed proof code is REALLY delivered (subject 'Kiero — kod do potwierdzenia metody logowania'), a wrong value is the typed [code_wrong_or_expired] rejection, a wrong value is refused without state change, the delivered code advances the ceremony to awaiting_target_proof with the google_oauth leg next",
@@ -203,6 +242,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "link-email-target-already-attached",
       "status": "PASS",
       "expected": "after cancelling, beginning an email_code-target ceremony on an email-code account is refused (no self-merge, no duplicate credential) and no ceremony is left open; the typed [method_already_attached] code is unobservable through the sanitized prod error channel (defect D1), pinned by tests/b2",
@@ -213,6 +253,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "sameemail-cross-method-signin",
       "status": "BLOCKED",
       "expected": "signing in with Google at an address owned by an email-code person (and the reverse) is refused with the method-conflict copy 'Konto z tym adresem e-mail używa innej metody logowania…' — no implicit merge; the explicit ceremony commits the link",
@@ -228,6 +269,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "link-google-oauth-commit",
       "status": "BLOCKED",
       "expected": "the google_oauth target leg completes the ceremony (the auth-callback hook commits users.googleSubject + ceremony state atomically; a resumed Google sign-in records the fresh proof for the reverse direction)",
@@ -243,6 +285,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "emailchange-confirm",
       "status": "PASS",
       "expected": "requesting an address change sends a real code to the NEW address ('Kiero — kod do zmiany adresu e-mail'); a wrong confirmation is refused and leaves the old address and sessions untouched; the correct code moves the account address while the current session stays live (the typed [code_wrong_or_expired] code is unobservable through the sanitized prod error channel — defect D1, pinned by tests/b2)",
@@ -253,16 +296,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
-      "id": "emailchange-old-address-detached",
-      "status": "PASS",
-      "expected": "after the change, proving the OLD address creates a separate fresh person and does NOT resume the moved account (its device sessions are absent from the new session list)",
-      "observed": "old-address sign-in created a separate account: true; sessions visible there: 1",
-      "criterion": "ac2-email-account-method-changes",
-      "repeatableCommand": "node e2e/access/identity-email-leg.mjs --run b5-i4 --candidate-sha d43fc27"
-    },
-    {
-      "run": "b5-i4",
-      "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "otp-limiter-mails-really-delivered",
       "status": "PASS",
       "expected": "the limiter probe's issued codes are real Resend deliveries to the real mailbox (the limiter counts sends, not shadows)",
@@ -273,6 +307,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "otp-verification-failure-limit",
       "status": "PASS",
       "expected": "after repeated wrong-code verifications on one address, the verification rate limit engages: even the CORRECT pending code is refused until the window passes (fail-closed against guessing; the library's refusal text is sanitized on prod — defect D1 — so the OUTCOME carries the proof)",
@@ -283,6 +318,7 @@
     {
       "run": "b5-i4",
       "leg": "identity-email",
+      "candidateSha": "d43fc27",
       "id": "page-errors-zero",
       "status": "PASS",
       "expected": "no pageerror events across the leg's browser sessions",
@@ -291,8 +327,20 @@
       "repeatableCommand": "node e2e/access/identity-email-leg.mjs --run b5-i4 --candidate-sha d43fc27"
     },
     {
+      "run": "b5-i4",
+      "leg": "identity-email",
+      "candidateSha": "d43fc27",
+      "id": "emailchange-old-address-detached",
+      "status": "PASS",
+      "expected": "after the change, proving the OLD address creates a separate fresh person and does NOT resume the moved account (its device sessions are absent from the new session list)",
+      "observed": "old-address sign-in created a separate account: true; sessions visible there: 1",
+      "criterion": "ac2-email-account-method-changes",
+      "repeatableCommand": "node e2e/access/identity-email-leg.mjs --run b5-i4 --candidate-sha d43fc27"
+    },
+    {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "id": "company-founded-first-admin",
       "status": "PASS",
       "expected": "a fresh person creates the namespaced tenant \"B5 b5-c3\" and becomes its first (and only) administrator",
@@ -303,6 +351,7 @@
     {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "id": "invitation-targeted-delivery",
       "status": "PASS",
       "expected": "the administrator's targeted invitation is created with the honest sent receipt and listed as pending, and its code is REALLY delivered to exactly that address",
@@ -313,6 +362,7 @@
     {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "id": "invitation-acceptance-member",
       "status": "PASS",
       "expected": "the invitee sees the invitation addressed to their email, accepts with the REAL delivered code, and joins as an ordinary member (not administrator)",
@@ -323,16 +373,18 @@
     {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "id": "member-authored-message",
       "status": "PASS",
       "expected": "the member authors one conversation message before removal",
       "observed": "message sent through the ordinary composer",
-      "criterion": "unmapped",
+      "criterion": "ac3-invitations-membership",
       "repeatableCommand": "node e2e/access/company-access-leg.mjs --run b5-c3 --candidate-sha d43fc27"
     },
     {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "id": "invitation-revocation-hostile-acceptance",
       "status": "PASS",
       "expected": "the invitation is delivered to the targeted address; a DIFFERENT member cannot accept it with the real code (not addressed to actor); a wrong code is refused; the administrator revokes it before acceptance (listed 'cofnięte'); acceptance after revocation is refused",
@@ -343,6 +395,7 @@
     {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "id": "invitation-second-acceptance-refused",
       "status": "PASS",
       "expected": "a member with an active company cannot accept a second invitation (one-active-company rule; exactly one valid outcome commits)",
@@ -353,6 +406,7 @@
     {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "id": "last-administrator-constraints",
       "status": "PASS",
       "expected": "the final administrator cannot leave, and cannot demote self: both attempts are refused with the last-admin guard and the company keeps its administrator",
@@ -363,6 +417,7 @@
     {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "id": "administrator-transfer",
       "status": "PASS",
       "expected": "the administrator transfers administration to the member in one confirmed act: the target becomes administrator, the actor becomes an ordinary member",
@@ -373,6 +428,7 @@
     {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "id": "administrator-transfer-race",
       "status": "PASS",
       "expected": "two concurrent last-admin transfers serialize through optimistic concurrency: exactly one commits, the loser is typed-refused, and the company retains at least one administrator",
@@ -383,6 +439,7 @@
     {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "id": "membership-removal-old-session-denial",
       "status": "PASS",
       "expected": "removing the member immediately ends their access: the open browser session loses the company (session-ended / no-company view), the still-verifying token's protected reads are denied, while their authored message stays in the company history",
@@ -393,6 +450,7 @@
     {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "id": "logout-old-token-denied",
       "status": "PASS",
       "expected": "explicit logout ends the device's upstream session: the UI returns to the sign-in surface and the old token's protected reads are denied (upstream session gone — the token alone never grants access)",
@@ -403,6 +461,7 @@
     {
       "run": "b5-c3",
       "leg": "company-access",
+      "candidateSha": "d43fc27",
       "id": "page-errors-zero",
       "status": "PASS",
       "expected": "no pageerror events across the leg's browser sessions",
@@ -413,6 +472,7 @@
     {
       "run": "b5-gm1",
       "leg": "gm-entry",
+      "candidateSha": "d43fc27",
       "id": "gm-entry-non-designated-refused",
       "status": "PASS",
       "expected": "a real signed-in account NOT on the operator allow-list cannot enter GM mode: the /gm panel answers the honest Polish refusal copy, the checked action refuses (forbidden gm_not_designated), and the overview stays not_gm — no env var was read or touched by the driver",
@@ -423,12 +483,24 @@
     {
       "run": "b5-gm1",
       "leg": "gm-entry",
+      "candidateSha": "d43fc27",
       "id": "page-errors-zero",
       "status": "PASS",
       "expected": "no pageerror events in the GM refusal session",
       "observed": "none",
       "criterion": "cross-zero-page-errors",
       "repeatableCommand": "node e2e/access/gm-entry-leg.mjs --run b5-gm1 --candidate-sha d43fc27"
+    },
+    {
+      "run": "b5-gm-entry2",
+      "leg": "gm-entry",
+      "candidateSha": "0e6d782",
+      "id": "gm-entry-audited-walk",
+      "status": "PASS",
+      "criterion": "ac3-gm-entry-audit",
+      "expected": "the designated operator enters GM mode with a stated basis (audited grant: actor, reason, time), inspects a target company through the audited command, ordinary boss read/activity metrics stay unchanged, and exit ends access immediately",
+      "observed": "coordinator-executed walk at candidate 0e6d782: gm-entry-audited=PASS; gm-inspect-audited=PASS; gm-ordinary-metrics-unchanged=PASS; gm-exit=PASS (banner with the stated basis; audited inspection; byte-identical boss metrics; honest inactive panel after exit)",
+      "repeatableCommand": "node e2e/access/gm-entry-leg.mjs --run b5-gm-entry2 --mode entry --operator-mailbox <mailbox.json> --company-id <k78...> --candidate-sha 0e6d782"
     },
     {
       "id": "google-signin-completion",
@@ -442,20 +514,6 @@
         "nextAction": "one tester Google login on the staged noVNC browser (Google project kiero-508611, External/Testing, one test user) or owner-relayed test credentials",
         "resumptionTrigger": "the Google sign-in completion leg executed against staging; then also execute sameemail-cross-method-signin and link-google-oauth-commit"
       }
-    },
-    {
-      "id": "gm-entry-audited-walk",
-      "leg": "gm-entry",
-      "status": "PASS",
-      "criterion": "ac3-gm-entry-audit",
-      "expected": "the designated operator enters GM mode with a stated basis (audited banner), the inspection answers the result block for an alpha company, the boss's ordinary metrics stay byte-identical, and the explicit exit returns the panel to the inactive state",
-      "observed": "executed by the coordinator (serialized allow-list window, restored after): 4/4 PASS (run b5-gm-entry2, candidate 0e6d782) — audited banner with the stated basis, inspection result block, byte-identical boss surface, honest inactive panel after exit",
-      "blocked": {
-        "responsibleActor": "implementation coordinator",
-        "nextAction": "add the operator address to KIERO_GM_EMAILS on wojtek-piskorz-jr:kiero-dev-core:staging (serialized between lanes), then run the entry mode with a stated basis against the B5 company",
-        "resumptionTrigger": "allow-list mutation window granted to this lane"
-      },
-      "run": "b5-gm-entry2"
     },
     {
       "id": "inactivity-30-day",

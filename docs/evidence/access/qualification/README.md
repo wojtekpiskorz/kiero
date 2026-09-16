@@ -55,8 +55,12 @@ node e2e/access/gm-entry-leg.mjs --run <run-id> --mode entry \
 # The sign-in error-copy probe (defect evidence; needs an exhausted mailbox).
 node e2e/access/limiter-copy-probe.mjs --mailbox <mailbox-m3.json>
 
-# Merge leg results into the committed matrix + copy sanitized snapshots:
-node e2e/access/collect-evidence.mjs --run <run1> --run <run2> ... --candidate-sha d43fc27
+# Merge leg results into the committed matrix + copy sanitized snapshots
+# (run order matters: superseded runs list BEFORE their corrective run —
+# a later --run wins per case id; every row carries its OWN run's SHA):
+node e2e/access/collect-evidence.mjs \
+  --run b5-i2 --run b5-i4 --run b5-c3 --run b5-gm1 --run b5-gm-entry2 \
+  --candidate-sha d43fc27
 ```
 
 Artifacts land under `/tmp/kiero-smoke/b5/<run>/<leg>/` (screenshots PNG,
@@ -72,8 +76,13 @@ independently expected result, observed result, environment and the
 repeatable command. Summary by acceptance criterion — final live runs
 `b5-i4` (identity), `b5-c3` (company), `b5-gm1` (GM refusal), `b5-gm-entry2`
 (GM audited entry, executed by the coordinator in the serialized allow-list
-window); overall 35 PASS, 1 FAIL (defect D1's user-visible copy), 2 BLOCKED
-(Google legs), 2 NOT RUN (real-time requirements):
+window); LIVE rows: 35 PASS, 1 FAIL (defect D1's user-visible copy), 2
+BLOCKED (the two Google-dependent cases). The matrix additionally holds
+three static rows no live run can produce: the Google-completion BLOCKED
+case (owner credentials — the same owner action as the two live BLOCKED
+rows) and two NOT RUN rows (real-time requirements: 30-day inactivity,
+7-day invitation expiry) — all-row totals 35 PASS / 1 FAIL / 3 BLOCKED /
+2 NOT RUN:
 
 - **AC1 email-code matrix + Google**: delivery PASS (real Resend ->
   mail.tm -> consumed in the real form); wrong code refused but with the

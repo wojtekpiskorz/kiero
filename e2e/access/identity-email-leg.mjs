@@ -24,9 +24,14 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import {
   WEB,
-  CONVEX_URL,
   CHROMIUM,
-  convexAuthNamespace,
+  argValue,
+  phaseOf,
+  tryQuery,
+  wrongCodeFor,
+  tokenOf,
+  browserSignIn,
+  browserRequestCode,
   recorder,
   openPersona,
   snapFor,
@@ -37,10 +42,7 @@ import {
 import { createMailbox, waitForCode, messageIds, nextCodeAfter } from "./lib/mail.mjs";
 
 const args = process.argv.slice(2);
-const value = (flag, fallback) => {
-  const at = args.indexOf(flag);
-  return at >= 0 ? args[at + 1] : fallback;
-};
+const value = (flag, fallback) => argValue(args, flag, fallback);
 const RUN = value("--run", `b5-${Date.now().toString(36)}`);
 const CANDIDATE_SHA = value("--candidate-sha", "d43fc27");
 const OUT = `/tmp/kiero-smoke/b5/${RUN}/identity`;
@@ -49,6 +51,8 @@ mkdirSync(OUT, { recursive: true });
 
 const snap = snapFor(OUT);
 const rec = recorder({ run: RUN, leg: "identity-email", candidateSha: CANDIDATE_SHA, outFile: RESULTS });
+/** Runs one phase; a thrown error becomes a recorded FAIL, not a lost leg. */
+const phase = phaseOf(rec);
 const state = { mailboxes: {}, tokens: {}, sessionIds: {}, pageErrors: [] };
 const persistState = () =>
   writeFileSync(
@@ -67,49 +71,6 @@ const persistState = () =>
     )}\n`,
   );
 
-/** Extracts the current session's Convex auth tokens from a live page (never logged). */
-async function tokenOf(page) {
-  const ns = convexAuthNamespace();
-  return await page.evaluate((namespace) => ({
-    token: localStorage.getItem(`__convexAuthJWT_${namespace}`),
-    refreshToken: localStorage.getItem(`__convexAuthRefreshToken_${namespace}`),
-  }), ns);
-}
-
-/** Reads a protected identity query; returns { ok, value } or { ok:false, error }. */
-async function tryQuery(client, name, fn) {
-  try {
-    return { ok: true, value: await fn(client) };
-  } catch (error) {
-    return { ok: false, error: String(error?.message ?? error).slice(0, 300), name };
-  }
-}
-
-const wrongCodeFor = (code) => {
-  const first = code[0] === "9" ? "0" : "9";
-  return `${first}${code.slice(1)}`;
-};
-
-/** Runs one phase; a thrown error becomes a recorded FAIL, not a lost leg. */
-async function phase(name, fn) {
-  try {
-    await fn();
-  } catch (error) {
-    rec.record(name, "FAIL", `phase ${name} completes`, `driver error: ${String(error?.message ?? error).slice(0, 400)}`);
-  }
-}
-
-/**
- * Requests a sign-in code THROUGH THE REAL FORM and waits for the next
- * delivery (id-snapshot freshness: deterministic against second-level
- * mail.tm timestamps).
- */
-async function browserCode(page, mailbox) {
-  const excludeIds = await messageIds(mailbox);
-  await page.getByRole("button", { name: "Wyślij kod" }).click();
-  await page.waitForTimeout(2000);
-  return await waitForCode(mailbox, "sign_in_code", { sinceMs: Date.now() - 2000, excludeIds });
-}
 
 // ---------------------------------------------------------------------------
 // Phase 0: mailboxes
@@ -151,20 +112,15 @@ await phase("otp-delivery", async () => {
     googleOffered >= 1 ? "button 'Zaloguj się przez Google' rendered" : "no Google button rendered",
     { scope: "the Google completion leg itself stays BLOCKED (owner credentials)" },
   );
-  await personaA.page.getByLabel("Adres e-mail").fill(M1.address);
-  const delivered = await browserCode(personaA.page, M1);
-  console.log(`[otp] delivered in ${Math.round((Date.now() - since) / 1000)}s`);
-  await personaA.page.getByLabel("Kod z wiadomości").fill(delivered.code);
-  await personaA.page.getByRole("button", { name: "Zaloguj się kodem" }).click();
-  await personaA.page.waitForTimeout(7000);
-  const after = await snap(personaA.page, "a1-delivery-signin");
+  const { body: after } = await browserSignIn(personaA.page, M1, { outDir: OUT, tag: "a1-delivery-signin" });
+  console.log(`[otp] walk finished in ${Math.round((Date.now() - since) / 1000)}s`);
   const signedIn = !after.includes("Zaloguj się do Kiero");
   rec.record(
     "otp-delivery",
     signedIn ? "PASS" : "FAIL",
     "real Resend delivery to a real mail.tm mailbox signs the persona in (no fixture codes on staging)",
     signedIn ? `code delivered + consumed; post-login state shows: ${after.includes("Nie należysz") ? "no-company admission view" : "authenticated app"}` : `still on sign-in card: ${after.slice(0, 200).replace(/\n/g, " | ")}`,
-    { deliverySeconds: Math.round((Date.now() - since) / 1000), subject: delivered.subject },
+    { deliverySeconds: Math.round((Date.now() - since) / 1000), subject: "Kiero — kod do logowania" },
   );
   const tokensA = await tokenOf(personaA.page);
   state.tokens.a = tokensA.token;
@@ -213,14 +169,7 @@ await phase("otp-issuance-limit", async () => {
 // the SAME address — one account, two devices, both live.
 const personaB = await openPersona(`/tmp/kiero-smoke/b5/${RUN}/profiles/m1-second`);
 await phase("sameemail-resume-second-device", async () => {
-  await personaB.page.goto(WEB, { waitUntil: "domcontentloaded" });
-  await personaB.page.waitForTimeout(2500);
-  await personaB.page.getByLabel("Adres e-mail").fill(M1.address);
-  const delivered = await browserCode(personaB.page, M1);
-  await personaB.page.getByLabel("Kod z wiadomości").fill(delivered.code);
-  await personaB.page.getByRole("button", { name: "Zaloguj się kodem" }).click();
-  await personaB.page.waitForTimeout(7000);
-  const body = await snap(personaB.page, "a4-second-browser");
+  const { body } = await browserSignIn(personaB.page, M1, { outDir: OUT, tag: "a4-second-browser" });
   const secondSignedIn = !body.includes("Zaloguj się do Kiero") && !body.includes("innej metody logowania");
   rec.record(
     "sameemail-resume-second-device",
@@ -259,8 +208,8 @@ await phase("device-revocation-immediate-denial", async () => {
   const denied = await snap(personaA.page, "a5-device-a-denied");
   const denial = denied.includes("Sesja tego urządzenia została zakończona");
   const clientA = authedClient(state.tokens.a);
-  const readA = await tryQuery(clientA, "listMySessions", (c) => c.query("access/identity/functions:listMySessions", {}));
-  const readB = await tryQuery(clientB, "listMySessions", (c) => c.query("access/identity/functions:listMySessions", {}));
+  const readA = await tryQuery(clientA, (c) => c.query("access/identity/functions:listMySessions", {}));
+  const readB = await tryQuery(clientB, (c) => c.query("access/identity/functions:listMySessions", {}));
   rec.record(
     "device-revocation-immediate-denial",
     revokedOk && denial && readA.ok === false && readB.ok ? "PASS" : "FAIL",
@@ -280,11 +229,8 @@ await phase("otp-wrong-code", async () => {
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
-  await page.goto(WEB, { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(2500);
-  await page.getByLabel("Adres e-mail").fill(M1.address);
-  const delivered = await browserCode(page, M1);
-  const wrong = wrongCodeFor(delivered.code);
+  const deliveredCode = await browserRequestCode(page, M1);
+  const wrong = wrongCodeFor(deliveredCode);
   await page.getByLabel("Kod z wiadomości").fill(wrong);
   await page.getByRole("button", { name: "Zaloguj się kodem" }).click();
   await page.waitForTimeout(5000);
@@ -297,14 +243,14 @@ await phase("otp-wrong-code", async () => {
     "a wrong 8-digit code is refused with the Polish copy 'Kod jest nieprawidłowy lub wygasł. Poproś o nowy kod.' and the resend control appears; no session is created",
     `alert shown: ${wrongAlert}; resend offered: ${resendOffered}; still on code form: ${afterWrong.includes("Kod z wiadomości")}`,
   );
-  await page.getByLabel("Kod z wiadomości").fill(delivered.code);
+  await page.getByLabel("Kod z wiadomości").fill(deliveredCode);
   await page.getByRole("button", { name: "Zaloguj się kodem" }).click();
   await page.waitForTimeout(7000);
   const afterRight = await snap(page, "a6-then-correct");
   const signedIn = !afterRight.includes("Zaloguj się do Kiero");
   // One-time use / replay: the consumed code, replayed by a fresh anonymous
   // client, must be refused.
-  const replay = await apiVerifyCode(M1.address, delivered.code);
+  const replay = await apiVerifyCode(M1.address, deliveredCode);
   rec.record(
     "otp-onetime-use-replay-refused",
     signedIn && replay.error !== undefined ? "PASS" : "FAIL",
@@ -405,7 +351,7 @@ await phase("linking-ceremony", async () => {
 
   // B3. Wrong proof code (nothing staged yet): refused, ceremony unchanged.
   const statusBeforeB3 = await clientC.query("access/linking/functions:linkingStatus", {});
-  const wrongEarly = await tryQuery(clientC, "verifyProofCode", (c) =>
+  const wrongEarly = await tryQuery(clientC, (c) =>
     c.mutation("access/linking/functions:verifyProofCode", { code: "00000000" }),
   );
   const statusAfterB3 = await clientC.query("access/linking/functions:linkingStatus", {});
@@ -422,7 +368,7 @@ await phase("linking-ceremony", async () => {
   const excludeIds = await messageIds(M1);
   const sent = await clientC.action("access/linking/functions:sendProofCode", {});
   const delivered = await waitForCode(M1, "method_link_code", { sinceMs: Date.now() - 2000, excludeIds });
-  const wrongAfterStage = await tryQuery(clientC, "verifyProofCode", (c) =>
+  const wrongAfterStage = await tryQuery(clientC, (c) =>
     c.mutation("access/linking/functions:verifyProofCode", { code: wrongCodeFor(delivered.code) }),
   );
   const verified = await clientC.mutation("access/linking/functions:verifyProofCode", { code: delivered.code });
@@ -447,7 +393,7 @@ await phase("linking-ceremony", async () => {
   // B5. The email-side unauthorized-merge refusal: an email-code account
   // asking to attach email_code again is [method_already_attached].
   const cancel = await clientC.mutation("access/linking/functions:cancelLinking", {});
-  const again = await tryQuery(clientC, "beginLinking", (c) =>
+  const again = await tryQuery(clientC, (c) =>
     c.mutation("access/linking/functions:beginLinking", { targetMethod: "email_code" }),
   );
   const statusB5 = await clientC.query("access/linking/functions:linkingStatus", {});
@@ -509,7 +455,7 @@ await phase("emailchange-confirm", async () => {
   const mail = await waitForCode(M4, "email_change_code", { sinceMs: Date.now() - 2000, excludeIds: excludeM4 });
 
   // C2. Wrong confirmation first: typed rejection, old address intact.
-  const wrongConfirm = await tryQuery(clientD, "confirmEmailChange", (c) =>
+  const wrongConfirm = await tryQuery(clientD, (c) =>
     c.mutation("access/linking/functions:confirmEmailChange", { code: wrongCodeFor(mail.code) }),
   );
   const statusBefore = await clientD.query("access/linking/functions:linkingStatus", {});

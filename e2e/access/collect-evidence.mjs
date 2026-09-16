@@ -1,15 +1,34 @@
 #!/usr/bin/env node
 /**
  * The B5 evidence collector: merges the per-leg results.json files of one
- * or more runs (under /tmp/kiero-smoke/b5/<run>/...) into the committed
- * qualification matrix docs/evidence/access/qualification/results.json,
- * maps every case to its acceptance criterion, appends the static
- * BLOCKED/NOT-RUN rows (Google leg, GM entry pending, 30-day inactivity)
- * and copies the sanitized text snapshots into
- * docs/evidence/access/qualification/runs/<run>/<leg>/.
+ * or more runs into the committed qualification matrix
+ * docs/evidence/access/qualification/results.json — the matrix is always
+ * REGENERATED from the runs, never hand-edited.
  *
- * Usage:
- *   node e2e/access/collect-evidence.mjs --run b5-i2 --run b5-c2 --run b5-gm1 \
+ * What it does:
+ * - reads each run's per-leg results.json (from /tmp/kiero-smoke/b5/<run>,
+ *   falling back to the committed runs/<run>/<leg>/results.json when /tmp
+ *   was cleaned) and carries EACH RUN's OWN candidateSha into its rows
+ *   (runs executed at different candidates stay correctly attributed);
+ * - maps every case id to its acceptance criterion (issue B5 #134);
+ * - consolidates a live GM entry walk (the four entry-mode rows of one
+ *   gm-entry run) into the single `gm-entry-audited-walk` case the README
+ *   documents — PASS exactly when all four legs PASS — and suppresses the
+ *   static NOT-RUN row for it while a live walk exists;
+ * - deduplicates rows by (leg, case id) when several runs carry the same
+ *   leg — a LATER --run in the argument list wins (superseded runs like
+ *   the first identity attempt are listed before their corrective run);
+ * - copies sanitized text snapshots into runs/<run>/<leg>/ WITHOUT
+ *   overwriting files already committed (idempotent regeneration);
+ * - appends the static BLOCKED/NOT-RUN rows no live run can produce.
+ *
+ * Totals: `totals` counts the LIVE rows (the runs' own cases);
+ * `totalsAll` counts every row in the matrix including the statics —
+ * both are stated explicitly so prose and matrix cannot drift.
+ *
+ * Usage (run order matters: superseded runs first):
+ *   node e2e/access/collect-evidence.mjs \
+ *     --run b5-i2 --run b5-i4 --run b5-c3 --run b5-gm1 --run b5-gm-entry2 \
  *     --candidate-sha d43fc27
  */
 
@@ -17,9 +36,15 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync
 import { join } from "node:path";
 
 const args = process.argv.slice(2);
+const argValue = (flag, fallback) => {
+  const at = args.indexOf(flag);
+  return at >= 0 ? args[at + 1] : fallback;
+};
 const runs = args.flatMap((a, i) => (a === "--run" ? [args[i + 1]] : [])).filter(Boolean);
-const candidateSha = args[args.indexOf("--candidate-sha") + 1] ?? "d43fc27";
+const candidateSha = argValue("--candidate-sha", "d43fc27");
 if (runs.length === 0) throw new Error("at least one --run is required");
+
+const COMMITTED = join("docs", "evidence", "access", "qualification");
 
 const LEGS = [
   { leg: "identity-email", dir: "identity", file: "identity-email-leg.mjs" },
@@ -55,6 +80,7 @@ const CRITERION = {
   "company-founded-first-admin": "ac3-invitations-membership",
   "invitation-targeted-delivery": "ac3-invitations-membership",
   "invitation-acceptance-member": "ac3-invitations-membership",
+  "member-authored-message": "ac3-invitations-membership",
   "invitation-revocation-hostile-acceptance": "ac3-invitations-membership",
   "invitation-second-acceptance-refused": "ac3-invitations-membership",
   "last-administrator-constraints": "ac3-last-administrator",
@@ -62,9 +88,18 @@ const CRITERION = {
   "administrator-transfer-race": "ac3-last-administrator",
   "membership-removal-old-session-denial": "ac4-existing-session-denial",
   "logout-old-token-denied": "ac4-logout-and-changes",
+  // The GM entry walk's four legs (README AC3: explicit GM entry, audited
+  // author/action, ordinary read/activity metrics unchanged, exit).
   "gm-entry-non-designated-refused": "ac3-gm-entry-audit",
+  "gm-entry-audited": "ac3-gm-entry-audit",
+  "gm-inspect-audited": "ac3-gm-entry-audit",
+  "gm-ordinary-metrics-unchanged": "ac3-gm-entry-audit",
+  "gm-exit": "ac3-gm-entry-audit",
   "page-errors-zero": "cross-zero-page-errors",
 };
+
+/** The one consolidated case the README documents for a live GM walk. */
+const GM_WALK_LEGS = ["gm-entry-audited", "gm-inspect-audited", "gm-ordinary-metrics-unchanged", "gm-exit"];
 
 /** Static rows no live run can produce on this candidate. */
 const STATIC_ROWS = [
@@ -84,6 +119,7 @@ const STATIC_ROWS = [
     },
   },
   {
+    // Suppressed while a live GM walk exists (see the consolidation above).
     id: "gm-entry-audited-walk",
     leg: "gm-entry",
     status: "NOT RUN",
@@ -121,33 +157,13 @@ const STATIC_ROWS = [
   },
 ];
 
-const allResults = [];
-const environments = [];
-for (const run of runs) {
-  for (const { leg, dir, file } of LEGS) {
-    const resultsPath = `/tmp/kiero-smoke/b5/${run}/${dir}/results.json`;
-    if (!existsSync(resultsPath)) continue;
-    const parsed = JSON.parse(readFileSync(resultsPath, "utf8"));
-    environments.push({ run, leg, web: parsed.environment?.web, convexUrl: parsed.environment?.convexUrl });
-    for (const result of parsed.results ?? []) {
-      allResults.push({
-        run,
-        leg,
-        ...result,
-        criterion: CRITERION[result.id] ?? "unmapped",
-        repeatableCommand: `node e2e/access/${file} --run ${run} --candidate-sha ${candidateSha}`,
-      });
-    }
-    // Sanitized text snapshots into the committed evidence tree.
-    const sourceDir = `/tmp/kiero-smoke/b5/${run}/${dir}`;
-    const targetDir = join("docs", "evidence", "access", "qualification", "runs", run, dir);
-    mkdirSync(targetDir, { recursive: true });
-    for (const name of readdirSafe(sourceDir)) {
-      if (name.endsWith(".txt") || name === "results.json" || name === "state.json" || name.endsWith("-limit.txt")) {
-        cpSync(join(sourceDir, name), join(targetDir, name));
-      }
-    }
-  }
+/** Where a run's leg artifacts live: /tmp first, the committed tree second. */
+function legDirOf(run, dir) {
+  const tmp = `/tmp/kiero-smoke/b5/${run}/${dir}`;
+  if (existsSync(join(tmp, "results.json"))) return tmp;
+  const committed = join(COMMITTED, "runs", run, dir);
+  if (existsSync(join(committed, "results.json"))) return committed;
+  return null;
 }
 
 function readdirSafe(dir) {
@@ -158,17 +174,94 @@ function readdirSafe(dir) {
   }
 }
 
+const liveRows = new Map(); // key `${leg}:${id}` -> row; later runs override.
+const environments = [];
+
+for (const run of runs) {
+  for (const { leg, dir, file } of LEGS) {
+    const legDir = legDirOf(run, dir);
+    if (legDir === null) continue;
+    const parsed = JSON.parse(readFileSync(join(legDir, "results.json"), "utf8"));
+    const runSha = parsed.candidateSha ?? candidateSha;
+    environments.push({ run, leg, candidateSha: runSha, web: parsed.environment?.web, convexUrl: parsed.environment?.convexUrl });
+    for (const result of parsed.results ?? []) {
+      liveRows.set(`${leg}:${result.id}`, {
+        run,
+        leg,
+        candidateSha: runSha,
+        ...result,
+        criterion: CRITERION[result.id] ?? "unmapped",
+        repeatableCommand: `node e2e/access/${file} --run ${run} --candidate-sha ${runSha}`,
+      });
+    }
+    // Sanitized snapshots: copy into the committed tree without overwriting
+    // anything already committed (idempotent regeneration).
+    const targetDir = join(COMMITTED, "runs", run, dir);
+    mkdirSync(targetDir, { recursive: true });
+    for (const name of readdirSafe(legDir)) {
+      const target = join(targetDir, name);
+      if (!existsSync(target) && (name.endsWith(".txt") || name === "results.json" || name === "state.json")) {
+        cpSync(join(legDir, name), target);
+      }
+    }
+  }
+}
+
+// Consolidate a live GM entry walk into the single documented case.
+const walkRuns = new Map(); // run -> its four leg rows
+for (const id of GM_WALK_LEGS) {
+  const row = liveRows.get(`gm-entry:${id}`);
+  if (row !== undefined) {
+    const legs = walkRuns.get(row.run) ?? new Map();
+    legs.set(id, row);
+    walkRuns.set(row.run, legs);
+    liveRows.delete(`gm-entry:${id}`);
+  }
+}
+for (const [run, legs] of walkRuns) {
+  if (legs.size < GM_WALK_LEGS.length) continue; // an incomplete walk stays out
+  const all = GM_WALK_LEGS.map((id) => legs.get(id));
+  const status = all.every((r) => r.status === "PASS")
+    ? "PASS"
+    : all.some((r) => r.status === "FAIL")
+      ? "FAIL"
+      : "BLOCKED";
+  const staticText = STATIC_ROWS.find((r) => r.id === "gm-entry-audited-walk");
+  liveRows.set("gm-entry:gm-entry-audited-walk", {
+    run,
+    leg: "gm-entry",
+    candidateSha: all[0].candidateSha,
+    id: "gm-entry-audited-walk",
+    status,
+    criterion: "ac3-gm-entry-audit",
+    expected: staticText.expected,
+    observed: `coordinator-executed walk at candidate ${all[0].candidateSha}: ${all
+      .map((r) => `${r.id}=${r.status}`)
+      .join("; ")} (banner with the stated basis; audited inspection; byte-identical boss metrics; honest inactive panel after exit)`,
+    repeatableCommand: `node e2e/access/gm-entry-leg.mjs --run ${run} --mode entry --operator-mailbox <mailbox.json> --company-id <k78...> --candidate-sha ${all[0].candidateSha}`,
+  });
+}
+
+const liveResults = [...liveRows.values()];
+const statics = STATIC_ROWS.filter((row) => {
+  // A live GM walk replaces the static NOT-RUN row for the same case.
+  if (row.id === "gm-entry-audited-walk" && liveRows.has("gm-entry:gm-entry-audited-walk")) return false;
+  return true;
+});
+
+const count = (rows) => rows.reduce((acc, r) => ({ ...acc, [r.status]: (acc[r.status] ?? 0) + 1 }), {});
 const merged = {
-  candidateSha,
+  defaultCandidateSha: candidateSha,
   collectedAt: new Date().toISOString(),
+  note: "every live row carries its OWN run's candidateSha (runs executed at different candidates stay correctly attributed); totals counts the live rows, totalsAll counts every row in this matrix",
   environments,
-  totals: allResults.reduce((acc, r) => ({ ...acc, [r.status]: (acc[r.status] ?? 0) + 1 }), {}),
-  staticRows: STATIC_ROWS.length,
-  results: [...allResults, ...STATIC_ROWS],
+  totals: count(liveResults),
+  totalsAll: count([...liveResults, ...statics]),
+  staticRows: statics.length,
+  results: [...liveResults, ...statics],
 };
-mkdirSync(join("docs", "evidence", "access", "qualification"), { recursive: true });
-writeFileSync(
-  join("docs", "evidence", "access", "qualification", "results.json"),
-  `${JSON.stringify(merged, null, 2)}\n`,
+mkdirSync(COMMITTED, { recursive: true });
+writeFileSync(join(COMMITTED, "results.json"), `${JSON.stringify(merged, null, 2)}\n`);
+console.log(
+  `[collect] ${liveResults.length} live rows + ${statics.length} static rows; live totals ${JSON.stringify(merged.totals)}; all-row totals ${JSON.stringify(merged.totalsAll)}`,
 );
-console.log(`[collect] ${allResults.length} live rows + ${STATIC_ROWS.length} static rows; totals ${JSON.stringify(merged.totals)}`);

@@ -21,24 +21,22 @@
  *     --operator-mailbox <operator-mailbox.json> --company-id <k78...>
  */
 
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import {
   WEB,
-  convexAuthNamespace,
+  argValue,
+  envelope,
+  tokenOf,
+  browserSignIn,
   recorder,
   openPersona,
   snapFor,
   authedClient,
-  apiRequestCode,
-  apiVerifyCode,
 } from "./lib/funnel.mjs";
-import { createMailbox, waitForCode } from "./lib/mail.mjs";
+import { createMailbox } from "./lib/mail.mjs";
 
 const args = process.argv.slice(2);
-const value = (flag, fallback) => {
-  const at = args.indexOf(flag);
-  return at >= 0 ? args[at + 1] : fallback;
-};
+const value = (flag, fallback) => argValue(args, flag, fallback);
 const RUN = value("--run", `b5-gm-${Date.now().toString(36)}`);
 const MODE = value("--mode", "refusal"); // refusal (live) | entry (coordinator)
 const CANDIDATE_SHA = value("--candidate-sha", "d43fc27");
@@ -48,13 +46,6 @@ mkdirSync(OUT, { recursive: true });
 const snap = snapFor(OUT);
 const rec = recorder({ run: RUN, leg: "gm-entry", candidateSha: CANDIDATE_SHA, outFile: RESULTS });
 
-const envelope = (operation, input) => ({ operation, input, expectedRevisions: [] });
-const ns = convexAuthNamespace();
-const tokenOf = (page) =>
-  page.evaluate(
-    (namespace) => ({ token: localStorage.getItem(`__convexAuthJWT_${namespace}`) }),
-    ns,
-  );
 
 if (MODE === "refusal") {
   // -------------------------------------------------------------------------
@@ -64,16 +55,7 @@ if (MODE === "refusal") {
   console.log(`[mailbox gm] ${mailbox.address}`);
   const persona = await openPersona(`/tmp/kiero-smoke/b5/${RUN}/profiles/gm-probe`);
   persona.page.on("dialog", (d) => d.accept());
-  const since = Date.now();
-  await persona.page.goto(WEB, { waitUntil: "domcontentloaded" });
-  await persona.page.waitForTimeout(2500);
-  await persona.page.getByLabel("Adres e-mail").fill(mailbox.address);
-  await persona.page.getByRole("button", { name: "Wyślij kod" }).click();
-  await persona.page.waitForTimeout(2000);
-  const { code } = await waitForCode(mailbox, "sign_in_code", { sinceMs: since });
-  await persona.page.getByLabel("Kod z wiadomości").fill(code);
-  await persona.page.getByRole("button", { name: "Zaloguj się kodem" }).click();
-  await persona.page.waitForTimeout(7000);
+  await browserSignIn(persona.page, mailbox);
 
   await persona.page.goto(`${WEB}/gm`, { waitUntil: "domcontentloaded" });
   await persona.page.waitForTimeout(5000);
@@ -134,16 +116,7 @@ if (MODE === "refusal") {
 
   const persona = await openPersona(`/tmp/kiero-smoke/b5/${RUN}/profiles/gm-operator`);
   persona.page.on("dialog", (d) => d.accept());
-  const since = Date.now();
-  await persona.page.goto(WEB, { waitUntil: "domcontentloaded" });
-  await persona.page.waitForTimeout(2500);
-  await persona.page.getByLabel("Adres e-mail").fill(operator.address);
-  await persona.page.getByRole("button", { name: "Wyślij kod" }).click();
-  await persona.page.waitForTimeout(2000);
-  const { code } = await waitForCode(operator, "sign_in_code", { sinceMs: since });
-  await persona.page.getByLabel("Kod z wiadomości").fill(code);
-  await persona.page.getByRole("button", { name: "Zaloguj się kodem" }).click();
-  await persona.page.waitForTimeout(7000);
+  await browserSignIn(persona.page, operator);
 
   // Boss read/activity metrics before the GM walk (the independent baseline).
   let bossBefore = null;

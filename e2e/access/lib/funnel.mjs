@@ -1,6 +1,8 @@
 /**
  * The B5 funnel session library (e2e leg): the API-level and browser-level
- * primitives every access driver shares.
+ * primitives every access driver shares — the lane's counterpart of
+ * e2e/helpers.mjs (which is imported, never duplicated: `envelope` comes
+ * from there).
  *
  * API level (the four-stage authenticated smoke path): `auth:signIn`
  * issues a REAL code through Resend (read from the mail.tm mailbox via
@@ -11,8 +13,8 @@
  *
  * Browser level: persistent-profile Chromium contexts (independent
  * personas = independent devices), pageerror collection, sanitized
- * snapshots, and the results recorder (id -> PASS/FAIL/BLOCKED/NOT RUN
- * with expected/observed detail).
+ * snapshots, the shared sign-in walk, and the results recorder
+ * (id -> PASS/FAIL/BLOCKED/NOT RUN with expected/observed detail).
  *
  * No import side effects; no credential VALUES are logged (mailbox
  * passwords are throwaway test artifacts referenced by address).
@@ -20,9 +22,12 @@
 
 import { ConvexHttpClient } from "convex/browser";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { waitForCode } from "./mail.mjs";
+import { waitForCode, messageIds } from "./mail.mjs";
 
 export { waitForCode };
+
+/** The checked-dispatch envelope, imported from the repo's shared helpers. */
+export { envelope } from "../../helpers.mjs";
 
 export const CHROMIUM =
   process.env.KIERO_SMOKE_CHROMIUM ?? "/root/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome";
@@ -30,6 +35,57 @@ export const WEB =
   process.env.KIERO_SMOKE_WEB ?? "https://kiero-staging-web.wojtek-524.workers.dev";
 export const CONVEX_URL =
   process.env.KIERO_SMOKE_CONVEX ?? "https://fiery-raven-417.eu-west-1.convex.cloud";
+
+// ---------------------------------------------------------------------------
+// Shared driver utilities (single definitions; every leg imports these)
+// ---------------------------------------------------------------------------
+
+/** Reads one --flag value from a CLI arg list (no off-by-one defaults). */
+export function argValue(args, flag, fallback) {
+  const at = args.indexOf(flag);
+  return at >= 0 ? args[at + 1] : fallback;
+}
+
+/**
+ * Runs one recorded phase; a thrown error becomes a recorded FAIL of that
+ * phase's case, never a lost leg. Usage: `const phase = phaseOf(rec);`.
+ */
+export function phaseOf(rec) {
+  return async function phase(name, fn) {
+    try {
+      await fn();
+    } catch (error) {
+      rec.record(name, "FAIL", `phase ${name} completes`, `driver error: ${String(error?.message ?? error).slice(0, 400)}`);
+    }
+  };
+}
+
+/**
+ * A protected read whose typed rejection text may be sanitized on prod:
+ * returns { ok: true, value } or { ok: false, error }.
+ */
+export async function tryQuery(client, fn) {
+  try {
+    return { ok: true, value: await fn(client) };
+  } catch (error) {
+    return { ok: false, error: String(error?.message ?? error).slice(0, 300) };
+  }
+}
+
+/** A deterministically-wrong variant of a delivered 8-digit code. */
+export const wrongCodeFor = (code) => (code[0] === "9" ? "0" : "9") + code.slice(1);
+
+/** Reads the page's current Convex auth tokens from localStorage (never logged). */
+export async function tokenOf(page) {
+  const namespace = convexAuthNamespace();
+  return await page.evaluate(
+    (ns) => ({
+      token: localStorage.getItem(`__convexAuthJWT_${ns}`),
+      refreshToken: localStorage.getItem(`__convexAuthRefreshToken_${ns}`),
+    }),
+    namespace,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // The sanitized results recorder
@@ -108,15 +164,16 @@ export function authedClient(token) {
 
 /**
  * The full API funnel for one mailbox: request the code, wait for the
- * real delivery, verify, provision the session registry. Returns the
- * authenticated client, both tokens and the live session id.
+ * real delivery (id-snapshot fresh), verify, provision the session
+ * registry. Returns the authenticated client, both tokens and the live
+ * session id.
  */
-export async function apiFunnelSignIn(mailbox, { sinceMs } = {}) {
-  const since = sinceMs ?? Date.now();
+export async function apiFunnelSignIn(mailbox) {
+  const excludeIds = await messageIds(mailbox);
   await apiRequestCode(mailbox.address).catch((error) => {
     throw new Error(`code request rejected: ${String(error?.message ?? error).slice(0, 300)}`);
   });
-  const { code } = await waitForDelivery(mailbox, since);
+  const { code } = await waitForCode(mailbox, "sign_in_code", { sinceMs: Date.now() - 2000, excludeIds });
   const verified = await apiVerifyCode(mailbox.address, code);
   if (verified.error !== undefined) {
     throw new Error(`verify rejected: ${verified.error}`);
@@ -180,25 +237,44 @@ export function snapFor(outDir) {
 }
 
 /**
- * The browser sign-in funnel: fills the real sign-in card, requests a
- * code, waits for the real delivery, verifies. Returns the delivered
- * code (callers assert the post-login state themselves).
+ * The browser code request every leg shares: the real card, a real code
+ * request, the real delivered code — WITHOUT submitting it (the wrong-code
+ * case must submit its own value first). FRESHNESS-CORRECT: the mailbox
+ * is snapshotted by message id BEFORE the request (mail.tm timestamps
+ * truncate to whole seconds, so a wall-clock `since` alone can miss a
+ * mail created in the request's own second — the b5-i1 lesson).
  */
-export async function browserSignIn(page, mailbox, { sinceMs, outDir, tag = "signin", timeoutMs = 720_000 } = {}) {
-  const since = sinceMs ?? Date.now();
+export async function browserRequestCode(page, mailbox, { timeoutMs = 720_000 } = {}) {
   await page.goto(WEB, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(2500);
   await page.getByLabel("Adres e-mail").fill(mailbox.address);
+  const excludeIds = await messageIds(mailbox);
   await page.getByRole("button", { name: "Wyślij kod" }).click();
   await page.waitForTimeout(2000);
-  const { code } = await waitForCode(mailbox, "sign_in_code", { sinceMs: since, timeoutMs });
+  const { code } = await waitForCode(mailbox, "sign_in_code", {
+    sinceMs: Date.now() - 2000,
+    excludeIds,
+    timeoutMs,
+  });
+  return code;
+}
+
+/**
+ * The browser sign-in walk every leg shares: request the delivered code
+ * (browserRequestCode), submit it, and read the post-login page.
+ * Returns { code, body }; body is also written as
+ * `<outDir>/<tag>.png|.txt` when outDir is given. Callers assert the
+ * post-login state themselves.
+ */
+export async function browserSignIn(page, mailbox, { outDir, tag = "signin", timeoutMs = 720_000 } = {}) {
+  const code = await browserRequestCode(page, mailbox, { timeoutMs });
   await page.getByLabel("Kod z wiadomości").fill(code);
   await page.getByRole("button", { name: "Zaloguj się kodem" }).click();
   await page.waitForTimeout(6000);
+  const body = await page.evaluate(() => document.body?.innerText ?? "");
   if (outDir !== undefined) {
-    const body = await page.evaluate(() => document.body?.innerText ?? "");
     await page.screenshot({ path: `${outDir}/${tag}.png`, fullPage: true });
     writeFileSync(`${outDir}/${tag}.txt`, body);
   }
-  return { code };
+  return { code, body };
 }

@@ -24,8 +24,13 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import {
   WEB,
-  CHROMIUM,
-  convexAuthNamespace,
+  argValue,
+  envelope,
+  phaseOf,
+  tryQuery,
+  wrongCodeFor,
+  tokenOf,
+  browserSignIn,
   recorder,
   openPersona,
   snapFor,
@@ -34,10 +39,7 @@ import {
 import { createMailbox, waitForCode, messageIds } from "./lib/mail.mjs";
 
 const args = process.argv.slice(2);
-const value = (flag, fallback) => {
-  const at = args.indexOf(flag);
-  return at >= 0 ? args[at + 1] : fallback;
-};
+const value = (flag, fallback) => argValue(args, flag, fallback);
 const RUN = value("--run", `b5-${Date.now().toString(36)}`);
 const CANDIDATE_SHA = value("--candidate-sha", "d43fc27");
 const COMPANY = `B5 ${RUN}`;
@@ -47,6 +49,8 @@ mkdirSync(OUT, { recursive: true });
 
 const snap = snapFor(OUT);
 const rec = recorder({ run: RUN, leg: "company-access", candidateSha: CANDIDATE_SHA, outFile: RESULTS });
+/** Runs one phase; a thrown error becomes a recorded FAIL, not a lost leg. */
+const phase = phaseOf(rec);
 const state = { mailboxes: {}, tokens: {}, pageErrors: [] };
 const persistState = () =>
   writeFileSync(
@@ -65,19 +69,6 @@ const persistState = () =>
     )}\n`,
   );
 
-const ns = convexAuthNamespace();
-const tokenOf = (page) =>
-  page.evaluate(
-    (namespace) => ({
-      token: localStorage.getItem(`__convexAuthJWT_${namespace}`),
-      refreshToken: localStorage.getItem(`__convexAuthRefreshToken_${namespace}`),
-    }),
-    ns,
-  );
-
-/** The checked-dispatch envelope (the public command bridge's wire shape). */
-const envelope = (operation, input) => ({ operation, input, expectedRevisions: [] });
-
 /** Runs one membership command; returns { ok, value } or { ok:false, error }. */
 async function dispatch(client, fnPath, operation, input) {
   try {
@@ -91,29 +82,9 @@ async function dispatch(client, fnPath, operation, input) {
   }
 }
 
-/** A protected read that captures the sanitized denial. */
-async function tryQuery(client, fn) {
-  try {
-    return { ok: true, value: await fn(client) };
-  } catch (error) {
-    return { ok: false, error: String(error?.message ?? error).slice(0, 300) };
-  }
-}
-
-const wrongCodeFor = (code) => (code[0] === "9" ? "0" : "9") + code.slice(1);
-
 /** One member row of the members list (never an invitation row). */
 const memberRowOf = (page, email) =>
   page.locator("li", { hasText: email }).filter({ hasNotText: "Zaprosienie ważne do" });
-
-/** Runs one phase; a thrown error becomes a recorded FAIL, not a lost leg. */
-async function phase(name, fn) {
-  try {
-    await fn();
-  } catch (error) {
-    rec.record(name, "FAIL", `phase ${name} completes`, `driver error: ${String(error?.message ?? error).slice(0, 400)}`);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Phase 0: mailboxes and personas
@@ -136,19 +107,9 @@ const MA = state.mailboxes.ma;
 const MB = state.mailboxes.mb;
 const MC = state.mailboxes.mc;
 
-/** Signs a persona in through the real browser card (fresh per persona). */
+/** Signs a persona in through the shared browser walk (fresh per persona). */
 async function signIn(persona, mailbox, tag) {
-  await persona.page.goto(WEB, { waitUntil: "domcontentloaded" });
-  await persona.page.waitForTimeout(2500);
-  await persona.page.getByLabel("Adres e-mail").fill(mailbox.address);
-  const excludeIds = await messageIds(mailbox);
-  await persona.page.getByRole("button", { name: "Wyślij kod" }).click();
-  await persona.page.waitForTimeout(2000);
-  const { code } = await waitForCode(mailbox, "sign_in_code", { sinceMs: Date.now() - 2000, excludeIds });
-  await persona.page.getByLabel("Kod z wiadomości").fill(code);
-  await persona.page.getByRole("button", { name: "Zaloguj się kodem" }).click();
-  await persona.page.waitForTimeout(7000);
-  const body = await snap(persona.page, tag);
+  const { body } = await browserSignIn(persona.page, mailbox, { outDir: OUT, tag });
   if (body.includes("Zaloguj się do Kiero")) throw new Error(`${tag}: sign-in did not complete`);
   return body;
 }
@@ -437,7 +398,9 @@ await phase("membership-removal-old-session-denial", async () => {
 
   rec.record(
     "membership-removal-old-session-denial",
-    removalCopy && (removedPerson === null || (reloadedDenied && apiDenied.ok === false)) ? "PASS" : "FAIL",
+    removalCopy && authorshipKept && (removedPerson === null || (reloadedDenied && apiDenied.ok === false))
+      ? "PASS"
+      : "FAIL",
     "removing the member immediately ends their access: the open browser session loses the company (session-ended / no-company view), the still-verifying token's protected reads are denied, while their authored message stays in the company history",
     `removal copy: ${removalCopy}; open-session reaction: ${liveReaction}; after reload denied: ${reloadedDenied}; API read: ${apiDenied.ok === false ? `denied (${apiDenied.error})` : "STILL ALLOWED"}; authorship kept: ${authorshipKept}`,
   );
@@ -449,25 +412,34 @@ await phase("logout-old-token-denied", async () => {
   await personaAdmin.page.waitForTimeout(4000);
   const selfRow = personaAdmin.page.locator("li", { hasText: "(to Ty)" });
   const logoutButton = selfRow.getByRole("button", { name: "Wyloguj się" });
-  let signedOut = false;
-  if ((await logoutButton.count()) >= 1) {
-    await logoutButton.click();
-    await personaAdmin.page.waitForTimeout(7000);
-    const body = await snap(personaAdmin.page, "15-logout");
-    signedOut = body.includes("Zaloguj się do Kiero") || !body.includes("Jesteś");
-  } else {
-    // The admin may have been removed above; then logout is proven by the
-    // membershipOverview denial instead.
-    signedOut = true;
+  if ((await logoutButton.count()) < 1) {
+    // The logout control is on the membership self row; without it this case
+    // cannot run through the UI — record honestly instead of assuming.
+    const readEarly = await tryQuery(authedClient(state.tokens.ma), (c) =>
+      c.query("access/membership/functions:membershipOverview", {}),
+    );
+    rec.record(
+      "logout-old-token-denied",
+      "NOT RUN",
+      "explicit logout ends the device's upstream session: the UI returns to the sign-in surface and the old token's protected reads are denied",
+      `the 'Wyloguj się' control was not reachable on the self row (persona state after the removal phase); old-token read: ${readEarly.ok === false ? `denied (${readEarly.error})` : "STILL ALLOWED"}`,
+    );
+    return;
   }
+  await logoutButton.click();
+  await personaAdmin.page.waitForTimeout(7000);
+  const body = await snap(personaAdmin.page, "15-logout");
+  // POSITIVE verification: the sign-in surface itself must render, and the
+  // OLD token (captured before logout) must stop resolving AFTER it.
+  const signInSurface = body.includes("Zaloguj się do Kiero");
   const read = await tryQuery(authedClient(state.tokens.ma), (c) =>
     c.query("access/membership/functions:membershipOverview", {}),
   );
   rec.record(
     "logout-old-token-denied",
-    signedOut && read.ok === false ? "PASS" : "FAIL",
+    signInSurface && read.ok === false ? "PASS" : "FAIL",
     "explicit logout ends the device's upstream session: the UI returns to the sign-in surface and the old token's protected reads are denied (upstream session gone — the token alone never grants access)",
-    `UI signed out: ${signedOut}; old-token read: ${read.ok === false ? `denied (${read.error})` : "STILL ALLOWED"}`,
+    `sign-in surface after logout: ${signInSurface}; old-token read: ${read.ok === false ? `denied (${read.error})` : "STILL ALLOWED"}`,
   );
 });
 
