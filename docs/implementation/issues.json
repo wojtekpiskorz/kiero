@@ -6084,7 +6084,7 @@
       "audit": {
         "mergedPr": 226,
         "mergeCommit": null,
-        "implemented": "The media protocol serves the image byte channel (op image: ONE capped 16 MiB window, magic-byte png/jpeg/webp sniff, closed object_too_large/format_unsupported refusals) through the one shared handler on all three surfaces; E4's vision client contract needed no change. The PR number is recorded on merge.",
+        "implemented": "The media protocol serves the image byte channel (op image: ONE capped 20 MiB window, magic-byte png/jpeg/webp sniff, closed object_too_large/format_unsupported refusals) through the one shared handler on all three surfaces; E4's vision client contract needed no change. The PR number is recorded on merge.",
         "evidence": [
           "https://github.com/wojtekpiskorz/kiero/issues/135#issuecomment-5703809138"
         ],
