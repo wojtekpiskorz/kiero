@@ -32,7 +32,7 @@ what requires OWNER action is stated exactly.
 
 ## PENDING owner actions (exact steps)
 
-I11 amendment (2026-09-16): steps 1-2 are DONE by the owner - the Axiom
+I11 amendment (2026-09-16): steps 1-2 are DONE by the owner; the Axiom
 account exists, the dataset is `kiero-staging` (EU), and the names
 `AXIOM_API_TOKEN` / `AXIOM_DATASET` are present on the Convex staging
 deployment `wojtek-piskorz-jr:kiero-dev-core:staging` (verified by name

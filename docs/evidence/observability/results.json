@@ -277,7 +277,7 @@
       "id": "Axiom receipt verification",
       "status": "BLOCKED",
       "actor": "owner",
-      "action": "Open the Axiom dataset (kiero-staging, EU) and verify ingested events carry environment=staging and the closed kind vocabulary. NOTE: the Convex-side marker forwardedAtMs is 0 on every stored event while the AXIOM_API_TOKEN/AXIOM_DATASET names are present on the staging deployment, so the Convex->Axiom ingest leg has never succeeded within the 1h forward window - the owner check must start from the Axiom ingest monitor/API, and a 401/404 there is the likely live transport failure, not a missing token name.",
+      "action": "Open the Axiom dataset (kiero-staging, EU) and verify ingested events carry environment=staging and the closed kind vocabulary. NOTE: the Convex-side marker forwardedAtMs is 0 on every stored event while the AXIOM_API_TOKEN/AXIOM_DATASET names are present on the staging deployment, so the Convex->Axiom ingest leg has never succeeded within the 1h forward window; the owner check must start from the Axiom ingest monitor/API, and a 401/404 there is the likely live transport failure, not a missing token name.",
       "resumption": "owner dashboard/API access to the dataset"
     },
     {

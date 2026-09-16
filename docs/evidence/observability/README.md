@@ -13,7 +13,7 @@ full-core closure stays with [J5 #64].
   dataset `kiero-staging` (EU; names `AXIOM_API_TOKEN`/`AXIOM_DATASET`
   present, values never read).
 - Constraints honored: `KIERO_GM_EMAILS` untouched (no GM-panel flow), no
-  staging env var changed (the guarded proof/fixture flags stayed unset -
+  staging env var changed (the guarded proof/fixture flags stayed unset, per
   `infra/bindings/convex-functions.md`), no wrangler deploy, nothing sent
   to the owner alert recipient by this session (the product's own
   configured channels were not exercised beyond their natural state; no

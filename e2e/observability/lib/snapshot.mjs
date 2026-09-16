@@ -119,7 +119,7 @@ export function leakScan(events, markers) {
     /Bearer\s+[A-Za-z0-9._-]{12,}/i,
     /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\./,
   ];
-  const mediaShapes = [/UklGR/, /^\/9j\//, /R0lGODlh/, /iVBORw0KGgo/];
+  const mediaShapes = [/UklGR/, \/9j\/4, /R0lGODlh/, /iVBORw0KGgo/];
   const emailShape = /[^\s@]+@[^\s@]+\.[a-z]{2,}/i;
   for (const event of events) {
     const blob = JSON.stringify(event);

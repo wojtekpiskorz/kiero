@@ -9,7 +9,7 @@ stay in their native units; they are never silently converted to PLN.
 ## Convex-side accrued (server truth, snapshot export)
 
 Source: `npx convex export --deployment wojtek-piskorz-jr:kiero-dev-core:staging`
-parsed by `e2e/observability/ops-surface.mjs` (row O3h), 2026-09-16.
+parsed by `e2e/observability/ops-surface.mjs` (row O3m), 2026-09-16.
 
 | Item | Observed |
 | --- | --- |
