@@ -87,8 +87,8 @@ describe("M1 audit: derived map table content", () => {
     expect(run.status).toBe(0);
     expect(run.report.result).toBe("PASS");
     expect(run.report.errors).toEqual([]);
-    expect(run.report.entries).toBe(98);
-    expect(run.report.coreEdges).toBe(217);
+    expect(run.report.entries).toBe(99);
+    expect(run.report.coreEdges).toBe(218);
     expect(run.report.uxRows).toBe(61);
   });
 
