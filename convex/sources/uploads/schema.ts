@@ -161,6 +161,9 @@ export const uploadsTables = {
      * owned by convex/processing/images/protocol.ts (pinned at runtime by
      * tests/d5, the fragments.test.ts pattern for fragment-local unions).
      */
+    // R24: the executor's HTTP status on conversion_failed (entitlement and
+    // decode failures become distinguishable in the durable record).
+    exceptionFailureStatus: v.optional(v.number()),
     exceptionKind: v.optional(
       v.union(
         v.literal("oversized_input"),

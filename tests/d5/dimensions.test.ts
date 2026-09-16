@@ -187,6 +187,9 @@ describe("exception rows carry the original's pixel space (R24)", () => {
     const retained = ctx.db.rows("mediaRepresentations").find((row) => row.role === "retained");
     expect(retained?.width).toBe(4032);
     expect(retained?.height).toBe(3024);
+    // The executor's HTTP status persists on the durable row (entitlement
+    // vs decode becomes distinguishable in the record).
+    expect(retained?.exceptionFailureStatus).toBe(403);
   });
 
   it("omits the dimensions when the header did not resolve (never a stand-in)", async () => {

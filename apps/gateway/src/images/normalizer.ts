@@ -71,6 +71,19 @@ interface ImagesBindingLike {
   };
 }
 
+/**
+ * The executor's typed refusal (R24): the HTTP status rides the error TYPE,
+ * not its prose — the drive's conversion-failure record reads the field, so
+ * no message wording is ever load-bearing.
+ */
+export class NormalizerFailure extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 /** The Q210-selected executor: the Images binding (requires Images Paid). */
 export function imagesBindingNormalizer(binding: ImagesBindingLike): PhotoNormalizer {
   return {
@@ -101,10 +114,10 @@ export function imagesBindingNormalizer(binding: ImagesBindingLike): PhotoNormal
         .output({ format: "image/webp", quality: request.quality })
         .response();
       if (!response.ok) {
-        // The status rides the message out (R24): the drive's conversion
+        // The status rides the typed refusal (R24): the drive's conversion
         // failure record names WHY the executor refused — entitlement and
         // decode failures stop being indistinguishable.
-        throw new Error(`images binding transform failed: ${response.status}`);
+        throw new NormalizerFailure(`images binding transform failed: ${response.status}`, response.status);
       }
       const output = new Uint8Array(await response.arrayBuffer());
       // The binding's response does not report output dimensions, so the
@@ -133,7 +146,7 @@ export function remoteNormalizer(url: string): PhotoNormalizer {
         body: request.bytes,
       });
       if (!response.ok) {
-        throw new Error(`remote normalizer failed: ${response.status}`);
+        throw new NormalizerFailure(`remote normalizer failed: ${response.status}`, response.status);
       }
       const payload = (await response.json()) as {
         bytesBase64?: unknown;

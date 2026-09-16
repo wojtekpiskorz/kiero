@@ -392,6 +392,9 @@ export async function recordNormalizationTransaction(
         ? {}
         : { bytes: attachment.receivedBytes }),
       exceptionKind: outcome.exceptionKind,
+      // R24: the executor's HTTP status when conversion failed (entitlement
+      // vs decode, distinguishable in the durable record).
+      ...(outcome.failureStatus === undefined ? {} : { exceptionFailureStatus: outcome.failureStatus }),
       // R24: the original's decoded pixel space when the bounded header
       // resolved — the coordinate space vision region validation needs over
       // the retained-original fallback. Absent means undecodable, never a
