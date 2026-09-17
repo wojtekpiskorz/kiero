@@ -494,6 +494,16 @@ describe("the Convex typed-code pass-through", () => {
     }
   });
 
+  it("prototype-chain names (toString, constructor) are NOT members of the closed set", async () => {
+    for (const inherited of ["toString", "constructor", "hasOwnProperty"]) {
+      vi.stubGlobal("fetch", vi.fn(async () => jsonAnswer(422, { ok: false, code: inherited })));
+      expect(await probeFromMediaWorker("voice.webm")).toMatchObject({
+        ok: false,
+        code: "media_worker_refused",
+      });
+    }
+  });
+
   it("keeps the unreachable/not-configured/malformed-response codes honest", async () => {
     vi.stubGlobal(
       "fetch",

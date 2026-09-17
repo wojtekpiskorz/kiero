@@ -64,6 +64,15 @@ const PROTOCOL_REFUSAL_CODES = {
   conversion_failed: true,
 } as const satisfies Record<SegmentRefusal, true>;
 
+/**
+ * The closed runtime membership set (the review's prototype-chain finding:
+ * `in` on the record above would admit "toString"/"constructor"). A Set has
+ * no inherited keys, so a foreign body cannot name itself a durable cause.
+ */
+const PROTOCOL_REFUSAL_CODE_SET: ReadonlySet<string> = new Set<string>(
+  Object.keys(PROTOCOL_REFUSAL_CODES),
+);
+
 export type SegmentBytesResult =
   | { readonly ok: true; readonly audioBase64: string; readonly durationMs: number }
   | { readonly ok: false; readonly code: SegmentBytesRefusal };
@@ -121,7 +130,7 @@ async function callMediaWorker(
     if (
       typeof refusalBody === "object" && refusalBody !== null &&
       typeof (refusalBody as { code?: unknown }).code === "string" &&
-      (refusalBody as { code: string }).code in PROTOCOL_REFUSAL_CODES
+      PROTOCOL_REFUSAL_CODE_SET.has((refusalBody as { code: string }).code)
     ) {
       return { ok: false, code: (refusalBody as { code: SegmentRefusal }).code };
     }
