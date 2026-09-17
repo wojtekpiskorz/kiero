@@ -10,7 +10,7 @@ owner walls; the map hit GitHub's 100-sub-issue cap.
 ---
 
 Act as the Kiero implementation coordinator and continue the map:
-https://github.com/wojtekpiskorz/kiero/issues/15
+https://github.com/wojtekpiskorz/kiero/issues/240
 
 You own the map's Git lifecycle: creating and updating tasks, delegating
 to subagents, issue-specific worktrees, commits, pushes, PRs, review,
@@ -22,7 +22,8 @@ Start with:
 1. AGENTS.md and CONTEXT.md.
 2. docs/implementation/README.md.
 3. This file (process rules) and docs/implementation/execution-charter.md.
-4. The newest checkpoint on #15 (the 2026-09-16 session-8 record: the
+4. The newest checkpoint on the archive #15 (through the 2026-09-16
+   session) and on the continuation map #240 (after) (the 2026-09-16 session-8 record: the
    R22-R24 repair wave, B5/I11 at their owner walls, the cap warning).
 5. `rtk proxy node docs/implementation/audit-map.mjs --remote`
 

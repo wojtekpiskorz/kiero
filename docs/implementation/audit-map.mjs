@@ -230,10 +230,17 @@ async function api(path) {
 let live = null;
 if (process.argv.includes('--remote') && errors.length === 0) {
   const prefix = 'repos/wojtekpiskorz/kiero/issues';
-  const children = await api(`${prefix}/15/sub_issues?per_page=100`);
+  // The map continues in #240 (2026-09-16): #15 stands closed as the archive
+  // of every entry closed under it; the entry set is the UNION of both maps'
+  // native children, and the cached map body is the continuation map's.
+  const [archived, active] = await Promise.all([
+    api(`${prefix}/15/sub_issues?per_page=100`),
+    api(`${prefix}/240/sub_issues?per_page=100`),
+  ]);
+  const children = [...archived, ...active];
   require(sameSet(children.map(child => child.number), entries.map(entry => entry.issueNumber)), 'native map children differ from manifest');
-  const [map] = await api(`${prefix}/15`);
-  require(map.body === manifest.mapBody, 'map #15 body differs from cached manifest');
+  const [map] = await api(`${prefix}/240`);
+  require(map.body === manifest.mapBody, 'map #240 body differs from cached manifest');
   const remoteByNumber = new Map(children.map(child => [child.number, child]));
   const allBlockers = new Map();
   let next = 0;
