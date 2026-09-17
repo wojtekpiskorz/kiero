@@ -6611,7 +6611,8 @@
         "apps/media-worker/src/segment-service.ts",
         "apps/media-worker/package.json",
         "convex/processing/audio/media.ts",
-        ".github/workflows/checks.yml"
+        ".github/workflows/checks.yml",
+        "package.json"
       ],
       "proofs": [],
       "sources": [
@@ -6626,7 +6627,7 @@
       "audit": {
         "mergedPr": 250,
         "mergeCommit": null,
-        "implemented": "The typed-refusal union lives in the zero-import leaf apps/media-worker/src/refusals.ts (re-exported by segment-service.ts, exported as ./refusals); the Convex side imports the leaf, so the Convex deploy typecheck program no longer reaches segment-service.ts. checks.yml gains the exact program the release typechecks (tsc -p convex/tsconfig.json --noEmit), closing the mechanical gate the session-9 release proved missing.",
+        "implemented": "The typed-refusal union lives in the zero-import leaf apps/media-worker/src/refusals.ts (re-exported by segment-service.ts, exported as ./refusals); the Convex side imports the leaf, so the Convex deploy typecheck program no longer reaches segment-service.ts. checks.yml gains the exact program the release typechecks (tsc -p convex/tsconfig.json --noEmit), closing the mechanical gate the session-9 release proved missing. The gate also joins the canonical local procedure: the root typecheck chain gains typecheck:convex (package.json), and the Checks step calls the script by name — local and CI share one spelling.",
         "evidence": [
           "https://github.com/wojtekpiskorz/kiero/actions/runs/35233212656"
         ],
