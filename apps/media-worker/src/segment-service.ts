@@ -327,8 +327,13 @@ function protocolStatus(response: SegmentResponse): number {
  */
 export interface ProtocolDeps {
   readonly converter?: AudioConverter;
-  /** What /healthz states about this surface's conversion capability. */
-  readonly conversionHealth?: string;
+  /**
+   * What /healthz states about this surface's conversion capability: the
+   * container's startup probe reports its verified binary state; every
+   * converter-less surface keeps the default. A closed pair (plus the
+   * default) — a typo cannot quietly misreport health.
+   */
+  readonly conversionHealth?: "ffmpeg-bounded" | "ffmpeg-unavailable";
 }
 
 /**
