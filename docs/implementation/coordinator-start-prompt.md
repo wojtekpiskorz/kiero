@@ -22,10 +22,11 @@ Start with:
 1. AGENTS.md and CONTEXT.md.
 2. docs/implementation/README.md.
 3. This file (process rules) and docs/implementation/execution-charter.md.
-4. The newest checkpoint: the session-8 record sits on the archive
+4. The newest checkpoint: the session-8 record (the R22-R24 repair
+   wave, B5/I11 at their owner walls) sits on the archive
    [#15](https://github.com/wojtekpiskorz/kiero/issues/15); everything
-   after the continuation lands on the map [#240](https://github.com/wojtekpiskorz/kiero/issues/240) (the 2026-09-16 session-8 record: the
-   R22-R24 repair wave, B5/I11 at their owner walls, the cap warning).
+   after the continuation lands on the map
+   [#240](https://github.com/wojtekpiskorz/kiero/issues/240).
 5. `rtk proxy node docs/implementation/audit-map.mjs --remote`
 
 Baseline at the 2026-09-16 session-8 handoff (verify, do not assume):
