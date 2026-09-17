@@ -30,11 +30,14 @@
  * that ran and said current.
  *
  * The structured answer returns in the command result for company
- * conversation views (H1 renders it; J2/J3 qualify it). Durable
- * answer/tool-attempt record rows need a shared table family that the
- * closed contracts inventory does not declare yet — named prerequisite,
- * see the session report; the clarifications and domain changes this flow
- * produces ARE durable rows through their registered operations.
+ * conversation views (H1 renders it; J2/J3 qualify it). The E6 named
+ * prerequisite — durable answer/tool-attempt record rows — landed as R25
+ * (issue #230): the loop now records every run and every provider turn
+ * into the answerRuns/answerTurns table family through ONE idempotent
+ * internal mutation per turn (./record.ts), names/codes/classes/latencies
+ * only, with NO loop behavior changes; the clarifications and domain
+ * changes this flow produces are durable rows through their registered
+ * operations.
  */
 
 import { v } from "convex/values";
@@ -43,6 +46,7 @@ import {
   runChatTurn,
   type AnyChatToolSpec,
   type ChatTurnCredentials,
+  type ProviderFailureKind,
 } from "@kiero/providers";
 import {
   ANSWER_TOOLS,
@@ -74,6 +78,7 @@ import type { Id } from "../_generated/dataModel";
 import { resolveAccessContextFromConvexAuth } from "../access/identity/resolution";
 import { loadAnswerContext } from "./context";
 import { dispatchAnswerToolCall } from "./toolExecution";
+import { ANSWER_EXCERPT_MAX_CHARS, noteRunFinalized, noteRunStart, noteTurn } from "./record";
 
 // The tool-execution half keeps its loop.ts export surface (the routing
 // tests and any sibling import the seam from here); the implementation
@@ -240,6 +245,16 @@ export async function startAnswerRun(
     throw new Error(`agent: ${stage.error ?? "context_load_failed"}`);
   }
   const context = stage.context;
+  // R25: the run's durable start row (idempotent per runId, best-effort —
+  // a dropped row degrades diagnostics, never the ask). Recorded at the
+  // loop's true start checkpoint: the context load succeeded, so the run
+  // has a world to answer against.
+  await noteRunStart(ctx, {
+    runId,
+    questionSourceId,
+    pipelineVersion: ANSWER_FLOW_PIPELINE_VERSION,
+    modelConfigurationVersion: ANSWER_MODEL_CONFIGURATION_VERSION,
+  });
   return {
     runId,
     context,
@@ -306,12 +321,11 @@ export async function runAnswerRound(
   let refreshes = current.refreshes;
   let finalText = current.finalText;
 
-  const finish = (
+  const finish = async (
     forced: AnswerRunResult["outcome"] | null,
-    meta: { failure?: string },
-  ): AnswerRoundOutcome => ({
-    kind: "done",
-    result: answerResult(
+    meta: { failure?: ProviderFailureKind },
+  ): Promise<AnswerRoundOutcome> => {
+    const result = answerResult(
       forced ??
         (state.submitted !== null
           ? "answered"
@@ -327,8 +341,21 @@ export async function runAnswerRound(
         turnLog,
         ...meta,
       },
-    ),
-  });
+    );
+    // R25: the run's durable finalize (outcome, failure kind, counts, the
+    // bounded excerpt) — ONE patch-shaped mutation, its own replay,
+    // best-effort like every recording half.
+    await noteRunFinalized(ctx, {
+      runId: current.runId,
+      outcome: result.outcome,
+      ...(meta.failure === undefined ? {} : { failureKind: meta.failure }),
+      turnCount: result.turns,
+      refreshCount: result.refreshes,
+      observedModels: result.observedModels,
+      finalTextExcerpt: result.finalText,
+    });
+    return { kind: "done", result };
+  };
 
   if (current.turns >= MAX_ANSWER_TURNS) {
     return finish(null, {});
@@ -340,13 +367,40 @@ export async function runAnswerRound(
       content: [{ kind: "text", text: finalTurnInstruction() }],
     });
   }
+  // R25: the provider turn's timing pair (the durable turn row's latency)
+  // and the route record's serving attempt, captured before the branch.
+  const turnStartedAtMs = Date.now();
   const call = await runChatTurn(credentials, {
     messages,
     tools,
     systemPrompt: answerSystemPrompt(),
   });
+  const turnFinishedAtMs = Date.now();
+  const attempt = call.record.attempts.at(-1);
   if (call.outcome.outcome === "failed") {
     const kind = call.outcome.failure.kind;
+    // R25: the rejected turn's record row (ONE idempotent mutation per
+    // turn). The finish class is honestly "unknown": the provider seam
+    // collapses finish length/content_filter, malformed tool-call JSON and
+    // schema mismatches into the single failure kind before the loop can
+    // observe which one fired.
+    await noteTurn(ctx, {
+      runId: current.runId,
+      turnIndex: turns,
+      outcome: "rejected",
+      finishReasonClass: "unknown",
+      failureKind: kind,
+      ...(attempt?.provider === undefined ? {} : { provider: attempt.provider }),
+      ...(attempt?.observedModel === undefined
+        ? {}
+        : { observedModel: attempt.observedModel }),
+      attemptCount: call.record.attempts.length,
+      toolCallNames: [],
+      callsOrigin: "none",
+      argumentDecodeFailureCodes: [],
+      startedAtMs: turnStartedAtMs,
+      finishedAtMs: turnFinishedAtMs,
+    });
     if (
       (kind === "output_rejected" || kind === "unknown_tool") &&
       state.submitted !== null
@@ -358,11 +412,11 @@ export async function runAnswerRound(
     return finish("provider_failed", { failure: kind });
   }
   const turn = call.outcome.value;
-  const observed = call.record.attempts.at(-1)?.observedModel;
+  const observed = attempt?.observedModel;
   if (typeof observed === "string") {
     observedModels.push(observed);
   }
-  finalText = turn.text.slice(0, 600);
+  finalText = turn.text.slice(0, ANSWER_EXCERPT_MAX_CHARS);
   const nextState = (): AnswerRoundState => ({
     runId: current.runId,
     context,
@@ -384,6 +438,28 @@ export async function runAnswerRound(
           arguments: toolCall.arguments,
         }))
       : parseTextToolCalls(turn.text);
+  // R25: the decoded turn's record row (ONE idempotent mutation per turn):
+  // the tool-call NAMES only — never raw payloads or arguments — plus which
+  // decode path produced them (native round or the text-encoded rescue).
+  await noteTurn(ctx, {
+    runId: current.runId,
+    turnIndex: turns,
+    outcome: "decoded",
+    finishReasonClass: turn.finishReason,
+    ...(observed === undefined ? {} : { observedModel: observed }),
+    ...(attempt?.provider === undefined ? {} : { provider: attempt.provider }),
+    attemptCount: call.record.attempts.length,
+    toolCallNames: activeCalls.map((decoded) => decoded.name),
+    callsOrigin:
+      turn.toolCalls.length > 0
+        ? "native"
+        : activeCalls.length > 0
+          ? "text_rescue"
+          : "none",
+    argumentDecodeFailureCodes: [],
+    startedAtMs: turnStartedAtMs,
+    finishedAtMs: turnFinishedAtMs,
+  });
   if (activeCalls.length === 0) {
     if (
       state.submitted === null &&

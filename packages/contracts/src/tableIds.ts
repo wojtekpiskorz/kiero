@@ -153,6 +153,11 @@ export const TABLE_ID_NAMES = [
   // search
   "searchEntries",
   "searchIndexGenerations",
+  // agent (R25 amendment, issue #230, the F3/G3 closed-inventory precedent):
+  // the answer loop's durable record family — the per-ask run rows and the
+  // per-provider-turn rows the E6 loop records from its checkpoints.
+  "answerRuns",
+  "answerTurns",
 ] as const;
 
 /** The closed table inventory (derived from the runtime constant). */

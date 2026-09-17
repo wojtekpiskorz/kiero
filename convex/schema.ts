@@ -57,6 +57,10 @@ import { exportsTables } from "./operations/exports/schema";
 import { deletionTables } from "./operations/deletion/schema";
 import { backupsTables } from "./operations/backups/schema";
 import { telemetryTables } from "./operations/telemetry/schema";
+// R25 append (flagged coordinated change, the F3/G3 precedent): the answer
+// loop's durable record family — per-ask answerRuns and per-turn answerTurns
+// (the E6 named prerequisite, issue #230).
+import { answerTables } from "./agent/schema";
 
 const fragments: ReadonlyArray<Record<string, TableDefinition>> = [
   identityTables,
@@ -85,6 +89,7 @@ const fragments: ReadonlyArray<Record<string, TableDefinition>> = [
   deletionTables,
   backupsTables,
   telemetryTables,
+  answerTables,
 ];
 
 const composed: Record<string, TableDefinition> = {};
@@ -146,4 +151,5 @@ export default defineSchema({
   ...deletionTables,
   ...backupsTables,
   ...telemetryTables,
+  ...answerTables,
 });
