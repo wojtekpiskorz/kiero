@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./wav": "./src/wav.ts",
+    "./refusals": "./src/refusals.ts",
     "./segment-service": "./src/segment-service.ts",
     "./convert": "./src/convert.ts"
   },

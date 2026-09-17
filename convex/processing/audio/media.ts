@@ -22,7 +22,10 @@
  */
 
 import { base64ToBytes, bytesToBase64, parseWav, sliceWav, wavDurationMs } from "@kiero/media-worker/wav";
-import type { SegmentRefusal } from "@kiero/media-worker/segment-service";
+// R32: the leaf import — the Convex deploy typecheck (convex/tsconfig.json,
+// no allowImportingTsExtensions) must not reach segment-service.ts through
+// this type; the zero-import ./refusals leaf is the importable spelling.
+import type { SegmentRefusal } from "@kiero/media-worker/refusals";
 import { sha256HexOfBytes } from "./segmentation";
 
 /**

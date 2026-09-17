@@ -33,6 +33,14 @@ jobs:
         run: npm ci
       - name: Strict typecheck (root and every workspace)
         run: npm run typecheck
+      - name: Convex deploy program typecheck (R32: the release's own gate)
+        run: |
+          set -eu
+          # `convex deploy` typechecks convex/tsconfig.json at deploy time
+          # (no allowImportingTsExtensions there); the session-9 release
+          # proved this program can be red while every workspace program is
+          # green — so Checks run the exact program the release runs.
+          node node_modules/typescript/bin/tsc -p convex/tsconfig.json --noEmit
       - name: Test suite (contracts, values, platform runtime)
         run: npm run test
       - name: Convex generated output present and unhand-edited (A3 policy)
