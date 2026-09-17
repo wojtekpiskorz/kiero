@@ -6,14 +6,27 @@
  * markers and the full typed-rejection copy map must be equal, error
  * classification keys on the marker + code token (never prose), and the
  * email shape check stays honest.
+ *
+ * R26: the linking refusals now travel as `ConvexError` DATA carrying
+ * the closed code (the message keeps the marker/copy text for logs).
+ * The pins below assert the data construction for every code, and that
+ * the (not yet data-aware) account classifier still classifies the new
+ * error shape through its message fallback.
  */
 
 import { describe, expect, it } from "vitest";
+import { ConvexError } from "convex/values";
 import {
   LINK_REJECTED_MARKER,
+  linkRejectionData,
   linkingRejectionCopy,
   type LinkRejectionCode,
 } from "../../convex/access/linking/policy";
+import {
+  LINK_REJECTION_CODES,
+  accessRefusalData,
+  decodeAccessRefusalCode,
+} from "../../convex/access/errorCodes";
 import { EMAIL_DELIVERY_FAILED_MARKER } from "../../convex/integrations/email/send";
 import {
   ACCOUNT_ERROR_MARKERS,
@@ -91,5 +104,67 @@ describe("account state helpers", () => {
     expect(isValidEmail("not-an-email")).toBe(false);
     expect(isValidEmail("a@b")).toBe(false);
     expect(isValidEmail("a b@c.pl")).toBe(false);
+  });
+});
+
+describe("structured link rejections (R26: data, never the message)", () => {
+  it("every rejection code the cores can return carries itself in the data", () => {
+    for (const code of LINK_REJECTION_CODES) {
+      const data = linkRejectionData(code);
+      expect(decodeAccessRefusalCode(data), code).toBe(code);
+      expect(data.code, code).toBe(code);
+    }
+  });
+
+  it("the data message keeps the marker + code token + copy byte-for-byte (log/dev fidelity)", () => {
+    for (const code of Object.keys(linkingRejectionCopy) as LinkRejectionCode[]) {
+      expect(linkRejectionData(code).message, code).toBe(
+        `${LINK_REJECTED_MARKER}[${code}] ${linkingRejectionCopy[code]}`,
+      );
+    }
+  });
+
+  it("the closed vocabulary holds exactly the ten linking codes", () => {
+    expect([...LINK_REJECTION_CODES]).toEqual([
+      "method_already_attached",
+      "target_account_established",
+      "ceremony_in_progress",
+      "no_active_ceremony",
+      "proof_stale",
+      "mismatched_address",
+      "google_email_unproven",
+      "code_wrong_or_expired",
+      "too_many_attempts",
+      "ambiguous_registry",
+    ]);
+  });
+
+  it("the account classifier still reads the code token from the new error shape (dev compat)", () => {
+    // The account feature is not yet data-aware (outside R26's owned
+    // paths); ConvexError embeds the data message in its message, so the
+    // marker+token classification keeps working wherever messages are
+    // visible (dev). Production copy for this surface is the R26
+    // follow-up defect, tracked by the coordinator.
+    for (const code of Object.keys(linkingRejectionCopy) as LinkRejectionCode[]) {
+      expect(classifyAccountError(new ConvexError(linkRejectionData(code))), code).toBe(code);
+    }
+    expect(
+      classifyAccountError(
+        new ConvexError(
+          accessRefusalData(
+            "email_delivery_failed",
+            `${EMAIL_DELIVERY_FAILED_MARKER} Nie udało się wysłać wiadomości.`,
+          ),
+        ),
+      ),
+    ).toBe("email_delivery_failed");
+  });
+
+  it("foreign payloads decode to nothing (fail closed)", () => {
+    expect(decodeAccessRefusalCode(undefined)).toBeNull();
+    expect(decodeAccessRefusalCode("proof_stale")).toBeNull();
+    expect(decodeAccessRefusalCode({ code: "method_conflict " })).toBeNull();
+    expect(decodeAccessRefusalCode({ code: ["proof_stale"] })).toBeNull();
+    expect(decodeAccessRefusalCode({ message: "no code field" })).toBeNull();
   });
 });

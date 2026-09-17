@@ -34,18 +34,28 @@
  * of upstream token validity.
  *
  * `convex/auth.ts` re-exports the returned functions (the client and the
- * platform look them up under the `auth` module path).
+ * platform look them up under the `auth` module path). `signIn` is the
+ * R26 data-carrying wrapper around the library action: every classified
+ * refusal reaches the client as `ConvexError` data, never as message
+ * text a production deployment would sanitize.
  */
 
 import { Schema } from "effect";
 import { convexAuth, type ConvexAuthConfig } from "@convex-dev/auth/server";
 import { Email } from "@convex-dev/auth/providers/Email";
 import Google from "@auth/core/providers/google";
+import { actionGeneric } from "convex/server";
+import { ConvexError, v } from "convex/values";
 import {
   deliverApplicationEmail,
   deliveryFailureCopy,
   EMAIL_DELIVERY_FAILED_MARKER,
 } from "../../integrations/email/send";
+import {
+  accessRefusalData,
+  decodeAccessRefusal,
+  type AccessRefusalData,
+} from "../errorCodes";
 import {
   METHOD_CONFLICT_MARKER,
   decideCreateOrUpdateUser,
@@ -124,11 +134,15 @@ const authConfig: ConvexAuthConfig = {
         });
         const copy = deliveryFailureCopy(outcome);
         if (copy !== null) {
-          // Fail the issuance loudly and sanitized: the machine marker
-          // (client classification) plus Polish copy; no code, key or
-          // provider payload anywhere. Retrying issues a fresh code (the
-          // pending one is replaced, never duplicated).
-          throw new Error(`${EMAIL_DELIVERY_FAILED_MARKER} ${copy}`);
+          // Fail the issuance loudly and sanitized: the machine marker and
+          // Polish copy stay in the message for logs, while the closed code
+          // rides the ConvexError DATA (client classification reads data —
+          // messages are sanitized to "Server Error" on prod deployments);
+          // no code, key or provider payload anywhere. Retrying issues a
+          // fresh code (the pending one is replaced, never duplicated).
+          throw new ConvexError<AccessRefusalData>(
+            accessRefusalData("email_delivery_failed", `${EMAIL_DELIVERY_FAILED_MARKER} ${copy}`),
+          );
         }
       },
     }),
@@ -229,8 +243,13 @@ const authConfig: ConvexAuthConfig = {
           Date.now(),
         );
         if (!throttled) {
-          throw new Error(
-            `${ISSUANCE_RATE_LIMITED_MARKER} Zbyt wiele próśb o kod na ten adres. Odczekaj kilka minut i spróbuj ponownie.`,
+          // Closed code in the DATA (classification), marker + Polish copy
+          // in the message (logs; sanitized away on prod deployments).
+          throw new ConvexError<AccessRefusalData>(
+            accessRefusalData(
+              "issuance_rate_limited",
+              `${ISSUANCE_RATE_LIMITED_MARKER} Zbyt wiele próśb o kod na ten adres. Odczekaj kilka minut i spróbuj ponownie.`,
+            ),
           );
         }
       }
@@ -292,9 +311,14 @@ const authConfig: ConvexAuthConfig = {
         // Polish product copy: the address belongs to an identity using a
         // different sign-in method; no detail about that identity is
         // disclosed. Verified method linking is B2's operation (account
-        // settings; both proofs). Twin literal pinned by tests/b1+b2.
-        throw new Error(
-          `${METHOD_CONFLICT_MARKER} Konto z tym adresem e-mail używa innej metody logowania. Zaloguj się pierwotną metodą; metody połączysz w ustawieniach konta, potwierdzając obie.`,
+        // settings; both proofs). Twin literal pinned by tests/b1+b2; the
+        // closed code rides the ConvexError DATA (R26), the marker + copy
+        // stay in the message for logs.
+        throw new ConvexError<AccessRefusalData>(
+          accessRefusalData(
+            "method_conflict",
+            `${METHOD_CONFLICT_MARKER} Konto z tym adresem e-mail używa innej metody logowania. Zaloguj się pierwotną metodą; metody połączysz w ustawieniach konta, potwierdzając obie.`,
+          ),
         );
       }
       if (decision.action === "resume") {
@@ -340,4 +364,99 @@ const authConfig: ConvexAuthConfig = {
   },
 };
 
-export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth(authConfig);
+const { auth, signIn: librarySignIn, signOut, store, isAuthenticated } = convexAuth(authConfig);
+
+/**
+ * The library action's registered handler seam (the same `_handler`
+ * property tests/b1 drive; Convex attaches it to every registered
+ * function). The wrapper calls the handler IN-PROCESS with its own ctx —
+ * the "shared helper function" shape Convex's own tooling recommends for
+ * function-to-function reuse. `ctx.runAction` cannot be used here: the
+ * library action is no longer a module export, so the bundler attaches
+ * no function reference to it. Pinned @convex-dev/auth 0.0.95 / convex
+ * keep this seam stable.
+ */
+const librarySignInHandler = (
+  librarySignIn as unknown as {
+    readonly _handler: (ctx: unknown, args: unknown) => Promise<unknown>;
+  }
+)._handler;
+
+/** True when the thrown error already carries data (ours and any library ConvexError). */
+function carriesData(error: unknown): boolean {
+  // The leaf's error-taking decoder is the ONE .data extraction cast.
+  return decodeAccessRefusal(error) !== null;
+}
+
+/**
+ * Whether the client call is an email-code VERIFICATION (the form's second
+ * step) — the only leg whose refusals the LIBRARY throws as plain errors
+ * ("Could not verify code": wrong/expired code, verifier mismatch, or the
+ * library's per-address verification-failure budget), unreachable for
+ * structuring at their throw site.
+ */
+function isEmailCodeVerification(args: {
+  readonly provider?: string;
+  readonly params?: { readonly code?: unknown };
+}): boolean {
+  return args.provider === "email_code" && typeof args.params?.code === "string";
+}
+
+/**
+ * Rounds the library's plain verification-leg Errors into structured
+ * refusals (R26 review round 1: the budget mislabel). SERVER-SIDE, before
+ * sanitization erases the message — the only place the two stable library
+ * literals are still readable. Anything else returns UNCHANGED, so a
+ * genuine crash on the leg propagates as itself. Exported pure for tests.
+ */
+export function wrapLibraryVerificationRefusal(error: unknown): unknown {
+  if (error instanceof Error) {
+    if (/Too many failed attempts/i.test(error.message)) {
+      return new ConvexError<AccessRefusalData>(
+        accessRefusalData("too_many_attempts", error.message),
+      );
+    }
+    if (/^Could not verify code$/.test(error.message)) {
+      return new ConvexError<AccessRefusalData>(
+        accessRefusalData("code_wrong_or_expired", error.message),
+      );
+    }
+  }
+  return error;
+}
+
+/**
+ * The exported sign-in action (R26): the library's `auth:signIn` wrapped
+ * so every refusal reaches the client as STRUCTURED `ConvexError` data.
+ *
+ * Our own refusals (issuance budget, method conflict, delivery failure)
+ * already throw ConvexErrors with the closed code in data — inside the
+ * library's store mutation or verification callback — and pass through
+ * untouched. The library's own verification refusals throw plain Errors
+ * whose messages production sanitizes to "Server Error"; on that one leg
+ * the wrapper classifies the two stable library literals into the closed
+ * data (see wrapLibraryVerificationRefusal) — the per-address
+ * verification budget maps to `too_many_attempts`, the wrong/expired-code
+ * literal to `code_wrong_or_expired`. Any OTHER failure on the leg
+ * (genuine crashes) propagates unchanged, so nothing masks a real error.
+ */
+export const signIn = actionGeneric({
+  args: {
+    provider: v.optional(v.string()),
+    params: v.optional(v.any()),
+    verifier: v.optional(v.string()),
+    refreshToken: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    try {
+      return await librarySignInHandler(ctx, args);
+    } catch (error) {
+      if (carriesData(error) || !isEmailCodeVerification(args)) {
+        throw error;
+      }
+      throw wrapLibraryVerificationRefusal(error);
+    }
+  },
+});
+
+export { auth, signOut, store, isAuthenticated };

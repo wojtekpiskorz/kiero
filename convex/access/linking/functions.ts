@@ -14,9 +14,10 @@
  *
  * Code delivery follows B1's honest pattern: the code is staged (hashed)
  * in an internal mutation, then emailed from the action; on delivery
- * failure the action fails loudly with the machine marker and a retry
- * stages a FRESH code (the pending hash is replaced, never duplicated).
- * The plain code never crosses to the client.
+ * failure the action fails loudly with the machine marker kept in the
+ * message and the closed code carried in `ConvexError` data (R26), and a
+ * retry stages a FRESH code (the pending hash is replaced, never
+ * duplicated). The plain code never crosses to the client.
  *
  * There is deliberately NO recovery entry here: the checked recovery
  * command's invoker stays unavailable until B4 supplies GM authority
@@ -52,7 +53,8 @@ import {
 import { confirmEmailChangeCore, stageEmailChangeCore } from "./emailChange";
 import { revokeOtherSessionsCore } from "./sessionControls";
 import { linkingStore, linkingTx } from "./storeAdapter";
-import { LINK_REJECTED_MARKER, linkingRejectionCopy, type LinkRejectionCode } from "./policy";
+import { accessRefusalData, type AccessRefusalData } from "../errorCodes";
+import { linkRejectionData, type LinkRejectionCode } from "./policy";
 
 /** The sanitized denial error every protected function fails with. */
 function denialError(reason: LiveSessionDenial): never {
@@ -60,12 +62,13 @@ function denialError(reason: LiveSessionDenial): never {
 }
 
 /**
- * The typed rejection thrown to clients: machine marker + typed code in
- * brackets + Polish copy. Classification keys on the marker and the code
- * token, never the prose.
+ * The typed rejection thrown to clients (R26): a `ConvexError` whose DATA
+ * carries the closed-vocabulary code plus the marker/copy message for
+ * logs — Convex preserves `error.data` through production sanitization,
+ * so clients classify on the code, never the prose.
  */
 function linkRejected(code: LinkRejectionCode): never {
-  throw new ConvexError(`${LINK_REJECTED_MARKER}[${code}] ${linkingRejectionCopy[code]}`);
+  throw new ConvexError<AccessRefusalData>(linkRejectionData(code));
 }
 
 /** Resolves the caller's live session ONCE, or fails sanitized (read-only). */
@@ -175,7 +178,10 @@ export const sendProofCode = action({
     const copy = deliveryFailureCopy(outcome);
     if (copy !== null) {
       // Fail loudly and sanitized; retry stages a fresh code (B1 pattern).
-      throw new Error(`${EMAIL_DELIVERY_FAILED_MARKER} ${copy}`);
+      // The structured data code survives production sanitization (R26).
+      throw new ConvexError<AccessRefusalData>(
+        accessRefusalData("email_delivery_failed", `${EMAIL_DELIVERY_FAILED_MARKER} ${copy}`),
+      );
     }
     return { sent: true };
   },
@@ -243,7 +249,9 @@ export const requestEmailChange = action({
     });
     const copy = deliveryFailureCopy(outcome);
     if (copy !== null) {
-      throw new Error(`${EMAIL_DELIVERY_FAILED_MARKER} ${copy}`);
+      throw new ConvexError<AccessRefusalData>(
+        accessRefusalData("email_delivery_failed", `${EMAIL_DELIVERY_FAILED_MARKER} ${copy}`),
+      );
     }
     return { requested: true };
   },
