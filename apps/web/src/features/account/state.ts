@@ -9,13 +9,15 @@
  * sanitization — classification reads the decoded data first (R31,
  * mirroring R26's sign-in classifier). The `[kiero:…]` message markers
  * remain only as a FALLBACK for responses without data (older deploys,
- * local network errors); tests/b2 pins the twin literals by importing
- * both sides — the client cannot import server modules.
+ * local network errors). The typed union comes from the leaf (one list,
+ * client and server); the client cannot import the leaf's RUNTIME module
+ * peers — markers and copy text stay local literals.
  */
 
 import {
   decodeAccessRefusal,
   type AccessRefusalCode,
+  type LinkRejectionCode,
 } from "../../../../../convex/access/errorCodes";
 
 /** The two sign-in methods, as the UI names them. */
@@ -43,19 +45,6 @@ export const ACCOUNT_ERROR_MARKERS = {
   linkRejected: "[kiero:link_rejected]",
   emailDeliveryFailed: "[kiero:email_delivery_failed]",
 } as const;
-
-/** Machine-readable typed rejection codes (mirrors the server union). */
-export type LinkRejectionCode =
-  | "method_already_attached"
-  | "target_account_established"
-  | "ceremony_in_progress"
-  | "no_active_ceremony"
-  | "proof_stale"
-  | "mismatched_address"
-  | "google_email_unproven"
-  | "code_wrong_or_expired"
-  | "too_many_attempts"
-  | "ambiguous_registry";
 
 /** Polish copy for every state and rejection (stable product text). */
 export const accountCopy = {
