@@ -35,11 +35,11 @@ import {
   assembleTranscriptTransaction,
   providerCallOutcome,
   recordSegmentOutcomeTransaction,
+  resolveManifestDuration,
   type SegmentAttemptOutcome,
 } from "../../convex/processing/audio/executor";
 import { asTx, fakeCtx, type FakeCtx } from "../d2/harness";
 import { planManifest } from "./manifest-planning";
-import { resolveManifestDuration } from "../../convex/processing/audio/executor";
 import { sha256HexOfBytes } from "../../convex/processing/audio/segmentation";
 
 const TABLES = [
