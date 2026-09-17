@@ -15,6 +15,10 @@
  * - Reads: `telemetryOverview` (public, redacted-by-construction composed
  *   state for diagnostics/H4/I5/I7) and `telemetryState` (internal full
  *   read used by the HTTP health surface and proofs).
+ *
+ * R27 (issue #235): `markForwarded` records the forward attempt's closed
+ * status class on the event rows AND the `telemetry.sink` tick ledger row;
+ * the composed state's `forwarding` block exposes the leg's durable state.
  */
 
 import { v } from "convex/values";
@@ -43,6 +47,13 @@ import {
 } from "./heartbeat";
 import { PRUNE_BATCH_SIZE, costPeriodCutoff, retentionCutoffMs } from "./retention";
 import { OBSERVABILITY_HONESTY } from "./observability";
+import {
+  FORWARD_STATUSES,
+  FORWARD_TICK_SERVICE,
+  type ForwardStatus,
+  type SinkForwardHealth,
+  sinkForwardHealth,
+} from "./forward";
 
 // --- explicit handler return types -------------------------------------------------
 // (They break the module -> generated api -> module type cycle, the same reason
@@ -100,6 +111,8 @@ export interface RecentDiagnosticEvent {
   readonly serviceName?: string;
   readonly redactionVersion: string;
   readonly forwardedAtMs: number;
+  /** R27: the closed status class of the last forward attempt, if any. */
+  readonly forwardStatus?: ForwardStatus;
   readonly atMs: number;
 }
 
@@ -117,6 +130,13 @@ export interface ComposedTelemetryState {
   readonly observability: typeof OBSERVABILITY_HONESTY;
   readonly diagnostics: { readonly recent: readonly RecentDiagnosticEvent[] };
   readonly health: ReturnType<typeof backendSilenceState>;
+  /**
+   * R27 (issue #235): the durable forward-leg state derived from the
+   * `telemetry.sink` tick ledger - the WHY behind a silent sink (wrong
+   * token, wrong dataset, unreachable, not configured) that the pre-R27
+   * surfaces could only guess at.
+   */
+  readonly forwarding: SinkForwardHealth;
   readonly costs: {
     readonly period: string;
     readonly perProvider: Record<string, number>;
@@ -150,35 +170,66 @@ function isHeartbeatService(value: string): value is HeartbeatService {
   return (HEARTBEAT_SERVICES as readonly string[]).includes(value);
 }
 
+/**
+ * Inserts one heartbeat row and prunes the bounded per-service tail. ONE
+ * definition (the review's duplication finding): every writer of
+ * `healthHeartbeats` goes through it, so the retention policy cannot fork.
+ */
+async function insertHeartbeatTailPruned(
+  ctx: MutationCtx,
+  row: {
+    serviceName: HeartbeatService;
+    status: "ok" | "degraded";
+    forwardStatus?: ForwardStatus;
+    atMs: number;
+  },
+): Promise<void> {
+  await ctx.db.insert("healthHeartbeats", row);
+  const tail = await ctx.db
+    .query("healthHeartbeats")
+    .withIndex("by_service_time", (q) => q.eq("serviceName", row.serviceName))
+    .order("desc")
+    .take(HEARTBEATS_KEPT_PER_SERVICE + 1);
+  for (const old of tail.slice(HEARTBEATS_KEPT_PER_SERVICE)) {
+    await ctx.db.delete(old._id);
+  }
+}
+
+/** The recordHeartbeat transaction (extracted so tests drive the real path). */
+export async function performRecordHeartbeat(
+  ctx: MutationCtx,
+  args: { serviceName: string; status: string },
+): Promise<{ recorded: boolean; reason?: string; atMs?: number }> {
+  if (!isHeartbeatService(args.serviceName)) {
+    return { recorded: false, reason: "service_unknown" };
+  }
+  // The telemetry tick's own ledger is written ONLY by the tick (the cron's
+  // markForwarded path): an external heartbeat carrying this service name
+  // must not be able to flip the forward-leg health (a no-class external
+  // row would read as "idle" and hide a persistent failure class).
+  if (args.serviceName === FORWARD_TICK_SERVICE) {
+    return { recorded: false, reason: "service_tick_internal" };
+  }
+  const serviceName: HeartbeatService = args.serviceName;
+  const status: "ok" | "degraded" = args.status === "degraded" ? "degraded" : "ok";
+  const atMs = Date.now();
+  await insertHeartbeatTailPruned(ctx, { serviceName, status, atMs });
+  await emitDiagnosticEvent(ctx, {
+    kind: "ops.health.heartbeat",
+    metadata: [
+      { key: "serviceName", value: serviceName },
+      { key: "status", value: status },
+    ],
+    serviceName,
+  });
+  return { recorded: true, atMs };
+}
+
 /** Records one heartbeat and prunes the bounded per-service tail. */
 export const recordHeartbeat = internalMutation({
   args: { serviceName: v.string(), status: v.string() },
-  handler: async (ctx, args): Promise<{ recorded: boolean; reason?: string; atMs?: number }> => {
-    if (!isHeartbeatService(args.serviceName)) {
-      return { recorded: false, reason: "service_unknown" };
-    }
-    const serviceName: HeartbeatService = args.serviceName;
-    const status: "ok" | "degraded" = args.status === "degraded" ? "degraded" : "ok";
-    const atMs = Date.now();
-    await ctx.db.insert("healthHeartbeats", { serviceName, status, atMs });
-    const tail = await ctx.db
-      .query("healthHeartbeats")
-      .withIndex("by_service_time", (q) => q.eq("serviceName", serviceName))
-      .order("desc")
-      .take(HEARTBEATS_KEPT_PER_SERVICE + 1);
-    for (const row of tail.slice(HEARTBEATS_KEPT_PER_SERVICE)) {
-      await ctx.db.delete(row._id);
-    }
-    await emitDiagnosticEvent(ctx, {
-      kind: "ops.health.heartbeat",
-      metadata: [
-        { key: "serviceName", value: serviceName },
-        { key: "status", value: status },
-      ],
-      serviceName,
-    });
-    return { recorded: true, atMs };
-  },
+  handler: async (ctx, args): Promise<{ recorded: boolean; reason?: string; atMs?: number }> =>
+    performRecordHeartbeat(ctx, args),
 });
 
 export interface CostEntryInput {
@@ -496,16 +547,54 @@ export const unforwardedRecent = internalQuery({
   },
 });
 
-/** Marks events delivered to the sink (idempotent). */
+/**
+ * Records one forward attempt's outcome (R27, issue #235): the closed
+ * status class on every attempted event row, and the `telemetry.sink` tick
+ * row the health surface derives the leg's state from. The historical name
+ * is kept deliberately - `tests/r13/environment-call-sites.test.ts` pins
+ * the mutation reference the cron drives; the args grew, not the identity.
+ *
+ * - `status: "ok"`: rows get `forwardedAtMs` + `forwardStatus: "ok"` (the
+ *   I2 marking behavior) and the tick row is a fresh heartbeat.
+ * - a refusal/unreachable class: rows carry the class with `forwardedAtMs`
+ *   still 0 (retry stays possible) and the tick row is degraded.
+ * - `status` absent: the window was empty - only the liveness tick row is
+ *   written (no attempt happened, so no class is claimed).
+ */
 export const markForwarded = internalMutation({
-  args: { ids: v.array(v.id("diagnosticEvents")), atMs: v.float64() },
-  handler: async (ctx, args): Promise<{ marked: number }> => {
-    for (const id of args.ids) {
-      await ctx.db.patch(id, { forwardedAtMs: args.atMs });
-    }
-    return { marked: args.ids.length };
+  args: {
+    ids: v.array(v.id("diagnosticEvents")),
+    atMs: v.float64(),
+    status: v.optional(
+      v.union(...FORWARD_STATUSES.map((status) => v.literal(status))),
+    ),
   },
+  handler: async (ctx, args): Promise<{ marked: number; tickRecorded: boolean }> =>
+    performMarkForwarded(ctx, args),
 });
+
+/** The markForwarded transaction (extracted so tests drive the real path). */
+export async function performMarkForwarded(
+  ctx: MutationCtx,
+  args: { ids: Id<"diagnosticEvents">[]; atMs: number; status?: ForwardStatus },
+): Promise<{ marked: number; tickRecorded: boolean }> {
+  for (const id of args.ids) {
+    if (args.status === "ok") {
+      await ctx.db.patch(id, { forwardedAtMs: args.atMs, forwardStatus: "ok" });
+    } else if (args.status === undefined) {
+      await ctx.db.patch(id, { forwardedAtMs: args.atMs });
+    } else {
+      await ctx.db.patch(id, { forwardStatus: args.status });
+    }
+  }
+  await insertHeartbeatTailPruned(ctx, {
+    serviceName: FORWARD_TICK_SERVICE,
+    status: args.status === undefined || args.status === "ok" ? "ok" : "degraded",
+    atMs: args.atMs,
+    ...(args.status === undefined ? {} : { forwardStatus: args.status }),
+  });
+  return { marked: args.ids.length, tickRecorded: true };
+}
 
 /**
  * Monitor scan 2's emission half: reports services whose latest heartbeat
@@ -604,6 +693,27 @@ export const clearCostsByLabel = internalMutation({
 
 // --- reads -------------------------------------------------------------------------
 
+/**
+ * The forward leg's durable state read (R27, issue #235): the composed
+ * state's `forwarding` block, derived from the `telemetry.sink` tick
+ * ledger's bounded tail (newest first - the index order the pure
+ * derivation in `./forward.ts` assumes). Exported so the i2 tests drive
+ * the REAL read path over the in-memory db.
+ */
+export async function readForwardingState(db: QueryCtx["db"]): Promise<SinkForwardHealth> {
+  const forwardTicks = await db
+    .query("healthHeartbeats")
+    .withIndex("by_service_time", (q) => q.eq("serviceName", FORWARD_TICK_SERVICE))
+    .order("desc")
+    .take(HEARTBEATS_KEPT_PER_SERVICE);
+  return sinkForwardHealth(
+    forwardTicks.map((row) => ({
+      atMs: row.atMs,
+      ...(row.forwardStatus === undefined ? {} : { forwardStatus: row.forwardStatus }),
+    })),
+  );
+}
+
 async function latestHeartbeats(ctx: QueryCtx) {
   const latest: Record<string, { atMs: number; status: "ok" | "degraded" }> = {};
   for (const service of HEARTBEAT_SERVICES) {
@@ -638,6 +748,8 @@ async function composedState(ctx: QueryCtx): Promise<ComposedTelemetryState> {
     .withIndex("by_period_level", (q) => q.eq("period", period))
     .collect();
   const silence = backendSilenceState(await latestHeartbeats(ctx), nowMs);
+  // R27: the forward leg's durable state, from the tick ledger's bounded tail.
+  const forwarding = await readForwardingState(ctx.db);
   return {
     atMs: nowMs,
     observability: OBSERVABILITY_HONESTY,
@@ -649,10 +761,12 @@ async function composedState(ctx: QueryCtx): Promise<ComposedTelemetryState> {
         ...(row.serviceName === undefined ? {} : { serviceName: row.serviceName }),
         redactionVersion: row.redactionVersion,
         forwardedAtMs: row.forwardedAtMs,
+        ...(row.forwardStatus === undefined ? {} : { forwardStatus: row.forwardStatus }),
         atMs: row.atMs,
       })),
     },
     health: silence,
+    forwarding,
     costs: {
       period,
       perProvider,

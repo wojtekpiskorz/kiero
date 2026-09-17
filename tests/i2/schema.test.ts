@@ -20,6 +20,7 @@ import {
   HEARTBEATS_KEPT_PER_SERVICE,
 } from "../../convex/operations/telemetry/heartbeat";
 import { SPEND_PROVIDERS } from "../../convex/operations/telemetry/costs";
+import { FORWARD_STATUSES } from "../../convex/operations/telemetry/forward";
 import { OBSERVABILITY_HONESTY } from "../../convex/operations/telemetry/observability";
 import {
   classifyIncidents,
@@ -49,7 +50,7 @@ interface LooseValidator {
 /** Pulls the literal members out of a table's closed vocabulary column. */
 function literalMembers(
   table: "diagnosticEvents" | "healthHeartbeats" | "costEntries",
-  column: "kind" | "serviceName" | "provider",
+  column: "kind" | "serviceName" | "provider" | "forwardStatus",
 ): string[] {
   const validator = schema.tables[table]?.validator as unknown as
     LooseValidator | undefined;
@@ -102,6 +103,15 @@ describe("telemetry fragment tables", () => {
     );
     expect(new Set(literalMembers("costEntries", "provider"))).toEqual(
       new Set(SPEND_PROVIDERS),
+    );
+  });
+
+  it("the R27 forward-status unions are pinned to the single vocabulary", () => {
+    expect(new Set(literalMembers("diagnosticEvents", "forwardStatus"))).toEqual(
+      new Set(FORWARD_STATUSES),
+    );
+    expect(new Set(literalMembers("healthHeartbeats", "forwardStatus"))).toEqual(
+      new Set(FORWARD_STATUSES),
     );
   });
 

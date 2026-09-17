@@ -29,6 +29,12 @@
  * operation, reason and outcome") and the read path for the alpha-metrics
  * exclusion and H4's audit views.
  *
+ * R27 amendment (issue #235, additive fields only - no new table): the
+ * diagnosticEvents and healthHeartbeats fragments carry the closed
+ * `forwardStatus` class of each sink-forward attempt (`./forward.ts`), so a
+ * refused or unreachable Convex->Axiom leg is durable and diagnosable from
+ * the composed health/ops reads instead of indistinguishable from silence.
+ *
  * Tables: auditRecords, diagnosticEvents, healthHeartbeats, costEntries,
  * costAlertStates.
  */
@@ -39,10 +45,16 @@ import { shared } from "../../schema/shared";
 import { DIAGNOSTIC_EVENT_KINDS } from "./redact";
 import { HEARTBEAT_SERVICES } from "./heartbeat";
 import { SPEND_PROVIDERS } from "./costs";
+import { FORWARD_STATUSES } from "./forward";
 
 /** Closed diagnostic event kind union pinned to the single redaction definition. */
 const diagnosticEventKind = v.union(
   ...DIAGNOSTIC_EVENT_KINDS.map((kind) => v.literal(kind)),
+);
+
+/** Closed sink-forward status class union pinned to the single R27 definition. */
+const forwardStatus = v.union(
+  ...FORWARD_STATUSES.map((status) => v.literal(status)),
 );
 
 const heartbeatService = v.union(
@@ -103,6 +115,14 @@ export const telemetryTables = {
     dedupKey: v.optional(v.string()),
     /** 0 = not yet forwarded to the external sink; set on best-effort delivery. */
     forwardedAtMs: shared.tsMs,
+    /**
+     * R27 (issue #235): the closed status class of the LAST forward attempt
+     * on this row ("ok" exactly when `forwardedAtMs` was set; a refusal
+     * class leaves `forwardedAtMs` 0 for retry). Absent = pre-R27 row, or
+     * the 1h forward window slid past before any attempt. Status class
+     * only - never response bodies or credential material.
+     */
+    forwardStatus: v.optional(forwardStatus),
     atMs: shared.tsMs,
   })
     .index("by_kind_time", ["kind", "atMs"])
@@ -114,10 +134,21 @@ export const telemetryTables = {
    * Written by the HTTP boundary when an external prober/gateway/worker
    * pings; the recorder keeps a bounded tail per service. Silence is judged
    * externally (monitor on absent sink events) AND internally (staleness).
+   *
+   * R27 amendment (issue #235): the telemetry tick writes the
+   * `telemetry.sink` rows itself (one per run, same bounded tail) - the
+   * persisted record of the Convex->Axiom forward leg that exists even
+   * when zero events forward.
    */
   healthHeartbeats: defineTable({
     serviceName: heartbeatService,
     status: v.union(v.literal("ok"), v.literal("degraded")),
+    /**
+     * R27: on `telemetry.sink` rows only - the closed status class of that
+     * tick's forward attempt. Absent = the tick ran with an empty forward
+     * window (no ingest attempted); the class never carries payloads.
+     */
+    forwardStatus: v.optional(forwardStatus),
     atMs: shared.tsMs,
   }).index("by_service_time", ["serviceName", "atMs"]),
 
