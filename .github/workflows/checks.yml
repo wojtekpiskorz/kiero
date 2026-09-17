@@ -33,7 +33,7 @@ jobs:
         run: npm ci
       - name: Strict typecheck (root and every workspace)
         run: npm run typecheck
-      - name: Convex deploy program typecheck (R32: the release's own gate)
+      - name: "Convex deploy program typecheck (R32 — the release's own gate)"
         run: |
           set -eu
           # `convex deploy` typechecks convex/tsconfig.json at deploy time
