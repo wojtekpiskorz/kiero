@@ -22,7 +22,8 @@
     "packages/*"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --workspaces --if-present",
+    "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --workspaces --if-present && npm run typecheck:convex",
+    "typecheck:convex": "tsc --noEmit -p convex/tsconfig.json",
     "test": "vitest run",
     "build": "npm run build --workspace @kiero/web",
     "dev": "npm run dev --workspace @kiero/web",
