@@ -19,7 +19,6 @@ flowchart TD
   I11["I11 #138"]
   J6["J6 #139"]
   C6["C6 #197"]
-  R25["R25 #230"]
   R28["R28 #236"]
   R29["R29 #237"]
   R30["R30 #242"]
@@ -33,7 +32,6 @@ flowchart TD
   I9 --> J5
   I11 --> J5
   R31 --> B5
-  R25 --> D7
   R30 --> D7
   D7 --> I9
   D7 --> I10
@@ -154,7 +152,7 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [R22 #224](https://github.com/wojtekpiskorz/kiero/issues/224) | CLOSED | None | Repair |
 | [R23 #225](https://github.com/wojtekpiskorz/kiero/issues/225) | CLOSED | None | Repair |
 | [R24 #229](https://github.com/wojtekpiskorz/kiero/issues/229) | CLOSED | None | Repair |
-| [R25 #230](https://github.com/wojtekpiskorz/kiero/issues/230) | OPEN | None | Repair |
+| [R25 #230](https://github.com/wojtekpiskorz/kiero/issues/230) | CLOSED | None | Repair |
 | [R26 #232](https://github.com/wojtekpiskorz/kiero/issues/232) | CLOSED | None | Repair |
 | [R27 #235](https://github.com/wojtekpiskorz/kiero/issues/235) | CLOSED | None | Repair |
 | [R28 #236](https://github.com/wojtekpiskorz/kiero/issues/236) | OPEN | [R27 #235](https://github.com/wojtekpiskorz/kiero/issues/235) | Repair |
