@@ -166,7 +166,7 @@ export type ManifestDuration =
 
 /** What the target query loads for the resolver (rows the channels read). */
 interface ManifestTarget {
-  readonly bytesChannel: string;
+  readonly bytesChannel: "media_worker" | "proof_inline";
   readonly proofAudioBase64?: string;
   readonly proofBytesSha256?: string;
   readonly representationObjectKey?: string;
@@ -212,28 +212,27 @@ export async function loadManifestTarget(
 }
 
 /** Resolves the duration over the LOADED target (the fetch-bearing half). */
-export function resolveManifestDuration(loaded: ManifestTarget): Promise<ManifestDuration> {
+export async function resolveManifestDuration(loaded: ManifestTarget): Promise<ManifestDuration> {
   if (loaded.bytesChannel === "proof_inline") {
     if (loaded.proofAudioBase64 === undefined) {
-      return Promise.resolve({ ok: false, code: "proof_stash_missing" });
+      return { ok: false, code: "proof_stash_missing" };
     }
-    return measureProofStash(loaded.proofAudioBase64).then((measured) => {
-      if (!measured.ok) {
-        return { ok: false, code: measured.code } as const;
-      }
-      // The order-time pin is COMPARED, not just stored (review finding 3):
-      // a stash mutated after ordering refuses planning.
-      if (
-        loaded.proofBytesSha256 !== undefined &&
-        loaded.proofBytesSha256 !== measured.sha256Hex
-      ) {
-        return { ok: false, code: "proof_stash_hash_mismatch" } as const;
-      }
-      return { ok: true, durationMs: measured.durationMs } as const;
-    });
+    const measured = await measureProofStash(loaded.proofAudioBase64);
+    if (!measured.ok) {
+      return { ok: false, code: measured.code };
+    }
+    // The order-time pin is COMPARED, not just stored (review finding 3):
+    // a stash mutated after ordering refuses planning.
+    if (
+      loaded.proofBytesSha256 !== undefined &&
+      loaded.proofBytesSha256 !== measured.sha256Hex
+    ) {
+      return { ok: false, code: "proof_stash_hash_mismatch" };
+    }
+    return { ok: true, durationMs: measured.durationMs };
   }
   if (loaded.representationObjectKey === undefined) {
-    return Promise.resolve({ ok: false, code: "representation_row_missing" });
+    return { ok: false, code: "representation_row_missing" };
   }
   return probeFromMediaWorker(loaded.representationObjectKey);
 }

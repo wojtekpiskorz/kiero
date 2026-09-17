@@ -33,14 +33,12 @@ import {
 import type { RouteCallResult } from "@kiero/providers";
 import {
   assembleTranscriptTransaction,
-  ensureManifestTransaction,
-  loadManifestTarget,
-  resolveManifestDuration,
   providerCallOutcome,
   recordSegmentOutcomeTransaction,
   type SegmentAttemptOutcome,
 } from "../../convex/processing/audio/executor";
-import { asReaderDb, asTx, fakeCtx, type FakeCtx } from "../d2/harness";
+import { asTx, fakeCtx, type FakeCtx } from "../d2/harness";
+import { planManifest } from "./manifest-planning";
 import { sha256HexOfBytes } from "../../convex/processing/audio/segmentation";
 
 const TABLES = [
@@ -60,19 +58,6 @@ const TABLES = [
 ];
 
 let ctx: FakeCtx;
-
-/**
- * The real two-phase planning path (R34): the query-side load, the
- * ACTION-side resolver (the fetch-bearing half — the proof channel measures
- * its stash there), then the transactional mutation.
- */
-async function planManifest(transcriptId: string) {
-  const loaded = await loadManifestTarget(asReaderDb(ctx), transcriptId as never);
-  const resolved = loaded.ok
-    ? await resolveManifestDuration(loaded.target)
-    : { ok: false as const, code: loaded.code };
-  return ensureManifestTransaction(asTx(ctx), transcriptId as never, resolved);
-}
 
 const FIXTURE_SECONDS = 4.8;
 
@@ -185,7 +170,7 @@ beforeEach(() => {
 describe("manifest planning", () => {
   it("plans the immutable manifest from the pinned proof bytes (aggressive cuts)", async () => {
     const transcriptId = await seedProofTranscript(1_200);
-    const outcome = await planManifest(transcriptId);
+    const outcome = await planManifest(ctx, transcriptId);
     expect(outcome).toMatchObject({ ok: true });
     if (!outcome.ok) {
       return;
@@ -207,16 +192,16 @@ describe("manifest planning", () => {
 
   it("re-planning an already-planned order changes NOTHING (immutable manifest)", async () => {
     const transcriptId = await seedProofTranscript(1_200);
-    const first = await planManifest(transcriptId);
+    const first = await planManifest(ctx, transcriptId);
     const rowsBefore = ctx.db.rows("audioSegments").map((row) => ({ ...row }));
-    const second = await planManifest(transcriptId);
+    const second = await planManifest(ctx, transcriptId);
     expect(second).toEqual(first);
     expect(ctx.db.rows("audioSegments")).toEqual(rowsBefore);
   });
 
   it("an unconfigured media executor is a TYPED refusal; the order stays planning (pending)", async () => {
     const transcriptId = await seedWorkerTranscript();
-    const outcome = await planManifest(transcriptId);
+    const outcome = await planManifest(ctx, transcriptId);
     expect(outcome).toMatchObject({ ok: false, code: "media_worker_not_configured" });
     const transcript = ctx.db.rows("audioTranscripts")[0];
     expect(transcript).toMatchObject({ state: "planning", lastErrorKind: "media_worker_not_configured" });
@@ -227,7 +212,7 @@ describe("manifest planning", () => {
 describe("outcome checkpoints", () => {
   async function planned(target = 1_200): Promise<string> {
     const transcriptId = await seedProofTranscript(target);
-    await planManifest(transcriptId);
+    await planManifest(ctx, transcriptId);
     return transcriptId;
   }
 
@@ -303,7 +288,7 @@ describe("outcome checkpoints", () => {
 describe("assembly", () => {
   async function planned(): Promise<string> {
     const transcriptId = await seedProofTranscript(1_200);
-    await planManifest(transcriptId);
+    await planManifest(ctx, transcriptId);
     return transcriptId;
   }
 
@@ -464,7 +449,7 @@ describe("malformed provider output fails CLOSED (E2 decode seam)", () => {
     const decoded = decodeTranscription({ text: "" });
     expect(decoded.ok).toBe(false);
     const transcriptId = await seedProofTranscript(1_200);
-    await planManifest(transcriptId);
+    await planManifest(ctx, transcriptId);
     await recordSegmentOutcomeTransaction(asTx(ctx), {
       transcriptId: transcriptId as never,
       segmentIndex: 0,
@@ -480,7 +465,7 @@ describe("malformed provider output fails CLOSED (E2 decode seam)", () => {
 
   it("uncertain provider outcomes carry the sanitized timeout/unknown vocabulary", async () => {
     const transcriptId = await seedProofTranscript(1_200);
-    await planManifest(transcriptId);
+    await planManifest(ctx, transcriptId);
     await recordSegmentOutcomeTransaction(asTx(ctx), {
       transcriptId: transcriptId as never,
       segmentIndex: 0,
@@ -512,7 +497,7 @@ it("the journal outcome schema decodes every outcome shape", () => {
 describe("review round-1 wiring: pins and attempt history", () => {
   it("a proof stash mutated after ordering refuses planning (hash pin COMPARED)", async () => {
     const transcriptId = await seedProofTranscript(1_200, { proofBytesSha256: "0".repeat(64) });
-    const outcome = await planManifest(transcriptId);
+    const outcome = await planManifest(ctx, transcriptId);
     expect(outcome).toMatchObject({ ok: false, code: "proof_stash_hash_mismatch" });
     const transcript = ctx.db.rows("audioTranscripts")[0];
     expect(transcript).toMatchObject({ state: "planning", lastErrorKind: "proof_stash_hash_mismatch" });
@@ -540,13 +525,13 @@ describe("review round-1 wiring: pins and attempt history", () => {
       createdAtMs: Date.now(),
       updatedAtMs: Date.now(),
     });
-    const outcome = await planManifest(transcriptId);
+    const outcome = await planManifest(ctx, transcriptId);
     expect(outcome).toMatchObject({ ok: true });
   });
 
   it("assembly REFUSES publication when the stored manifest coordinates moved", async () => {
     const transcriptId = await seedProofTranscript(1_200);
-    await planManifest(transcriptId);
+    await planManifest(ctx, transcriptId);
     for (let index = 0; index < 4; index += 1) {
       await recordSegmentOutcomeTransaction(asTx(ctx), {
         transcriptId: transcriptId as never,
@@ -570,7 +555,7 @@ describe("review round-1 wiring: pins and attempt history", () => {
 
   it("provider attempts number sequentially within a pass (no duplicate attempt:1)", async () => {
     const transcriptId = await seedProofTranscript(1_200);
-    await planManifest(transcriptId);
+    await planManifest(ctx, transcriptId);
     const fallbackOutcome: SegmentAttemptOutcome = providerCallOutcome({
       outcome: { outcome: "succeeded", value: { text: "x" } },
       record: {
@@ -656,7 +641,7 @@ describe("the manifest seam (R34: Convex mutations cannot fetch)", () => {
     );
   });
 
-  it("the ensureManifest transaction contains no probe or fetch call", () => {
+  it("the ensureManifest transaction contains no probe, fetch or resolver call", () => {
     const from = source.indexOf("export async function ensureManifestTransaction");
     const to = source.indexOf("/** The action-side resolver's args");
     expect(from).toBeGreaterThanOrEqual(0);
@@ -664,5 +649,8 @@ describe("the manifest seam (R34: Convex mutations cannot fetch)", () => {
     const transaction = source.slice(from, to);
     expect(transaction).not.toContain("probeFromMediaWorker");
     expect(transaction).not.toContain("fetch(");
+    // The RESOLVER fetches for the media_worker channel: calling it from the
+    // mutation would keep the pins above green while reintroducing the bug.
+    expect(transaction).not.toContain("resolveManifestDuration");
   });
 });
