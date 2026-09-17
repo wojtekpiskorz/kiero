@@ -4,7 +4,7 @@ The application is implemented across 48 integrated historical issues. The 2026-
 
 The target remains a complete accepted core behind an unstyled Polish PWA. Final design integration, production activation and the four-week live alpha remain separate work.
 
-Start with the [live implementation map](https://github.com/wojtekpiskorz/kiero/issues/15) and [coordinator prompt](coordinator-start-prompt.md). Before selecting work, run `rtk proxy node docs/implementation/audit-map.mjs --remote` from a clean, current checkout. GitHub native blockers are readiness authority; this committed inventory is a dated cache.
+Start with the [live implementation map](https://github.com/wojtekpiskorz/kiero/issues/240) (continuing the closed [archive #15](https://github.com/wojtekpiskorz/kiero/issues/15)) and [coordinator prompt](coordinator-start-prompt.md). Before selecting work, run `rtk proxy node docs/implementation/audit-map.mjs --remote` from a clean, current checkout. GitHub native blockers are readiness authority; this committed inventory is a dated cache.
 
 The [2026-09-14 VPS resumption record](vps-resumption-2026-09-14.md) is
 historical: it superseded the older cloud-setup assumptions, and the
