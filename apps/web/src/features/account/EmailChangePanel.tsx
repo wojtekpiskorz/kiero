@@ -13,6 +13,7 @@ import {
   accountPendingLabel,
   classifyAccountError,
   isValidEmail,
+  type AccountFailure,
   type AccountState,
 } from "./state";
 
@@ -22,9 +23,7 @@ export function EmailChangePanel(): React.ReactNode {
   const [state, setState] = useState<AccountState>({ step: "idle" });
   const [newEmail, setNewEmail] = useState("");
   const [code, setCode] = useState("");
-  const [failure, setFailure] = useState<
-    ReturnType<typeof classifyAccountError> | "invalid_email" | null
-  >(null);
+  const [failure, setFailure] = useState<AccountFailure | "invalid_email" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const pending = accountPendingLabel(state);
