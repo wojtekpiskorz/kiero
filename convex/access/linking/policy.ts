@@ -30,6 +30,19 @@
 
 import { Schema } from "effect";
 import { normalizeEmail } from "../identity/userPolicy";
+import {
+  accessRefusalData,
+  type AccessRefusalData,
+  type LinkRejectionCode as LinkRejectionCodeFromVocabulary,
+} from "../errorCodes";
+
+/*
+ * The typed rejection union now lives in the shared closed vocabulary
+ * (../errorCodes.ts, R26) so client and server pin ONE list; re-exported
+ * here because every linking module and test historically imports it
+ * from this policy module.
+ */
+export type LinkRejectionCode = LinkRejectionCodeFromVocabulary;
 
 /** The whole ceremony (both proofs and the commit) fits in this window. */
 export const LINKING_WINDOW_MS = 15 * 60 * 1000;
@@ -39,19 +52,6 @@ export const LINKING_PROOF_FRESHNESS_MS = 15 * 60 * 1000;
 export const RECENT_AUTH_MS = 15 * 60 * 1000;
 /** One-time codes (linking proofs, email change) are valid this long. */
 export const CODE_VALIDITY_MS = 15 * 60 * 1000;
-
-/** Machine-readable typed rejection codes (one vocabulary for all lanes). */
-export type LinkRejectionCode =
-  | "method_already_attached"
-  | "target_account_established"
-  | "ceremony_in_progress"
-  | "no_active_ceremony"
-  | "proof_stale"
-  | "mismatched_address"
-  | "google_email_unproven"
-  | "code_wrong_or_expired"
-  | "too_many_attempts"
-  | "ambiguous_registry";
 
 /** The canonical decoded form of Google's raw OAuth id-token payload. */
 export const GoogleLinkProfile = Schema.Struct({
@@ -398,3 +398,13 @@ export const linkingRejectionCopy: Readonly<Record<LinkRejectionCode, string>> =
  * (twin literal pinned by tests/b2).
  */
 export const LINK_REJECTED_MARKER = "[kiero:link_rejected]";
+
+/**
+ * The structured payload every linking refusal throws as `ConvexError`
+ * data (R26): the closed-vocabulary code plus the marker/copy message for
+ * logs and older clients. Convex preserves `error.data` through
+ * production sanitization; the message is never classified on again.
+ */
+export function linkRejectionData(code: LinkRejectionCode): AccessRefusalData {
+  return accessRefusalData(code, `${LINK_REJECTED_MARKER}[${code}] ${linkingRejectionCopy[code]}`);
+}

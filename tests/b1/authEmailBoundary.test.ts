@@ -17,6 +17,11 @@
  * methods (the Kiero policy running inside the real library callback),
  * the session key/issuer contract of the minted token, and the honest
  * absence of the Google routes when the client names are unconfigured.
+ *
+ * R26: every classified refusal is asserted on the STRUCTURED
+ * `ConvexError` data (the closed code) — the message only carries the
+ * marker/copy text for logs, because a production deployment sanitizes
+ * messages to "Server Error".
  */
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -32,6 +37,9 @@ import {
   type PlatformCtx,
 } from "./helpers/authBoundaryHarness";
 import { METHOD_CONFLICT_MARKER } from "../../convex/access/identity/userPolicy";
+import { ISSUANCE_RATE_LIMITED_MARKER } from "../../convex/access/identity/issuanceLimit";
+import { decodeAccessRefusalCode } from "../../convex/access/errorCodes";
+import { ISSUANCE_MAX_ATTEMPTS } from "../../convex/access/identity/issuanceLimit";
 
 /** Fixture env names/values — self-generated, never real credentials. */
 const FIXTURE_SITE = "https://kiero-fixture.convex.site";
@@ -114,6 +122,18 @@ async function redeemCode(
   })) as { tokens?: { token?: string } | null };
 }
 
+/** Runs a sign-in call expecting refusal; returns the decoded closed code
+ * (R26: refusal assertions read `error.data`, never the message). */
+async function refusalOf(call: () => Promise<unknown>): Promise<string | null> {
+  const error: unknown = await call().then(
+    () => {
+      throw new Error("fixture: expected a refusal");
+    },
+    (cause: unknown) => cause,
+  );
+  return decodeAccessRefusalCode((error as { readonly data?: unknown }).data);
+}
+
 describe("email-code issuance at the real package boundary", () => {
   let ctx: PlatformCtx;
   let db: MemoryDb;
@@ -182,16 +202,63 @@ describe("email-code issuance at the real package boundary", () => {
 
   it("refuses the code redeemed with a different address (the provider's real same-email check)", async () => {
     const code = await issueCode(ctx, "pierwszy@firma.pl");
-    await expect(redeemCode(ctx, "drugi@firma.pl", code)).rejects.toThrow(
-      "Could not verify code",
+    // R26: the wrapper re-issues the library's plain refusal as structured
+    // data (the closed code), so production clients can classify it.
+    expect(await refusalOf(() => redeemCode(ctx, "drugi@firma.pl", code))).toBe(
+      "code_wrong_or_expired",
     );
   });
 
-  it("refuses a wrong code with the library's stable message", async () => {
+  it("refuses a wrong code with the structured code in the data", async () => {
     await issueCode(ctx, "kod@firma.pl");
-    await expect(redeemCode(ctx, "kod@firma.pl", "00000000")).rejects.toThrow(
-      "Could not verify code",
+    expect(await refusalOf(() => redeemCode(ctx, "kod@firma.pl", "00000000"))).toBe(
+      "code_wrong_or_expired",
     );
+  });
+
+  it("refuses the 6th rapid send on one address with the structured issuance code", async () => {
+    const email = "wyczerpany@firma.pl";
+    for (let i = 1; i <= ISSUANCE_MAX_ATTEMPTS; i++) {
+      const result = (await signInHandler(ctx, {
+        provider: "email_code",
+        params: { email },
+      })) as { started?: boolean };
+      expect(result.started, `send ${i}`).toBe(true);
+    }
+    // Budget spent: the next send is refused BEFORE any row or email —
+    // the refusal carries the closed code in data, marker/copy in message.
+    const code = await refusalOf(() =>
+      signInHandler(ctx, { provider: "email_code", params: { email } }),
+    );
+    expect(code).toBe("issuance_rate_limited");
+    const rejection = await signInHandler(ctx, {
+      provider: "email_code",
+      params: { email },
+    }).then(
+      () => {
+        throw new Error("fixture: expected a refusal");
+      },
+      (error: unknown) => error as { readonly data: { readonly message?: string } },
+    );
+    expect(rejection.data.message).toBe(
+      `${ISSUANCE_RATE_LIMITED_MARKER} Zbyt wiele próśb o kod na ten adres. Odczekaj kilka minut i spróbuj ponownie.`,
+    );
+  });
+
+  it("refuses a send whose delivery cannot be proven with the structured delivery code", async () => {
+    // The real adapter with no key NAME configured: the delivery outcome
+    // is `not_configured`, the issuance fails loudly — data carries the
+    // closed code, the message keeps the marker + honest Polish copy.
+    const hadKey = process.env.RESEND_API_KEY;
+    delete process.env.RESEND_API_KEY;
+    try {
+      const code = await refusalOf(() =>
+        signInHandler(ctx, { provider: "email_code", params: { email: "brak-klucza@firma.pl" } }),
+      );
+      expect(code).toBe("email_delivery_failed");
+    } finally {
+      process.env.RESEND_API_KEY = hadKey;
+    }
   });
 });
 
@@ -234,7 +301,7 @@ describe("explicit refusal to link accounts sharing an address (the app policy i
     vi.unstubAllGlobals();
   });
 
-  it("the rejection copy is the accepted Polish text with no identity detail", async () => {
+  it("the rejection data carries the closed code and the accepted Polish copy, with no identity detail", async () => {
     vi.stubGlobal("fetch", resendStub);
     const { ctx, db } = platform();
     const userId = db.insert("users", {
@@ -249,16 +316,26 @@ describe("explicit refusal to link accounts sharing an address (the app policy i
       providerAccountId: "kiero-fixture-google-sub-778",
     });
 
+    // R26: classification reads `error.data` (the closed code); the exact
+    // marker/copy text rides the data's message field for logs and older
+    // clients. Asserted here byte-for-byte.
     const rejection = await signInHandler(ctx, {
       provider: "email_code",
       params: { email: "drugi@firma.pl" },
-    }).catch((error: unknown) => String((error as Error).message));
-    expect(rejection).toBe(
+    }).then(
+      () => {
+        throw new Error("fixture: expected a refusal");
+      },
+      (error: unknown) =>
+        error as { readonly data: { readonly code?: unknown; readonly message?: unknown } },
+    );
+    expect(rejection.data.code).toBe("method_conflict");
+    expect(rejection.data.message).toBe(
       `${METHOD_CONFLICT_MARKER} Konto z tym adresem e-mail używa innej metody logowania. Zaloguj się pierwotną metodą; metody połączysz w ustawieniach konta, potwierdzając obie.`,
     );
     // No detail about the existing identity leaks into the refusal.
-    expect(rejection).not.toContain("google");
-    expect(rejection).not.toContain("Google");
+    expect(String(rejection.data.message)).not.toContain("google");
+    expect(String(rejection.data.message)).not.toContain("Google");
     vi.unstubAllGlobals();
   });
 });

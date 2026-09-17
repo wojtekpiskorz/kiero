@@ -5,11 +5,19 @@
  * The screen's step is a `SignInState`; every pending/intermediate label
  * the component renders comes from `signInCopy` keyed by that state (no
  * ad-hoc strings in the component). Incoming errors map to honest
- * user-facing copy: OUR thrown errors carry a stable machine marker
- * (`[kiero:…]`) that classification keys on; library errors stay matched
- * by their stable upstream messages. Nothing internal can leak: unknown
- * errors classify as `unknown` and show generic copy.
+ * user-facing copy: our refusals are `ConvexError`s whose DATA carries a
+ * closed-vocabulary code (convex/access/errorCodes.ts) that survives
+ * production message sanitization — classification reads the decoded
+ * data first. The message markers and library strings below remain only
+ * as a FALLBACK for responses without data (older deploys, local
+ * network errors). Nothing internal can leak: unknown errors classify as
+ * `unknown` and show generic copy.
  */
+
+import {
+  decodeAccessRefusalCode,
+  type AccessRefusalCode,
+} from "../../../../../convex/access/errorCodes";
 
 /** The named sign-in states (barebones, no visual design). */
 export type SignInState =
@@ -20,9 +28,10 @@ export type SignInState =
   | { readonly step: "google-pending" };
 
 /**
- * Machine markers OUR server-side errors prefix their message with.
- * The server literals are pinned equal to these by tests/b1 (the client
- * cannot import server modules; the test can import both sides).
+ * Machine markers OUR server-side errors keep in their message for logs.
+ * Classification no longer keys on them (R26: the closed code rides the
+ * ConvexError data); they stay matched only as the no-data fallback. The
+ * server literals are pinned equal to these by tests/b1.
  */
 export const OUR_ERROR_MARKERS = {
   emailDeliveryFailed: "[kiero:email_delivery_failed]",
@@ -138,12 +147,35 @@ export function isValidEmail(input: string): boolean {
 }
 
 /**
+ * Which closed refusal codes this surface renders, mapped to its failure
+ * names. Linking-layer codes (the account surface's domain) are
+ * deliberately absent: reaching one here classifies as `unknown`
+ * (fail-closed), never as the wrong sign-in copy.
+ */
+const REFUSAL_FAILURE_BY_CODE: Readonly<Partial<Record<AccessRefusalCode, SignInFailure>>> = {
+  email_delivery_failed: "email_delivery_failed",
+  issuance_rate_limited: "too_many_attempts",
+  method_conflict: "method_conflict",
+  code_wrong_or_expired: "code_wrong_or_expired",
+  too_many_attempts: "too_many_attempts",
+};
+
+/**
  * Maps a thrown sign-in error to a failure cause WITHOUT leaking the
- * message: our own errors are recognized by their machine marker;
- * upstream library errors by their stable messages; everything else is
- * `unknown`.
+ * message: refusals carrying structured `ConvexError` data classify by
+ * the decoded closed code (this path works on production deployments,
+ * where messages are sanitized to "Server Error"). Only responses
+ * WITHOUT data fall back to the marker/library message heuristics;
+ * everything else is `unknown`.
  */
 export function classifySignInError(error: unknown): SignInFailure {
+  const refusal = decodeAccessRefusalCode(
+    (error as { readonly data?: unknown } | null | undefined)?.data,
+  );
+  const byCode = refusal === null ? undefined : REFUSAL_FAILURE_BY_CODE[refusal];
+  if (byCode !== undefined) {
+    return byCode;
+  }
   const message = error instanceof Error ? error.message : "";
   if (message.includes(OUR_ERROR_MARKERS.emailDeliveryFailed)) {
     return "email_delivery_failed";
