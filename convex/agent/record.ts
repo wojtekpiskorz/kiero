@@ -34,18 +34,20 @@ import {
   type MutationCtx,
 } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import type { ValueValidator } from "../schema/shared";
+import { vocabularyOf } from "../schema/shared";
 import {
   ANSWER_RUN_OUTCOMES,
   ANSWER_TURN_CALLS_ORIGINS,
   ANSWER_TURN_FAILURE_KINDS,
   ANSWER_TURN_FINISH_CLASSES,
   ANSWER_TURN_OUTCOMES,
+  ANSWER_TURN_PROVIDERS,
   type AnswerRunOutcome,
   type AnswerTurnCallsOrigin,
   type AnswerTurnFailureKind,
   type AnswerTurnFinishClass,
   type AnswerTurnOutcome,
+  type AnswerTurnProvider,
 } from "./schema";
 
 /** The final-text excerpt bound (the answer result's own finalText bound). */
@@ -55,20 +57,12 @@ export const ANSWER_EXCERPT_MAX_CHARS = 600 as const;
 export const ANSWER_TURN_NAMES_MAX = 16 as const;
 export const ANSWER_TURN_CODES_MAX = 16 as const;
 
-/**
- * One closed string vocabulary's validator, built from its constant list in
- * ./schema.ts (the calendar/sync fragment's pattern: the argument validators
- * and the table columns share the single spelling, so drift fails here).
- */
-function vocabularyOf<T extends string>(kinds: readonly T[]): ValueValidator<T> {
-  return v.union(...kinds.map((kind) => v.literal(kind)));
-}
-
 const runOutcomeArg = vocabularyOf(ANSWER_RUN_OUTCOMES);
 const turnOutcomeArg = vocabularyOf(ANSWER_TURN_OUTCOMES);
 const finishClassArg = vocabularyOf(ANSWER_TURN_FINISH_CLASSES);
 const failureKindArg = vocabularyOf(ANSWER_TURN_FAILURE_KINDS);
 const callsOriginArg = vocabularyOf(ANSWER_TURN_CALLS_ORIGINS);
+const providerArg = vocabularyOf(ANSWER_TURN_PROVIDERS);
 
 // ---------------------------------------------------------------------------
 // The transactional writes (plain functions, the search/records.ts
@@ -90,7 +84,7 @@ export interface AnswerTurnInput {
   readonly outcome: AnswerTurnOutcome;
   readonly finishReasonClass: AnswerTurnFinishClass;
   readonly failureKind?: AnswerTurnFailureKind;
-  readonly provider?: "deepseek" | "openrouter";
+  readonly provider?: AnswerTurnProvider;
   readonly observedModel?: string;
   readonly attemptCount: number;
   readonly toolCallNames: readonly string[];
@@ -230,7 +224,7 @@ export const recordAnswerTurn = internalMutation({
     outcome: turnOutcomeArg,
     finishReasonClass: finishClassArg,
     failureKind: v.optional(failureKindArg),
-    provider: v.optional(v.union(v.literal("deepseek"), v.literal("openrouter"))),
+    provider: v.optional(providerArg),
     observedModel: v.optional(v.string()),
     attemptCount: v.float64(),
     toolCallNames: v.array(v.string()),
@@ -267,9 +261,11 @@ export const finalizeAnswerRun = internalMutation({
 async function note<T>(run: () => Promise<T>): Promise<void> {
   try {
     await run();
-  } catch {
+  } catch (error) {
     // A dropped record is a degraded diagnostics state, never an answer
-    // failure; the run's honest rows are whatever did land.
+    // failure — but never SILENT: a systematically broken write path must
+    // not read as "no ask happened" (the acceptance criterion reads rows).
+    console.error("[agent/record] dropped answer-loop record:", error);
   }
 }
 

@@ -78,7 +78,7 @@ import type { Id } from "../_generated/dataModel";
 import { resolveAccessContextFromConvexAuth } from "../access/identity/resolution";
 import { loadAnswerContext } from "./context";
 import { dispatchAnswerToolCall } from "./toolExecution";
-import { noteRunFinalized, noteRunStart, noteTurn } from "./record";
+import { ANSWER_EXCERPT_MAX_CHARS, noteRunFinalized, noteRunStart, noteTurn } from "./record";
 
 // The tool-execution half keeps its loop.ts export surface (the routing
 // tests and any sibling import the seam from here); the implementation
@@ -416,7 +416,7 @@ export async function runAnswerRound(
   if (typeof observed === "string") {
     observedModels.push(observed);
   }
-  finalText = turn.text.slice(0, 600);
+  finalText = turn.text.slice(0, ANSWER_EXCERPT_MAX_CHARS);
   const nextState = (): AnswerRoundState => ({
     runId: current.runId,
     context,

@@ -53,6 +53,16 @@ export type Encoded<S> = Schema.Codec.Encoded<S>;
  */
 export type ValueValidator<T> = Validator<T, "required", string>;
 
+/**
+ * One closed string vocabulary's validator, built from its constant list —
+ * the single spelling schema fragments AND argument validators share (the
+ * R25 review's dedup: the helper previously lived copy-per-fragment, so
+ * vocabulary drift failed only where a copy happened to exist).
+ */
+export function vocabularyOf<T extends string>(kinds: readonly T[]): ValueValidator<T> {
+  return v.union(...kinds.map((kind) => v.literal(kind)));
+}
+
 // ---------------------------------------------------------------------------
 // The one proved conversion path: Effect Schema semantic values → Convex
 // validators. Each entry is hand-written and type-checked against the

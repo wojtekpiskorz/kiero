@@ -32,8 +32,8 @@
 
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
-import type { ProviderFailureKind } from "@kiero/providers";
-import { shared, type ValueValidator } from "../schema/shared";
+import type { ProviderFailureKind, ProviderKind } from "@kiero/providers";
+import { shared, vocabularyOf, type ValueValidator } from "../schema/shared";
 
 /** The run-level outcomes (the answer result's closed outcome vocabulary). */
 export const ANSWER_RUN_OUTCOMES = [
@@ -78,6 +78,18 @@ export const ANSWER_TURN_CALLS_ORIGINS = [
 export type AnswerTurnCallsOrigin = (typeof ANSWER_TURN_CALLS_ORIGINS)[number];
 
 /**
+ * The supplier kinds a recorded turn can be served by — pinned to
+ * @kiero/providers' `ProviderKind` (the `satisfies` pin fails typecheck the
+ * day a new route exists without this vocabulary learning it; a drifted
+ * args validator would silently drop exactly that turn's row).
+ */
+export const ANSWER_TURN_PROVIDERS = [
+  "deepseek",
+  "openrouter",
+] as const satisfies readonly ProviderKind[];
+export type AnswerTurnProvider = (typeof ANSWER_TURN_PROVIDERS)[number];
+
+/**
  * The sanitized provider failure kinds a rejected turn records — exactly
  * E2's closed classification (the `satisfies` pin rejects a name this
  * vocabulary does not own; a MISSING kind fails typecheck at the loop's
@@ -99,9 +111,8 @@ export const ANSWER_TURN_FAILURE_KINDS = [
 export type AnswerTurnFailureKind = (typeof ANSWER_TURN_FAILURE_KINDS)[number];
 
 /** The answer turns' failure-kind validator, pinned to the closed list. */
-const answerFailureKindValue: ValueValidator<AnswerTurnFailureKind> = v.union(
-  ...ANSWER_TURN_FAILURE_KINDS.map((kind) => v.literal(kind)),
-);
+const answerFailureKindValue: ValueValidator<AnswerTurnFailureKind> =
+  vocabularyOf(ANSWER_TURN_FAILURE_KINDS);
 
 export const answerTables = {
   /**
@@ -113,7 +124,7 @@ export const answerTables = {
   answerRuns: defineTable({
     /** The loop's run id (`e6-<sourceId>-<startMs>`); the idempotency key. */
     runId: v.string(),
-    /** The question source ("Wypowiedź") this run answers. */
+    /** The question source ("Wiadomość źródłowa", CONTEXT.md) this run answers. */
     questionSourceId: shared.sourceId,
     /** Tenant scope, resolved server-side from the question source row. */
     companyId: v.optional(shared.companyId),
@@ -122,9 +133,7 @@ export const answerTables = {
     modelConfigurationVersion: v.string(),
     startedAtMs: shared.tsMs,
     // Finalize-time fields (absent until the run finished).
-    outcome: v.optional(
-      v.union(...ANSWER_RUN_OUTCOMES.map((outcome) => v.literal(outcome))),
-    ),
+    outcome: v.optional(vocabularyOf(ANSWER_RUN_OUTCOMES)),
     /** The E2 failure kind; present exactly on a `provider_failed` run. */
     failureKind: v.optional(answerFailureKindValue),
     turnCount: v.optional(shared.counter),
@@ -151,21 +160,19 @@ export const answerTables = {
     runId: v.string(),
     /** 1-based position in the run (the loop's own turn counter). */
     turnIndex: shared.counter,
-    outcome: v.union(...ANSWER_TURN_OUTCOMES.map((o) => v.literal(o))),
-    finishReasonClass: v.union(
-      ...ANSWER_TURN_FINISH_CLASSES.map((c) => v.literal(c)),
-    ),
+    outcome: vocabularyOf(ANSWER_TURN_OUTCOMES),
+    finishReasonClass: vocabularyOf(ANSWER_TURN_FINISH_CLASSES),
     /** Present exactly when the turn was rejected. */
     failureKind: v.optional(answerFailureKindValue),
     /** The supplier of the attempt that served (or last failed) the turn. */
-    provider: v.optional(v.union(v.literal("deepseek"), v.literal("openrouter"))),
+    provider: v.optional(vocabularyOf(ANSWER_TURN_PROVIDERS)),
     /** The model that actually served the turn, as observed in it. */
     observedModel: v.optional(v.string()),
     /** Attempts the ordered route burned for this turn (fallback visible). */
     attemptCount: shared.counter,
     /** The decoded calls' names, in order (names only, never arguments). */
     toolCallNames: v.array(v.string()),
-    callsOrigin: v.union(...ANSWER_TURN_CALLS_ORIGINS.map((o) => v.literal(o))),
+    callsOrigin: vocabularyOf(ANSWER_TURN_CALLS_ORIGINS),
     /**
      * Closed codes for argument-decode failures, codes only. Empty today:
      * the provider seam collapses per-call decode failures into the turn's

@@ -33,6 +33,7 @@ import {
   ANSWER_TURN_CALLS_ORIGINS,
   ANSWER_TURN_FAILURE_KINDS,
   ANSWER_TURN_FINISH_CLASSES,
+  ANSWER_TURN_PROVIDERS,
   ANSWER_TURN_OUTCOMES,
 } from "../../convex/agent/schema";
 import {
@@ -151,6 +152,10 @@ describe("the record vocabularies", () => {
 
   it("calls origins name every decode path the loop has", () => {
     expect(ANSWER_TURN_CALLS_ORIGINS).toEqual(["native", "text_rescue", "none"]);
+  });
+
+  it("providers are exactly @kiero/providers' route suppliers (drift fails the pin)", () => {
+    expect(ANSWER_TURN_PROVIDERS).toEqual(["deepseek", "openrouter"]);
   });
 
   it("failure kinds are exactly E2's closed provider failure classification", () => {
