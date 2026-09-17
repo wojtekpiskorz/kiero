@@ -6703,7 +6703,7 @@
       "audit": {
         "mergedPr": 255,
         "mergeCommit": null,
-        "implemented": "The manifest step splits along the I/O seam: the action loads the target through a query and resolves the duration (the media-worker probe fetch runs ACTION-side), then the mutation commits the transactional plan with the resolved duration — Convex mutations cannot fetch, and the probe silently died as media_worker_unreachable inside the mutation on every real recording. Structural pins hold both directions.",
+        "implemented": "The manifest step splits along the I/O seam: the action loads the target through a query and resolves the duration (the media-worker probe fetch runs ACTION-side), then the mutation commits the transactional plan. The follow-up merge ( reopened after the live walk) maps the probe answer to the EXACT ManifestDuration keys — probeFromMediaWorker's extra format field failed the mutation step's strict v.object validator (ArgumentValidationError at .resolved), a seam TypeScript's structural assignability cannot see; the exact-key shape is now pinned.",
         "evidence": [
           "https://github.com/wojtekpiskorz/kiero/issues/242#issuecomment-5718962856"
         ],

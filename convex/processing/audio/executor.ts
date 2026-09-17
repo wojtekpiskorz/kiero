@@ -236,7 +236,12 @@ export async function resolveManifestDuration(loaded: ManifestTarget): Promise<M
     }
     return { ok: true, durationMs: measured.durationMs };
   }
-  return probeFromMediaWorker(loaded.representationObjectKey);
+  // Map to the EXACT ManifestDuration shape: the probe's full answer carries
+  // `format`, and the registered mutation's v.object is strict — an extra
+  // key is an ArgumentValidationError at the workflow's mutation step
+  // (TypeScript's structural assignability cannot see that seam).
+  const probed = await probeFromMediaWorker(loaded.representationObjectKey);
+  return probed.ok ? { ok: true, durationMs: probed.durationMs } : { ok: false, code: probed.code };
 }
 
 /**
