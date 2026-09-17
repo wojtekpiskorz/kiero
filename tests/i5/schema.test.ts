@@ -97,8 +97,9 @@ describe("the recoveryManifests fragment", () => {
   });
 
   it("the composed table inventory is unchanged (I5 adds NO table)", () => {
-    // 76 since I4's deletionPurgeStages (I5 itself added none).
-    expect(TABLE_ID_NAMES).toHaveLength(76);
+    // 76 since I4's deletionPurgeStages; 78 after R25's answerRuns/answerTurns
+    // (I5 itself added none).
+    expect(TABLE_ID_NAMES).toHaveLength(78);
     expect(TABLE_ID_NAMES).toContain("recoveryManifests");
   });
 });

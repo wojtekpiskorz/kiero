@@ -50,6 +50,7 @@ import type * as agent_evidence from "../agent/evidence.js";
 import type * as agent_execute from "../agent/execute.js";
 import type * as agent_loop from "../agent/loop.js";
 import type * as agent_probe from "../agent/probe.js";
+import type * as agent_record from "../agent/record.js";
 import type * as attention_context from "../attention/context.js";
 import type * as attention_delivery_commands from "../attention/delivery/commands.js";
 import type * as attention_delivery_dispatch from "../attention/delivery/dispatch.js";
@@ -321,6 +322,7 @@ declare const fullApi: ApiFromModules<{
   "agent/execute": typeof agent_execute;
   "agent/loop": typeof agent_loop;
   "agent/probe": typeof agent_probe;
+  "agent/record": typeof agent_record;
   "attention/context": typeof attention_context;
   "attention/delivery/commands": typeof attention_delivery_commands;
   "attention/delivery/dispatch": typeof attention_delivery_dispatch;

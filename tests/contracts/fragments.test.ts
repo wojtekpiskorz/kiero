@@ -112,8 +112,10 @@ describe("schema composition", () => {
     // amendment added pushDeliveries and the proof-only pushProofDevices;
     // 75 since the F4 amendment added reminderSchedules and reminderSnoozes;
     // 76 since the I4 amendment added deletionPurgeStages (the per-stage
-    // purge tracking of one permanent deletion).
-    expect(composed).toHaveLength(76);
+    // purge tracking of one permanent deletion); 78 since the R25 amendment
+    // added answerRuns and answerTurns (the answer loop's durable record
+    // family).
+    expect(composed).toHaveLength(78);
   });
 
   it("gives the domain event envelope a durable outbox home", () => {
