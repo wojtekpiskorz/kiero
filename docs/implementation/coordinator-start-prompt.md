@@ -2,7 +2,7 @@
 
 Use this prompt for the remaining core implementation map. It grants the
 coordinator the Git lifecycle for the assigned map; implementation workers
-own only their bounded issue slice. This revision (2026-09-16, session 8)
+own only their bounded issue slice. This revision (the 2026-09-16 map continuation, M13)
 supersedes the M9+M11 wording: the media repair wave (R22-R24) is deployed
 and the vision OCR lane completed live; B5 and I11 are executed to their
 owner walls; the map hit GitHub's 100-sub-issue cap.
@@ -22,8 +22,9 @@ Start with:
 1. AGENTS.md and CONTEXT.md.
 2. docs/implementation/README.md.
 3. This file (process rules) and docs/implementation/execution-charter.md.
-4. The newest checkpoint on the archive #15 (through the 2026-09-16
-   session) and on the continuation map #240 (after) (the 2026-09-16 session-8 record: the
+4. The newest checkpoint: the session-8 record sits on the archive
+   [#15](https://github.com/wojtekpiskorz/kiero/issues/15); everything
+   after the continuation lands on the map [#240](https://github.com/wojtekpiskorz/kiero/issues/240) (the 2026-09-16 session-8 record: the
    R22-R24 repair wave, B5/I11 at their owner walls, the cap warning).
 5. `rtk proxy node docs/implementation/audit-map.mjs --remote`
 
@@ -47,8 +48,7 @@ Baseline at the 2026-09-16 session-8 handoff (verify, do not assume):
   the fixture-window and gateway-cron decisions).
 - The map continues in #240 (the owner's 2026-09-16 decision): #15
   stands closed as the archive of every entry closed under it, the open
-  entries are #240's children, and new issues register under #240 (86
-  slots of headroom). The I11 telemetry repairs joined as R27/R28/R29,
+  entries are #240's children, and new issues register under #240 (84 slots of headroom under the same cap). The I11 telemetry repairs joined as R27/R28/R29,
   chained over their shared paths.
 
 The ready frontier: D7 #135 (coordinator-claimed; the remaining proofs
