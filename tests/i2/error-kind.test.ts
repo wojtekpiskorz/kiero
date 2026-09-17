@@ -148,11 +148,13 @@ describe("producer direction: every producer error kind survives redaction", () 
         outbox: [
           {
             eventId: "c4d62f5c-0000-4000-8000-000000000abc",
-            // Real outbox event names are camelCase (`sources.sourceAccepted`)
-            // and redact under the eventName format - a separate pre-existing
-            // gap (reported with this issue); a format-admissible name keeps
-            // this test focused on the errorKind entry.
-            eventName: "sources.source_accepted",
+            // The REAL producer shape: outbox event names are camelCase and
+            // the eventName entry redacts under today's format — exactly the
+            // R33 #251 gap. This test pins the production event as it occurs:
+            // one redaction (eventName), the errorKind entry verbatim. When
+            // R33 aligns the eventName format, redactionsApplied flips to 0
+            // and this pin must be updated with it.
+            eventName: "sources.sourceAccepted",
             deliveryState: "failed",
             attempts: 2,
             lastErrorKind: "withdrawal_marking_refused:representation_retained_event_missing",
@@ -170,7 +172,12 @@ describe("producer direction: every producer error kind survives redaction", () 
     if (sanitized.status !== "ok") {
       return;
     }
-    expect(sanitized.event.redactionsApplied).toBe(0);
+    // The production event as it occurs today: exactly one redaction — the
+    // eventName entry (the R33 #251 gap) — while the errorKind entry rides
+    // through verbatim. R33's alignment flips redactionsApplied to 0.
+    expect(sanitized.event.redactionsApplied).toBe(1);
+    const nameEntry = sanitized.event.metadata.find((item) => item.key === "eventName");
+    expect(nameEntry?.value).toBe("<redacted>");
     const entry = sanitized.event.metadata.find((item) => item.key === "errorKind");
     expect(entry?.value).toBe(
       "withdrawal_marking_refused:representation_retained_event_missing",
