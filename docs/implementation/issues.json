@@ -6554,7 +6554,7 @@
       "externalBlockedBy": [],
       "state": "CLOSED",
       "audit": {
-        "mergedPr": null,
+        "mergedPr": 248,
         "mergeCommit": null,
         "implemented": "The voice byte channel's missing leg exists: non-WAV retained audio converts to PCM WAV through the container's FFmpeg (injected converter, bounded input/output/duration/wall-clock, typed refusals, sha-256-keyed LRU disk cache) and the converted output flows through the existing exact measure/slice discipline; Convex carries the protocol's typed refusal codes into audioTranscripts.lastErrorKind so the honest 'planning' state names its real cause.",
         "evidence": [
