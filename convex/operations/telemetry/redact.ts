@@ -86,8 +86,25 @@ export const METADATA_KEY_FORMATS = {
   eventId: /^[a-f0-9-]{10,64}$/,
   /** Durable job key (`job_` + uuid). */
   jobKey: /^job_[a-f0-9-]{10,64}$/,
-  /** Closed snake_case error/state/outcome kinds (sanitized, no payloads). */
-  errorKind: /^[a-z][a-z0-9_]{1,63}$/,
+  /**
+   * Closed snake_case error/state/outcome kinds (sanitized, no payloads).
+   *
+   * R28: producers emit actionable failures as `kind:detail` composites -
+   * the closed-error `${_tag}:${code}` pair (e.g.
+   * `unavailable:images_executor_unavailable`, I11's live finding) and the
+   * lane-prefixed refusal kinds (`withdrawal_marking_refused:<code>`). The
+   * format admits exactly one of two closed branches:
+   * - colon-free: the pre-R28 shape, unchanged (ErrorCode-width snake_case);
+   * - one optional colon: both segments closed-format snake_case - the kind
+   *   segment at most 32 chars (the longest producer prefix,
+   *   `withdrawal_marking_refused`, is 26), the detail segment carrying the
+   *   contracts' full ErrorCode charset (`[a-z][a-z0-9_]{0,63}`, so the real
+   *   37-char `representation_retained_event_missing` survives).
+   * The whole value stays capped at MAX_VALUE_LENGTH, and nothing else is
+   * admitted: multi-colon, empty segments, whitespace, uppercase, diacritics,
+   * `//` and credential shapes still redact - no free text.
+   */
+  errorKind: /^(?:[a-z][a-z0-9_]{1,63}|[a-z][a-z0-9_]{0,31}:[a-z][a-z0-9_]{0,63})$/,
   state: /^[a-z][a-z0-9_]{1,31}$/,
   outcome: /^[a-z][a-z0-9_]{1,31}$/,
   status: /^[a-z][a-z0-9_]{1,31}$/,
