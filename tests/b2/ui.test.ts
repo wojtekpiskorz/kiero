@@ -3,15 +3,17 @@
  *
  * Pins the twin literals between server and client (the client cannot
  * import server modules; this test imports both sides): the machine
- * markers and the full typed-rejection copy map must be equal, error
- * classification keys on the marker + code token (never prose), and the
+ * markers and the full typed-rejection copy map must be equal, and the
  * email shape check stays honest.
  *
- * R26: the linking refusals now travel as `ConvexError` DATA carrying
- * the closed code (the message keeps the marker/copy text for logs).
- * The pins below assert the data construction for every code, and that
- * the (not yet data-aware) account classifier still classifies the new
- * error shape through its message fallback.
+ * R26: the linking refusals travel as `ConvexError` DATA carrying the
+ * closed code (the message keeps the marker/copy text for logs). The
+ * pins below assert the data construction for every code.
+ *
+ * R31: the account classifier is now data-aware — every linking code
+ * maps to its typed copy from `error.data` alone, with the message
+ * sanitized to "Server Error"; foreign payloads fail closed. The marker
+ * + code-token matching survives only as the no-data fallback.
  */
 
 import { describe, expect, it } from "vitest";
@@ -57,7 +59,7 @@ describe("twin literals (server <-> client)", () => {
   });
 });
 
-describe("classifyAccountError", () => {
+describe("classifyAccountError (no-data fallback: markers and library strings)", () => {
   it("classifies by marker + code token, never prose", () => {
     const message = `${LINK_REJECTED_MARKER}[proof_stale] ${linkingRejectionCopy.proof_stale}`;
     expect(classifyAccountError(new Error(message))).toBe("proof_stale");
@@ -139,12 +141,10 @@ describe("structured link rejections (R26: data, never the message)", () => {
     ]);
   });
 
-  it("the account classifier still reads the code token from the new error shape (dev compat)", () => {
-    // The account feature is not yet data-aware (outside R26's owned
-    // paths); ConvexError embeds the data message in its message, so the
-    // marker+token classification keeps working wherever messages are
-    // visible (dev). Production copy for this surface is the R26
-    // follow-up defect, tracked by the coordinator.
+  it("the account classifier reads the full ConvexError shape (dev compat)", () => {
+    // R31: classification reads the data first; the ConvexError still
+    // embeds the marker/copy text in its message, so wherever messages
+    // are visible (dev) the two paths agree.
     for (const code of Object.keys(linkingRejectionCopy) as LinkRejectionCode[]) {
       expect(classifyAccountError(new ConvexError(linkRejectionData(code))), code).toBe(code);
     }
@@ -166,5 +166,55 @@ describe("structured link rejections (R26: data, never the message)", () => {
     expect(decodeAccessRefusalCode({ code: "method_conflict " })).toBeNull();
     expect(decodeAccessRefusalCode({ code: ["proof_stale"] })).toBeNull();
     expect(decodeAccessRefusalCode({ message: "no code field" })).toBeNull();
+  });
+});
+
+describe("structured account refusals (R31: data, never the message)", () => {
+  /**
+   * The sanitized production shape: a Convex deployment replaces the
+   * message with "Server Error" (wrapped by the client transport), while
+   * `error.data` survives — every classification below must hold with the
+   * message carrying NO classification signal at all.
+   */
+  function sanitizedRefusal(code: string): Error {
+    const error = new Error(
+      "[CONVEX Mutation(access:linking:verifyProofCode)] Server Error\n  Called by client",
+    );
+    return Object.assign(error, { data: { code, message: "Server Error" } });
+  }
+
+  it("maps every linking rejection code to its typed copy from data alone", () => {
+    for (const code of LINK_REJECTION_CODES) {
+      const failure = classifyAccountError(sanitizedRefusal(code));
+      expect(failure, code).toBe(code);
+      expect(accountCopy.failures[failure], code).toBe(linkingRejectionCopy[code]);
+    }
+  });
+
+  it("classifies the email-delivery refusal from data with a sanitized message", () => {
+    const failure = classifyAccountError(sanitizedRefusal("email_delivery_failed"));
+    expect(failure).toBe("email_delivery_failed");
+    expect(accountCopy.failures[failure]).toBe(
+      "Nie udało się wysłać wiadomości z kodem. Spróbuj ponownie za chwilę.",
+    );
+  });
+
+  it("data wins over a contradictory message (the message is not load-bearing)", () => {
+    const error = Object.assign(
+      new Error(`${EMAIL_DELIVERY_FAILED_MARKER} Nie udało się wysłać wiadomości.`),
+      { data: accessRefusalData("proof_stale", "irrelevant") },
+    );
+    expect(classifyAccountError(error)).toBe("proof_stale");
+  });
+
+  it("a sign-in-layer code reaching this surface fails closed to unknown", () => {
+    expect(classifyAccountError(sanitizedRefusal("method_conflict"))).toBe("unknown");
+    expect(classifyAccountError(sanitizedRefusal("issuance_rate_limited"))).toBe("unknown");
+  });
+
+  it("foreign payloads classify to nothing (fail closed)", () => {
+    expect(classifyAccountError(sanitizedRefusal("not_a_code"))).toBe("unknown");
+    expect(classifyAccountError(new ConvexError({ message: "no code field" }))).toBe("unknown");
+    expect(classifyAccountError("not an error")).toBe("unknown");
   });
 });

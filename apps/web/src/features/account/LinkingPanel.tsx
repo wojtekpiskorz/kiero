@@ -13,11 +13,9 @@ import {
   accountCopy,
   accountPendingLabel,
   classifyAccountError,
+  type AccountFailure,
   type AccountState,
-  type LinkRejectionCode,
 } from "./state";
-
-type Failure = LinkRejectionCode | "email_delivery_failed" | "network" | "unknown";
 
 export function LinkingPanel(): React.ReactNode {
   const status = useQuery(api.access.linking.functions.linkingStatus, {});
@@ -29,7 +27,7 @@ export function LinkingPanel(): React.ReactNode {
   const { signIn } = useAuthActions();
   const [state, setState] = useState<AccountState>({ step: "idle" });
   const [code, setCode] = useState("");
-  const [failure, setFailure] = useState<Failure | null>(null);
+  const [failure, setFailure] = useState<AccountFailure | null>(null);
   const [linkedNotice, setLinkedNotice] = useState(false);
 
   const view = status ?? undefined;

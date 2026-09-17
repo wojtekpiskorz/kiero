@@ -3,12 +3,22 @@
  * failure classification (B2).
  *
  * Every pending label and failure text renders from `accountCopy` keyed by
- * a named state — no ad-hoc strings in components. Server rejections
- * arrive with the `[kiero:link_rejected]` machine marker followed by
- * Polish prose; classification keys on the marker and the typed code map
- * mirrors the server vocabulary (pinned equal by tests/b2, which imports
- * both sides — the client cannot import server modules).
+ * a named state — no ad-hoc strings in components. Our rejections are
+ * `ConvexError`s whose DATA carries a closed-vocabulary code
+ * (convex/access/errorCodes.ts) that survives production message
+ * sanitization — classification reads the decoded data first (R31,
+ * mirroring R26's sign-in classifier). The `[kiero:…]` message markers
+ * remain only as a FALLBACK for responses without data (older deploys,
+ * local network errors). The typed union comes from the leaf (one list,
+ * client and server); the client cannot import the leaf's RUNTIME module
+ * peers — markers and copy text stay local literals.
  */
+
+import {
+  decodeAccessRefusal,
+  type AccessRefusalCode,
+  type LinkRejectionCode,
+} from "../../../../../convex/access/errorCodes";
 
 /** The two sign-in methods, as the UI names them. */
 export type LinkMethod = "google" | "email_code";
@@ -26,26 +36,15 @@ export type AccountState =
   | { readonly step: "confirming-email-change" };
 
 /**
- * Machine markers OUR server-side errors prefix their message with. The
+ * Machine markers OUR server-side errors keep in their message for logs.
+ * Classification no longer keys on them (R31: the closed code rides the
+ * ConvexError data); they stay matched only as the no-data fallback. The
  * server literals are pinned equal to these by tests/b2.
  */
 export const ACCOUNT_ERROR_MARKERS = {
   linkRejected: "[kiero:link_rejected]",
   emailDeliveryFailed: "[kiero:email_delivery_failed]",
 } as const;
-
-/** Machine-readable typed rejection codes (mirrors the server union). */
-export type LinkRejectionCode =
-  | "method_already_attached"
-  | "target_account_established"
-  | "ceremony_in_progress"
-  | "no_active_ceremony"
-  | "proof_stale"
-  | "mismatched_address"
-  | "google_email_unproven"
-  | "code_wrong_or_expired"
-  | "too_many_attempts"
-  | "ambiguous_registry";
 
 /** Polish copy for every state and rejection (stable product text). */
 export const accountCopy = {
@@ -149,18 +148,56 @@ export function isValidEmail(input: string): boolean {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(input.trim());
 }
 
-/** What a thrown account error classifies to (marker-first, never prose). */
-export function classifyAccountError(
-  error: unknown,
-): LinkRejectionCode | "email_delivery_failed" | "network" | "unknown" {
+/** What a thrown account error classifies to (the failure vocabulary). */
+export type AccountFailure =
+  | LinkRejectionCode
+  | "email_delivery_failed"
+  | "network"
+  | "unknown";
+
+/**
+ * Which closed refusal codes this surface renders, mapped to its failure
+ * names. Sign-in-layer codes (`issuance_rate_limited`, `method_conflict`)
+ * are deliberately absent: reaching one here classifies as `unknown`
+ * (fail-closed), never as the wrong account copy.
+ */
+const ACCOUNT_FAILURE_BY_CODE: Readonly<Partial<Record<AccessRefusalCode, AccountFailure>>> = {
+  method_already_attached: "method_already_attached",
+  target_account_established: "target_account_established",
+  ceremony_in_progress: "ceremony_in_progress",
+  no_active_ceremony: "no_active_ceremony",
+  proof_stale: "proof_stale",
+  mismatched_address: "mismatched_address",
+  google_email_unproven: "google_email_unproven",
+  code_wrong_or_expired: "code_wrong_or_expired",
+  too_many_attempts: "too_many_attempts",
+  ambiguous_registry: "ambiguous_registry",
+  email_delivery_failed: "email_delivery_failed",
+};
+
+/**
+ * Maps a thrown account error to a failure cause WITHOUT leaking the
+ * message: refusals carrying structured `ConvexError` data classify by
+ * the decoded closed code (this path works on production deployments,
+ * where messages are sanitized to "Server Error"). Only responses
+ * WITHOUT data fall back to the marker message heuristics; everything
+ * else is `unknown`.
+ */
+export function classifyAccountError(error: unknown): AccountFailure {
+  const refusal = decodeAccessRefusal(error);
+  const byCode = refusal === null ? undefined : ACCOUNT_FAILURE_BY_CODE[refusal];
+  if (byCode !== undefined) {
+    return byCode;
+  }
   const message = error instanceof Error ? error.message : "";
   if (message.includes(ACCOUNT_ERROR_MARKERS.emailDeliveryFailed)) {
     return "email_delivery_failed";
   }
   const markerAt = message.indexOf(ACCOUNT_ERROR_MARKERS.linkRejected);
   if (markerAt !== -1) {
-    // The server appends `[code]` right after the marker; classify on the
-    // code token, falling back to unknown for anything unmapped.
+    // Dev/older-deploy fallback: the server appends `[code]` right after
+    // the marker; classify on the code token, falling back to unknown for
+    // anything unmapped.
     const afterMarker = message.slice(markerAt + ACCOUNT_ERROR_MARKERS.linkRejected.length);
     const match = /^\[([a-z_]+)\]/.exec(afterMarker);
     const code = match?.[1];
