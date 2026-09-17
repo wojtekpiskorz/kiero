@@ -19,7 +19,7 @@
  *   fails CLOSED without recording transcript text.
  */
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { Schema } from "effect";
 import { bytesToBase64, toneWav } from "@kiero/media-worker/wav";
@@ -35,6 +35,7 @@ import {
   assembleTranscriptTransaction,
   providerCallOutcome,
   recordSegmentOutcomeTransaction,
+  resolveManifestDuration,
   type SegmentAttemptOutcome,
 } from "../../convex/processing/audio/executor";
 import { asTx, fakeCtx, type FakeCtx } from "../d2/harness";
@@ -652,5 +653,32 @@ describe("the manifest seam (R34: Convex mutations cannot fetch)", () => {
     // The RESOLVER fetches for the media_worker channel: calling it from the
     // mutation would keep the pins above green while reintroducing the bug.
     expect(transaction).not.toContain("resolveManifestDuration");
+  });
+
+  it("the resolver's media_worker answer carries EXACTLY the ManifestDuration keys (strict v.object)", async () => {
+    // The live 2026-09-17 failure: probeFromMediaWorker's full answer adds
+    // `format`, and the registered mutation's v.object rejected the extra
+    // key at the workflow's mutation step (structural assignability in
+    // TypeScript cannot see that seam — this pin can).
+    process.env.KIERO_MEDIA_WORKER_URL = "https://media.test";
+    process.env.KIERO_MEDIA_WORKER_TOKEN = "proof-token";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ ok: true, format: "wav", durationMs: 11_940 }), { status: 200 }),
+      ),
+    );
+    try {
+      const resolved = await resolveManifestDuration({
+        bytesChannel: "media_worker",
+        representationObjectKey: "voice.webm",
+      });
+      expect(Object.keys(resolved).sort()).toEqual(["durationMs", "ok"]);
+      expect(resolved).toEqual({ ok: true, durationMs: 11_940 });
+    } finally {
+      delete process.env.KIERO_MEDIA_WORKER_URL;
+      delete process.env.KIERO_MEDIA_WORKER_TOKEN;
+      vi.unstubAllGlobals();
+    }
   });
 });
