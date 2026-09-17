@@ -157,5 +157,6 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [R29 #237](https://github.com/wojtekpiskorz/kiero/issues/237) | OPEN | [R28 #236](https://github.com/wojtekpiskorz/kiero/issues/236) | Repair |
 | [R30 #242](https://github.com/wojtekpiskorz/kiero/issues/242) | CLOSED | None | Remaining execution |
 | [R31 #244](https://github.com/wojtekpiskorz/kiero/issues/244) | OPEN | None | Remaining execution |
+| [R32 #249](https://github.com/wojtekpiskorz/kiero/issues/249) | CLOSED | None | Remaining execution |
 
 Administration rows are documentation work, not core features. Their cached states change only through bounded administration PRs that rerun the audit and keep every derived cell equal to the manifest.

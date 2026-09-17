@@ -33,6 +33,8 @@ jobs:
         run: npm ci
       - name: Strict typecheck (root and every workspace)
         run: npm run typecheck
+      - name: "Convex deploy program typecheck (R32 — the release's own gate)"
+        run: npm run typecheck:convex
       - name: Test suite (contracts, values, platform runtime)
         run: npm run test
       - name: Convex generated output present and unhand-edited (A3 policy)

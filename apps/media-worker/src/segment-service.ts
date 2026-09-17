@@ -99,20 +99,12 @@ export type SegmentResponse =
   | { ok: true; format: "image"; imageBase64: string; mimeType: ImageMime; bytes: number }
   | { ok: false; code: SegmentRefusal };
 
-export type SegmentRefusal =
-  | "malformed_request"
-  | "object_not_found"
-  | "object_read_failed"
-  | "format_requires_container"
-  | "interval_out_of_range"
-  | "object_too_large"
-  | "format_unsupported"
-  | "conversion_unavailable"
-  | "conversion_input_too_large"
-  | "conversion_output_too_large"
-  | "conversion_output_too_long"
-  | "conversion_timed_out"
-  | "conversion_failed";
+// The ONE spelling of the refusal union lives in the zero-import leaf
+// ./refusals.ts (R32: the Convex deploy typecheck reaches it through
+// convex/processing/audio/media.ts and cannot compile this file's
+// extension imports). Re-exported here for the worker surfaces.
+export type { SegmentRefusal } from "./refusals.ts";
+import type { SegmentRefusal } from "./refusals.ts";
 
 /** The window the header walk needs (fmt + data chunk headers live here). */
 export const HEAD_WINDOW_BYTES = 8_192;
