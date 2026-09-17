@@ -19,9 +19,12 @@
  * honestly does NOT exist yet:
  * - the media-bucket S3 API token (dashboard-issued) — until the values are
  *   injected, every byte operation answers the typed `not_configured`
- *   refusal, never a fake success;
- * - FFmpeg conversion of non-WAV containers — PCM WAV slicing is exact and
- *   served here; anything else answers `format_requires_container`.
+ *   refusal, never a fake success.
+ *
+ * FFmpeg conversion of non-WAV containers (R30) runs ONLY in the container
+ * process (src/container-main.ts verifies the binary and injects the
+ * converter); this Worker surface refuses non-WAV audio with
+ * `format_requires_container` — an isolate cannot spawn a process.
  */
 
 import { Container } from "@cloudflare/containers";

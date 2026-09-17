@@ -29,9 +29,15 @@
  * bucket other than the configured media bucket, and answers every refusal
  * with a closed code — no stack, no key material, no raw payloads.
  *
- * Non-WAV retained audio is refused with `format_requires_container`: PCM
- * WAV slicing is exact; other containers need FFmpeg conversion inside the
- * container (container follow-up).
+ * Non-WAV retained audio (the composer's webm/opus) is CONVERTED to PCM WAV
+ * (R30, the voice byte channel) through an INJECTED converter
+ * (`AudioConverter`): the FFmpeg-backed implementation (./convert.ts) runs
+ * only on the container surface, where the image ships the binary — every
+ * other surface keeps the honest `format_requires_container` refusal,
+ * because an isolate cannot spawn a process. The converted output is a
+ * real PCM WAV, so the existing measure/slice discipline applies to it
+ * UNCHANGED; every conversion breach (input cap, output duration cap,
+ * wall-clock timeout) answers a typed refusal — never silent truncation.
  */
 
 import {
@@ -40,6 +46,7 @@ import {
   serializeWav,
   wavDurationMs,
   wavRangeForInterval,
+  type WavHeader,
 } from "./wav.ts";
 import { s3ObjectReader } from "./s3r2.ts";
 
@@ -48,6 +55,23 @@ export type ObjectReader = (
   objectKey: string,
   range?: { start: number; end: number },
 ) => Promise<Uint8Array | null>;
+
+/** What one conversion call receives: the object key and the byte source. */
+export interface ConversionCall {
+  readonly objectKey: string;
+  readonly readObject: ObjectReader;
+}
+
+/**
+ * Converts one retained non-WAV audio object into ONE complete PCM WAV file
+ * (16-bit), under explicit bounds owned by the implementation (input byte
+ * cap, output duration cap, wall-clock timeout — see ./convert.ts). Present
+ * only on surfaces that can spawn FFmpeg (the container); every breach and
+ * every failure answers a closed refusal code, never a truncated guess.
+ */
+export type AudioConverter = (
+  call: ConversionCall,
+) => Promise<{ ok: true; wav: Uint8Array } | { ok: false; code: SegmentRefusal }>;
 
 /** The env the deployed Worker/container receives (names only, no values). */
 export interface MediaWorkerEnv {
@@ -70,8 +94,8 @@ export type ImageMime = "image/png" | "image/jpeg" | "image/webp";
 
 /** Every protocol response; refusals carry a closed code only. */
 export type SegmentResponse =
-  | { ok: true; format: "wav"; durationMs: number; sampleRate?: number }
-  | { ok: true; format: "wav"; audioBase64: string; durationMs: number }
+  | { ok: true; format: "wav"; durationMs: number; sampleRate?: number; converted?: true }
+  | { ok: true; format: "wav"; audioBase64: string; durationMs: number; converted?: true }
   | { ok: true; format: "image"; imageBase64: string; mimeType: ImageMime; bytes: number }
   | { ok: false; code: SegmentRefusal };
 
@@ -82,7 +106,13 @@ export type SegmentRefusal =
   | "format_requires_container"
   | "interval_out_of_range"
   | "object_too_large"
-  | "format_unsupported";
+  | "format_unsupported"
+  | "conversion_unavailable"
+  | "conversion_input_too_large"
+  | "conversion_output_too_large"
+  | "conversion_output_too_long"
+  | "conversion_timed_out"
+  | "conversion_failed";
 
 /** The window the header walk needs (fmt + data chunk headers live here). */
 export const HEAD_WINDOW_BYTES = 8_192;
@@ -122,10 +152,57 @@ export function sniffImageMime(bytes: Uint8Array): ImageMime | null {
   return null;
 }
 
+/**
+ * The resolved audio of one object: either the retained object IS PCM WAV
+ * (slice via ranged reads of the object) or it was converted (slice the
+ * in-memory WAV the converter produced). Both carry the SAME parsed header,
+ * so measure/slice discipline is identical for both sources.
+ */
+type AudioResolution =
+  | { ok: true; header: WavHeader; converted: Uint8Array | null }
+  | { ok: false; code: SegmentRefusal };
+
+/**
+ * Resolves one object's audio for measuring/slicing: the 8 KiB header
+ * window first (the bounded read, always), then — only when the object is
+ * not PCM WAV — the injected converter, when this surface has one.
+ */
+async function resolveAudio(
+  readObject: ObjectReader,
+  objectKey: string,
+  converter: AudioConverter | undefined,
+): Promise<AudioResolution> {
+  const head = await readObject(objectKey, { start: 0, end: HEAD_WINDOW_BYTES });
+  if (head === null) {
+    return { ok: false, code: "object_not_found" };
+  }
+  const parsed = parseWav(head);
+  if (parsed.ok) {
+    return { ok: true, header: parsed.header, converted: null };
+  }
+  if (converter === undefined) {
+    // No FFmpeg on this surface (the Worker/DO isolates cannot spawn): PCM
+    // WAV slicing is exact; other containers stay the container's job.
+    return { ok: false, code: "format_requires_container" };
+  }
+  const converted = await converter({ objectKey, readObject });
+  if (!converted.ok) {
+    return { ok: false, code: converted.code };
+  }
+  const reparsed = parseWav(converted.wav);
+  if (!reparsed.ok) {
+    // The converter's output must be real PCM WAV (its own contract); a
+    // breach refuses — the service never serves a guess.
+    return { ok: false, code: "conversion_failed" };
+  }
+  return { ok: true, header: reparsed.header, converted: converted.wav };
+}
+
 /** Serves one protocol request over the injected byte source. */
 export async function serveSegmentRequest(
   readObject: ObjectReader,
   request: unknown,
+  converter?: AudioConverter,
 ): Promise<SegmentResponse> {
   if (typeof request !== "object" || request === null) {
     return { ok: false, code: "malformed_request" };
@@ -135,21 +212,16 @@ export async function serveSegmentRequest(
     return { ok: false, code: "malformed_request" };
   }
   if (value.op === "probe") {
-    const head = await readObject(value.objectKey, { start: 0, end: HEAD_WINDOW_BYTES });
-    if (head === null) {
-      return { ok: false, code: "object_not_found" };
-    }
-    const parsed = parseWav(head);
-    if (!parsed.ok) {
-      // Any parse refusal over a retained object means "not PCM WAV": the
-      // container's FFmpeg stage owns conversion; slicing must not guess.
-      return { ok: false, code: "format_requires_container" };
+    const resolved = await resolveAudio(readObject, value.objectKey, converter);
+    if (!resolved.ok) {
+      return { ok: false, code: resolved.code };
     }
     return {
       ok: true,
       format: "wav",
-      durationMs: wavDurationMs(parsed.header),
-      sampleRate: parsed.header.sampleRate,
+      durationMs: wavDurationMs(resolved.header),
+      sampleRate: resolved.header.sampleRate,
+      ...(resolved.converted === null ? {} : { converted: true }),
     };
   }
   if (value.op === "image") {
@@ -175,33 +247,38 @@ export async function serveSegmentRequest(
     if (typeof value.startMs !== "number" || typeof value.endMs !== "number") {
       return { ok: false, code: "malformed_request" };
     }
-    // Read 1: the header window (format + data chunk location).
-    const head = await readObject(value.objectKey, { start: 0, end: HEAD_WINDOW_BYTES });
-    if (head === null) {
-      return { ok: false, code: "object_not_found" };
+    // Read 1: the header window (format + data chunk location) — or, for a
+    // non-WAV object, the conversion that produces the whole PCM WAV.
+    const resolved = await resolveAudio(readObject, value.objectKey, converter);
+    if (!resolved.ok) {
+      return { ok: false, code: resolved.code };
     }
-    const parsed = parseWav(head);
-    if (!parsed.ok) {
-      return { ok: false, code: "format_requires_container" };
-    }
-    const header = parsed.header;
+    const header = resolved.header;
     const wholeDurationMs = wavDurationMs(header);
     if (value.startMs < 0 || value.endMs <= value.startMs || value.startMs >= wholeDurationMs) {
       return { ok: false, code: "interval_out_of_range" };
     }
     const clampedEnd = Math.min(value.endMs, wholeDurationMs);
-    // Read 2: exactly the frame-aligned window of the asked interval
-    // (inclusive HTTP range end). Never the whole object.
+    // Read 2: exactly the frame-aligned window of the asked interval — a
+    // ranged read of the retained WAV object, or the same window of the
+    // in-memory converted WAV. Never an unbounded whole-object read.
     const { byteStart, byteEnd } = wavRangeForInterval(header, value.startMs, clampedEnd);
-    const data = await readObject(value.objectKey, { start: byteStart, end: byteEnd - 1 });
-    if (data === null || data.length === 0) {
-      return { ok: false, code: "object_read_failed" };
+    let data: Uint8Array;
+    if (resolved.converted === null) {
+      const read = await readObject(value.objectKey, { start: byteStart, end: byteEnd - 1 });
+      if (read === null || read.length === 0) {
+        return { ok: false, code: "object_read_failed" };
+      }
+      data = read;
+    } else {
+      data = resolved.converted.subarray(byteStart, byteEnd);
     }
     return {
       ok: true,
       format: "wav",
       audioBase64: bytesToBase64(serializeWav(header, data)),
       durationMs: (data.length / header.byteRate) * 1000,
+      ...(resolved.converted === null ? {} : { converted: true }),
     };
   }
   return { ok: false, code: "malformed_request" };
@@ -242,6 +319,19 @@ function protocolStatus(response: SegmentResponse): number {
 }
 
 /**
+ * Surface-specific dependencies of the shared boundary (R30): the container
+ * server injects the FFmpeg-backed converter (the image ships the binary)
+ * and states what its /healthz should report about conversion; the Worker
+ * entry injects nothing (its isolates cannot spawn, so non-WAV audio keeps
+ * the honest `format_requires_container` refusal there).
+ */
+export interface ProtocolDeps {
+  readonly converter?: AudioConverter;
+  /** What /healthz states about this surface's conversion capability. */
+  readonly conversionHealth?: string;
+}
+
+/**
  * The ONE protocol HTTP handler: bearer guard, S3-reader construction,
  * request decode and the unified status map. The Worker entry, the Durable
  * Object and the container server all call exactly this — there is no
@@ -250,6 +340,7 @@ function protocolStatus(response: SegmentResponse): number {
 export async function handleMediaProtocol(
   request: Request,
   env: MediaWorkerEnv,
+  deps: ProtocolDeps = {},
 ): Promise<Response> {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/healthz") {
@@ -258,7 +349,9 @@ export async function handleMediaProtocol(
       environment: env.ENVIRONMENT ?? "unknown",
       bytes: "s3-credentials",
       wavSlicing: "ranged-exact",
-      ffmpegConversion: "container-pending",
+      // Honest per surface: the container reports its verified FFmpeg
+      // state; everywhere else conversion is the container's job only.
+      ffmpegConversion: deps.conversionHealth ?? "container-only",
     }, 200);
   }
   if (
@@ -285,6 +378,6 @@ export async function handleMediaProtocol(
   } catch {
     body = null;
   }
-  const response = await serveSegmentRequest(reader.read, body);
+  const response = await serveSegmentRequest(reader.read, body, deps.converter);
   return jsonResponse(response, protocolStatus(response));
 }

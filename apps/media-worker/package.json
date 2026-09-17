@@ -9,7 +9,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./wav": "./src/wav.ts",
-    "./segment-service": "./src/segment-service.ts"
+    "./segment-service": "./src/segment-service.ts",
+    "./convert": "./src/convert.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.container.json"

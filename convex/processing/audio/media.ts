@@ -22,17 +22,47 @@
  */
 
 import { base64ToBytes, bytesToBase64, parseWav, sliceWav, wavDurationMs } from "@kiero/media-worker/wav";
+import type { SegmentRefusal } from "@kiero/media-worker/segment-service";
 import { sha256HexOfBytes } from "./segmentation";
 
-/** Typed refusal codes of byte resolution (closed vocabulary). */
+/**
+ * Typed refusal codes of byte resolution (closed vocabulary). The protocol's
+ * own codes (`SegmentRefusal`) are carried through since R30: a 422-class
+ * answer's JSON body names the real cause (`format_requires_container`,
+ * `conversion_*`, ...) and it survives into `audioTranscripts.lastErrorKind`
+ * instead of the generic `media_worker_refused` collapse.
+ */
 export type SegmentBytesRefusal =
   | "media_worker_not_configured"
   | "media_worker_unreachable"
   | "media_worker_refused"
   | "media_worker_malformed_response"
+  | SegmentRefusal
   | "proof_stash_missing"
   | "proof_stash_corrupt"
   | "wav_slice_refused";
+
+/**
+ * The protocol's closed refusal vocabulary, mirrored for the runtime check.
+ * `satisfies Record<SegmentRefusal, true>` makes the mirror exhaustive: a
+ * code added to the media worker's union without this table fails HERE at
+ * compile time, not in production.
+ */
+const PROTOCOL_REFUSAL_CODES = {
+  malformed_request: true,
+  object_not_found: true,
+  object_read_failed: true,
+  format_requires_container: true,
+  interval_out_of_range: true,
+  object_too_large: true,
+  format_unsupported: true,
+  conversion_unavailable: true,
+  conversion_input_too_large: true,
+  conversion_output_too_large: true,
+  conversion_output_too_long: true,
+  conversion_timed_out: true,
+  conversion_failed: true,
+} as const satisfies Record<SegmentRefusal, true>;
 
 export type SegmentBytesResult =
   | { readonly ok: true; readonly audioBase64: string; readonly durationMs: number }
@@ -72,10 +102,29 @@ async function callMediaWorker(
   } catch {
     return { ok: false, code: "media_worker_unreachable" };
   }
-  // 401 (bad token), 404/422 (typed protocol refusals) and 503 (executor
-  // not configured) are all DEFINITE refusals; anything else unexpected is
-  // unreachable-grade.
-  if (response.status === 401 || response.status === 404 || response.status === 422 || response.status === 503) {
+  // 401 (bad token), 404/413/422 (typed protocol refusals) and 503
+  // (executor not configured) are all DEFINITE refusals; anything else
+  // unexpected is unreachable-grade. A definite refusal's body carries the
+  // protocol's typed `code` — carry it through when it is a known closed
+  // code so `lastErrorKind` names the real cause (R30); non-JSON or unknown
+  // bodies keep the generic `media_worker_refused`.
+  if (
+    response.status === 401 || response.status === 404 || response.status === 413 ||
+    response.status === 422 || response.status === 503
+  ) {
+    let refusalBody: unknown;
+    try {
+      refusalBody = await response.json();
+    } catch {
+      refusalBody = null;
+    }
+    if (
+      typeof refusalBody === "object" && refusalBody !== null &&
+      typeof (refusalBody as { code?: unknown }).code === "string" &&
+      (refusalBody as { code: string }).code in PROTOCOL_REFUSAL_CODES
+    ) {
+      return { ok: false, code: (refusalBody as { code: SegmentRefusal }).code };
+    }
     return { ok: false, code: "media_worker_refused" };
   }
   if (!response.ok) {

@@ -7,6 +7,12 @@
  * node:http streams to a Web `Request` and writes the handler's `Response`
  * back: there is no second copy of the boundary to drift.
  *
+ * R30: this surface is where FFmpeg conversion lives (the image ships the
+ * binary; the isolates cannot spawn). At startup the process verifies the
+ * binary once and injects the converter into the shared handler when — and
+ * only when — it is actually there; /healthz then states the verified truth
+ * instead of an image-build assumption.
+ *
  * Node >= 22.12 runs this file directly with type stripping
  * (`node --experimental-strip-types`), so the image needs no build step and
  * no added dependency; intra-app imports therefore carry explicit `.ts`
@@ -14,9 +20,16 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { handleMediaProtocol } from "./segment-service.ts";
+import { handleMediaProtocol, type ProtocolDeps } from "./segment-service.ts";
+import { ffmpegAvailability, ffmpegConverter } from "./convert.ts";
 
 const PORT = Number(process.env.PORT ?? 8080);
+
+// Verified once at startup: converter present only when ffmpeg answers.
+const availability = await ffmpegAvailability();
+const deps: ProtocolDeps = availability.ok
+  ? { converter: ffmpegConverter(), conversionHealth: "ffmpeg-bounded" }
+  : { conversionHealth: "ffmpeg-unavailable" };
 
 function reply(response: ServerResponse, status: number, body: string, contentType: string): void {
   response.writeHead(status, { "content-type": contentType });
@@ -46,7 +59,7 @@ async function toWebRequest(request: IncomingMessage): Promise<Request> {
 const server = createServer((request, response) => {
   void (async () => {
     const webRequest = await toWebRequest(request);
-    const served = await handleMediaProtocol(webRequest, process.env);
+    const served = await handleMediaProtocol(webRequest, process.env, deps);
     reply(
       response,
       served.status,

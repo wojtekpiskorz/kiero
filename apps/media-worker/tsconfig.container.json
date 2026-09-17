@@ -4,5 +4,5 @@
     "types": ["node"],
     "allowImportingTsExtensions": true
   },
-  "include": ["src/container-main.ts"]
+  "include": ["src/container-main.ts", "src/convert.ts"]
 }
