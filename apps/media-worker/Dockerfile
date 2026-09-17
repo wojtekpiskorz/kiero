@@ -2,8 +2,10 @@
 # - Node 22 slim + ffmpeg: the conversion/segmentation runtime the scoped
 #   EU Container exists for (architecture "Deployment and ownership").
 # - The entry serves the segment protocol (/healthz, /probe, /segment) with
-#   PCM WAV slicing exact and FFmpeg conversion arriving with the container
-#   follow-up (non-WAV answers `format_requires_container` until then).
+#   PCM WAV slicing exact and FFmpeg conversion of non-WAV retained audio
+#   (R30, the voice byte channel): the container process verifies the
+#   binary at startup and converts under explicit bounds (input byte cap,
+#   output duration cap, wall-clock timeout; typed refusals on breach).
 # - No credentials are baked in: R2 media S3 keys and the segment bearer
 #   token arrive as container runtime env (forwarded by the DO class),
 #   never as image layers.

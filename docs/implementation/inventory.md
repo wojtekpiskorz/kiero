@@ -19,7 +19,6 @@ Audited application `4aa1cc64b3ecab669c76ffa672832d4c5638ac68`, 2026-09-12. All 
 | [C6 #197](https://github.com/wojtekpiskorz/kiero/issues/197) | Google Calendar connection for the post-core release | [J5 #64](https://github.com/wojtekpiskorz/kiero/issues/64) |
 | [R28 #236](https://github.com/wojtekpiskorz/kiero/issues/236) | Let actionable error kinds survive redaction | [R27 #235](https://github.com/wojtekpiskorz/kiero/issues/235) |
 | [R29 #237](https://github.com/wojtekpiskorz/kiero/issues/237) | Add the provider-call cost producer | [R28 #236](https://github.com/wojtekpiskorz/kiero/issues/236) |
-| [R30 #242](https://github.com/wojtekpiskorz/kiero/issues/242) | Serve the container's FFmpeg conversion for non-WAV recordings (the voice byte channel) | None |
 | [R31 #244](https://github.com/wojtekpiskorz/kiero/issues/244) | Classify the account surface's refusals by structured error data (the R26 follow-up) | None |
 
 ## Integrated implementation
@@ -108,6 +107,7 @@ Audited application `4aa1cc64b3ecab669c76ffa672832d4c5638ac68`, 2026-09-12. All 
 | [R25 #230](https://github.com/wojtekpiskorz/kiero/issues/230) | [#247](https://github.com/wojtekpiskorz/kiero/pull/247) | [R25] Record the answer loop's turns durably (the E6 named prerequisite). | [D7 #135](https://github.com/wojtekpiskorz/kiero/issues/135) |
 | [R26 #232](https://github.com/wojtekpiskorz/kiero/issues/232) | [#246](https://github.com/wojtekpiskorz/kiero/pull/246) | [R26] Classify identity refusals by structured error data, not sanitized message strings. | [B5 #134](https://github.com/wojtekpiskorz/kiero/issues/134) |
 | [R27 #235](https://github.com/wojtekpiskorz/kiero/issues/235) | [#245](https://github.com/wojtekpiskorz/kiero/pull/245) | [R27] Record the Axiom forward outcome durably. | [I11 #138](https://github.com/wojtekpiskorz/kiero/issues/138) |
+| [R30 #242](https://github.com/wojtekpiskorz/kiero/issues/242) | [#248](https://github.com/wojtekpiskorz/kiero/pull/248) | Serve the container's FFmpeg conversion for non-WAV recordings (the voice byte channel). | [D7 #135](https://github.com/wojtekpiskorz/kiero/issues/135) |
 | [I8 #133](https://github.com/wojtekpiskorz/kiero/issues/133) | [#204](https://github.com/wojtekpiskorz/kiero/pull/204) / [#205](https://github.com/wojtekpiskorz/kiero/pull/205) / [#206](https://github.com/wojtekpiskorz/kiero/pull/206) / [#215](https://github.com/wojtekpiskorz/kiero/pull/215) | Isolated live staging environment, released and runtime-secret injected; the ordinary authenticated smoke passed end to end through the API-mailbox funnel (delivered OTP, company, message, live agent answer, audited GM initialization). | None |
 | [M8 #202](https://github.com/wojtekpiskorz/kiero/issues/202) | [#203](https://github.com/wojtekpiskorz/kiero/pull/203) | Cache-flip of the R16 closure. | [J5 #64](https://github.com/wojtekpiskorz/kiero/issues/64) |
 | [M9 #207](https://github.com/wojtekpiskorz/kiero/issues/207) | [#208](https://github.com/wojtekpiskorz/kiero/pull/208) | Refresh of the coordinator start prompt to the post-unblocking state. | [J5 #64](https://github.com/wojtekpiskorz/kiero/issues/64) |

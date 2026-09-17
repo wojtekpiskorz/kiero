@@ -21,7 +21,6 @@ flowchart TD
   C6["C6 #197"]
   R28["R28 #236"]
   R29["R29 #237"]
-  R30["R30 #242"]
   R31["R31 #244"]
   I10 --> I6
   J6 --> J3
@@ -32,7 +31,6 @@ flowchart TD
   I9 --> J5
   I11 --> J5
   R31 --> B5
-  R30 --> D7
   D7 --> I9
   D7 --> I10
   R28 --> I11
@@ -157,7 +155,7 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [R27 #235](https://github.com/wojtekpiskorz/kiero/issues/235) | CLOSED | None | Repair |
 | [R28 #236](https://github.com/wojtekpiskorz/kiero/issues/236) | OPEN | [R27 #235](https://github.com/wojtekpiskorz/kiero/issues/235) | Repair |
 | [R29 #237](https://github.com/wojtekpiskorz/kiero/issues/237) | OPEN | [R28 #236](https://github.com/wojtekpiskorz/kiero/issues/236) | Repair |
-| [R30 #242](https://github.com/wojtekpiskorz/kiero/issues/242) | OPEN | None | Remaining execution |
+| [R30 #242](https://github.com/wojtekpiskorz/kiero/issues/242) | CLOSED | None | Remaining execution |
 | [R31 #244](https://github.com/wojtekpiskorz/kiero/issues/244) | OPEN | None | Remaining execution |
 
 Administration rows are documentation work, not core features. Their cached states change only through bounded administration PRs that rerun the audit and keep every derived cell equal to the manifest.

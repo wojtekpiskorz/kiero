@@ -5,5 +5,5 @@
     "allowImportingTsExtensions": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/container-main.ts"]
+  "exclude": ["src/container-main.ts", "src/convert.ts"]
 }
