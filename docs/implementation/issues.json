@@ -6624,7 +6624,7 @@
       "externalBlockedBy": [],
       "state": "CLOSED",
       "audit": {
-        "mergedPr": null,
+        "mergedPr": 250,
         "mergeCommit": null,
         "implemented": "The typed-refusal union lives in the zero-import leaf apps/media-worker/src/refusals.ts (re-exported by segment-service.ts, exported as ./refusals); the Convex side imports the leaf, so the Convex deploy typecheck program no longer reaches segment-service.ts. checks.yml gains the exact program the release typechecks (tsc -p convex/tsconfig.json --noEmit), closing the mechanical gate the session-9 release proved missing.",
         "evidence": [
