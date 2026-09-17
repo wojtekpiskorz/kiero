@@ -15,7 +15,7 @@
  */
 
 import {
-  decodeAccessRefusalCode,
+  decodeAccessRefusal,
   type AccessRefusalCode,
 } from "../../../../../convex/access/errorCodes";
 
@@ -169,9 +169,7 @@ const REFUSAL_FAILURE_BY_CODE: Readonly<Partial<Record<AccessRefusalCode, SignIn
  * everything else is `unknown`.
  */
 export function classifySignInError(error: unknown): SignInFailure {
-  const refusal = decodeAccessRefusalCode(
-    (error as { readonly data?: unknown } | null | undefined)?.data,
-  );
+  const refusal = decodeAccessRefusal(error);
   const byCode = refusal === null ? undefined : REFUSAL_FAILURE_BY_CODE[refusal];
   if (byCode !== undefined) {
     return byCode;

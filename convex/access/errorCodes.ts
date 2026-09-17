@@ -94,3 +94,15 @@ export function decodeAccessRefusalCode(data: unknown): AccessRefusalCode | null
   }
   return code as AccessRefusalCode;
 }
+
+/**
+ * Error-taking decoder: THE one `.data` extraction cast (R26 review round 1
+ * — one per surface drifts; one in the leaf does not). Accepts any thrown
+ * value, returns the closed code or null.
+ */
+export function decodeAccessRefusal(error: unknown): AccessRefusalCode | null {
+  if (typeof error !== "object" || error === null) {
+    return null;
+  }
+  return decodeAccessRefusalCode((error as { readonly data?: unknown }).data);
+}

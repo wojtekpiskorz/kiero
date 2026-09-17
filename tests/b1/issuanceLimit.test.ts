@@ -13,6 +13,7 @@ import {
   decideIssuance,
 } from "../../convex/access/identity/issuanceLimit";
 import { isProofFixtureEmail } from "../../convex/access/identity/proofDomain";
+import { wrapLibraryVerificationRefusal } from "../../convex/access/identity/authEntry";
 import {
   decideCreateOrUpdateUser,
   normalizeEmail,
@@ -231,5 +232,33 @@ describe("structured refusal codes (R26: data, never the message)", () => {
       "code_wrong_or_expired",
       "too_many_attempts",
     ]);
+  });
+});
+
+describe("the library verification-leg wrapper (the budget must not wear the wrong-code copy)", () => {
+  const wrap = (message: string) =>
+    wrapLibraryVerificationRefusal(new Error(message)) as {
+      readonly data: { readonly code?: unknown; readonly message?: unknown };
+    };
+
+  it("the per-address verification budget classifies as too_many_attempts with the real message", () => {
+    const wrapped = wrap("Too many failed attempts");
+    expect(wrapped.data.code).toBe("too_many_attempts");
+    expect(wrapped.data.message).toBe("Too many failed attempts");
+  });
+
+  it("the wrong/expired-code literal keeps its accepted classification", () => {
+    const wrapped = wrap("Could not verify code");
+    expect(wrapped.data.code).toBe("code_wrong_or_expired");
+    expect(wrapped.data.message).toBe("Could not verify code");
+  });
+
+  it("the budget code maps to the too_many_attempts failure the UI renders (never the wrong-code advice)", () => {
+    expect(classifySignInError(wrap("Too many failed attempts"))).toBe("too_many_attempts");
+  });
+
+  it("a genuine crash on the leg propagates UNCHANGED (no refusal mask)", () => {
+    const crash = new TypeError("ctx.runQuery is not a function");
+    expect(wrapLibraryVerificationRefusal(crash)).toBe(crash);
   });
 });

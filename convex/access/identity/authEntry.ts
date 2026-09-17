@@ -53,6 +53,7 @@ import {
 } from "../../integrations/email/send";
 import {
   accessRefusalData,
+  decodeAccessRefusal,
   type AccessRefusalData,
 } from "../errorCodes";
 import {
@@ -383,7 +384,8 @@ const librarySignInHandler = (
 
 /** True when the thrown error already carries data (ours and any library ConvexError). */
 function carriesData(error: unknown): boolean {
-  return (error as { readonly data?: unknown } | null | undefined)?.data !== undefined;
+  // The leaf's error-taking decoder is the ONE .data extraction cast.
+  return decodeAccessRefusal(error) !== null;
 }
 
 /**
@@ -401,17 +403,42 @@ function isEmailCodeVerification(args: {
 }
 
 /**
+ * Rounds the library's plain verification-leg Errors into structured
+ * refusals (R26 review round 1: the budget mislabel). SERVER-SIDE, before
+ * sanitization erases the message — the only place the two stable library
+ * literals are still readable. Anything else returns UNCHANGED, so a
+ * genuine crash on the leg propagates as itself. Exported pure for tests.
+ */
+export function wrapLibraryVerificationRefusal(error: unknown): unknown {
+  if (error instanceof Error) {
+    if (/Too many failed attempts/i.test(error.message)) {
+      return new ConvexError<AccessRefusalData>(
+        accessRefusalData("too_many_attempts", error.message),
+      );
+    }
+    if (/^Could not verify code$/.test(error.message)) {
+      return new ConvexError<AccessRefusalData>(
+        accessRefusalData("code_wrong_or_expired", error.message),
+      );
+    }
+  }
+  return error;
+}
+
+/**
  * The exported sign-in action (R26): the library's `auth:signIn` wrapped
  * so every refusal reaches the client as STRUCTURED `ConvexError` data.
  *
  * Our own refusals (issuance budget, method conflict, delivery failure)
  * already throw ConvexErrors with the closed code in data — inside the
  * library's store mutation or verification callback — and pass through
- * untouched. The library's own verification refusal throws a plain Error
- * whose message production sanitizes to "Server Error"; on that one leg
- * the wrapper re-issues the refusal with the closed code in data, keeping
- * the library's stable message for logs. Every other failure (Google
- * redirects, token refresh, genuine crashes) propagates unchanged.
+ * untouched. The library's own verification refusals throw plain Errors
+ * whose messages production sanitizes to "Server Error"; on that one leg
+ * the wrapper classifies the two stable library literals into the closed
+ * data (see wrapLibraryVerificationRefusal) — the per-address
+ * verification budget maps to `too_many_attempts`, the wrong/expired-code
+ * literal to `code_wrong_or_expired`. Any OTHER failure on the leg
+ * (genuine crashes) propagates unchanged, so nothing masks a real error.
  */
 export const signIn = actionGeneric({
   args: {
@@ -427,11 +454,7 @@ export const signIn = actionGeneric({
       if (carriesData(error) || !isEmailCodeVerification(args)) {
         throw error;
       }
-      // The library's stable literal, kept verbatim for logs; the closed
-      // code rides the data field the client classifies on.
-      throw new ConvexError<AccessRefusalData>(
-        accessRefusalData("code_wrong_or_expired", "Could not verify code"),
-      );
+      throw wrapLibraryVerificationRefusal(error);
     }
   },
 });
