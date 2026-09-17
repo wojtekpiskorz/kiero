@@ -42,7 +42,7 @@ import {
 import { transcribeSegmentInput } from "@kiero/contracts";
 import { internal } from "../../_generated/api";
 import { internalAction, internalMutation, internalQuery } from "../../_generated/server";
-import type { MutationCtx } from "../../_generated/server";
+import type { MutationCtx, QueryCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 import { workflow } from "../../platform/pipeline";
 import type { JobExecutor, JobOutcome } from "../../platform/executors";
@@ -150,10 +150,105 @@ export async function removeSegmentFailureMarker(
 /** The outcome of the (idempotent) manifest planning mutation. */
 export type ManifestOutcome = { ok: true; segmentCount: number } | { ok: false; code: string };
 
-/** The manifest planning transaction (idempotent; testable without a deployment). */
+/**
+ * The byte-channel resolution the manifest needs (R34, issue #254): the
+ * duration of the retained audio. The LOAD is a query (`manifestTarget`);
+ * the RESOLUTION is I/O-BEARING — the `media_worker` channel probes the
+ * media executor over HTTP — so it runs in an ACTION
+ * (`resolveManifestInput`); Convex mutations cannot fetch, and the probe
+ * silently died as `media_worker_unreachable` on every real recording
+ * while the D6 proof fixtures (the fetch-free `proof_inline` channel)
+ * never noticed.
+ */
+export type ManifestDuration =
+  | { readonly ok: true; readonly durationMs: number }
+  | { readonly ok: false; readonly code: string };
+
+/** What the target query loads for the resolver (rows the channels read). */
+export type ManifestTarget =
+  | {
+      readonly bytesChannel: "proof_inline";
+      readonly proofAudioBase64?: string;
+      readonly proofBytesSha256?: string;
+    }
+  | {
+      readonly bytesChannel: "media_worker";
+      /** The schema requires mediaRepresentations.objectKey; the loader sets it. */
+      readonly representationObjectKey: string;
+    };
+
+/** Loads the resolver's inputs (the query half; NO fetch, NO writes). */
+export async function loadManifestTarget(
+  db: QueryCtx["db"],
+  transcriptId: Id<"audioTranscripts">,
+): Promise<
+  | { readonly ok: true; readonly target: ManifestTarget }
+  | { readonly ok: false; readonly code: string }
+> {
+  const transcript = await db.get(transcriptId);
+  if (transcript === null) {
+    return { ok: false, code: "transcript_row_missing" };
+  }
+  if (transcript.bytesChannel === "proof_inline") {
+    return {
+      ok: true,
+      target: {
+        bytesChannel: transcript.bytesChannel,
+        ...(transcript.proofAudioBase64 === undefined
+          ? {}
+          : { proofAudioBase64: transcript.proofAudioBase64 }),
+        ...(transcript.proofBytesSha256 === undefined
+          ? {}
+          : { proofBytesSha256: transcript.proofBytesSha256 }),
+      },
+    };
+  }
+  const representation = await db.get(transcript.representationId);
+  if (representation === null) {
+    return { ok: false, code: "representation_row_missing" };
+  }
+  return {
+    ok: true,
+    target: {
+      bytesChannel: transcript.bytesChannel,
+      representationObjectKey: representation.objectKey,
+    },
+  };
+}
+
+/** Resolves the duration over the LOADED target (the fetch-bearing half). */
+export async function resolveManifestDuration(loaded: ManifestTarget): Promise<ManifestDuration> {
+  if (loaded.bytesChannel === "proof_inline") {
+    if (loaded.proofAudioBase64 === undefined) {
+      return { ok: false, code: "proof_stash_missing" };
+    }
+    const measured = await measureProofStash(loaded.proofAudioBase64);
+    if (!measured.ok) {
+      return { ok: false, code: measured.code };
+    }
+    // The order-time pin is COMPARED, not just stored (review finding 3):
+    // a stash mutated after ordering refuses planning.
+    if (
+      loaded.proofBytesSha256 !== undefined &&
+      loaded.proofBytesSha256 !== measured.sha256Hex
+    ) {
+      return { ok: false, code: "proof_stash_hash_mismatch" };
+    }
+    return { ok: true, durationMs: measured.durationMs };
+  }
+  return probeFromMediaWorker(loaded.representationObjectKey);
+}
+
+/**
+ * The manifest planning transaction (idempotent; testable without a
+ * deployment). Takes the ACTION-resolved duration (see
+ * `resolveManifestDuration`) — this half is pure transaction and fetches
+ * NOTHING.
+ */
 export async function ensureManifestTransaction(
   ctx: MutationCtx,
   transcriptId: Id<"audioTranscripts">,
+  resolved: ManifestDuration,
 ): Promise<ManifestOutcome> {
   {
     const transcript = await ctx.db.get(transcriptId);
@@ -164,43 +259,14 @@ export async function ensureManifestTransaction(
       // Resume: the immutable manifest exists; never re-plan it.
       return { ok: true, segmentCount: transcript.segmentCount };
     }
-    // Resolve the duration through the order's byte channel.
-    let durationMs: number;
-    if (transcript.bytesChannel === "proof_inline") {
-      if (transcript.proofAudioBase64 === undefined) {
-        await patchPlanningRefusal(ctx, transcriptId, "proof_stash_missing");
-        return { ok: false, code: "proof_stash_missing" };
-      }
-      const measured = await measureProofStash(transcript.proofAudioBase64);
-      if (!measured.ok) {
-        await patchPlanningRefusal(ctx, transcriptId, measured.code);
-        return { ok: false, code: measured.code };
-      }
-      // The order-time pin is COMPARED, not just stored (review finding 3):
-      // a stash mutated after ordering refuses planning.
-      if (
-        transcript.proofBytesSha256 !== undefined &&
-        transcript.proofBytesSha256 !== measured.sha256Hex
-      ) {
-        await patchPlanningRefusal(ctx, transcriptId, "proof_stash_hash_mismatch");
-        return { ok: false, code: "proof_stash_hash_mismatch" };
-      }
-      durationMs = measured.durationMs;
-    } else {
-      const representation = await ctx.db.get(transcript.representationId);
-      if (representation === null) {
-        await patchPlanningRefusal(ctx, transcriptId, "representation_row_missing");
-        return { ok: false, code: "representation_row_missing" };
-      }
-      const probed = await probeFromMediaWorker(representation.objectKey);
-      if (!probed.ok) {
-        // The honest production degradation: no media executor, no manifest.
-        // The transcript stays `planning` — visible pending, never failed.
-        await patchPlanningRefusal(ctx, transcriptId, probed.code);
-        return { ok: false, code: probed.code };
-      }
-      durationMs = probed.durationMs;
+    if (!resolved.ok) {
+      // The honest production degradation: no resolved duration, no
+      // manifest. The transcript stays `planning` — visible pending, never
+      // failed — with the resolver's typed code on the row.
+      await patchPlanningRefusal(ctx, transcriptId, resolved.code);
+      return { ok: false, code: resolved.code };
     }
+    const durationMs = resolved.durationMs;
     const config: SegmentationConfig = JSON.parse(transcript.segmentationConfigJson);
     const plan = planSegments(durationMs, config);
     if (!plan.ok) {
@@ -233,11 +299,44 @@ export async function ensureManifestTransaction(
   }
 }
 
+/** The action-side resolver's args (the I/O-bearing half of planning). */
+const manifestDurationValidator = v.union(
+  v.object({ ok: v.literal(true), durationMs: v.number() }),
+  v.object({ ok: v.literal(false), code: v.string() }),
+);
+
+/** The query half: loads the resolver's target rows (no fetch, no writes). */
+export const manifestTarget = internalQuery({
+  args: { transcriptId: v.id("audioTranscripts") },
+  handler: async (ctx, args) => loadManifestTarget(ctx.db, args.transcriptId),
+});
+
+/**
+ * The fetch-bearing half of manifest planning (R34): Convex mutations
+ * cannot perform I/O, so the action loads the target through the query and
+ * resolves the duration HERE, handing it to the transactional mutation.
+ */
+export const resolveManifestInput = internalAction({
+  args: { transcriptId: v.id("audioTranscripts") },
+  handler: async (ctx, args): Promise<ManifestDuration> => {
+    const loaded = await ctx.runQuery(internal.processing.audio.executor.manifestTarget, {
+      transcriptId: args.transcriptId,
+    });
+    if (!loaded.ok) {
+      return { ok: false, code: loaded.code };
+    }
+    return resolveManifestDuration(loaded.target);
+  },
+});
+
 /** The registered durable step (thin wrapper over the transaction). */
 export const ensureManifest = internalMutation({
-  args: { transcriptId: v.id("audioTranscripts") },
+  args: {
+    transcriptId: v.id("audioTranscripts"),
+    resolved: manifestDurationValidator,
+  },
   handler: async (ctx, args): Promise<ManifestOutcome> =>
-    ensureManifestTransaction(ctx, args.transcriptId),
+    ensureManifestTransaction(ctx, args.transcriptId, args.resolved),
 });
 
 /** Records a planning refusal without inventing a manifest. */
@@ -764,8 +863,15 @@ export const transcribeAudioWorkflow = workflow
     }),
   })
   .handler(async (step, args) => {
+    // R34: the byte-channel probe FETCHES, and mutations cannot — the
+    // resolver runs as an action first, the transaction commits second.
+    const resolved = await step.runAction(
+      internal.processing.audio.executor.resolveManifestInput,
+      { transcriptId: args.transcriptId },
+    );
     const manifest = await step.runMutation(internal.processing.audio.executor.ensureManifest, {
       transcriptId: args.transcriptId,
+      resolved,
     });
     if (!manifest.ok) {
       // Planning refused (typed): no manifest, no assembly. The order row

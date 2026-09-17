@@ -44,8 +44,8 @@ import {
 } from "@kiero/media-worker/convert";
 import { base64ToBytes, serializeWav, sliceWav, toneWav } from "@kiero/media-worker/wav";
 import { probeFromMediaWorker } from "../../convex/processing/audio/media";
-import { ensureManifestTransaction } from "../../convex/processing/audio/executor";
-import { asTx, fakeCtx, type FakeCtx } from "../d2/harness";
+import { planManifest } from "./manifest-planning";
+import { fakeCtx, type FakeCtx } from "../d2/harness";
 
 /** The composer's retained container (webm/opus): EBML magic, never WAV. */
 const WEBM = new Uint8Array([
@@ -542,7 +542,7 @@ describe("the Convex typed-code pass-through", () => {
       vi.fn(async () => jsonAnswer(422, { ok: false, code: "format_requires_container" })),
     );
     const transcriptId = await seedWorkerChannelTranscript();
-    const outcome = await ensureManifestTransaction(asTx(ctx), transcriptId as never);
+    const outcome = await planManifest(ctx, transcriptId);
     expect(outcome).toMatchObject({ ok: false, code: "format_requires_container" });
     const transcript = ctx.db.rows("audioTranscripts")[0];
     expect(transcript).toMatchObject({
@@ -558,7 +558,7 @@ describe("the Convex typed-code pass-through", () => {
       vi.fn(async () => jsonAnswer(200, { ok: true, format: "wav", durationMs: 4_800, converted: true })),
     );
     const transcriptId = await seedWorkerChannelTranscript();
-    const outcome = await ensureManifestTransaction(asTx(ctx), transcriptId as never);
+    const outcome = await planManifest(ctx, transcriptId);
     expect(outcome).toMatchObject({ ok: true, segmentCount: 4 });
     expect(ctx.db.rows("audioTranscripts")[0]).toMatchObject({ state: "pending", segmentCount: 4 });
   });
