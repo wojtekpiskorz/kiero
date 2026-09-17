@@ -1,6 +1,6 @@
 # Core dependency graph
 
-Snapshot reconciled on 2026-09-16. Historical reviewed application `4aa1cc64b3ecab669c76ffa672832d4c5638ac68`. Native GitHub blockers determine current readiness. There are 225 core edges and one external planning edge, A0 blocked by completed #13.
+Snapshot reconciled on 2026-09-16. Historical reviewed application `4aa1cc64b3ecab669c76ffa672832d4c5638ac68`. Native GitHub blockers determine current readiness. There are 227 core edges and one external planning edge, A0 blocked by completed #13.
 
 ## Remaining work
 
@@ -19,9 +19,9 @@ flowchart TD
   I11["I11 #138"]
   J6["J6 #139"]
   C6["C6 #197"]
-  R28["R28 #236"]
   R29["R29 #237"]
   R31["R31 #244"]
+  R33["R33 #251"]
   I10 --> I6
   J6 --> J3
   J6 --> J4
@@ -33,12 +33,12 @@ flowchart TD
   R31 --> B5
   D7 --> I9
   D7 --> I10
-  R28 --> I11
   R29 --> I11
+  R33 --> I11
   D7 --> J6
   B5 --> J6
   J5 --> C6
-  R28 --> R29
+  R29 --> R33
 ```
 
 ## Scheduling and ownership
@@ -117,7 +117,7 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [D7 #135](https://github.com/wojtekpiskorz/kiero/issues/135) | OPEN | [I8 #133](https://github.com/wojtekpiskorz/kiero/issues/133), [D5 #33](https://github.com/wojtekpiskorz/kiero/issues/33), [D6 #34](https://github.com/wojtekpiskorz/kiero/issues/34), [E4 #38](https://github.com/wojtekpiskorz/kiero/issues/38), [D3 #31](https://github.com/wojtekpiskorz/kiero/issues/31), [R19 #218](https://github.com/wojtekpiskorz/kiero/issues/218), [R20 #220](https://github.com/wojtekpiskorz/kiero/issues/220), [R21 #222](https://github.com/wojtekpiskorz/kiero/issues/222), [R22 #224](https://github.com/wojtekpiskorz/kiero/issues/224), [R23 #225](https://github.com/wojtekpiskorz/kiero/issues/225), [R24 #229](https://github.com/wojtekpiskorz/kiero/issues/229), [R25 #230](https://github.com/wojtekpiskorz/kiero/issues/230), [R30 #242](https://github.com/wojtekpiskorz/kiero/issues/242) | Remaining execution |
 | [I9 #136](https://github.com/wojtekpiskorz/kiero/issues/136) | OPEN | [R3 #128](https://github.com/wojtekpiskorz/kiero/issues/128), [D7 #135](https://github.com/wojtekpiskorz/kiero/issues/135), [I3 #55](https://github.com/wojtekpiskorz/kiero/issues/55), [R5 #130](https://github.com/wojtekpiskorz/kiero/issues/130), [R17 #209](https://github.com/wojtekpiskorz/kiero/issues/209) | Remaining execution |
 | [I10 #137](https://github.com/wojtekpiskorz/kiero/issues/137) | OPEN | [R3 #128](https://github.com/wojtekpiskorz/kiero/issues/128), [D7 #135](https://github.com/wojtekpiskorz/kiero/issues/135), [I5 #57](https://github.com/wojtekpiskorz/kiero/issues/57) | Remaining execution |
-| [I11 #138](https://github.com/wojtekpiskorz/kiero/issues/138) | OPEN | [I8 #133](https://github.com/wojtekpiskorz/kiero/issues/133), [I2 #54](https://github.com/wojtekpiskorz/kiero/issues/54), [R27 #235](https://github.com/wojtekpiskorz/kiero/issues/235), [R28 #236](https://github.com/wojtekpiskorz/kiero/issues/236), [R29 #237](https://github.com/wojtekpiskorz/kiero/issues/237) | Remaining execution |
+| [I11 #138](https://github.com/wojtekpiskorz/kiero/issues/138) | OPEN | [I8 #133](https://github.com/wojtekpiskorz/kiero/issues/133), [I2 #54](https://github.com/wojtekpiskorz/kiero/issues/54), [R27 #235](https://github.com/wojtekpiskorz/kiero/issues/235), [R28 #236](https://github.com/wojtekpiskorz/kiero/issues/236), [R29 #237](https://github.com/wojtekpiskorz/kiero/issues/237), [R33 #251](https://github.com/wojtekpiskorz/kiero/issues/251) | Remaining execution |
 | [J6 #139](https://github.com/wojtekpiskorz/kiero/issues/139) | OPEN | [R3 #128](https://github.com/wojtekpiskorz/kiero/issues/128), [R4 #129](https://github.com/wojtekpiskorz/kiero/issues/129), [R5 #130](https://github.com/wojtekpiskorz/kiero/issues/130), [R7 #132](https://github.com/wojtekpiskorz/kiero/issues/132), [D7 #135](https://github.com/wojtekpiskorz/kiero/issues/135), [B5 #134](https://github.com/wojtekpiskorz/kiero/issues/134), [R10 #171](https://github.com/wojtekpiskorz/kiero/issues/171), [R12 #181](https://github.com/wojtekpiskorz/kiero/issues/181), [R13 #182](https://github.com/wojtekpiskorz/kiero/issues/182), [R14 #187](https://github.com/wojtekpiskorz/kiero/issues/187), [R16 #198](https://github.com/wojtekpiskorz/kiero/issues/198), [R18 #213](https://github.com/wojtekpiskorz/kiero/issues/213) | Remaining execution |
 | [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125) | CLOSED | None | Map administration |
 | [M1 #141](https://github.com/wojtekpiskorz/kiero/issues/141) | CLOSED | [M0 #125](https://github.com/wojtekpiskorz/kiero/issues/125) | Map administration |
@@ -153,10 +153,11 @@ J6 waits for B5 so its joined proof uses ordinary real authentication. J3 and J4
 | [R25 #230](https://github.com/wojtekpiskorz/kiero/issues/230) | CLOSED | None | Repair |
 | [R26 #232](https://github.com/wojtekpiskorz/kiero/issues/232) | CLOSED | None | Repair |
 | [R27 #235](https://github.com/wojtekpiskorz/kiero/issues/235) | CLOSED | None | Repair |
-| [R28 #236](https://github.com/wojtekpiskorz/kiero/issues/236) | OPEN | [R27 #235](https://github.com/wojtekpiskorz/kiero/issues/235) | Repair |
+| [R28 #236](https://github.com/wojtekpiskorz/kiero/issues/236) | CLOSED | [R27 #235](https://github.com/wojtekpiskorz/kiero/issues/235) | Repair |
 | [R29 #237](https://github.com/wojtekpiskorz/kiero/issues/237) | OPEN | [R28 #236](https://github.com/wojtekpiskorz/kiero/issues/236) | Repair |
 | [R30 #242](https://github.com/wojtekpiskorz/kiero/issues/242) | CLOSED | None | Remaining execution |
 | [R31 #244](https://github.com/wojtekpiskorz/kiero/issues/244) | OPEN | None | Remaining execution |
 | [R32 #249](https://github.com/wojtekpiskorz/kiero/issues/249) | CLOSED | None | Remaining execution |
+| [R33 #251](https://github.com/wojtekpiskorz/kiero/issues/251) | OPEN | [R29 #237](https://github.com/wojtekpiskorz/kiero/issues/237) | Remaining execution |
 
 Administration rows are documentation work, not core features. Their cached states change only through bounded administration PRs that rerun the audit and keep every derived cell equal to the manifest.
