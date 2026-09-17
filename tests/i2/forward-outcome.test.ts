@@ -16,7 +16,6 @@ import { getFunctionName } from "convex/server";
 import type { ActionCtx } from "../../convex/_generated/server";
 import {
   FORWARD_STATUSES,
-  FORWARD_TICK_CADENCE_MS,
   FORWARD_TICK_SERVICE,
   classifySinkResult,
   sinkForwardHealth,
@@ -38,6 +37,7 @@ import {
 import { emitDiagnosticEvent } from "../../convex/operations/telemetry/emit";
 import {
   performMarkForwarded,
+  performRecordHeartbeat,
   readForwardingState,
 } from "../../convex/operations/telemetry/functions";
 import { cronTick, type CronTickSummary } from "../../convex/operations/telemetry/cron";
@@ -72,8 +72,9 @@ describe("the closed forward-status vocabulary", () => {
 
   it("the tick's service identity is in the closed heartbeat vocabulary at the cron cadence", () => {
     expect(HEARTBEAT_SERVICES).toContain(FORWARD_TICK_SERVICE);
-    expect(HEARTBEAT_CADENCE_MS[FORWARD_TICK_SERVICE]).toBe(FORWARD_TICK_CADENCE_MS);
-    expect(FORWARD_TICK_CADENCE_MS).toBe(60 * 1000);
+    // HEARTBEAT_CADENCE_MS is the SINGLE cadence definition (convex/crons.ts
+    // registers the tick every minute).
+    expect(HEARTBEAT_CADENCE_MS[FORWARD_TICK_SERVICE]).toBe(60 * 1000);
   });
 });
 
@@ -123,7 +124,6 @@ describe("classifySinkResult maps every sink result into a class", () => {
 describe("sinkForwardHealth derives the leg's state from the tick ledger", () => {
   const tick = (atMs: number, forwardStatus?: ForwardStatus): SinkForwardTickRow => ({
     atMs,
-    status: forwardStatus === undefined || forwardStatus === "ok" ? "ok" : "degraded",
     ...(forwardStatus === undefined ? {} : { forwardStatus }),
   });
 
@@ -213,6 +213,27 @@ function tickRows(ctx: FakeCtx) {
     .filter((row) => row.serviceName === FORWARD_TICK_SERVICE)
     .sort((a, b) => Number(b.atMs) - Number(a.atMs));
 }
+
+describe("the tick ledger's writer gate (the external heartbeat surface cannot flip the forward leg)", () => {
+  it("recordHeartbeat refuses the tick's own service: only the cron's markForwarded writes it", async () => {
+    const ctx = fakeCtx([...PERSIST_TABLES]);
+    const refused = await performRecordHeartbeat(asTx(ctx), {
+      serviceName: FORWARD_TICK_SERVICE,
+      status: "ok",
+    });
+    expect(refused).toEqual({ recorded: false, reason: "service_tick_internal" });
+    expect(tickRows(ctx)).toEqual([]);
+  });
+
+  it("a normal external service still records through the shared tail helper", async () => {
+    const ctx = fakeCtx([...PERSIST_TABLES]);
+    const recorded = await performRecordHeartbeat(asTx(ctx), {
+      serviceName: "media.worker",
+      status: "ok",
+    });
+    expect(recorded.recorded).toBe(true);
+  });
+});
 
 describe("performMarkForwarded persists the outcome on rows and the tick ledger", () => {
   it("a refusal class lands on the rows with forwardedAtMs still 0, plus a degraded tick row", async () => {

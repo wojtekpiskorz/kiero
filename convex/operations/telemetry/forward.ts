@@ -58,8 +58,8 @@ export type ForwardStatus = (typeof FORWARD_STATUSES)[number];
  */
 export const FORWARD_TICK_SERVICE = "telemetry.sink" as const satisfies HeartbeatService;
 
-/** The cron cadence the silence machinery must assume for the tick. */
-export const FORWARD_TICK_CADENCE_MS = 60 * 1000;
+// The tick's cadence lives ONCE, in HEARTBEAT_CADENCE_MS (./heartbeat.ts) —
+// the silence machinery's map is the single definition.
 
 /**
  * Maps one sink result into the closed vocabulary. Total: any reason string
@@ -93,8 +93,6 @@ export function classifySinkResult(result: SinkIngestResult): ForwardStatus {
 /** One `telemetry.sink` tick row in the shape the health derivation reads. */
 export interface SinkForwardTickRow {
   readonly atMs: number;
-  /** The heartbeat ledger's coarse state: degraded = the attempt failed. */
-  readonly status: "ok" | "degraded";
   /** The attempt's status class; absent = the window was empty (no attempt). */
   readonly forwardStatus?: ForwardStatus;
 }

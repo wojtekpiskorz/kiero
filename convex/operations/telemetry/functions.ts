@@ -170,35 +170,66 @@ function isHeartbeatService(value: string): value is HeartbeatService {
   return (HEARTBEAT_SERVICES as readonly string[]).includes(value);
 }
 
+/**
+ * Inserts one heartbeat row and prunes the bounded per-service tail. ONE
+ * definition (the review's duplication finding): every writer of
+ * `healthHeartbeats` goes through it, so the retention policy cannot fork.
+ */
+async function insertHeartbeatTailPruned(
+  ctx: MutationCtx,
+  row: {
+    serviceName: HeartbeatService;
+    status: "ok" | "degraded";
+    forwardStatus?: ForwardStatus;
+    atMs: number;
+  },
+): Promise<void> {
+  await ctx.db.insert("healthHeartbeats", row);
+  const tail = await ctx.db
+    .query("healthHeartbeats")
+    .withIndex("by_service_time", (q) => q.eq("serviceName", row.serviceName))
+    .order("desc")
+    .take(HEARTBEATS_KEPT_PER_SERVICE + 1);
+  for (const old of tail.slice(HEARTBEATS_KEPT_PER_SERVICE)) {
+    await ctx.db.delete(old._id);
+  }
+}
+
+/** The recordHeartbeat transaction (extracted so tests drive the real path). */
+export async function performRecordHeartbeat(
+  ctx: MutationCtx,
+  args: { serviceName: string; status: string },
+): Promise<{ recorded: boolean; reason?: string; atMs?: number }> {
+  if (!isHeartbeatService(args.serviceName)) {
+    return { recorded: false, reason: "service_unknown" };
+  }
+  // The telemetry tick's own ledger is written ONLY by the tick (the cron's
+  // markForwarded path): an external heartbeat carrying this service name
+  // must not be able to flip the forward-leg health (a no-class external
+  // row would read as "idle" and hide a persistent failure class).
+  if (args.serviceName === FORWARD_TICK_SERVICE) {
+    return { recorded: false, reason: "service_tick_internal" };
+  }
+  const serviceName: HeartbeatService = args.serviceName;
+  const status: "ok" | "degraded" = args.status === "degraded" ? "degraded" : "ok";
+  const atMs = Date.now();
+  await insertHeartbeatTailPruned(ctx, { serviceName, status, atMs });
+  await emitDiagnosticEvent(ctx, {
+    kind: "ops.health.heartbeat",
+    metadata: [
+      { key: "serviceName", value: serviceName },
+      { key: "status", value: status },
+    ],
+    serviceName,
+  });
+  return { recorded: true, atMs };
+}
+
 /** Records one heartbeat and prunes the bounded per-service tail. */
 export const recordHeartbeat = internalMutation({
   args: { serviceName: v.string(), status: v.string() },
-  handler: async (ctx, args): Promise<{ recorded: boolean; reason?: string; atMs?: number }> => {
-    if (!isHeartbeatService(args.serviceName)) {
-      return { recorded: false, reason: "service_unknown" };
-    }
-    const serviceName: HeartbeatService = args.serviceName;
-    const status: "ok" | "degraded" = args.status === "degraded" ? "degraded" : "ok";
-    const atMs = Date.now();
-    await ctx.db.insert("healthHeartbeats", { serviceName, status, atMs });
-    const tail = await ctx.db
-      .query("healthHeartbeats")
-      .withIndex("by_service_time", (q) => q.eq("serviceName", serviceName))
-      .order("desc")
-      .take(HEARTBEATS_KEPT_PER_SERVICE + 1);
-    for (const row of tail.slice(HEARTBEATS_KEPT_PER_SERVICE)) {
-      await ctx.db.delete(row._id);
-    }
-    await emitDiagnosticEvent(ctx, {
-      kind: "ops.health.heartbeat",
-      metadata: [
-        { key: "serviceName", value: serviceName },
-        { key: "status", value: status },
-      ],
-      serviceName,
-    });
-    return { recorded: true, atMs };
-  },
+  handler: async (ctx, args): Promise<{ recorded: boolean; reason?: string; atMs?: number }> =>
+    performRecordHeartbeat(ctx, args),
 });
 
 export interface CostEntryInput {
@@ -556,20 +587,12 @@ export async function performMarkForwarded(
       await ctx.db.patch(id, { forwardStatus: args.status });
     }
   }
-  await ctx.db.insert("healthHeartbeats", {
+  await insertHeartbeatTailPruned(ctx, {
     serviceName: FORWARD_TICK_SERVICE,
     status: args.status === undefined || args.status === "ok" ? "ok" : "degraded",
-    ...(args.status === undefined ? {} : { forwardStatus: args.status }),
     atMs: args.atMs,
+    ...(args.status === undefined ? {} : { forwardStatus: args.status }),
   });
-  const tail = await ctx.db
-    .query("healthHeartbeats")
-    .withIndex("by_service_time", (q) => q.eq("serviceName", FORWARD_TICK_SERVICE))
-    .order("desc")
-    .take(HEARTBEATS_KEPT_PER_SERVICE + 1);
-  for (const row of tail.slice(HEARTBEATS_KEPT_PER_SERVICE)) {
-    await ctx.db.delete(row._id);
-  }
   return { marked: args.ids.length, tickRecorded: true };
 }
 
@@ -686,7 +709,6 @@ export async function readForwardingState(db: QueryCtx["db"]): Promise<SinkForwa
   return sinkForwardHealth(
     forwardTicks.map((row) => ({
       atMs: row.atMs,
-      status: row.status,
       ...(row.forwardStatus === undefined ? {} : { forwardStatus: row.forwardStatus }),
     })),
   );
