@@ -6590,7 +6590,7 @@
       "externalBlockedBy": [],
       "state": "CLOSED",
       "audit": {
-        "mergedPr": null,
+        "mergedPr": 253,
         "mergeCommit": null,
         "implemented": "The account surface classifies by structured error data: the classifier reads error.data first through the shared closed-vocabulary leaf (decodeAccessRefusal) and a closed ACCOUNT_FAILURE_BY_CODE map — the ten linking codes plus email_delivery_failed render the typed Polish copies, the sign-in-layer codes fail closed to unknown (the inverse of the sign-in split), and the message markers survive only as the no-data fallback.",
         "evidence": [
