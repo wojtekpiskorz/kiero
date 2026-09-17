@@ -165,12 +165,17 @@ export type ManifestDuration =
   | { readonly ok: false; readonly code: string };
 
 /** What the target query loads for the resolver (rows the channels read). */
-interface ManifestTarget {
-  readonly bytesChannel: "media_worker" | "proof_inline";
-  readonly proofAudioBase64?: string;
-  readonly proofBytesSha256?: string;
-  readonly representationObjectKey?: string;
-}
+export type ManifestTarget =
+  | {
+      readonly bytesChannel: "proof_inline";
+      readonly proofAudioBase64?: string;
+      readonly proofBytesSha256?: string;
+    }
+  | {
+      readonly bytesChannel: "media_worker";
+      /** The schema requires mediaRepresentations.objectKey; the loader sets it. */
+      readonly representationObjectKey: string;
+    };
 
 /** Loads the resolver's inputs (the query half; NO fetch, NO writes). */
 export async function loadManifestTarget(
@@ -230,9 +235,6 @@ export async function resolveManifestDuration(loaded: ManifestTarget): Promise<M
       return { ok: false, code: "proof_stash_hash_mismatch" };
     }
     return { ok: true, durationMs: measured.durationMs };
-  }
-  if (loaded.representationObjectKey === undefined) {
-    return { ok: false, code: "representation_row_missing" };
   }
   return probeFromMediaWorker(loaded.representationObjectKey);
 }

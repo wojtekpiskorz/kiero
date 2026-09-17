@@ -12,7 +12,7 @@ import {
 } from "../../convex/processing/audio/executor";
 import { asReaderDb, asTx, type FakeCtx } from "../d2/harness";
 
-export async function planManifest(ctx: FakeCtx, transcriptId: string | never) {
+export async function planManifest(ctx: FakeCtx, transcriptId: string) {
   const loaded = await loadManifestTarget(asReaderDb(ctx), transcriptId as never);
   const resolved = loaded.ok
     ? await resolveManifestDuration(loaded.target)
