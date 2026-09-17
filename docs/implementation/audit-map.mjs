@@ -200,7 +200,7 @@ for (const entry of remaining) {
   require(!productFacing || uxRemainingReferences.has(entry.key), `UX coverage never references open product-path owner ${entry.key}`);
 }
 
-// Cached map body (#15): string equality with the live body is checked in --remote mode;
+// Cached map body (#240, the continuation): string equality with the live body is checked in --remote mode;
 // offline we still reject the count-restating drift class and stale execution-order rows.
 require(typeof manifest.mapBody === 'string' && manifest.mapBody.length > 0, 'cached map body missing');
 if (typeof manifest.mapBody === 'string') {

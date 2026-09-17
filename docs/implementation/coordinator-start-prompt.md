@@ -29,12 +29,12 @@ Start with:
 
 Baseline at the 2026-09-16 session-8 handoff (verify, do not assume):
 
-- Main carries the merged waves: R22 #224 / PR #226 (the media executor
-  image byte op), R23 #225 / PR #227 (the secure-channel photo decoupled
-  from OCR), R24 #229 / PR #231 (real dimensions + the typed failure
-  status through the images drive), the B5 evidence PR #233 and the I11
-  evidence PR #238. Audit remote PASS: 99
-  entries, 218 core edges, 86 closed, 13 open.
+- Main carries the merged waves through M13 (the map continuation): R22
+  #224 / PR #226, R23 #225 / PR #227, R24 #229 / PR #231 (the media
+  repair wave), the B5 evidence PR #233, the I11 evidence PR #238, and
+  the M13 continuation PR itself. Audit remote PASS: 102 entries, 223
+  core edges, 86 closed, 16 open (the entry set is the UNION of the
+  closed archive #15's children and the continuation #240's children).
 - The D7 vision OCR lane is PROVEN live end to end for the first time
   (vision order `complete`, image_region fragments) over the
   retained-original fallback. Two anomalies stay: the Images binding's
@@ -45,17 +45,16 @@ Baseline at the 2026-09-16 session-8 handoff (verify, do not assume):
   tester Google login on the staged noVNC browser; I11: Axiom ingest
   verification, the three monitors, one delivered alert, metered costs,
   the fixture-window and gateway-cron decisions).
-- **#15 holds exactly 100 sub-issues (GitHub's hard cap).** No new
-  issue can join the map (sub-issue plus registration) until the owner
-  decides: prune closed children (an audit-contract change through a
-  bounded M-issue) or keep future repairs standalone. Issues #235, #236
-  and #237 (the I11 defects) are standalone repairs awaiting that
-  decision.
+- The map continues in #240 (the owner's 2026-09-16 decision): #15
+  stands closed as the archive of every entry closed under it, the open
+  entries are #240's children, and new issues register under #240 (86
+  slots of headroom). The I11 telemetry repairs joined as R27/R28/R29,
+  chained over their shared paths.
 
 The ready frontier: D7 #135 (coordinator-claimed; the remaining proofs
-below), R25 #230 and R26 #232 (unassigned, no open blockers), then
-I9/I10 after D7, I6, J6 after B5+D7, J3/J4, J5, C6. Qualify strictly by
-native blocked_by.
+below), R25 #230, R26 #232 and R27 #235 (unassigned, no open blockers),
+then R28/R29 behind R27, I9/I10 after D7, I6, J6 after B5+D7, J3/J4,
+J5, C6. Qualify strictly by native blocked_by.
 
 D7's remaining scope, in order:
 
@@ -96,7 +95,9 @@ Owner decisions, do not re-ask:
 
 Open positions to watch:
 
-- **The 100-sub-issue cap** (the owner decision above).
+- The map's home is #240; checkpoints land there (the archive #15 keeps
+  its history). New issues register under #240 with the same
+  self-carried or lane-PR registration patterns.
 - The funnel: tools/smoke/mailbox.mjs (mail.tm; latency varies 5-8+ min
   vs the 15-min OTP validity; fresh mailbox per run, patient polls to
   ~12 min, one re-request on timeout). The durable upgrade is the owned
@@ -142,4 +143,4 @@ One task = one worktree and one PR. Serialize shared files, staging
 changes and integrations. Continue until the map is complete or a
 genuine owner-requiring block. Never lower the J3/J4/J5 thresholds.
 Production, final design and the four-week alpha remain separate stages.
-Leave a durable checkpoint on #15 before ending a session.
+Leave a durable checkpoint on the continuation map #240 before ending a session.
