@@ -6588,16 +6588,16 @@
       "issueNumber": 244,
       "issueUrl": "https://github.com/wojtekpiskorz/kiero/issues/244",
       "externalBlockedBy": [],
-      "state": "OPEN",
+      "state": "CLOSED",
       "audit": {
         "mergedPr": null,
         "mergeCommit": null,
-        "implemented": "Not implemented yet: the account surface still classifies linking refusals by message markers (found by the R26 lane outside its owned paths); the server already carries the structured data, so the bounded classifier mirror lands through this issue's own PR.",
+        "implemented": "The account surface classifies by structured error data: the classifier reads error.data first through the shared closed-vocabulary leaf (decodeAccessRefusal) and a closed ACCOUNT_FAILURE_BY_CODE map — the ten linking codes plus email_delivery_failed render the typed Polish copies, the sign-in-layer codes fail closed to unknown (the inverse of the sign-in split), and the message markers survive only as the no-data fallback.",
         "evidence": [
           "https://github.com/wojtekpiskorz/kiero/pull/245"
         ],
         "remaining": [
-          "The account classifier reads error.data through the shared closed vocabulary; the typed copies render on staging."
+          "The post-release live legs ride the owner issue's evidence (B5)."
         ]
       },
       "body": "## Problem\n\nR26's live-qualification root cause (production-type deployments sanitize Convex error MESSAGE strings, so the UI's message-marker classification degrades every typed copy to the generic „Coś nie zadziałało. Spróbuj ponownie.\") was found to reach ONE more surface beyond R26's owned paths: `apps/web/src/features/account/state.ts` still classifies account/linking refusals by message markers (`[kiero:link_rejected][code]`, address-mismatch strings). The server side now carries the structured `ConvexError` data end to end (R26: `convex/access/errorCodes.ts`, `linkRejectionData` on every linking throw site), so on staging/production the account surface's typed Polish copies never render — exactly the defect class R26 fixed for the sign-in surface, on the surface that renders the Google-linking ceremony B5's completion leg exercises. Found by the R26 lane (2026-09-17); dev compat is pinned by a b2 test.\n\n## Bounded solution\n\nMirror R26's classifier shape on the account surface: classify by the decoded `error.data` code through the SAME closed vocabulary leaf (`convex/access/errorCodes.ts` — `LINK_REJECTION_CODES` / `decodeAccessRefusalCode`), map each code to the existing typed Polish copy, keep the message heuristics only as the no-data fallback. No copy text changes; no server changes (the data already flows).\n\n## Acceptance criteria\n\n- [ ] Unit tests: the account classifier maps every linking rejection code to its copy from `error.data` alone (message sanitized to „Server Error\"); unknown/foreign payloads fail closed; typecheck/shape/guards green.\n- [ ] Live: the account-surface refusal copies render on staging where the generic copy rendered before.\n\n## Verification case\n\nUnit (tests/b2 additions) + the B5 account-surface legs post-release.\n\n## Owned paths\n\n- `apps/web/src/features/account/**`\n- `tests/b2/**`\n\n## Blocked by\n\nNone. Registered as a native blocker of B5 #134 (the account-surface copy leg).\n\nPart of the core implementation map: [continuation #240](https://github.com/wojtekpiskorz/kiero/issues/240) (the closed archive is [#15](https://github.com/wojtekpiskorz/kiero/issues/15)).\n",
