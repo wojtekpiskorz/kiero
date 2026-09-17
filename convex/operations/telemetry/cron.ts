@@ -10,13 +10,26 @@
  *
  * `cronTick` runs every minute from convex/crons.ts: incident scan, cost
  * threshold evaluation, windowed retention, then best-effort sink forward.
+ *
+ * R27 (issue #235): the sink forward's outcome is recorded durably - the
+ * closed status class of every attempt (refused, unreachable, ok) persists
+ * on the attempted event rows and on the `telemetry.sink` tick ledger row
+ * (see ./forward.ts), so a failing Convex->Axiom leg is diagnosable from
+ * the health surfaces instead of indistinguishable from a dead cron.
  */
 
 import { internalAction } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import type { ActionCtx } from "../../_generated/server";
-import { axiomHttpSink, nullSink, toSinkEvent, type SinkIngestResult } from "./sink";
+import {
+  axiomHttpSink,
+  nullSink,
+  toSinkEvent,
+  SINK_REASON_NOT_CONFIGURED,
+  type SinkIngestResult,
+} from "./sink";
 import { FORWARD_WINDOW_MS } from "./retention";
+import { classifySinkResult, type ForwardStatus } from "./forward";
 import { deploymentEnvironment } from "@kiero/runtime";
 
 /** Summary of one telemetry tick. */
@@ -29,18 +42,22 @@ export interface CronTickSummary {
     readonly prunedCostEntries: number;
     readonly prunedAlertStates: number;
   };
-  readonly forwarded: SinkIngestResult & { readonly attempted: number };
+  readonly forwarded: SinkIngestResult & {
+    readonly attempted: number;
+    /** R27: the attempt's closed status class (the durable copy is persisted). */
+    readonly status: ForwardStatus;
+  };
 }
 
 async function forwardRecentToSink(
   ctx: ActionCtx,
-): Promise<SinkIngestResult & { attempted: number }> {
+): Promise<SinkIngestResult & { attempted: number; status: ForwardStatus }> {
   const apiToken = process.env.AXIOM_API_TOKEN;
   const dataset = process.env.AXIOM_DATASET;
   const sink =
     apiToken !== undefined && apiToken !== "" && dataset !== undefined && dataset !== ""
       ? axiomHttpSink({ apiToken, dataset })
-      : nullSink("axiom_not_configured");
+      : nullSink(SINK_REASON_NOT_CONFIGURED);
 
   // The deployment's closed environment label through the ONE shared rule
   // (R13: this read previously lived as one of five drifting copies).
@@ -51,7 +68,13 @@ async function forwardRecentToSink(
     sinceMs: nowMs - FORWARD_WINDOW_MS,
   });
   if (recent.length === 0) {
-    return { ok: true, ingested: 0, attempted: 0 };
+    // No attempt happened, but the tick itself ran: record the liveness row
+    // (no status class claimed) so an empty window never looks like silence.
+    await ctx.runMutation(internal.operations.telemetry.functions.markForwarded, {
+      ids: [],
+      atMs: nowMs,
+    });
+    return { ok: true, ingested: 0, attempted: 0, status: "ok" };
   }
   const events = recent.map((row) =>
     toSinkEvent(
@@ -69,13 +92,16 @@ async function forwardRecentToSink(
     ),
   );
   const result = await sink.ingest(events);
-  if (result.ok) {
-    await ctx.runMutation(internal.operations.telemetry.functions.markForwarded, {
-      ids: recent.map((row) => row._id),
-      atMs: nowMs,
-    });
-  }
-  return { ...result, attempted: events.length };
+  // R27 (issue #235): the outcome is no longer dropped. Both classes land in
+  // markForwarded - "ok" marks the rows delivered, a refusal persists the
+  // class on them and on the telemetry.sink tick row the health surface reads.
+  const status = classifySinkResult(result);
+  await ctx.runMutation(internal.operations.telemetry.functions.markForwarded, {
+    ids: recent.map((row) => row._id),
+    atMs: nowMs,
+    status,
+  });
+  return { ...result, attempted: events.length, status };
 }
 
 /** The every-minute telemetry tick registered in convex/crons.ts. */

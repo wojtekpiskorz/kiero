@@ -34,6 +34,15 @@ export interface SinkIngestResult {
   readonly reason?: string;
 }
 
+/**
+ * The closed reason strings (R27, issue #235): single definitions so the
+ * forward-outcome classification in `./forward.ts` cannot drift from what
+ * the sinks actually report. Status-class reasons carry the HTTP code.
+ */
+export const SINK_REASON_NOT_CONFIGURED = "axiom_not_configured";
+export const SINK_REASON_UNREACHABLE = "axiom_unreachable";
+export const SINK_STATUS_REASON_PREFIX = "axiom_status_";
+
 /** The one delivery interface every telemetry producer talks to. */
 export interface TelemetrySink {
   readonly name: string;
@@ -108,11 +117,15 @@ export function axiomHttpSink(config: AxiomSinkConfig): TelemetrySink {
           body: JSON.stringify(events),
         });
         if (!response.ok) {
-          return { ok: false, ingested: 0, reason: `axiom_status_${response.status}` };
+          return {
+            ok: false,
+            ingested: 0,
+            reason: `${SINK_STATUS_REASON_PREFIX}${response.status}`,
+          };
         }
         return { ok: true, ingested: events.length };
       } catch {
-        return { ok: false, ingested: 0, reason: "axiom_unreachable" };
+        return { ok: false, ingested: 0, reason: SINK_REASON_UNREACHABLE };
       }
     },
   };
