@@ -221,52 +221,52 @@ rec[
 
 // --- R6/R7: the two tasks (dated slot + undated) -------------------------------
 if (projectReady) {
-// The project select carries only real project options (no empty row):
-// the first one is this run's agent-published project.
-await page.locator("#task-edit-project").selectOption({ index: 0 });
-// The term options load through a live query once the project state settles.
-await page.waitForTimeout(3000);
+  // The project select carries only real project options (no empty row):
+  // the first one is this run's agent-published project.
+  await page.locator("#task-edit-project").selectOption({ index: 0 });
+  // The term options load through a live query once the project state settles.
+  await page.waitForTimeout(3000);
 
-// Dated task: bind the deadline to a temporal ustalenie when one exists.
-const deadlineSelect = page.locator("#task-edit-deadline");
-const deadlineOptions = await deadlineSelect.locator("option").allTextContents();
-const bindable = deadlineOptions.filter(
-  (label) => !/nowe zadanie|brak ustaleń|bez terminu|^\(brak\)$|—/.test(label.trim()),
-);
-// A bindable option must be a real date label, selected by VALUE (never a
-// positional index): the pass condition includes the binding itself.
-const datedLabel = bindable.find((label) => /\d{2}\.\d{2}\.\d{4}|\d{4}-\d{2}-\d{2}/.test(label)) ?? null;
-let datedBound = false;
-if (datedLabel !== null) {
-  await deadlineSelect.selectOption({ label: datedLabel });
-  datedBound = true;
-}
-await page.locator("#task-edit-title").fill(DATED_TASK);
-await page.getByRole("button", { name: "Zapisz zadanie" }).click();
-await page.waitForTimeout(5000);
-let afterTask = await snap("r6-dated-task");
-const taskSaved = afterTask.includes(DATED_TASK);
-rec[taskSaved && datedBound ? "pass" : "fail"](
-  "R6 dated task saved",
-  "task created with the deadline bound to the temporal ustalenie",
-  taskSaved
-    ? datedBound
-      ? `${DATED_TASK} created with deadline binding: ${JSON.stringify(datedLabel)}`
-      : `${DATED_TASK} created but NO date-labelled ustalenie option existed (deadline left empty; the binding did not happen)`
-    : firstLine(afterTask),
-);
+  // Dated task: bind the deadline to a temporal ustalenie when one exists.
+  const deadlineSelect = page.locator("#task-edit-deadline");
+  const deadlineOptions = await deadlineSelect.locator("option").allTextContents();
+  const bindable = deadlineOptions.filter(
+    (label) => !/nowe zadanie|brak ustaleń|bez terminu|^\(brak\)$|—/.test(label.trim()),
+  );
+  // A bindable option must be a real date label, selected by VALUE (never a
+  // positional index): the pass condition includes the binding itself.
+  const datedLabel = bindable.find((label) => /\d{2}\.\d{2}\.\d{4}|\d{4}-\d{2}-\d{2}/.test(label)) ?? null;
+  let datedBound = false;
+  if (datedLabel !== null) {
+    await deadlineSelect.selectOption({ label: datedLabel });
+    datedBound = true;
+  }
+  await page.locator("#task-edit-title").fill(DATED_TASK);
+  await page.getByRole("button", { name: "Zapisz zadanie" }).click();
+  await page.waitForTimeout(5000);
+  let afterTask = await snap("r6-dated-task");
+  const taskSaved = afterTask.includes(DATED_TASK);
+  rec[taskSaved && datedBound ? "pass" : "fail"](
+    "R6 dated task saved",
+    "task created with the deadline bound to the temporal ustalenie",
+    taskSaved
+      ? datedBound
+        ? `${DATED_TASK} created with deadline binding: ${JSON.stringify(datedLabel)}`
+        : `${DATED_TASK} created but NO date-labelled ustalenie option existed (deadline left empty; the binding did not happen)`
+      : firstLine(afterTask),
+  );
 
-// Undated task: the evaluator's no_deadline state.
-await page.locator("#task-edit-title").fill(UNDATED_TASK);
-await deadlineSelect.selectOption({ index: 0 });
-await page.getByRole("button", { name: "Zapisz zadanie" }).click();
-await page.waitForTimeout(5000);
-afterTask = await snap("r7-undated-task");
-rec[afterTask.includes(UNDATED_TASK) ? "pass" : "fail"](
-  "R7 undated task saved",
-  "second task created without a deadline",
-  afterTask.includes(UNDATED_TASK) ? `${UNDATED_TASK} created (no deadline)` : firstLine(afterTask),
-);
+  // Undated task: the evaluator's no_deadline state.
+  await page.locator("#task-edit-title").fill(UNDATED_TASK);
+  await deadlineSelect.selectOption({ index: 0 });
+  await page.getByRole("button", { name: "Zapisz zadanie" }).click();
+  await page.waitForTimeout(5000);
+  afterTask = await snap("r7-undated-task");
+  rec[afterTask.includes(UNDATED_TASK) ? "pass" : "fail"](
+    "R7 undated task saved",
+    "second task created without a deadline",
+    afterTask.includes(UNDATED_TASK) ? `${UNDATED_TASK} created (no deadline)` : firstLine(afterTask),
+  );
 } else {
   rec.notRun(
     "R6 dated task saved",

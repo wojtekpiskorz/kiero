@@ -71,7 +71,7 @@ mailbox, company timezone `America/Los_Angeles` so the run sat outside the
 default quiet hours and past 07:00 local) proved the whole F4/F3 chain
 with zero page errors (`runs/funnel-reminders.json`):
 
-1. Delivered-OTP sign-in, company creation (explicit company timezone -
+1. Delivered-OTP sign-in, company creation (explicit company timezone, namely
    "Strefa czasu firmy"), one source message asking the agent to record
    `termin oddania wyceny 2026-09-16 (cały dzień, bez godziny)` plus a
    unique run marker and a deliberately fake `sk-proj-…` token.
