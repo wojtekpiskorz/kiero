@@ -225,8 +225,8 @@ describe("M1 audit: derived map table content", () => {
     const run = auditFixture({
       manifest: manifest => {
         manifest.mapBody = (manifest.mapBody as string).replace(
-          "The map's native children and dependency edges are exactly those recorded",
-          "The complete map contains 68 native children and its edges are recorded",
+          "the audit derives the entry set from the union of both maps' native children",
+          "the audit records that this map contains 68 native children and their edges",
         );
       },
     });
@@ -237,8 +237,8 @@ describe("M1 audit: derived map table content", () => {
     const run = auditFixture({
       manifest: manifest => {
         manifest.mapBody = (manifest.mapBody as string).replace(
-          "plus A0's external planning prerequisite #13.",
-          "across 160 core dependency edges plus A0's external planning prerequisite #13.",
+          "with durable sources, typed memory, project work",
+          "with durable sources and typed memory across 160 core dependency edges, project work",
         );
       },
     });
@@ -249,8 +249,8 @@ describe("M1 audit: derived map table content", () => {
     const run = auditFixture({
       manifest: manifest => {
         manifest.mapBody = (manifest.mapBody as string).replace(
-          "Remaining execution and administration work is listed",
-          "After M0 closed, 19 execution issues remain and are listed",
+          "so the remaining qualification work keeps native readiness relations",
+          "so the remaining qualification work, 19 issues remain, keeps native readiness relations",
         );
       },
     });
@@ -261,8 +261,8 @@ describe("M1 audit: derived map table content", () => {
     const run = auditFixture({
       manifest: manifest => {
         manifest.mapBody = (manifest.mapBody as string).replace(
-          "Remaining execution and administration work is listed",
-          "Four original qualifiers remain open and are listed",
+          "so the remaining qualification work keeps native readiness relations",
+          "so four original qualifiers remain open with native readiness relations",
         );
       },
     });
