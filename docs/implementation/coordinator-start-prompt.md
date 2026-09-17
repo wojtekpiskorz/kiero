@@ -32,7 +32,7 @@ Baseline at the 2026-09-16 session-8 handoff (verify, do not assume):
   image byte op), R23 #225 / PR #227 (the secure-channel photo decoupled
   from OCR), R24 #229 / PR #231 (real dimensions + the typed failure
   status through the images drive), the B5 evidence PR #233 and the I11
-  evidence PR (its final number: check the repo). Audit remote PASS: 99
+  evidence PR #238. Audit remote PASS: 99
   entries, 218 core edges, 86 closed, 13 open.
 - The D7 vision OCR lane is PROVEN live end to end for the first time
   (vision order `complete`, image_region fragments) over the
@@ -44,11 +44,12 @@ Baseline at the 2026-09-16 session-8 handoff (verify, do not assume):
   tester Google login on the staged noVNC browser; I11: Axiom ingest
   verification, the three monitors, one delivered alert, metered costs,
   the fixture-window and gateway-cron decisions).
-- ⚠ **#15 holds exactly 100 sub-issues — GitHub's hard cap.** No new
-  issue can join the map (sub-issue + registration) until the owner
+- **#15 holds exactly 100 sub-issues (GitHub's hard cap).** No new
+  issue can join the map (sub-issue plus registration) until the owner
   decides: prune closed children (an audit-contract change through a
-  bounded M-issue) or keep future repairs standalone. Issues #235/#236
- /#237 (the I11 defects) are standalone repairs awaiting that decision.
+  bounded M-issue) or keep future repairs standalone. Issues #235, #236
+  and #237 (the I11 defects) are standalone repairs awaiting that
+  decision.
 
 The ready frontier: D7 #135 (coordinator-claimed; the remaining proofs
 below), R25 #230 and R26 #232 (unassigned, no open blockers), then
@@ -57,7 +58,7 @@ native blocked_by.
 
 D7's remaining scope, in order:
 
-1. The /zrodlo display proof: the feed has no direct /zrodlo links —
+1. The /zrodlo display proof: the feed has no direct /zrodlo links ;
    click „Szczegóły i źródło" first, then the permalink; the
    secure-channel control („Pokaż zdjęcie") must render the `<img>`
    (R23) with the OCR overlays once complete (R22+R24).
@@ -65,7 +66,7 @@ D7's remaining scope, in order:
    the media worker is healthy with live S3 credentials; allow ~4 min
    after any release for the container's sleep→wake image cycle before
    probing /image).
-3. R25 lands → the ask-agent re-runs (photo first — its vision context
+3. R25 lands → the ask-agent re-runs (photo first; its vision context
    now exists; then voice with a real transcript).
 4. Edge fixtures (panorama/corrupt/oversized), interruption/replay,
    private reads/ranges/revocation, the evidence PR and closure per
@@ -85,29 +86,29 @@ Owner decisions, do not re-ask:
   C6 #197 behind J5; push STAYS in v1.
 - GM staging and alert recipient: wojtek@honestly.design (KIERO_GM_EMAILS
   on staging; every qualification window widens then restores it).
-- Telemetry: Axiom, dataset kiero-staging (EU) — the ingest leg has
+- Telemetry: Axiom, dataset kiero-staging (EU); the ingest leg has
   never succeeded (#235 records why nobody could tell).
 - VPS: Convex/Wrangler CLIs logged in; do NOT repeat provisioning
   (fiery-raven-417, R2 buckets, the GitHub staging environment, all
   STAGING_* secrets; the only deferred secret is
-  STAGING_CONVEX_BACKUP_ADMIN_KEY — I10's decision).
+  STAGING_CONVEX_BACKUP_ADMIN_KEY; I10's decision).
 
 Open positions to watch:
 
 - **The 100-sub-issue cap** (the owner decision above).
 - The funnel: tools/smoke/mailbox.mjs (mail.tm; latency varies 5-8+ min
-  vs the 15-min OTP validity — fresh mailbox per run, patient polls to
+  vs the 15-min OTP validity; fresh mailbox per run, patient polls to
   ~12 min, one re-request on timeout). The durable upgrade is the owned
   Email Worker on a subdomain (owner DNS decision). The B5 lane's
   e2e/access/lib/mail.mjs generalizes this with id-snapshot freshness.
 - The cache-flip pattern: self-carried registration (R17-R24 precedent)
-  — the repair PR carries its own CLOSED entry + mergedPr + native
+ ; the repair PR carries its own CLOSED entry + mergedPr + native
   relations before merge; OPEN registrations for unfixed defects ride
   the discovering lane's PR (R25/R26 precedent); after merge: the map
   tables, m1 fixtures and the remote audit. **Issue bodies are hashed:
   hash the raw API JSON, never `gh -q .body` output (it appends a
-  newline — lesson #228).**
-- The PWA update handshake CORS-blocked (honest „unavailable") — J4/J6.
+  newline; lesson #228).**
+- The PWA update handshake CORS-blocked (honest „unavailable"); J4/J6.
 - The shared routeUrl in @kiero/runtime for the four remaining inline
   appends; the descriptor-vs-config overlap check (R20's review); the
   access drivers' blind-wait conversion (deferred on PR #233); the
@@ -123,8 +124,8 @@ Operational rules (expensive lessons):
 - After a squash-merge the branch conflicts; rebase the diff onto fresh
   main.
 - Secrets: names/presence only. KIERO_MEDIA_WORKER_TOKEN is a plain
-  Convex variable — never propagate its value.
-- Cloudflare: a var and a secret share one namespace per Worker — a name
+  Convex variable; never propagate its value.
+- Cloudflare: a var and a secret share one namespace per Worker; a name
   collision is code 10053 (R20). A release's container image rolls on
   the sleep→wake boundary: wait ~4 idle minutes before probing.
 - Restore staging mutations (KIERO_GM_EMAILS). Advisory reviews: read
