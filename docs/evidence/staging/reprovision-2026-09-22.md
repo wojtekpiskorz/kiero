@@ -140,3 +140,26 @@ work). The cadences are deliberate lane decisions (F2/F4/I5/I6
 phase is an owner/lane decision under the ADR's waste-first rule, not
 something this session did unilaterally. The usage-limits above bound
 the blast radius in the meantime.
+
+## Follow-up 2026-09-25: runtime configuration
+
+`infra/environments/provision-runtime.mjs` now provisions everything that
+can be generated (values in process memory, set over stdin, never
+printed):
+
+- Convex `dev/main` and `staging`: `JWT_PRIVATE_KEY`, `JWKS`, `SITE_URL`,
+  `KIERO_ENVIRONMENT`, `KIERO_DEPLOYMENT_LABEL`, the VAPID trio,
+  `KIERO_SERVICE_TOKEN`, `KIERO_MEDIA_WORKER_TOKEN`,
+  `KIERO_CALENDAR_TOKEN_KEY`, the Calendar URLs and (staging) the five
+  executor URLs and `AXIOM_DATASET`. Verified: the dev JWKS endpoint
+  serves one RSA key.
+- GitHub `staging`: owner rows 2 (`STAGING_CONVEX_DEPLOY_KEY`,
+  `STAGING_CONVEX_DEPLOYMENT`, variable `STAGING_CONVEX_URL`) are done;
+  `STAGING_CONVEX_BACKUP_ADMIN_KEY` is set to a dedicated deploy key;
+  `STAGING_KIERO_SERVICE_TOKEN` / `STAGING_KIERO_MEDIA_WORKER_TOKEN` match
+  the new Convex values and reach the Workers at the next release.
+
+Still owner-held (row 3): `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`,
+`RESEND_API_KEY`, `RESEND_FROM`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`,
+`AXIOM_API_TOKEN`, `KIERO_GM_EMAILS` on each Convex deployment. Re-run the
+script without `--apply` to list what is missing.

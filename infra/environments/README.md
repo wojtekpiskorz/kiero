@@ -61,3 +61,13 @@ is the sibling note the file itself points to through its fields:
 4. Secrets are injected only through the documented methods in
    [infra/bindings/README.md](../../infra/bindings/README.md); pull requests
    that add a secret name must update that inventory and never a value.
+
+## Runtime configuration
+
+`node infra/environments/provision-runtime.mjs --target dev|staging` lists
+which Convex variables a deployment is missing (names only). With
+`--apply` it generates and sets the self-generated ones (auth keys, VAPID
+pair, service tokens, sealing key, URLs and labels); `--github` also
+mirrors the release-consumed values and fresh deploy keys into the GitHub
+`staging` environment. Provider credentials are never generated.
+
