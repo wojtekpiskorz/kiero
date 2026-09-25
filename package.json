@@ -55,6 +55,7 @@
     "@types/node": "22.20.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
+    "convex-test": "0.0.60",
     "typescript": "5.9.3",
     "vite": "8.2.2",
     "vitest": "5.0.0",
