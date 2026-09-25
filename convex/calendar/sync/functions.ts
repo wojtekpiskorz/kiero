@@ -526,9 +526,8 @@ export const jobInputForReconcile = internalQuery({
  * failed, reconnect-needed and possible-cleanup-remains. The
  * save-to-Google acceptance timing for the 95%-within-60-seconds
  * evaluation is NOT aggregated here: a derived number measured neither
- * "last" nor save-only (a review flagged the old
- * max-latency-over-all-attempts reduce), and a percentile needs the
- * attempt rows anyway — device qualification reads their `desiredAtMs`/`completedAtMs`
+ * "last" nor save-only, and a percentile needs the attempt rows
+ * anyway — device qualification reads their `desiredAtMs`/`completedAtMs`
  * pairs directly.
  */
 export const syncOverview = query({

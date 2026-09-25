@@ -61,9 +61,9 @@ provides:
 | Scheduler | separate per-deployment cron/scheduler queue and durable workflow state |
 | Storage | separate per-deployment file storage namespace |
 | Project-level env defaults | prohibited: `convex env default` values apply per deployment TYPE, and staging is prod-type, so any prod-type default would silently inject variables into the staging deployment; every staging variable is set per-deployment only, and the prod-type default list must stay empty (runbook success check) |
-| Web origin | the staging PWA is served only from the Workers Static Assets Worker `kiero-staging-web` at `https://kiero-staging-web.wojtek-524.workers.dev` (owner decision 2026-09-14, issue no Pages project exists); OAuth redirect URIs are pinned to that origin (see candidate.json) |
+| Web origin | the staging PWA is served only from the Workers Static Assets Worker `kiero-staging-web` at `https://kiero-staging-web.wojtek-524.workers.dev` (owner decision 2026-09-14; no Pages project exists); OAuth redirect URIs are pinned to that origin (see candidate.json) |
 | Environment labels | `ENVIRONMENT=staging` / `KIERO_ENVIRONMENT=staging` stamped by workers and functions |
-| Fixture authorization | proof/fixture flags and proof override variables must stay unset on the staging deployment; the exact enumerated list is maintained in [infra/bindings/convex-functions.md](../bindings/convex-functions.md), and the qualification user path may not be authorized through fixtures or probes  |
+| Fixture authorization | proof/fixture flags and proof override variables must stay unset on the staging deployment; the exact enumerated list is maintained in [infra/bindings/convex-functions.md](../bindings/convex-functions.md), and the qualification user path may not be authorized through fixtures or probes |
 
 Contract rules for addressing and authorizing staging:
 

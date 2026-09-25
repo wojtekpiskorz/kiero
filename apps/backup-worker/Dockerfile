@@ -1,5 +1,5 @@
-# EU backup container image (I5). Bounded, honest (the D6 media image
-# pattern; no FFmpeg here - the backup executor needs only Node and the
+# EU backup container image. Bounded, honest (the media image pattern;
+# no FFmpeg here - the backup executor needs only Node and the
 # pinned Convex CLI):
 #
 # - Node 22 slim; the entry serves the shared backup protocol (/healthz,

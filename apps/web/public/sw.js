@@ -1,12 +1,12 @@
 /*
- * Kiero PWA service worker (F3: web push).
+ * Kiero PWA service worker (web push).
  *
  * Scope: ONLY notification presentation and click-through. This worker
  * deliberately installs NO fetch handler and NO cache: protected data
  * reaches the app exclusively through live authorized queries, so no
  * cached copy can ever bypass current authentication or company access
  * (the hard rule in apps/web/src/app/pwa/composition.ts). Update
- * behavior belongs to I7.
+ * behavior lives in apps/web/src/pwa/update.
  *
  * Push messages arrive RFC 8030/8291-encrypted; the browser decrypts and
  * hands this worker the JSON payload the Kiero server composed:
@@ -15,7 +15,7 @@
  *
  * notificationclick never marks anything read ("Nieprzeczytany wpis"
  * changes only when the person sees the original in the app) and never
- * performs any server call. R3 (issue #128): the click navigates only to
+ * performs any server call. The click navigates only to
  * a VALIDATED relative same-origin target - the payload's canonical
  * source dossier, task record or Co teraz route - and it rejects
  * absolute, protocol-relative, cross-origin and unknown routes outright

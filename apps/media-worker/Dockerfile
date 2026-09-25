@@ -1,18 +1,16 @@
-# EU media container image (D6). Bounded, honest:
+# EU media container image. Bounded, honest:
 # - Node 22 slim + ffmpeg: the conversion/segmentation runtime the scoped
 #   EU Container exists for (architecture "Deployment and ownership").
 # - The entry serves the segment protocol (/healthz, /probe, /segment) with
 #   PCM WAV slicing exact and FFmpeg conversion of non-WAV retained audio
-#   (R30, the voice byte channel): the container process verifies the
+#   (the voice byte channel): the container process verifies the
 #   binary at startup and converts under explicit bounds (input byte cap,
 #   output duration cap, wall-clock timeout; typed refusals on breach).
 # - No credentials are baked in: R2 media S3 keys and the segment bearer
 #   token arrive as container runtime env (forwarded by the DO class),
 #   never as image layers.
-# - Deploy state (observed live by D6): this image builds for linux/amd64,
-#   deploys and serves under the EU jurisdiction constraints on the current
-#   account — the preflight's Workers-Paid assumption did not materialize.
-#   The only pending owner action is the R2 media S3 token (dashboard).
+# - This image builds for linux/amd64 and deploys under the EU jurisdiction
+#   constraints on the current account.
 
 # linux/amd64 explicitly: local docker on arm64 Macs would otherwise build
 # an arm64 image the Cloudflare Container VM cannot run (requirement:

@@ -31,7 +31,7 @@ import { fileURLToPath as nodeFileURLToPath } from "node:url";
 /** The canonical evidence ledger path (append-only). */
 export const RELEASE_EVIDENCE_PATH = new URL("./evidence/releases.jsonl", import.meta.url);
 
-/** The terminal component outcomes (R6 truthfulness contract). */
+/** The terminal component outcomes (truthfulness contract). */
 export const COMPONENT_OUTCOMES = ["deployed", "skipped", "blocked"];
 
 /** Builds one "release-attempt" record (pure; the caller supplies every field). */
