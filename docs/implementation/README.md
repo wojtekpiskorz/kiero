@@ -1,10 +1,10 @@
 # Kiero core implementation package
 
-The application is implemented across 48 integrated historical issues. The 2026-09-12 review identified repairs and missing real-service qualification. The map's native children are the prior implementation issues, the registered repair and proof issues, and the map administration tasks; the audit derives current counts and remaining work from the manifest. The inventory's remaining-execution table lists every issue that still owes implementation or qualification work.
+The application is implemented across 48 integrated historical issues. The 2026-09-12 review identified repairs and missing real-service qualification. The map's native children on GitHub are the prior implementation issues and the registered repair and proof issues.
 
 The target remains a complete accepted core behind an unstyled Polish PWA. Final design integration, production activation and the four-week live alpha remain separate work.
 
-Start with the [live implementation map](https://github.com/wojtekpiskorz/kiero/issues/240) (continuing the closed [archive #15](https://github.com/wojtekpiskorz/kiero/issues/15)) and [coordinator prompt](coordinator-start-prompt.md). Before selecting work, run `rtk proxy node docs/implementation/audit-map.mjs --remote` from a clean, current checkout. GitHub native blockers are readiness authority; this committed inventory is a dated cache.
+Start with the [live implementation map](https://github.com/wojtekpiskorz/kiero/issues/240) (continuing the closed [archive #15](https://github.com/wojtekpiskorz/kiero/issues/15)) and [coordinator prompt](coordinator-start-prompt.md). GitHub native blockers are readiness authority: query them before selecting work. The committed inventory is a dated snapshot, not a mirror to keep in sync.
 
 The [2026-09-14 VPS resumption record](vps-resumption-2026-09-14.md) is
 historical: it superseded the older cloud-setup assumptions, and the
@@ -19,7 +19,6 @@ outstanding; real-service qualification (B5/D7/I11 onward) is.
 - [Execution charter](execution-charter.md): accepted scope, ownership and completion conditions.
 - [Proof ownership](proof-ownership.md): P01-P12 evidence boundaries, thresholds and responsible issues.
 - [UX coverage](ux-coverage.md): all 61 accepted design-inventory operations and follow-up owners.
-- [Full manifest](issues.json): canonical cached issue bodies, hashes, identities and native edges.
 - [Review record](../evidence/map-review/2026-09-12.md): verified baseline, defects and test results.
 - [Architecture proof cases](../mvp/architecture-proof-matrix.md), [alpha readiness](../mvp/alpha-readiness.md), [contracts](contracts/README.md) and [glossary](../../CONTEXT.md): accepted requirements.
 
