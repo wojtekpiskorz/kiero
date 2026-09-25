@@ -1,5 +1,5 @@
 /**
- * Release evidence recording (I7/R6): appends immutable records to the
+ * Release evidence recording: appends immutable records to the
  * append-only ledger infra/release/evidence/releases.jsonl (or a path the
  * caller chooses). The ledger carries two record kinds:
  *
@@ -45,7 +45,7 @@ export function buildReleaseRecord({
   descriptorId = null,
   notes = null,
   migrationLedgerText = null,
-  // I8: the worker runtime-secret injection outcomes (names-only rows
+  // The worker runtime-secret injection outcomes (names-only rows
   // written by inject-worker-secrets.mjs), or null when the injection
   // step never ran (deploy refused before it).
   runtimeSecretsOutcomes = null,

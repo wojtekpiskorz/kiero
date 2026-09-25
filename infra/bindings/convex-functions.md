@@ -5,7 +5,7 @@ via `npx --yes convex@1.45.0 dev|deploy`). Convex actions perform the
 OpenRouter AI calls (chat, vision, STT, embeddings) with server-owned
 configuration, per the accepted architecture.
 
-I8 reconciliation (issue #133, 2026-09-12): every name below was re-checked
+Staging reconciliation (2026-09-12): every name below was re-checked
 against the actual runtime reads (`grep process.env` over `convex/`).
 `AUTH_RESEND_KEY` never existed at runtime and is removed in favor of the
 real names `RESEND_API_KEY` / `RESEND_FROM`; the Google OAuth, Web Push
@@ -19,17 +19,17 @@ now part of the inventory. Presence states live in
 | --- | --- | --- | --- | --- |
 | `JWT_PRIVATE_KEY` | Convex Auth session issuance | Deployment-specific RS256 PKCS#8 signing key | `STAGING_JWT_PRIVATE_KEY` GitHub environment secret and per-deployment Convex variable, transferred through stdin | SET on staging 2026-09-14; in-memory signature verification passed; deployed auth proof pending |
 | `JWKS` | Convex Auth verification endpoint | Public verification keys derived from the staging signing key | `STAGING_JWKS` GitHub environment secret and per-deployment Convex variable | SET on staging 2026-09-14; published endpoint proof pending |
-| `DEEPSEEK_API_KEY` | Direct DeepSeek provider adapter (E8: chat, vision) | Owner-selected direct API access to `deepseek-flash`, observed as V4.1 Flash on 2026-09-14 | `STAGING_DEEPSEEK_API_KEY` GitHub environment secret and per-deployment Convex variable | name present in both staging stores (2026-09-14); E8 implements the direct client; first live call pending a successful release |
+| `DEEPSEEK_API_KEY` | Direct DeepSeek provider adapter (chat, vision) | Owner-selected direct API access to `deepseek-flash`, observed as V4.1 Flash on 2026-09-14 | `STAGING_DEEPSEEK_API_KEY` GitHub environment secret and per-deployment Convex variable | name present in both staging stores (2026-09-14); the direct client is implemented; first live call pending a successful release |
 | `OPENROUTER_API_KEY` | AI actions (chat-vision fallback, STT, embeddings) | OpenRouter API authentication for model calls from server actions | `npx --yes convex@1.45.0 env set OPENROUTER_API_KEY` per deployment (dev: locally; staging/alpha: CI from GitHub secret), or dashboard Settings > Environment Variables | name present in GitHub staging + Convex staging (2026-09-14, names-only); first live call pending a successful release |
 | `RESEND_API_KEY` | `convex/integrations/email/resend.ts` (exported `RESEND_API_KEY_NAME`) | Resend credential for transactional email (OTP/invites); runtime reads exactly this name, not `AUTH_RESEND_KEY` | same as above | name present in both staging stores (2026-09-14); domain woji.dev owner-verified; runtime send NOT RUN (no deployed functions) |
 | `RESEND_FROM` | same module | verified sender identity for outgoing email | same as above | name present in both staging stores (2026-09-14); runtime send NOT RUN |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | `convex/access/identity/authEntry.ts`, `providerAvailability.ts`; reused by `convex/calendar/connection/*` | Google OAuth client for sign-in and Calendar connection (one client per environment; redirect URIs pinned in the staging evidence) | same as above | client created in project kiero-508611 (External/Testing, one test user); names present in both staging stores; runtime flow untested |
-| `WEB_PUSH_VAPID_PUBLIC_KEY` / `WEB_PUSH_VAPID_PRIVATE_KEY` / `WEB_PUSH_VAPID_SUBJECT` | `convex/attention/push/functions.ts`, `proofService.ts` | VAPID keypair for Web Push delivery and subscription proof verification | same as above | SET on staging 2026-09-14 (I8-generated fresh P-256 pair, RFC 8292 shapes verified in memory; subject = the public staging web origin; public key also reaches the PWA through the proof/subscription path, never a committed file); deployed push proof pending |
+| `WEB_PUSH_VAPID_PUBLIC_KEY` / `WEB_PUSH_VAPID_PRIVATE_KEY` / `WEB_PUSH_VAPID_SUBJECT` | `convex/attention/push/functions.ts`, `proofService.ts` | VAPID keypair for Web Push delivery and subscription proof verification | same as above | SET on staging 2026-09-14 (fresh P-256 pair, RFC 8292 shapes verified in memory; subject = the public staging web origin; public key also reaches the PWA through the proof/subscription path, never a committed file); deployed push proof pending |
 | `KIERO_SERVICE_TOKEN` | `convex/platform/http.ts`, `processing/images`, `operations/deletion`, `operations/exports`, `calendar/connection/http.ts` | shared service bearer for the verified Convex protocol routes (platform, executors, calendar callbacks) | Convex deployment variable + matching worker-side secret (`infra/bindings/backup-worker.md`, `media-export-workers.md`) | SET on dev by lane proofs; SET on staging 2026-09-14 (names-only verified in both stores); worker-side injection pending the first staging worker deploys |
-| `KIERO_MEDIA_WORKER_TOKEN` | `convex/processing/multimodal/vision.ts`, `processing/audio/media.ts` | bearer Convex presents to the media executor's `/probe` and `/segment` routes (reader side of the media worker's `MEDIA_SEGMENT_TOKEN`) | Convex deployment variable | SET on dev (D6 live proof); SET on staging 2026-09-14 (names-only); worker-side `MEDIA_SEGMENT_TOKEN` injection pending |
+| `KIERO_MEDIA_WORKER_TOKEN` | `convex/processing/multimodal/vision.ts`, `processing/audio/media.ts` | bearer Convex presents to the media executor's `/probe` and `/segment` routes (reader side of the media worker's `MEDIA_SEGMENT_TOKEN`) | Convex deployment variable | SET on dev (transcription live proof); SET on staging 2026-09-14 (names-only); worker-side `MEDIA_SEGMENT_TOKEN` injection pending |
 | `KIERO_CALENDAR_TOKEN_KEY` | `convex/calendar/connection/credentialStore.ts` | key sealing stored Google Calendar credentials | Convex deployment variable | SET on staging 2026-09-14 (names-only in both stores); runtime seal/unseal untested |
-| `CONVEX_BACKUP_ADMIN_KEY` | backup executor (not Convex env) | Convex access token driving the documented export (I5-finalized mechanism) | stored only in the backup runtime environment | PENDING (owner) |
-| `AXIOM_API_TOKEN` | telemetry sink forwarder | Axiom ingest credential (redacted diagnostic events) | `npx --yes convex@1.45.0 env set AXIOM_API_TOKEN` per deployment | PENDING owner account provisioning (I2 consumer implemented) |
+| `CONVEX_BACKUP_ADMIN_KEY` | backup executor (not Convex env) | Convex access token driving the documented export (finalized mechanism) | stored only in the backup runtime environment | PENDING (owner) |
+| `AXIOM_API_TOKEN` | telemetry sink forwarder | Axiom ingest credential (redacted diagnostic events) | `npx --yes convex@1.45.0 env set AXIOM_API_TOKEN` per deployment | PENDING owner account provisioning (consumer implemented) |
 
 ## Non-secret variables (names only)
 
@@ -61,7 +61,7 @@ probes), `KIERO_ECHO_TARGET` (platform echo diagnostics) and the calendar
 proof overrides `KIERO_CALENDAR_GOOGLE_API_BASE_OVERRIDE`,
 `KIERO_CALENDAR_TOKEN_ENDPOINT_OVERRIDE` gate fixture/probe authorization
 and fake endpoints. Enabling any of them on a deployment opens non-user
-authorization paths; issue #133 forbids them on the staging qualification
+authorization paths; they are forbidden on the staging qualification
 user path. They are set only on dedicated dev deployments by their owning
 proof lanes.
 
@@ -77,7 +77,7 @@ the current deployment; see
 - Convex environment variables are per-deployment: setting `OPENROUTER_API_KEY`
   on the dev deployment does not affect staging/alpha: each deployment gets
   its own injection. Staging is a named deployment inside `kiero-dev-core`
-  (I8 reconciliation), so its variables are set with
+  (staging reconciliation), so its variables are set with
   `npx --yes convex@1.45.0 env set <NAME> --deployment wojtek-piskorz-jr:kiero-dev-core:staging`-style
   addressing or the dashboard.
 - Verification without values: `npx --yes convex@1.45.0 env list --names-only

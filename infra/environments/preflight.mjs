@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Kiero environment preflight (issue #53, I1).
+// Kiero environment preflight.
 //
 // One documented command that reports each required capability as
 // VERIFIED / UNAVAILABLE / PENDING without revealing secret values.

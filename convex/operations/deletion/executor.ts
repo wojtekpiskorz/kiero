@@ -17,7 +17,7 @@
  *   fragments are DELETED (this is permanent deletion, not withdrawal
  *   history); an in-flight change set of the source fails with the typed
  *   purge reason so a late AI plan cannot publish over the tombstone
- *   (the publish re-check stays the structural guard). R2:
+ *   (the publish re-check stays the structural guard).
  *   BEFORE the fragments leave, the clarification content linked through
  *   them (and through resolution evidence) is purged in one idempotent
  *   per-source pass — associations removed, possibly derived text

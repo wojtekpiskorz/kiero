@@ -12,7 +12,7 @@
  * existing reads: company resolved from the verified context, project
  * scope tenant-checked, everything ordered and bounded.
  *
- * R2 makes this read ride the ONE shared clarification
+ * This read rides the ONE shared clarification
  * content rule (`clarificationContentRuleOf` in ./references, the lane's
  * rule-text home): a link whose source's CONTENT is gone (missing,
  * cross-company or `purged`) is dead, possibly derived text redacts to
@@ -270,7 +270,7 @@ export async function readClarificationRows(
     const rule = await clarificationContentRuleOf(db, clarification);
     if (!rule.actionable) {
       // A redacted open case is not actionable: Pamięć and Co teraz must
-      // not list it (R2).
+      // not list it.
       continue;
     }
     if (out.length >= MAX_CLARIFICATION_ROWS) {

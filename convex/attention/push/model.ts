@@ -5,8 +5,7 @@
  * so every rule is unit-testable without a deployment while
  * ./operations.ts re-runs the SAME functions inside transactions).
  *
- * Semantics pinned by issue 43's bounded solution and the accepted
- * notification decision:
+ * Semantics pinned by the accepted notification decision:
  *
  * - The unit of delivery is the COLLAPSED summary on one delivered
  *   intent: ONE notification per recipient, bucket and fire instant -

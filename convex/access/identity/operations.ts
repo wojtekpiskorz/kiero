@@ -223,7 +223,7 @@ function accessHandlers(): HandlerRegistry<MutationCtx> {
 /**
  * The dispatch entry: the checked command path with the live-session
  * identity source and identity policy. Operations not listed here (invitations,
- * GM mode) stay fail-closed `unsupported`. The amendment
+ * GM mode) stay fail-closed `unsupported`. The table also
  * composes the linking handlers (`access.linkVerifiedMethod`) into the
  * same registry: one dispatch, one checked path, no drift.
  */

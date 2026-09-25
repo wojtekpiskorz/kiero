@@ -1,7 +1,6 @@
 /**
  * Task-reminder transactions: the durable schedule recompute, the
- * due-time evaluator and the personal snooze (issue 44's bounded
- * solution).
+ * due-time evaluator and the personal snooze.
  *
  * Everything runs inside ONE Convex mutation transaction per call:
  *
@@ -444,7 +443,7 @@ type TaskRecheck =
 
 /**
  * THE due-time re-check: the FINAL recipient, state, term and schedule
- * epoch decide, never the payload's snapshot (issue 44's race acceptance:
+ * epoch decide, never the payload's snapshot (the race case:
  * the assignee or state changed while the reminder sat due).
  */
 async function recheckTaskAtDue(

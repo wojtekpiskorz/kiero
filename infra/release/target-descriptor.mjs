@@ -1,5 +1,5 @@
 /**
- * The shared release-target descriptor (R6): the ONE format the guard
+ * The shared release-target descriptor: the ONE format the guard
  * (verify-target.mjs), the deploy adapter (deploy-component.mjs), the
  * Checks gate (verify-checks.mjs) and the evidence recorder
  * (record-release-evidence.mjs) all consume.
@@ -18,7 +18,7 @@
  *   convex-deploy transport may additionally pin `expectedIdentity`: the
  *   provider-observed identity (team, project, reference, type, slug, URL,
  *   default-ness) the credential must resolve to before any mutating
- *   command runs (R9).
+ *   command runs.
  *
  * Authorization is intrinsic and re-checked at every layer: the descriptor
  * target must match the requested target, the runtime environment label
@@ -50,7 +50,7 @@ export function isCommittedDescriptorPath(path, cwd = process.cwd()) {
 }
 
 /**
- * Committed-descriptor rule (R6 hardening): files under
+ * Committed-descriptor rule: files under
  * infra/release/targets must never use the stub transport, so an edit to
  * a committed descriptor cannot mint synthetic "deployed" records from
  * the test transport. Returns violations (empty when clean).
@@ -112,7 +112,7 @@ function checkTransportFields(kind, transport, violations) {
     }
   }
   if (kind === "convex-deploy") {
-    // R9: the pinned provider-observed identity a Convex transport may
+    // The pinned provider-observed identity a Convex transport may
     // deploy to. Optional at the format level (alpha production stays
     // unpinned until its deployment exists); the deploy adapter's
     // credential-target gate refuses any unpinned Convex component, so an
@@ -250,11 +250,11 @@ export function validateTargetDescriptor(value) {
       );
     }
     if (component.runtimeSecrets !== undefined) {
-      // I8: the worker RUNTIME secret plane. Names follow the binding
+      // The worker RUNTIME secret plane. Names follow the binding
       // docs; sources are the deployment-scoped store names (GitHub
       // environment secrets). `deferred` marks names whose value is an
       // explicitly recorded owner decision still pending (e.g.
-      // CONVEX_BACKUP_ADMIN_KEY until I10): the injector records them
+      // CONVEX_BACKUP_ADMIN_KEY while unset): the injector records them
       // instead of refusing.
       if (!Array.isArray(component.runtimeSecrets) || component.runtimeSecrets.length === 0) {
         violations.push(`${where} runtimeSecrets must be a non-empty array when present`);
@@ -281,7 +281,7 @@ export function validateTargetDescriptor(value) {
           if (entry.deferred !== undefined && typeof entry.deferred !== "boolean") {
             violations.push(`${where} runtimeSecrets deferred must be a boolean when present`);
           }
-          // R19: an optional `format` composes the injected value from the
+          // An optional `format` composes the injected value from the
           // source (exactly one `{}` placeholder); the EU R2 endpoints are
           // URLs built from the nonsecret account id, never committed whole.
           if (entry.format !== undefined) {

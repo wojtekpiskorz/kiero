@@ -7,10 +7,10 @@ exists: `outgoing-marlin-429` (prod-type, reference `staging`, region
 the billing incident — the previous `fiery-raven-417` is gone; see
 [docs/evidence/staging/reprovision-2026-09-22.md](../../docs/evidence/staging/reprovision-2026-09-22.md)).
 The R2 buckets, workers and the GitHub-side `staging` environment
-variables/secrets remain PENDING owner/I8 actions. The R6 release adapter
+variables/secrets remain PENDING owner actions. The release adapter
 consumes the same names through `infra/release/targets/staging.json` and
 records a BLOCKED outcome (naming the missing configuration) until they
-exist; since R9 the descriptor also pins the deployment's identity, and the
+exist; the descriptor also pins the deployment's identity, and the
 adapter refuses to run any Convex deploy whose credential does not resolve
 exactly that identity.
 
@@ -20,7 +20,7 @@ The dated snapshot of how those rules were checked, plus the release
 runbook and the current release-workflow credential mapping status, live in
 [docs/evidence/staging/README.md](../../docs/evidence/staging/README.md).
 
-Topology reconciliation (I8, 2026-09-12): an earlier revision of this file
+Topology reconciliation (2026-09-12): an earlier revision of this file
 prescribed a new Convex project `kiero-staging-core`. The owner's binding
 resource instruction ([#15 checkpoint,
 2026-09-12](https://github.com/wojtekpiskorz/kiero/issues/15#issuecomment-5618841487))
@@ -36,7 +36,7 @@ a separate project.
 | Environment name | `staging` (synthetic staging, CI deploy target) |
 | Convex team | `wojtek-piskorz-jr` |
 | Convex project | `kiero-dev-core` (existing; shared with dev by owner instruction, and no new project may be created) |
-| Convex deployment | `outgoing-marlin-429`: prod-type, reference `staging`, full selector `wojtek-piskorz-jr:kiero-dev-core:staging`, URL `https://outgoing-marlin-429.eu-west-1.convex.cloud` (region `eu-west-1`), non-default (created without `--default`; R9 pinned it in the staging descriptor; recreated 2026-09-22 in the same shape) |
+| Convex deployment | `outgoing-marlin-429`: prod-type, reference `staging`, full selector `wojtek-piskorz-jr:kiero-dev-core:staging`, URL `https://outgoing-marlin-429.eu-west-1.convex.cloud` (region `eu-west-1`), non-default (created without `--default`; the staging descriptor pins it; recreated 2026-09-22 in the same shape) |
 | Cloudflare account | same account as dev (see evidence doc for the id) |
 | Cloudflare resource prefix | `kiero-staging-` |
 
@@ -60,10 +60,10 @@ provides:
 | Credentials | separate per-deployment environment variables and auth keys; Convex Auth JWT key material is deployment configuration, and `convex env set` on one deployment never touches another |
 | Scheduler | separate per-deployment cron/scheduler queue and durable workflow state |
 | Storage | separate per-deployment file storage namespace |
-| Project-level env defaults | prohibited: `convex env default` values apply per deployment TYPE, and staging is prod-type, so any prod-type default would silently inject variables into the staging deployment; every staging variable is set per-deployment only, and the prod-type default list must stay empty (runbook R9 success check) |
-| Web origin | the staging PWA is served only from the Workers Static Assets Worker `kiero-staging-web` at `https://kiero-staging-web.wojtek-524.workers.dev` (owner decision 2026-09-14, issue R8 #167; no Pages project exists); OAuth redirect URIs are pinned to that origin (see candidate.json) |
+| Project-level env defaults | prohibited: `convex env default` values apply per deployment TYPE, and staging is prod-type, so any prod-type default would silently inject variables into the staging deployment; every staging variable is set per-deployment only, and the prod-type default list must stay empty (runbook success check) |
+| Web origin | the staging PWA is served only from the Workers Static Assets Worker `kiero-staging-web` at `https://kiero-staging-web.wojtek-524.workers.dev` (owner decision 2026-09-14, issue no Pages project exists); OAuth redirect URIs are pinned to that origin (see candidate.json) |
 | Environment labels | `ENVIRONMENT=staging` / `KIERO_ENVIRONMENT=staging` stamped by workers and functions |
-| Fixture authorization | proof/fixture flags and proof override variables must stay unset on the staging deployment; the exact enumerated list is maintained in [infra/bindings/convex-functions.md](../bindings/convex-functions.md), and the qualification user path may not be authorized through fixtures or probes (issue #133 acceptance) |
+| Fixture authorization | proof/fixture flags and proof override variables must stay unset on the staging deployment; the exact enumerated list is maintained in [infra/bindings/convex-functions.md](../bindings/convex-functions.md), and the qualification user path may not be authorized through fixtures or probes  |
 
 Contract rules for addressing and authorizing staging:
 
@@ -73,11 +73,11 @@ Contract rules for addressing and authorizing staging:
    deployment only, and the pinned CLI ignores `CONVEX_DEPLOYMENT`
    entirely when such a key is set). `CONVEX_DEPLOYMENT` carries the
    reference `wojtek-piskorz-jr:kiero-dev-core:staging` as declared intent
-   only, never as evidence. Since R9 the release transport resolves the
+   only, never as evidence. The release transport resolves the
    credential-selected deployment through a read-only probe BEFORE any
    mutating command and accepts the run only when the provider-observed
    type/team/project/reference/slug/URL/default-ness match the identity
-   pinned in `infra/release/targets/staging.json` (the runbook R11 success
+   pinned in `infra/release/targets/staging.json` (the runbook success
    check, enforced pre-mutation instead of glanced at post-hoc).
 2. Staging is addressed only through the explicit reference. The deployment
    carries no `--default` flag, so bare `convex dev` / `convex deploy`
@@ -91,7 +91,7 @@ Dated verification of these rules (CLI source reading, probe commands and
 outputs) and the release-workflow credential mapping status with its
 follow-up are recorded once in the evidence snapshot
 ([docs/evidence/staging/README.md](../../docs/evidence/staging/README.md),
-runbook R4); this contract links there instead of restating them.
+runbook); this contract links there instead of restating them.
 
 Fallback if the plan refuses a second prod-type deployment: record BLOCKED
 with the exact dashboard error. A dev-type lease (`--type dev`, optionally
@@ -128,17 +128,17 @@ see [infra/bindings/](../bindings/README.md)):
 `RESEND_FROM`; the inventory now matches the code.)
 
 GitHub Actions secret names for staging follow `STAGING_<NAME>` (for example
-`STAGING_OPENROUTER_API_KEY`); only unsuffixed names exist today. The R6
-release workflow also references `STAGING_CONVEX_DEPLOYMENT` (the staging
+`STAGING_OPENROUTER_API_KEY`); only unsuffixed names exist today. The release
+workflow also references `STAGING_CONVEX_DEPLOYMENT` (the staging
 deployment reference, consumed as `CONVEX_DEPLOYMENT`),
 `STAGING_CLOUDFLARE_API_TOKEN` and `STAGING_CLOUDFLARE_ACCOUNT_ID` (wrangler
 deploy credentials for the static-assets web Worker and the four workers,
 consumed under wrangler's own names), and `STAGING_CONVEX_DEPLOY_KEY`
 (deployment-scoped Convex deploy key, consumed as `CONVEX_DEPLOY_KEY`; see
-the evidence snapshot's runbook R4 for the workflow mapping status). The
+the evidence snapshot's runbook for the workflow mapping status). The
 non-secret build inputs are mapped from `staging` GitHub environment
 variables (`vars` context), created at provisioning time: `VITE_CONVEX_URL`
-from `STAGING_CONVEX_URL` (the deployment URL) and, since R8,
+from `STAGING_CONVEX_URL` (the deployment URL) and, 
 `VITE_GATEWAY_URL` from `STAGING_GATEWAY_URL` (the staging gateway Worker's
 public URL). Both are required by name in the descriptor's `requiredConfig`
 before any web transport starts; neither is a credential.
@@ -156,7 +156,7 @@ adapter's `wrangler-deploy` transport; workers.dev origin
 reference `staging` inside project `kiero-dev-core`.
 
 Workers static assets replaced the former Pages web host by the owner's
-decision of 2026-09-14 (issue R8 #167); the Pages project is not created
+decision of 2026-09-14 ; the Pages project is not created
 and no Pages provisioning step remains for staging.
 
 ## EU requirements
@@ -165,16 +165,16 @@ and no Pages provisioning step remains for staging.
   allowed region for any Kiero deployment.
 - R2 buckets with `--jurisdiction eu --location weur`.
 - Containers with `constraints.jurisdiction: "eu"` (requires wrangler >= 4.130
-  pending; owner A3, see docs/evidence/environment/preflight-2026-09.md).
+  pending; see docs/evidence/environment/preflight-2026-09.md).
 
 ## Command aliases (wrong-environment guardrail)
 
 - Staging deploys are explicit: `wrangler deploy --env staging` inside `apps/*`
   (the `staging` env blocks point only at `kiero-staging-*` names) and
   Convex pushes authorized by the deployment-scoped staging deploy key, in
-  CI via the R6/R9 transport (`CONVEX_DEPLOY_KEY` from
+  CI via the release transport (`CONVEX_DEPLOY_KEY` from
   `STAGING_CONVEX_DEPLOY_KEY`, plus the `CONVEX_DEPLOYMENT` intent label).
-  Actual pinned-CLI semantics (R9 read-only probes, 2026-09-14; the earlier
+  Actual pinned-CLI semantics (read-only probes, 2026-09-14; the earlier
   "deploy staging locally by reference" guidance here was wrong and is
   withdrawn):
   - `convex deploy` takes NO `--deployment` flag; its target selection is
@@ -239,6 +239,6 @@ and `STAGING_GATEWAY_URL` and its secrets `STAGING_CONVEX_DEPLOYMENT`,
 `STAGING_CLOUDFLARE_ACCOUNT_ID` (plus the `STAGING_<NAME>` runtime
 credentials above as provisioning proceeds).
 
-Owner: I8 #133 (this ticket) defines the contract; the owner/coordinator
-executes the authenticated provisioning and the first real staging release
-following the recorded runbook. These stay PENDING until then.
+This file defines the contract. Generated runtime values come from
+`infra/environments/provision-runtime.mjs`; provider credentials are the
+owner's to set.

@@ -1,4 +1,4 @@
-# Release (I7, R6)
+# Release
 
 The release surfaces for issues #59 and #131: the pinned workflow, the
 checked deploy adapters, the exact-SHA Checks gate, the expand-migrate-
@@ -62,7 +62,7 @@ only; presence is checked at deploy time, values are never read here.
    evidence/releases.jsonl --outcomes deploy-outcomes.json`, the checked
    adapter. It re-validates the Checks report itself, requires the
    runtime label to equal the descriptor target, checks configuration
-   NAMES for presence, and for every Convex component runs the R9
+   NAMES for presence, and for every Convex component runs the target
    credential-target gate (`verify-convex-target.mjs`) BEFORE any build
    or transport command: the read-only `convex deploy --dry-run` probe
    resolves the deployment the CONVEX_DEPLOY_KEY credential actually
@@ -122,7 +122,7 @@ After a bad release, repair is code-level only
   production job runs under the alpha-production environment NAME.
   Whether environment protection is actually configured is live GitHub
   state this YAML cannot claim; provisioning and the first protected
-  execution are owner/I8 work.
+  execution are owner work.
 - Concurrency: one release per target at a time; a concurrent attempt
   queues (never cancels) and still stops at the alpha-production
   environment.
@@ -142,7 +142,7 @@ After a bad release, repair is code-level only
 row count, runtime and client versions, migration-ledger SHA-256, and
 the dispatcher's notes when supplied) and
 `component-outcome` (the three terminal states above). Nothing edits or
-removes lines. J4/J5 qualification and the owner matrix consume this
+removes lines. Qualification and the owner matrix consume this
 ledger.
 
 ## The PWA update flow (consumer note)

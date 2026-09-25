@@ -54,7 +54,7 @@ import type {
  * is reachable through the SAME checked command path (the barebones UI query
  * in ./functions.ts is the reactive convenience read).
  *
- * Notes (additive, flagged): the extension operations this dispatch
+ * The extension operations this dispatch
  * left fail-closed `unsupported` are now registered from the extensions
  * lane's own registry (memory.defineExtension, versionExtensionDefinition,
  * searchExtensionCatalog, validateExtensionValue) — one merged handler table,

@@ -1,5 +1,5 @@
 {
-  "description": "Provider hard limits and observed-cost measurement for complete backups (I5, P12). The backup run MEASURES its usage (database export bytes, pooled media bytes, S3 class A/B operation counts) and records it: per-manifest byte columns on recoveryManifests, per-run cost entries (provider 'backup', categories export/storage/egress) in the 400/500 PLN accounting, and the pooled-bytes-vs-allowance comparison in the backups state read. Amounts are 0 minor (observed) while inside free allowances; an overage is NEVER silently absorbed and NEVER silently changes the backup frequency - it is a loud typed failure plus an owner decision (the pre-user daily cadence is such a recorded decision, docs/adr/mvp-cost-envelope-2026-09.md). R2 overage pricing is USD-denominated; PLN conversion for the budget accounting is an owner decision recorded here as PENDING, not an invented rate.",
+  "description": "Provider hard limits and observed-cost measurement for complete backups. The backup run MEASURES its usage (database export bytes, pooled media bytes, S3 class A/B operation counts) and records it: per-manifest byte columns on recoveryManifests, per-run cost entries (provider 'backup', categories export/storage/egress) in the 400/500 PLN accounting, and the pooled-bytes-vs-allowance comparison in the backups state read. Amounts are 0 minor (observed) while inside free allowances; an overage is NEVER silently absorbed and NEVER silently changes the backup frequency - it is a loud typed failure plus an owner decision (the pre-user daily cadence is such a recorded decision, docs/adr/mvp-cost-envelope-2026-09.md). R2 overage pricing is USD-denominated; PLN conversion for the budget accounting is an owner decision recorded here as PENDING, not an invented rate.",
   "r2": {
     "plan": "free",
     "storageFreeBytes": 10000000000,
@@ -15,11 +15,11 @@
     "snapshotSlotCleanup": "the zip export creates no persistent snapshot slots (a fresh zip per run); native snapshot-based exports, when later adopted, must measure slot creation/cleanup against the plan (P10 row in docs/evidence/backups/README.md)"
   },
   "containers": {
-    "plan": "Containers runtime verified deployable on the current account (D6 observed 2026-09-10, no Workers-Paid blocker); dev instance type until alpha provisioning"
+    "plan": "Containers runtime verified deployable on the current account (observed 2026-09-10, no Workers-Paid blocker); dev instance type until alpha provisioning"
   },
   "measurement": {
     "perRun": "databaseBytes/mediaBytes/mediaObjectCount plus classAOps/classBOps on the manifest row; the executor counts its S3 port calls (Class A: PUTs/DELETEs; Class B: GETs/HEADs/LISTs)",
-    "perMonth": "cost entries by period (YYYY-MM) in the 400/500 PLN accounting (I2 seam); the state read sums the month's verified runs",
+    "perMonth": "cost entries by period (YYYY-MM) in the 400/500 PLN accounting ; the state read sums the month's verified runs",
     "stateRead": "pooledBytes vs storageFreeBytes, withinStorageFreeAllowance, monthlyClassAOps/monthlyClassBOps and the exceededAllowances categories in /operations/backups/state"
   }
 }

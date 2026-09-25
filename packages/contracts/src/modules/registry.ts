@@ -251,8 +251,8 @@ export const deliverPushInput = Schema.Struct({
 // share one closed input. Both work events (`work.taskChanged` and
 // `work.taskStateChanged`) project onto the ONE `task_changed` trigger:
 // the recompute re-reads the live task row, so the state event needs no
-// reaction of its own (PR #102 review round 1 dropped the certified but
-// never-produced `task_state_changed` literal). The work events' dedup
+// reaction of its own (no `task_state_changed` literal exists: nothing
+// produced it). The work events' dedup
 // identity already carries the task revision
 // (`work.<event>:<id>:<revision>`), so the projection rides the row's key
 // and every distinct change registers its own job while replays collapse.

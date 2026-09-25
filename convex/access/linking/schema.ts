@@ -77,8 +77,7 @@ export const linkingTables = {
   })
     .index("by_user_started", ["userId", "startedAtMs"])
     .index("by_email_state", ["email", "state"])
-    // Staged for the ceremony expiry sweeper (no sweeper ships in B2's
-    // scope; nothing reads this index today — kept so the sweeper does not
+    // Staged for the ceremony expiry sweeper (no sweeper ships yet; nothing reads this index today — kept so the sweeper does not
     // ship a schema change later).
     .index("by_state_started", ["state", "startedAtMs"]),
 
@@ -121,7 +120,7 @@ export const linkingTables = {
     /** Whether the linked Google subject was detached. */
     clearedGoogleSubject: v.boolean(),
   })
-    // Staged for the B4 GM recovery-audit view (nothing reads this index
-    // today; B2 only writes the ledger rows).
+    // Staged for the GM recovery-audit view (nothing reads this index
+    // today; linking only writes the ledger rows).
     .index("by_user_time", ["userId", "performedAtMs"]),
 } as const;

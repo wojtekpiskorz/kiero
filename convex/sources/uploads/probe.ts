@@ -21,8 +21,7 @@
  *   the public accept entry predates the identity source (its dispatch
  *   still reads the older `identityFromConvexAuth` seam, which cannot
  *   resolve Convex Auth subjects) — the acting principal here is the real
- *   signed-in user, never the service account. Flagged to the coordinator:
- *   the dispatch adopting `resolveAccessContextWithProvisioning` retires
+ *   signed-in user, never the service account. The dispatch adopting `resolveAccessContextWithProvisioning` retires
  *   this probe in favor of the certified client command.
  * - `probeAgeUpload`: fixture control for the reconciliation grace proofs —
  *   moves one of the caller's company's uploads into the past by an exact

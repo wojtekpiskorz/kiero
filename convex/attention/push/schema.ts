@@ -11,7 +11,7 @@
  *
  * The push subscription table itself lives in the delivery fragment
  * (`convex/attention/delivery/schema.ts`, whose header names web push as the
- * co-owning implementer of push delivery); the flagged amendment there
+ * co-owning implementer of push delivery); that fragment
  * adds the user/session/company binding. Attempt history rows stay in
  * `notificationAttempts` (the shared external-attempt ledger the
  * schema comments assign to this lane's export read).
@@ -60,7 +60,7 @@ export const pushTables = {
   })
     .index("by_intent_subscription", ["intentId", "subscriptionId"])
     .index("by_state_updated", ["state", "updatedAtMs"])
-    // R3 (issue #128): the deletion purge's affected-work scan rides the
+    // The deletion purge's affected-work scan rides the
     // company prefix instead of the global state index, keeping the purge
     // transaction's reads bounded to one firm.
     .index("by_company_state", ["companyId", "state"]),

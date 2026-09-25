@@ -32,10 +32,10 @@ export const readStateTables = {
   })
     .index("by_user_source", ["userId", "sourceId"])
     // Future consumer (no reader yet): the per-source "who has read this
-    // entry" listing F2's recipient re-checks / a later H view need; kept so
+    // entry" listing that delivery re-checks and a later UI view need; kept so
     // the index ships with the schema instead of a migration later.
     .index("by_source", ["sourceId"])
-    // F1: the audited-GM inspection read lists one company's read states
+    // The audited-GM inspection read lists one company's read states
     // without touching any boss's row (GM reads never write).
     .index("by_company", ["companyId"]),
 } as const;

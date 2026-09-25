@@ -121,7 +121,7 @@ export type RevisionOrigin =
   // witness still marks unknown).
   | "reassignment_marking"
   // The support-removal
-  // marking of a permanent source deletion (issue #56). Like a withdrawal
+  // marking of a permanent source deletion. Like a withdrawal
   // marking it is already an explicit unknown, so replays never re-mark.
   | "purge_marking";
 

@@ -109,7 +109,7 @@ export const deliveryTables = {
     .index("by_endpoint", ["endpoint"])
     // The hygiene sweep's drained discriminator: it queries the rows whose
     // revokedAtMs is still undefined, and patching that field moves the row
-    // out of the swept range (see the F3 review repair note above).
+    // out of the swept range.
     .index("by_revoked", ["revokedAtMs"]),
 
   /** External delivery attempt history with known/unknown outcomes. */

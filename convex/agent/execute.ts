@@ -24,7 +24,7 @@
  * - the staleness recheck: current revision counters versus the run's
  *   load-time snapshot (`decideAnswerFreshness`).
  *
- * R2 adds the ONE agent-entry rule to every execution above:
+ * The ONE agent-entry rule applies to every execution above:
  * the question source's accepted LIFECYCLE decides, not row existence — a
  * retained tombstone (permanent deletion) refuses the execution with the
  * typed `question_source_not_active` code before any write or event, and
@@ -115,7 +115,7 @@ async function ensureEvidenceFragment(
 }
 
 // ---------------------------------------------------------------------------
-// The one agent-entry preamble (R2).
+// The one agent-entry preamble.
 // ---------------------------------------------------------------------------
 
 /** The typed refusals the question-source preamble can return. */
@@ -177,7 +177,7 @@ export interface ExecuteClarificationInput {
 }
 
 /**
- * The checked raise execution body (R2): the QUESTION source must be
+ * The checked raise execution body: the QUESTION source must be
  * ACTIVE (a retained tombstone refuses with a typed code — late work
  * publishes nothing), every conflicting-evidence source must be active
  * too, and the final command runs the dispatch whose own fragment

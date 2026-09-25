@@ -9,7 +9,7 @@
  * - a service worker is registered only through this composition, never
  *   ad-hoc from a feature;
  * - no service-worker cache may serve protected data in a way that
- *   bypasses current access checks (execution charter / issue 19 AC):
+ *   bypasses current access checks (execution charter):
  *   protected reads stay behind live authorized queries. Stated here for
  *   the push and update modules; nothing in this module enforces it.
  *

@@ -12,7 +12,7 @@
  * precedent).
  *
  * Semantics pinned by the accepted notification decision (issue 7
- * resolution) and issue 42's bounded solution:
+ * resolution):
  *
  * - The batching window is 60 seconds counted from the FIRST qualifying
  *   entry's durable all-attachment acceptance ("Pozostaje grupowanie przez

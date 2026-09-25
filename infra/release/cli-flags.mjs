@@ -1,6 +1,5 @@
 /**
- * Strict CLI flag parsing shared by the release executables (R6
- * hardening): unknown flags and valueless flags are USAGE ERRORS, never
+ * Strict CLI flag parsing shared by the release executables: unknown flags and valueless flags are USAGE ERRORS, never
  * silently ignored. A renamed flag in a parser or in workflow YAML must
  * degrade to an explicit failure, not to a weaker default guard.
  *

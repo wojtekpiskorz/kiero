@@ -1,5 +1,5 @@
 /**
- * The Cloudflare Worker transport (R6): deploys one apps/* worker through
+ * The Cloudflare Worker transport: deploys one apps/* worker through
  * its named wrangler environment (`wrangler deploy --env staging` /
  * `--env alpha-production`). The named environment blocks point only at
  * kiero-staging-* / kiero-alpha-* resource names, so a bare deploy can

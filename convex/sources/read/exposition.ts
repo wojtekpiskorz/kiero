@@ -3,7 +3,7 @@
  * memory-exposition precedent): the full dossier of ONE immutable source
  * and the paginated evidence chain that rests on it.
  *
- * Issue #51: "Source detail shows immutable authored content, all retained
+ * Scope: "Source detail shows immutable authored content, all retained
  * representations, transcript/OCR segments and time/coordinate anchors,
  * project fragments, findings/provenance, corrections, withdrawals, and
  * dependent recomputation status", and "Paginate history rather than

@@ -1,6 +1,6 @@
 # Kiero environments
 
-Index of the checked-in environment descriptors owned by issue [I1 #53].
+Index of the checked-in environment descriptors.
 These files define NAMES and contracts only. They never contain values;
 `docs/evidence/environment/preflight-2026-09.md` records what was actually
 verified against the live accounts on 2026-09-08/09.
@@ -8,7 +8,7 @@ verified against the live accounts on 2026-09-08/09.
 | File | Environment | Cloud/Convex identity |
 | --- | --- | --- |
 | [local.md](local.md) | local development | Convex project `kiero-dev-core` (team `wojtek-piskorz-jr`), Cloudflare resources `kiero-dev-*` |
-| [synthetic-staging.md](synthetic-staging.md) | synthetic staging (CI deploy target) | Convex deployment `staging` inside the existing project `kiero-dev-core` (PENDING; I8 reconciliation with the owner's no-new-projects instruction), Cloudflare resources `kiero-staging-*` (PENDING) |
+| [synthetic-staging.md](synthetic-staging.md) | synthetic staging (CI deploy target) | Convex deployment `staging` inside the existing project `kiero-dev-core` (PENDING; staging reconciliation with the owner's no-new-projects instruction), Cloudflare resources `kiero-staging-*` (PENDING) |
 | [alpha-production.md](alpha-production.md) | future alpha production | Convex project `kiero-alpha-core` (PENDING; owner decision required, see the note in that file), Cloudflare resources `kiero-alpha-*` (PENDING) |
 
 [preflight.mjs](preflight.mjs) is the one-command readiness probe:
@@ -33,13 +33,13 @@ is the sibling note the file itself points to through its fields:
 
 - `team` / `project` pin the LOCAL DEVELOPMENT project (`kiero-dev-core`).
   Plain `npx convex dev` in the repository root therefore can only ever target
-  that project's dev deployments. Since the I8 reconciliation, staging is a
+  that project's dev deployments. Since the staging reconciliation, staging is a
   NAMED deployment (`wojtek-piskorz-jr:kiero-dev-core:staging`) inside the
   same project, reachable only through the explicit reference (never through
   the project defaults); alpha production remains a separate-project decision
   addressed exclusively by explicit `team:project:ref` or `--prod` against
   its own `convex.<env>.json`-style configs created by its owning tickets.
-- `functions` is `convex/`, the single functions root A2/A3 compose.
+- `functions` is `convex/`, the single functions root.
 - The file must stay non-secret. Deployment URLs and admin keys live in
   gitignored `.env.local` (written by `npx convex dev` / `deployment select`),
   never here.

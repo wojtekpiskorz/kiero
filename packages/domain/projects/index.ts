@@ -9,10 +9,8 @@
  * reservation across retained history, role multiplicity) without a
  * deployment.
  *
- * Consumers reach this folder through explicit relative imports until the
- * coordinated package exports amendment lands (a shared-file need reported
- * by the projects domain: `packages/domain/package.json` exports and `src/index.ts`
- * re-exports are bootstrap-owned, not lane-owned).
+ * Consumers reach this folder through explicit relative imports; it is not
+ * re-exported from `src/index.ts`.
  */
 
 export * from "./stages";

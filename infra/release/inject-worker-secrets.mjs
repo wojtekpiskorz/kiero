@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * I8: inject worker RUNTIME secrets after a successful deploy.
+ * Inject worker RUNTIME secrets after a successful deploy.
  *
  * The transports deploy code and configuration (vars); the worker
  * SECRETS are a separate Cloudflare plane (wrangler secret), set per
@@ -17,7 +17,7 @@
  * - deferred  { worker, name }   `deferred: true` with an unset source:
  *                                an explicitly recorded pending owner
  *                                decision (e.g. CONVEX_BACKUP_ADMIN_KEY
- *                                until I10), not a silent skip
+ *                                while unset), not a silent skip
  * - refused   { worker, ... }      either a non-deferred secret whose
  *                                source is unset ({ name, source }) or a
  *                                failed bulk call ({ reason, exitCode,
@@ -65,7 +65,7 @@ function planComponent(component) {
   const refused = [];
   for (const entry of entries) {
     const raw = process.env[entry.source];
-    // R19: `format` composes the value (exactly one {} placeholder,
+    // `format` composes the value (exactly one {} placeholder,
     // validated by the descriptor), e.g. the EU R2 endpoint URL from the
     // nonsecret account id. Without it the source value passes as-is.
     const value = raw === undefined || raw === "" || entry.format === undefined

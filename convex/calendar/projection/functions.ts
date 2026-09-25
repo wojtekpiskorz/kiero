@@ -9,8 +9,8 @@
  * writes desired states. Scheduling the pass (cron, outbox consumer or
  * the sync loop) is deliberately NOT owned here: one durable consumer
  * edge per event is the certified platform shape today and the work.* fan-out
- * question is flagged in the report, so the pass is an explicit seam reconciliation
- * and the joins trigger.
+ * is not wired, so the pass is an explicit seam that reconciliation and the
+ * joins trigger.
  *
  * `dispatchCalendarProjection` carries the certified personal-hide
  * operation (`calendar.setCopyHidden`) and the
