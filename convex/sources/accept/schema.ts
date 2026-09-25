@@ -8,7 +8,7 @@
  * same original rather than copying it. Each new STT/vision version is
  * another immutable extraction; historical evidence never silently moves.
  *
- * Notes (the owning lane completes the candidate fragment):
+ * Additions to the certified fragment:
  * - `sources.acceptanceKey`/`acceptanceFingerprint`: the client-generated
  *   logical-source key (the command idempotency key) and a fingerprint of
  *   the first accepted logical payload. A replay of the key returns the same

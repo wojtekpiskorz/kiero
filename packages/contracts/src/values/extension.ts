@@ -18,8 +18,7 @@
  *
  * Certified by platform on 2026-09-09 (docs/implementation/contracts/README.md).
  *
- * Notes (the owning lane completes the candidate surface, additive
- * and flagged on the precedent):
+ * Additions to the certified surface:
  * - `ExtensionFieldShape.kind` narrows to `DefinitionFieldKind`: a definition
  *   FIELD may be one of the seven scalar kinds or a bounded `list` with a
  *   scalar `itemKind`. `object` stays a legal VALUE kind (the value

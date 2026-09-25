@@ -42,8 +42,7 @@ export const DurableJobKind = Schema.Literals([
   "backups.verify_manifest",
   "search.index_generation",
   "access.cleanup_revocation",
-  // Platform certification amendment: the platform's own external-delivery proof
-  // executor (echo stand-in for provider calls; provider routing points the same
+  // The platform's own external-delivery proof executor (echo stand-in for provider calls; provider routing points the same
   // mechanism at OpenRouter).
   "platform.echo_delivery",
 ]);

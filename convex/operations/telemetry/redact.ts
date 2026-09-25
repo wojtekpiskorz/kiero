@@ -50,7 +50,7 @@ export const DIAGNOSTIC_EVENT_KINDS = [
   "ops.health.heartbeat",
   "ops.health.silence_detected",
   // Complete-backup freshness. Emitted by the backups freshness check when
-  // the newest VERIFIED manifest's SNAPSHOT age exceeds one hour (or runs
+  // the newest VERIFIED manifest's SNAPSHOT age exceeds `FRESHNESS_LIMIT_MS` (or runs
   // exist but none ever verified); deduped per staleness episode.
   "ops.backup.stale",
   // Permanent-deletion 24-hour tracking. Emitted by the deletion purge tick

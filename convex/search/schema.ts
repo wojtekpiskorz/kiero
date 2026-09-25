@@ -6,7 +6,7 @@
  * requires a new generation and verified cutover. Absence of a semantic hit
  * is never absence of a fact.
  *
- * Notes (the owning lane completes the candidate fragment):
+ * Additions to the certified fragment:
  * - `searchEntries.sourceId`: the canonical link for source-backed entries
  *   (message text, transcript, OCR), denormalized so hydration re-checks
  *   source lifecycle and tenant scope without a fragment hop, and scoped
@@ -55,7 +55,7 @@ export const searchTables = {
   })
     .index("by_fragment", ["sourceFragmentId"])
     .index("by_generation", ["generationId"])
-    // E5: the tenant-scoped query read and the scoped refresh indexes.
+    // The tenant-scoped query read and the scoped refresh indexes.
     .index("by_company_generation", ["companyId", "generationId"])
     .index("by_source", ["sourceId"])
     .index("by_finding", ["findingId"]),

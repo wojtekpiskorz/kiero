@@ -9,7 +9,7 @@
  * are opaque to the schema (workflow-owned strings); attempts keep provider
  * routing evidence for GM inspection.
  *
- * Certification amendments to the candidate (see the certification
+ * Additions to the certified candidate (see the certification
  * note in docs/implementation/contracts/README.md):
  * - `durableJobs.by_jobKey` index (job-key dedup lookup inside the
  *   registration transaction) and `lastErrorKind`/`finishedAtMs` outcome

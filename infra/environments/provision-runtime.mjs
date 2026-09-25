@@ -110,14 +110,19 @@ function convex(args, options = {}) {
   return execFileSync("npx", [...CONVEX, ...args], { encoding: "utf8", ...options });
 }
 
+/** Variable names only: values never enter this process (preflight.mjs does the same). */
 function existingNames(deployment) {
-  const out = convex(["env", "list", "--deployment", deployment], { stdio: ["ignore", "pipe", "ignore"] });
-  return new Set(
-    out
-      .split("\n")
-      .map((line) => /^([A-Z0-9_]+)=/.exec(line)?.[1])
-      .filter(Boolean),
-  );
+  const out = convex(["env", "list", "--names-only", "--deployment", deployment], {
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  const lines = out.split("\n").map((line) => line.trim()).filter(Boolean);
+  const names = lines.filter((line) => /^[A-Z0-9_]+$/.test(line));
+  // Anything else means the CLI output changed shape; refusing beats silently
+  // treating every variable as missing and overwriting live keys.
+  if (names.length !== lines.length && !/no environment variables/i.test(out)) {
+    throw new Error("unexpected `convex env list --names-only` output; refusing to continue");
+  }
+  return new Set(names);
 }
 
 function withSecretFile(content, run) {

@@ -8,8 +8,8 @@
  * verified, and is kept on unsupported conversion, failure or unresolved
  * quality.
  *
- * Notes (the owning lane completes the candidate fragment; every
- * added column is OPTIONAL so the text-only seed fixtures stay valid):
+ * Additions to the certified fragment (every added column is OPTIONAL so
+ * the text-only seed fixtures stay valid):
  *
  * - `uploads.draftId/attachmentCount/declaredKinds/declaredParts`: the
  *   client's stable draft identity and its declaration (media kinds and the

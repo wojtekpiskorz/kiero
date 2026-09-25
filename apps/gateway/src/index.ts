@@ -4,13 +4,10 @@
  * Routes resolve through the composition registry
  * (`./composition/registry.ts`); the platform lane's routes live in
  * `./platform/routes.ts`, the uploads lane's in `./uploads/routes.ts`, the
- * images lane's in `./images/routes.ts`, and all call Convex through their
- * verified bridges. Unknown paths, including unmatched `/platform/*`,
- * `/uploads/*` and `/images/*` paths, answer with the sanitized
-
- * media lane's in `./media/routes.ts`, and all call Convex through their
- * verified bridges. Unknown paths, including unmatched `/platform/*`,
- * `/uploads/*` and `/media/*` paths, answer with the sanitized
+ * images lane's in `./images/routes.ts`, the media lane's in
+ * `./media/routes.ts`, and all call Convex through their verified bridges.
+ * Unknown paths, including unmatched `/platform/*`, `/uploads/*`,
+ * `/images/*` and `/media/*` paths, answer with the sanitized
  * `unsupported` closed error, never a fake success.
  *
  * Every request is wrapped in request-scoped redacted telemetry

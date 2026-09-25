@@ -4,8 +4,8 @@
  *
  * PURE MODULE (unit-testable without Convex). The scan mutation reads the
  * platform surfaces (`durableJobs`, `outboxEvents`, `processingRuns`) and hands the
- * rows here; this module decides - including the handoff note "attempts-
- * exhausted replay diagnostics": a durable job that exhausted maxAttempts
+ * rows here; this module decides - including attempts-exhausted replay
+ * diagnostics: a durable job that exhausted maxAttempts
  * across every replay is diagnosed EXACTLY once (dedup key from jobKey).
  */
 

@@ -15,6 +15,6 @@
     { "provider": "ai_openrouter", "tracks": "chat/vision/STT/embedding spend", "limit": "no provider cap; bounded by the PLN thresholds", "limitSource": "openrouter usage terms" },
     { "provider": "email_resend", "tracks": "OTP/invite email send volume", "limit": "100 emails/day on Free", "limitSource": "resend pricing, dated 2026-09-08" },
     { "provider": "observability_axiom", "tracks": "ingest/storage usage", "limit": "Personal: 1 user, 3 datasets, 3 monitors, 30d retention, usage limits", "limitSource": "axiom limits, dated 2026-09-08" },
-    { "provider": "backup", "tracks": "backup generation/transfer counted against Convex + R2 limits", "limit": "~2,880 full snapshots/month at the 15-minute schedule; Free/Starter allow at most 2 stored native backups", "limitSource": "convex backup docs, dated 2026-09-08" }
+    { "provider": "backup", "tracks": "backup generation/transfer counted against Convex + R2 limits", "limit": "~30 full snapshots/month at the pre-user daily schedule (infra/backups/retention.json); Free/Starter allow at most 2 stored native backups", "limitSource": "convex backup docs, dated 2026-09-08" }
   ]
 }

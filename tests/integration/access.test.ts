@@ -8,6 +8,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { backend, ok, type Backend } from "./harness";
 
 const CODE = "12345678";
@@ -61,7 +62,7 @@ describe("company access", () => {
       }),
     );
 
-    const issued = ok<{ invitationId: string; delivery: string }>(
+    const issued = ok<{ invitationId: Id<"invitations">; delivery: string }>(
       await admin.action(api.access.membership.functions.createInvitationCommand, {
         envelope: envelope("access.createInvitation", { email: "szef2@kiero.invalid", role: "member" }),
       }),
@@ -70,7 +71,7 @@ describe("company access", () => {
     expect(issued.delivery).toBe("delivery_failed");
     ok(
       await t.action(api.access.membership.probe.b3ProofSetInvitationCode, {
-        invitationId: issued.invitationId as never,
+        invitationId: issued.invitationId,
         code: CODE,
       }),
     );
