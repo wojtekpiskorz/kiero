@@ -185,15 +185,13 @@ export const normalizePhotoInput = Schema.Struct({
   attachmentIds: Schema.Array(tableIdSchema("attachments")),
 });
 
-// Platform certification amendment: the platform's external-delivery proof executor.
+// The platform's external-delivery proof executor.
 export const echoDeliveryInput = Schema.Struct({
   dedupKey: Schema.NonEmptyString,
   message: Schema.NonEmptyString,
 });
 
-// The first
-// model-call job kind gets its executor registration - the prerequisite the
-// dispatch named. Per-segment STT executes through the durable path; the
+// The first model-call job kind. Per-segment STT executes through the durable path; the
 // transcript row is the order the workflow owns.
 export const transcribeSegmentInput = Schema.Struct({
   transcriptId: tableIdSchema("audioTranscripts"),
@@ -328,8 +326,8 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "processing.normalize_photo",
     input: normalizePhotoInput,
   }),
-  // Platform certification amendment: the platform's external-delivery proof
-  // executor (echo stand-in; business lanes keep their own kinds).
+  // The platform's external-delivery proof executor (echo stand-in;
+  // business lanes keep their own kinds).
   executorEntry({
     kind: "executor",
     executorId: decodeFeatureId("platform.echo"),
@@ -347,7 +345,7 @@ export const executors: readonly ExecutorEntry[] = [
   }),
   // The multimodal-join executor
   // (`convex/processing/multimodal/join.ts` implements it). It no-ops
-  // text-only sources (the analyze owns those) and joins extraction
+  // text-only sources (text analysis owns those) and joins extraction
   // outcomes into partial-safe analysis groups for mixed ones.
   executorEntry({
     kind: "executor",
@@ -463,8 +461,7 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   // edge (text-only sources no-op inside the executor).
   consumer("sources.sourceAccepted", "processing.join_multimodal"),
   consumer("operations.reanalysisRequested", "processing.join_multimodal"),
-  // Platform certification amendment: the platform's echo publication drains into
-  // its own durable delivery job through the same edge mechanism.
+  // The platform's echo publication drains into its own durable delivery job through the same edge mechanism.
   consumer("platform.echoRequested", "platform.echo_delivery"),
   // The three
   // intent-source events drain into the notification-intent executor.

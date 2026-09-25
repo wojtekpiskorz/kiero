@@ -34,8 +34,8 @@
  *   evidence). A non-known root is a no-op: the stale cascade above owns
  *   that direction.
  *
- * - `sources.sourceReassigned` → cause `source_reassigned` (
- *   flagged): a project reassignment re-assesses DEPENDENT SCOPE. The
+ * - `sources.sourceReassigned` → cause `source_reassigned`: a project
+ *   reassignment re-assesses DEPENDENT SCOPE. The
  *   moved source stays active (its evidence still witnesses), so nothing
  *   is marked unknown here; the findings whose project placement lost the
  *   source's link, narrowed to unlinked scopes, sparing explicit

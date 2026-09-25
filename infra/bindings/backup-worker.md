@@ -1,11 +1,11 @@
 # Backup worker bindings
 
 Runtime: `apps/backup-worker`: the separate EU-jurisdiction Container run by
-the scheduled backup job (every 15 minutes per the accepted architecture).
+the scheduled backup job (cadence in [infra/backups/retention.json](../backups/retention.json); daily
+during the pre-user phase).
 Configuration skeleton: [apps/backup-worker/wrangler.jsonc](../../apps/backup-worker/wrangler.jsonc).
 
-I5 append (issue #57, flagged shared-file change): the executor is
-implemented; the table below records the finalized mechanism names and the
+The executor is implemented; the table below records the finalized mechanism names and the
 dev proof state. Full configuration and owner actions:
 [infra/backups/README.md](../backups/README.md).
 

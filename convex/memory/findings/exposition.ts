@@ -117,7 +117,7 @@ export interface ClarificationWireRow {
     readonly fragmentId: string | null;
   }[];
   /**
-   * R2 amendment (additive, flagged): whether the question (or resolution
+   * Whether the question (or resolution
    * note) text is redacted to the fixed copy because a source it possibly
    * derived from was permanently deleted (or its link is otherwise dead).
    */

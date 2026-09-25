@@ -5,7 +5,7 @@
  * key is 32 raw bytes.
  */
 
-import { createPrivateKey, createPublicKey, createSign, createVerify, webcrypto } from "node:crypto";
+import { createPrivateKey, createPublicKey, createSign, createVerify, webcrypto, type JsonWebKey } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   OWNER_PROVIDED,
@@ -19,10 +19,12 @@ describe("provision-runtime generated values", () => {
   it("produces a Convex Auth key pair that signs and verifies", () => {
     expect(values.JWT_PRIVATE_KEY).not.toContain("\n");
     const privateKey = createPrivateKey(pemFromOneLine(values.JWT_PRIVATE_KEY));
-    const jwks = JSON.parse(values.JWKS) as { keys: { use: string; kty: string }[] };
+    const jwks = JSON.parse(values.JWKS) as { keys: (JsonWebKey & { use: string })[] };
     expect(jwks.keys).toHaveLength(1);
     expect(jwks.keys[0]).toMatchObject({ use: "sig", kty: "RSA" });
-    const publicKey = createPublicKey({ key: jwks.keys[0] as never, format: "jwk" });
+    const [jwk] = jwks.keys;
+    if (jwk === undefined) throw new Error("JWKS has no key");
+    const publicKey = createPublicKey({ key: jwk, format: "jwk" });
     const signature = createSign("RSA-SHA256").update("kiero").sign(privateKey);
     expect(createVerify("RSA-SHA256").update("kiero").verify(publicKey, signature)).toBe(true);
   });

@@ -80,9 +80,8 @@ export const calendarOperations = {
     }),
     errorKinds: ["forbidden", "not_found", "unavailable"],
   }),
-  // The report certified this write as the named
-  // prerequisite but the entry never landed in the file (the platform proved the
-  // honest `unsupported` refusal live). This is the minimal certificate
+  // The personal project-selection write. Without this entry the dispatch
+  // answered the honest `unsupported` refusal. This is the minimal certificate
   // amendment: the flat { mode, projectIds? } shape the recorded dispatch
   // used, over the SAME vocabulary the calendarSyncState column stores.
   "calendar.setSelection": operationEntry({

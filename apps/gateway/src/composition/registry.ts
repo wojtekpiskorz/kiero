@@ -7,15 +7,10 @@
  *
  * - `routeProviders`: each provider owns its routes and, when it has
  *   parameterized paths, its own `match` for them; the platform lane's
- *   provider, the uploads lane's provider and the images lane's
- *   provider are imported below. `matchRoute` stays generic: exact match
- *   over all providers' route tables first, then each provider's optional
- *   `match`. The range reads become the next provider using this seam.
-
- *   provider, the uploads lane's provider and the media lane's
- *   provider are imported below. `matchRoute` stays generic: exact match
- *   over all providers' route tables first, then each provider's optional
- *   `match`.
+ *   provider and the uploads, images, media, exports, purge and Calendar
+ *   OAuth providers are imported below. `matchRoute` stays generic: exact
+ *   match over all providers' route tables first, then each provider's
+ *   optional `match`.
 
  * - `schedulerConsumers`: what this Worker consumes from durable execution
  *   (the Convex-side executors own the work; the gateway currently hosts

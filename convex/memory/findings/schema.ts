@@ -10,7 +10,7 @@
  * publish) and inference is never another witness; withdrawal/correction
  * locates affected findings without discarding independent evidence.
  *
- * Notes (the owning lane completes the candidate fragment):
+ * Additions to the certified fragment:
  * - `findingRevisions.origin` + optional `provenance`/`reason` +
  *   `recordedByUserId`/`recordedAtMs`: a revision names WHERE it came from —
  *   a source-backed publication (provenance: source, fragments, actor),

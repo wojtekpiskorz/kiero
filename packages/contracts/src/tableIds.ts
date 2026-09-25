@@ -98,7 +98,7 @@ export const TABLE_ID_NAMES = [
   "visionOrders",
   "durableJobs",
   "outboxEvents",
-  // Platform certification amendment: observable external-effect ledger used by the
+  // Observable external-effect ledger used by the
   // no-duplicate-effect proof (the echo stand-in for external systems).
   "externalEffects",
   // attention/read-state

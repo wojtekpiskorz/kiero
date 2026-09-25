@@ -610,7 +610,7 @@ export interface FreshnessResult {
 /**
  * Evaluates freshness from SNAPSHOT times and emits the deduplicated
  * `ops.backup.stale` diagnostic when the newest verified set is older than
- * one hour (or attempts exist but none ever verified). Never emits when no
+ * `FRESHNESS_LIMIT_MS` (./slot.ts; or attempts exist but none ever verified). Never emits when no
  * backup attempt ever ran (the lane is not wired yet, not silently broken).
  */
 export async function freshnessCheckTx(ctx: MutationCtx, nowMs: number = Date.now()): Promise<FreshnessResult> {

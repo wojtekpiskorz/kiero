@@ -13,7 +13,7 @@
  * directions. Drift of either side fails loudly here, long before
  * deployment.
  *
- * Platform certification amendment: `defineSchema` now receives the literal
+ * `defineSchema` receives the literal
  * spread (not the checked `Record`) so per-table INDEX types survive into
  * the generated data model: `withIndex("by_dedup", ...)` and friends
  * typecheck against real index names instead of only system indexes. The

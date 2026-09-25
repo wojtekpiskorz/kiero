@@ -7,7 +7,7 @@
  * dated finding; both bind to temporal findings by reference, never by
  * copying values.
  *
- * Notes (the owning lane completes the candidate fragment):
+ * Additions to the certified fragment:
  * - `tasks.linkedEventId`: the explicit link from a task to the event it
  *   serves (the receiving task of a delivery); sharing the event's dated
  *   finding stays a separate explicit binding.

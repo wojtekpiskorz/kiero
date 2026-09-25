@@ -10,8 +10,8 @@
  *   surfaces, incl. attempts-exhausted rows), `evaluateCostAlerts` (400/500
  *   PLN thresholds with per-level cooldown), `pruneExpired` (windowed
  *   retention), `forwardToSink` (best-effort Axiom delivery).
- * - `cronTick`: the orchestrator registered in convex/crons.ts (which also
- *   carries the handoff note's outbox-drain safety net).
+ * - `cronTick`: the orchestrator registered in convex/crons.ts (next to the
+ *   outbox-drain safety net).
  * - Reads: `telemetryOverview` (public, redacted-by-construction composed
  *   state for diagnostics, processing inspection, backups and release) and
  * `telemetryState` (internal full

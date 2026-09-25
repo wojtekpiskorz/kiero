@@ -16,7 +16,8 @@
  * `createOrUpdateUser` is REPLACED by the Kiero policy (./userPolicy.ts):
  * the library default would implicitly link accounts by verified email,
  *   which the accepted identity rules forbid — linking requires both
- *   proofs and is operation. The amendment below keeps that rule
+ *   proofs and is the linking lane's explicit operation. The hooks below
+ *   keep that rule
  *   and adds the two explicit ceremony hooks (./linking/authHook.ts):
  *
  * - a Google sign-in that RESUMES an account records the fresh Google

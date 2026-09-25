@@ -61,7 +61,7 @@ export const deletionTables = {
     purgeDeadlineAtMs: v.optional(shared.tsMs),
   })
     .index("by_company_time", ["companyId", "createdAtMs"])
-    // I4: the idempotent re-request path and the executor's null-record
+    // The idempotent re-request path and the executor's null-record
     // resolution find the source's ledger row through this index.
     .index("by_target_source", ["targetSourceId"]),
 

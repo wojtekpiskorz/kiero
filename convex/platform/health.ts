@@ -1,7 +1,6 @@
 /**
- * Health and observability reads (re-scoped for production honesty
- * per the handoff note: the dev-proof framing of the metadata became the
- * real statement of what this surface does and does not cover).
+ * Health and observability reads. The metadata states what this surface
+ * does and does not cover in production.
  *
  * `snapshot` is the live subscription target: it exposes runtime version,
  * the registered executors (from the composed registry), outbox counts

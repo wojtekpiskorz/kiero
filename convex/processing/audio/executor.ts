@@ -2,10 +2,9 @@
  * The durable STT segment workflow: resumable, checkpointed per
  * segment, one bounded provider pass per segment per run.
  *
- * The registered executor (`processing.transcribe_segment`, the coordinated
- * contracts amendment provider routing needed) delegates to a
- * @convex-dev/workflow workflow — the ONE canonical engine (the platform precedent in
- * convex/platform/pipeline.ts). Crash/restart semantics:
+ * The registered executor (`processing.transcribe_segment`) delegates to a
+ * @convex-dev/workflow workflow — the ONE canonical engine, as in
+ * convex/platform/pipeline.ts. Crash/restart semantics:
  *
  * - The manifest is planned ONCE (insert-if-absent): the immutable
  *   original-time interval rows are the checkpoints.
