@@ -35,7 +35,7 @@ outstanding; real-service qualification (B5/D7/I11 onward) is.
 - **Runtime configuration.** `infra/environments/provision-runtime.mjs`
   sets every generated value. Provider credentials (DeepSeek, OpenRouter,
   Resend, Google, Axiom) and `KIERO_GM_EMAILS` are owner actions on both
-  deployments; until they exist, AI analysis, email and Google sign-in fail
+  deployments (`bash infra/environments/owner-credentials.sh`); until they exist, AI analysis, email and Google sign-in fail
   honestly.
 - **Tests.** `tests/integration` runs acceptance, the processing pipeline,
   memory corrections and access on an in-process Convex backend.

@@ -71,3 +71,9 @@ pair, service tokens, sealing key, URLs and labels); `--github` also
 mirrors the release-consumed values and fresh deploy keys into the GitHub
 `staging` environment. Provider credentials are never generated.
 
+Owner-held credentials (DeepSeek, OpenRouter, Resend, Google, Axiom, GM
+addresses) are entered with the interactive wizard:
+`bash infra/environments/owner-credentials.sh`. It opens each provider's
+page, takes each value with hidden input, sets it on the chosen Convex
+deployments over stdin and verifies with the dry run above.
+
