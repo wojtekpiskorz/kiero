@@ -148,3 +148,36 @@ allowlist item, not a covered one.
    usage inside the included allowances.
 5. Evidence recorded under docs/evidence/staging/ with the date and the
    observed plan states.
+
+## Amendment 2026-09-25: pre-user background cadences
+
+**Owner decision** (2026-09-25, after the waste review rule 3 requires): the
+always-on machinery is cut to pre-user cadences. This is the explicit owner
+decision rule 5 demands before backup frequency changes; it is not a silent
+reduction.
+
+| Job | Before | Pre-user |
+| --- | --- | --- |
+| Telemetry tick (incidents, silence, cost alerts, pruning, Axiom forward) | every minute | hourly |
+| Outbox, intent, reminder and push safety nets | every 1–5 minutes | hourly |
+| Deletion purge pass (24-hour deadline) | every 15 minutes | hourly |
+| Google Calendar sync pass (integration deferred beyond v1) | every 5 minutes | removed |
+| Backup Container run (`convex export` of the whole database) | every 15 minutes | daily, 02:00 UTC |
+| Convex backup freshness tick | every 15 minutes | daily, 03:00 UTC |
+
+Scheduled runs per deployment fall from roughly 127,000 to roughly 4,350 a
+month, before the calls each run fans out to. `tests/platform/crons.test.ts`
+caps the total at 5,000 and forbids anything more frequent than hourly.
+
+Consequences:
+
+- Backup RPO becomes one day, and the freshness limit becomes 26 hours.
+  Retention windows are unchanged. The accepted alpha cadence (15 minutes,
+  RPO one hour) returns with the first real users, by the same kind of
+  explicit decision, before I6/I10 qualify recovery.
+- Safety nets only matter after a lost scheduled hop: the real work runs
+  through `ctx.scheduler` when its event happens, so user-visible latency
+  does not change.
+- External silence detection in Axiom tolerates 27 hours, because the daily
+  backup heartbeat is the only event reaching the sink until the gateway
+  prober is wired.

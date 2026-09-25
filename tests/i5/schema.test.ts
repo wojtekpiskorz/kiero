@@ -129,17 +129,17 @@ describe("infra/backups mirrors cannot drift from slot.ts", () => {
   });
 });
 
-describe("the cadence agreement (never silently reduced)", () => {
-  it("the Container's cron trigger is every 15 minutes in every environment scope", () => {
+describe("the cadence agreement (changed only by recorded owner decision)", () => {
+  it("the Container's cron trigger runs daily at 02:00 UTC in every environment scope", () => {
     const matches = wranglerConfig.match(/"crons": \[\s*"([^"]+)"\s*\]/g) ?? [];
     expect(matches.length).toBeGreaterThanOrEqual(3); // top-level + staging + alpha
     for (const match of matches) {
-      expect(match).toContain("*/15 * * * *");
+      expect(match).toContain("0 2 * * *");
     }
   });
 
-  it("the schedule interval is exactly 15 minutes and the lease strictly shorter", () => {
-    expect(SCHEDULE_INTERVAL_MS).toBe(15 * 60 * 1000);
+  it("the schedule interval is exactly one day and the lease strictly shorter", () => {
+    expect(SCHEDULE_INTERVAL_MS).toBe(24 * 60 * 60 * 1000);
     expect(LEASE_MS).toBeLessThan(SCHEDULE_INTERVAL_MS);
   });
 });

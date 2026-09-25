@@ -34,7 +34,7 @@ function probeDisabled(): ResultEnvelope {
  * Acquires (or refuses) a run lease. The optional `nowMs` is a PROOF
  * FIXTURE (the G3 fake-Google precedent): a proof-only clock override that
  * lets the live proof target a slot other than the current one - completed
- * scenarios must not wait out the 15-minute grid, and an immediate re-begin
+ * scenarios must not wait out the schedule grid, and an immediate re-begin
  * of a verified slot is `already_complete` by design. It only feeds the tx's
  * existing `nowMs` parameter; every lease/takeover/refusal decision still
  * runs unchanged on the value it is given. Production begins (the HTTP run

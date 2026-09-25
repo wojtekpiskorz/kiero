@@ -31,6 +31,7 @@ import {
 import { valuePasses } from "../../convex/operations/telemetry/redact";
 import {
   HEARTBEAT_CADENCE_MS,
+  TELEMETRY_TICK_INTERVAL_MS,
   HEARTBEATS_KEPT_PER_SERVICE,
   HEARTBEAT_SERVICES,
 } from "../../convex/operations/telemetry/heartbeat";
@@ -72,9 +73,8 @@ describe("the closed forward-status vocabulary", () => {
 
   it("the tick's service identity is in the closed heartbeat vocabulary at the cron cadence", () => {
     expect(HEARTBEAT_SERVICES).toContain(FORWARD_TICK_SERVICE);
-    // HEARTBEAT_CADENCE_MS is the SINGLE cadence definition (convex/crons.ts
-    // registers the tick every minute).
-    expect(HEARTBEAT_CADENCE_MS[FORWARD_TICK_SERVICE]).toBe(60 * 1000);
+    // convex/crons.ts registers the tick from the same constant.
+    expect(HEARTBEAT_CADENCE_MS[FORWARD_TICK_SERVICE]).toBe(TELEMETRY_TICK_INTERVAL_MS);
   });
 });
 

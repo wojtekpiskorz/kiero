@@ -2,7 +2,7 @@
  * The complete-backup function surface (I5).
  *
  * The Convex side is the coordination authority; the EU backup Container
- * (apps/backup-worker) is the executor. One 15-minute run:
+ * (apps/backup-worker) is the executor. One scheduled run:
  *
  * 1. `beginRun` (single-run lease): decides start/takeover/retry/refuse for
  *    the current slot, reads the retained-media inventory (D3 seam) and the
@@ -295,7 +295,7 @@ export const beginRun = internalMutation({
      * PROOF/TEST CLOCK OVERRIDE (never used in production): the tx's
      * existing `nowMs` parameter, exposed so the guarded proof action can
      * acquire a slot OTHER than the current one - a live proof must not
-     * wait out the 15-minute grid between scenarios, and a completed slot
+     * wait out the schedule grid between scenarios, and a completed slot
      * is `already_complete` forever by design. The HTTP run route sends no
      * body, so production always decides on real wall-clock time; the
      * decision logic itself reads this value unchanged.
@@ -658,7 +658,7 @@ export const slotRowQuery = internalQuery({
 });
 
 /**
- * The Convex-owned schedule tick (every 15 minutes, convex/crons.ts): runs
+ * The Convex-owned schedule tick (daily, convex/crons.ts): runs
  * the freshness check, and when the current slot has NO row at all (the
  * Container missed its own trigger), pings the backup worker's run endpoint
  * best-effort so the schedule converges under partial scheduler loss.

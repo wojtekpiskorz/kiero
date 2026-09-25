@@ -1,8 +1,8 @@
 {
   "description": "Complete-backup retention configuration (I5, issue #57). Single source of truth mirrored by convex/operations/backups/slot.ts; tests/i5 asserts the two cannot drift. Frequent complete sets are kept 48 hours; daily complete sets (the first slot of each UTC day) are kept through day 14. Media objects are pooled and shared across sets: collection is reference-aware and deletes an object only when NO surviving manifest references it. Deleted-source content cannot survive backups beyond 30 days: the retention invariant (no set outlives 14 days) holds by construction and is asserted at runtime and in tests, so a future retention extension that would break the 30-day bound fails loudly instead of silently keeping purged bytes.",
   "schedule": {
-    "intervalMs": 900000,
-    "note": "Every 15 minutes, the accepted cadence. Frequency is NEVER silently reduced to fit a plan: a plan-limit breach is a loud typed failure plus owner decision (see plan-limits.json and the 400/500 PLN cost alerts), never a quiet schedule change. The cadence is owned in TWO places that tests keep equal: this file and the backup Container's cron trigger (apps/backup-worker/wrangler.jsonc)."
+    "intervalMs": 86400000,
+    "note": "Daily (02:00 UTC) during the pre-user phase: explicit owner decision of 2026-09-25 recorded in docs/adr/mvp-cost-envelope-2026-09.md. The accepted alpha cadence of 15 minutes returns with the first users by the same kind of explicit decision. Frequency is never changed silently to fit a plan. The cadence is owned in TWO places that tests keep equal: this file and the backup Container's cron trigger (apps/backup-worker/wrangler.jsonc)."
   },
   "frequent": {
     "retentionMs": 172800000,
@@ -10,16 +10,16 @@
   },
   "daily": {
     "retentionMs": 1209600000,
-    "window": "through day 14 (selection: the first 15-minute slot of each UTC day)"
+    "window": "through day 14 (selection: the first slot of each UTC day; with the daily cadence every slot)"
   },
   "deletedContent": {
     "expiryMs": 2592000000,
     "enforcement": "purged-source media is excluded from NEW sets at build time (I4 ledger); every set expires within 14 days, so backup content cannot outlive 30 days; the invariant retention <= 30d is asserted at runtime (beginRun refuses on violation) and in tests/i5"
   },
   "freshness": {
-    "limitMs": 3600000,
+    "limitMs": 93600000,
     "measuredFrom": "database snapshot time (snapshotAtMs of the newest VERIFIED manifest), never completion time",
-    "alerting": "ops.backup.stale diagnostic (deduped per episode) + backup.job heartbeats every attempt (I2 silence detection fires at 3x15m, before the one-hour limit)"
+    "alerting": "ops.backup.stale diagnostic (deduped per episode) past one cadence plus two hours of slack, and backup.job heartbeats every attempt (silence detection fires at three missed cadences)"
   },
   "orphanCollection": {
     "graceMs": 172800000,

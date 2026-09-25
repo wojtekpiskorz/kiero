@@ -9,7 +9,7 @@ credential values. The decision model lives once in
 
 | File | What it defines |
 | --- | --- |
-| [retention.json](retention.json) | The 15-minute schedule, 48h/14d retention tiers, one-hour freshness limit, the 30-day deleted-content bound and orphan collection grace |
+| [retention.json](retention.json) | The schedule (daily pre-user, see docs/adr/mvp-cost-envelope-2026-09.md), 48h/14d retention tiers, freshness limit, the 30-day deleted-content bound and orphan collection grace |
 | [plan-limits.json](plan-limits.json) | R2/Convex/Containers free-plan hard limits, the measured-cost recording rules and the PENDING PLN-conversion owner decision |
 
 ## What is implemented (no owner action needed)

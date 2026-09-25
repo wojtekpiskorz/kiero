@@ -38,16 +38,16 @@ const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 
 describe("cadence and slots", () => {
-  it("the cadence is 15 minutes and the lease is strictly shorter than one slot", () => {
-    expect(SCHEDULE_INTERVAL_MS).toBe(15 * MIN);
+  it("the cadence is one day and the lease is strictly shorter than one slot", () => {
+    expect(SCHEDULE_INTERVAL_MS).toBe(DAY);
     expect(LEASE_MS).toBeLessThan(SCHEDULE_INTERVAL_MS);
   });
 
-  it("floors timestamps onto the 15-minute grid", () => {
+  it("floors timestamps onto the UTC-day grid", () => {
     expect(slotOf(0)).toBe(0);
-    expect(slotOf(15 * MIN - 1)).toBe(0);
-    expect(slotOf(15 * MIN)).toBe(15 * MIN);
-    expect(slotOf(15 * MIN + 42_000)).toBe(15 * MIN);
+    expect(slotOf(DAY - 1)).toBe(0);
+    expect(slotOf(DAY)).toBe(DAY);
+    expect(slotOf(DAY + 2 * HOUR + 42_000)).toBe(DAY);
   });
 
   it("a slot is current exactly inside its own window", () => {
@@ -69,7 +69,8 @@ describe("retention tiers", () => {
     expect(tierOfSlot(0)).toBe("daily");
     expect(tierOfSlot(DAY)).toBe("daily");
     expect(tierOfSlot(DAY + 15 * MIN)).toBe("frequent");
-    expect(tierOfSlot(DAY - SCHEDULE_INTERVAL_MS)).toBe("frequent");
+    // With the daily cadence every scheduled slot is the day's first.
+    expect(tierOfSlot(slotOf(DAY + 2 * HOUR))).toBe("daily");
   });
 
   it("no set can outlive the 30-day deleted-content expiry (construction + assertion)", () => {

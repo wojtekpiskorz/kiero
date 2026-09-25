@@ -8,7 +8,7 @@
  * - the Worker `fetch` answers `/healthz` locally (cheap, no container
  *   wake-up) and proxies everything else through the Durable Object to the
  *   EU container instance;
- * - the Worker `scheduled` handler (the every-15-minutes cron trigger in
+ * - the Worker `scheduled` handler (the daily cron trigger in
  *   wrangler.jsonc) drives one `/run` through the same DO;
  * - the container (src/container-main.ts + src/deps.ts) executes the run
  *   with the real exporter/stores/protocol.

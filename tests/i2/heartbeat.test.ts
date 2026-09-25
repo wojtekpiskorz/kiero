@@ -135,7 +135,9 @@ describe("the external monitor layer", () => {
     // Round-1 repair: the loop is closed - the emitted silence events are
     // part of this monitor's query.
     expect(silence?.apl.includes("ops.health.silence_detected")).toBe(true);
-    expect(silence?.trigger.threshold).toBe("15m");
+    // Pre-user: the daily backup heartbeat is the only external event, so the
+    // threshold is one day plus slack (infra/observability/monitors.json).
+    expect(silence?.trigger.threshold).toBe("27h");
   });
 
   it("every notification destination is explicitly PENDING (no live alerting yet)", () => {

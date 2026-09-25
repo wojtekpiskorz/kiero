@@ -6,15 +6,18 @@
  * retention and deleted-content rule lives HERE so the Convex functions,
  * the backup Container and the tests share one definition:
  *
- * - Cadence: one run slot every 15 minutes; a slot admits exactly one
- *   single-run lease; overlapping attempts of the same slot are refused
- *   while the lease is live, and an interrupted lease can be taken over
- *   (resumable: every object write is content-addressed and idempotent).
+ * - Cadence: one run slot per UTC day during the pre-user phase
+ *   (docs/adr/mvp-cost-envelope-2026-09.md, 2026-09-25 amendment; the
+ *   accepted alpha cadence of 15 minutes returns with the first users). A
+ *   slot admits exactly one single-run lease; overlapping attempts of the
+ *   same slot are refused while the lease is live, and an interrupted lease
+ *   can be taken over (resumable: every object write is content-addressed
+ *   and idempotent).
  * - Freshness is measured from the DATABASE SNAPSHOT time of the newest
- *   VERIFIED manifest, never from completion time; beyond one hour the
- *   staleness monitor emits an I2 diagnostic event (deduped per episode).
+ *   VERIFIED manifest, never from completion time; past the limit the
+ *   staleness monitor emits a diagnostic event (deduped per episode).
  * - Retention: frequent sets 48 hours, daily sets (the first slot of each
- *   UTC day) through day 14. Media objects live in one shared pool and are
+ *   UTC day) through day 14. With a daily cadence every slot is daily. Media objects live in one shared pool and are
  *   collected reference-aware: an object is deleted only when NO surviving
  *   manifest references it.
  * - Deleted-content expiry: purged source content must not survive in
@@ -23,8 +26,8 @@
  *   a future retention extension cannot silently break it.
  */
 
-/** The accepted schedule cadence (every 15 minutes). */
-export const SCHEDULE_INTERVAL_MS = 15 * 60 * 1000;
+/** The pre-user schedule cadence: one slot per UTC day. */
+export const SCHEDULE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Single-run lease length. Shorter than the cadence so a lease can never
@@ -35,8 +38,11 @@ export const LEASE_MS = 12 * 60 * 1000;
 /** Max attempts (fresh starts + takeovers + retries) per slot. */
 export const MAX_ATTEMPTS_PER_SLOT = 3;
 
-/** A complete set older than this (by snapshot time) is stale. */
-export const FRESHNESS_LIMIT_MS = 60 * 60 * 1000;
+/**
+ * A complete set older than this (by snapshot time) is stale: one cadence
+ * plus two hours of slack for the 02:00 trigger and a retry.
+ */
+export const FRESHNESS_LIMIT_MS = SCHEDULE_INTERVAL_MS + 2 * 60 * 60 * 1000;
 
 /** Frequent complete sets are retained 48 hours. */
 export const FREQUENT_RETENTION_MS = 48 * 60 * 60 * 1000;
@@ -65,12 +71,12 @@ export function tierOfSlot(slotMs: number): BackupTier {
   return slotMs % (24 * 60 * 60 * 1000) === 0 ? "daily" : "frequent";
 }
 
-/** The run slot a timestamp belongs to (floor to the 15-minute grid). */
+/** The run slot a timestamp belongs to (floor to the schedule grid). */
 export function slotOf(nowMs: number): number {
   return Math.floor(nowMs / SCHEDULE_INTERVAL_MS) * SCHEDULE_INTERVAL_MS;
 }
 
-/** True while `nowMs` is still inside the slot's 15-minute window. */
+/** True while `nowMs` is still inside the slot's window. */
 export function slotIsCurrent(slotMs: number, nowMs: number): boolean {
   return nowMs >= slotMs && nowMs < slotMs + SCHEDULE_INTERVAL_MS;
 }
@@ -154,7 +160,7 @@ export interface FreshnessState {
 
 /**
  * Evaluates backup freshness from snapshot times (never completion times):
- * stale when the newest VERIFIED snapshot is older than one hour. Failed
+ * stale when the newest VERIFIED snapshot is older than the limit. Failed
  * rows are context; a chain that only ever fails is `never_verified`.
  */
 export function freshnessOf(
