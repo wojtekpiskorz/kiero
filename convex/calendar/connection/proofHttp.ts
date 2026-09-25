@@ -1,21 +1,21 @@
 /**
- * The G1 guarded proof-fixture HTTP surface (dev deployment only).
+ * The guarded proof-fixture HTTP surface (dev deployment only).
  *
  * Everything the evidence script (tests/g1/live-proof.mjs) needs beyond the
  * production routes lives HERE, beside the fixture vocabulary (./proof.ts),
  * not in the production boundary (./http.ts): a fake Google token endpoint
  * and Calendar API that RECORD THEIR EFFECTS in `externalEffects` before
- * answering (the A3 echo pattern), so the no-duplicate-effect proofs count
+ * answering (the echo pattern), so the no-duplicate-effect proofs count
  * rows per dedup key, plus guarded reads of the sanitized connection state
  * and the real refresh capability.
  *
- * Same guard as B1's probe: queries and mutations cannot be guarded by
+ * Same guard as the probe: queries and mutations cannot be guarded by
  * deployment variables, so every fixture entry is an HTTP action that
  * checks `KIERO_G1_PROOF_ENABLED === "1"`; on any other deployment the
  * variable is absent and every fixture fails closed 404. Fixture values
  * are constants, never secrets.
  *
- * Routes (wired by the sanctioned append in convex/http.ts):
+ * Routes (wired by the append in convex/http.ts):
  * - `POST /calendar/oauth/proof/fake-google/token`
  * - `POST /calendar/oauth/proof/fake-google/api/calendars`
  * - `GET  /calendar/oauth/proof/fake-google/api/calendars/kiero-proof-calendar`

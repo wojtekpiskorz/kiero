@@ -1,6 +1,6 @@
 /**
  * Search module surface (derived search records; architecture "Logical data
- * dictionary"). Implements lanes: E5 (indexing/retrieval), H3 (UI reads).
+ * dictionary"). Covers indexing/retrieval and UI reads.
  *
  * Search indexes are disposable derived data, never authority: absence of a
  * semantic hit is never absence of a fact. Index generations are versioned
@@ -8,8 +8,7 @@
  * requires a new generation and verified cutover. Coverage gaps during
  * embedding outages are disclosed, not hidden.
  *
- * E5 amendments (the owning lane completes its candidate surface; the
- * A2/A3 candidate shapes are kept and extended additively):
+ * Notes:
  * - `search.queryEvidence` input gains the optional Polish barebones
  *   filters (project, author, send-date range) and a cursor, and its result
  *   entries become hydrated rows: kind (source fragment vs finding), the
@@ -53,7 +52,7 @@ export const searchOperations = {
         Schema.check(Schema.isInt()),
         Schema.check(Schema.isBetween({ minimum: 1, maximum: 100 })),
       ),
-      // E5: optional filters and cursor (all additive; H3 consumes).
+      // Optional filters and cursor (all additive; the UI consumes them).
       projectId: Schema.optionalKey(tableIdSchema("projects")),
       authorUserId: Schema.optionalKey(tableIdSchema("users")),
       sentFromMs: Schema.optionalKey(Schema.Number),

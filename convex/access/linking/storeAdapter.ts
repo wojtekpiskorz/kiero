@@ -1,11 +1,11 @@
 /**
- * The generated-ctx adapter (B2): maps the Convex mutation/query context
+ * The generated-ctx adapter: maps the Convex mutation/query context
  * onto the snapshot store surfaces from ./store.ts.
  *
- * `normalizeId` is the proved bridge (A3) from the cores' plain-string ids
+ * `normalizeId` is the proved bridge from the cores' plain-string ids
  * to branded table ids; typed index chains live only here. The Convex Auth
  * callback's generic ctx has its own adapter (./authHook.ts). Revocation
- * goes through B1's `revokeSessionCore` with its canonical event
+ * goes through `revokeSessionCore` with its canonical event
  * publication, and the issuance throttle delegates to the shared
  * `commitIssuanceAttempt` core (identity/issuanceLimit.ts).
  */
@@ -232,7 +232,7 @@ function throttleStore(db: MutationCtx["db"]): IssuanceThrottleStore {
 
 /**
  * Adapts one Convex mutation context to the linking write surface. The
- * full ctx (not just db) is required: revocation goes through B1's
+ * full ctx (not just db) is required: revocation goes through the
  * `revokeSessionCore` with its canonical event publication.
  */
 export function linkingTx(ctx: MutationCtx): LinkingTx {

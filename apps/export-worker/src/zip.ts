@@ -1,5 +1,5 @@
 /**
- * A bounded, streaming ZIP writer (I3 export worker): the STORE method
+ * A bounded, streaming ZIP writer (export worker): the STORE method
  * (no compression) with CRC-32 computed while bytes stream through, local
  * file headers carrying the data-descriptor flag, and a central directory
  * at the end. Nothing is buffered whole: every file's bytes are pushed

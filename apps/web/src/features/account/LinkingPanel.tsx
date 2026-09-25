@@ -1,6 +1,6 @@
 /**
  * The linking panel: method inventory, the ceremony walkthrough and its
- * pending proofs (B2). Both directions render from ONE state machine: the
+ * pending proofs. Both directions render from ONE state machine: the
  * ceremony's `nextLeg` (mirrored from the server view) decides whether
  * the expected proof is a mailed code or a Google re-authentication.
  */

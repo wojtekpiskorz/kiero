@@ -1,5 +1,5 @@
 /**
- * Web Push queries (F3): the Polish settings screen's server read.
+ * Web Push queries: the Polish settings screen's server read.
  *
  * `pushState` is the authenticated personal read: the deployment's
  * application server key (the PUBLIC half of the VAPID pair; the private
@@ -14,8 +14,8 @@
  * -> user -> active membership); the resolved session id also marks
  * which subscription row belongs to THIS device.
  *
- * J2 identity repair (the attention-lane gap H2 recorded, F3 sibling of
- * the context.ts fold-in): the public read resolves through B1's
+ * Identity resolution (the sibling of
+ * the context.ts fold-in): the public read resolves through the
  * live-session chain because the platform-generic subject is not a
  * sessions-registry id and ordinary user tokens failed
  * `no_live_session_push` before it.

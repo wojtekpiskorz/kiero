@@ -1,8 +1,8 @@
 /**
  * Calendar module surface (architecture "Deep modules": Integrations, the
  * Calendar half; see CONTEXT.md "Kalendarz Kiero w Google").
- * Implements lanes: G1 (connection), G2 (projection), G3 (reconciliation),
- * G5 (the personal project-selection write and read; issue #107).
+ * Covers connection, projection, reconciliation and
+ * the personal project-selection write and read.
  *
  * Kiero → Google one-way projection into a dedicated personal calendar.
  * Actual agreements stay in Kiero. Unknown remote outcomes require
@@ -80,10 +80,10 @@ export const calendarOperations = {
     }),
     errorKinds: ["forbidden", "not_found", "unavailable"],
   }),
-  // G5 (issue #107): G2's report certified this write as the named
-  // prerequisite but the entry never landed in the file (G4 proved the
+  // The report certified this write as the named
+  // prerequisite but the entry never landed in the file (the platform proved the
   // honest `unsupported` refusal live). This is the minimal certificate
-  // amendment: the flat { mode, projectIds? } shape G4's recorded dispatch
+  // amendment: the flat { mode, projectIds? } shape the recorded dispatch
   // used, over the SAME vocabulary the calendarSyncState column stores.
   "calendar.setSelection": operationEntry({
     kind: "operation",

@@ -1,5 +1,5 @@
 /**
- * The images normalization ledger transactions (D5): one place for every
+ * The images normalization ledger transactions: one place for every
  * state change of the photo-normalization durable job
  * `processing.normalize_photo`, each safe to retry.
  *
@@ -337,7 +337,7 @@ export async function prepareNormalizationTransaction(
  *   rows (hashes, dimensions, bytes, content type) — verification is a
  *   separate step with its own evidence;
  * - `exception`: the explicit retained-original row pointing AT the
- *   received bytes with the typed `exceptionKind` (durable since D2
+ *   received bytes with the typed `exceptionKind` (durable since the upload
  *   verified the received object at completion), published as retained.
  *
  * Idempotent: an existing retained row of the same transform version is
@@ -354,7 +354,7 @@ export async function recordNormalizationTransaction(
     return errorResult(loaded.error);
   }
   const job = loaded.job;
-  // Decode BEFORE any write (the D1 structural pattern).
+  // Decode BEFORE any write (the structural pattern).
   const outcome = Schema.decodeUnknownSync(RecordOutcome)(outcomeValue);
   const attachmentId = tx.db.normalizeId("attachments", attachmentIdValue);
   if (attachmentId === null) {
@@ -392,17 +392,17 @@ export async function recordNormalizationTransaction(
         ? {}
         : { bytes: attachment.receivedBytes }),
       exceptionKind: outcome.exceptionKind,
-      // R24: the executor's HTTP status when conversion failed (entitlement
+      // The executor's HTTP status when conversion failed (entitlement
       // vs decode, distinguishable in the durable record).
       ...(outcome.failureStatus === undefined ? {} : { exceptionFailureStatus: outcome.failureStatus }),
-      // R24: the original's decoded pixel space when the bounded header
+      // The original's decoded pixel space when the bounded header
       // resolved — the coordinate space vision region validation needs over
       // the retained-original fallback. Absent means undecodable, never a
       // stand-in.
       ...(outcome.originalSpace === undefined
         ? {}
         : { width: outcome.originalSpace.width, height: outcome.originalSpace.height }),
-      // The received object was already verified durable by D2's completion
+      // The received object was already verified durable by the completion
       // step; the exception's archive IS those bytes.
       verifiedAtMs: nowMs,
       createdAtMs: nowMs,
@@ -505,7 +505,7 @@ export async function verifyNormalizationTransaction(
   if (!scoped.images.some((candidate) => candidate._id === attachmentId)) {
     return errorResult(validationError("attachment_not_in_job"));
   }
-  // Pre-flight the registry entry before the first write (D1's pattern).
+  // Pre-flight the registry entry before the first write.
   const eventEntry = events["sources.representationRetained"];
   if (eventEntry === undefined) {
     return errorResult(unavailableError(true, "representation_retained_event_missing"));

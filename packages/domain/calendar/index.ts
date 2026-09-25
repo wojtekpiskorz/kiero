@@ -1,5 +1,5 @@
 /**
- * @kiero/domain calendar surface (G2): the PURE projection rules for the
+ * @kiero/domain calendar surface: the PURE projection rules for the
  * "Kalendarz Kiero w Google" deep module — personal eligibility (selected
  * projects, coordinated-by-me or unassigned, open tasks and planned
  * events), the deterministic term mapping (all-day / interval /

@@ -1,30 +1,30 @@
 /**
- * The memory feature (H1): "Pamięć projektu" and firm memory readable by a
+ * The memory feature: "Pamięć projektu" and firm memory readable by a
  * boss without re-reading the conversation (CONTEXT.md).
  *
  * JSX-free on purpose (createElement only), like the conversation surface:
  * the host feature registry chain stays importable by the node programs.
  *
- * - current findings: `memory.readCurrentFindings` (C2) with the honest
- *   knowledge states — `conflicted` and `updating` (C5) are visibly NOT
+ * - current findings: `memory.readCurrentFindings` with the honest
+ *   knowledge states — `conflicted` and `updating` are visibly NOT
  *   settled facts and say so in their labels;
- * - revisions and provenance: `memory.readFindingHistory` (the H1-flagged
+ * - revisions and provenance: `memory.readFindingHistory` (the
  *   read) — every immutable revision with its origin (publication from a
  *   message, explicit correction, withdrawal marking), author, time,
  *   reason, what it supersedes, and its evidence witnesses linking back to
- *   the canonical dossier route with its encoded `zrodlo` param (R5's
+ *   the canonical dossier route with its encoded `zrodlo` param (the
  *   shared serializer in ../source-detail/source-route);
  * - the correction flow: correction-as-new-source lives in the conversation
  *   feature (a new message referencing the old one); a DIRECT structured
- *   correction uses C2's audited command `memory.correctFinding` with the
+ *   correction uses the audited command `memory.correctFinding` with the
  *   revision the boss actually saw as `expectedRevision` — a concurrent
  *   revision conflict refuses honestly instead of overwriting;
  * - clarifications ("Sprawa do wyjaśnienia"): `memory.readClarifications`
- *   (the H1-flagged read) shows E3's sourced questions with the
+ *   (the clarifications read) shows the sourced questions with the
  *   conflicting evidence; answering runs `memory.resolveClarification`,
  *   which keeps the resolving author and note in history.
  *
- * All routes enforce B3 access through the backend operations themselves;
+ * All routes enforce membership access through the backend operations themselves;
  * this surface never reads around them.
  */
 
@@ -310,7 +310,7 @@ function FindingHistoryPanel({
                       createElement(
                         "a",
                         {
-                          // R5: the one canonical serializer builds the
+                          // The one canonical serializer builds the
                           // evidence link (with the fragment's anchor).
                           href: serializeSourceReference({
                             sourceId: witness.sourceId,
@@ -352,7 +352,7 @@ function revisionSupersedesNumber(
 }
 
 // ---------------------------------------------------------------------------
-// Direct structured correction (C2's audited command)
+// Direct structured correction (the audited command)
 // ---------------------------------------------------------------------------
 
 function DirectCorrectionForm({
@@ -445,11 +445,11 @@ function DirectCorrectionForm({
 }
 
 // ---------------------------------------------------------------------------
-// Clarifications: E3's sourced questions, answered by a boss
+// Clarifications: the sourced questions, answered by a boss
 // ---------------------------------------------------------------------------
 
 /**
- * R1 (issue #126): the labels of the recorded resolution basis. Local to
+ * The labels of the recorded resolution basis. Local to
  * this file because the shared memory copy module is outside this issue's
  * owned paths; a future copy consolidation can move them unchanged.
  */
@@ -486,7 +486,7 @@ export function ResolutionBasisView({ row }: { readonly row: ClarificationWireRo
           createElement(
             "a",
             {
-              // R5: the one canonical serializer builds the saved
+              // The one canonical serializer builds the saved
               // resolution-evidence link (with the fragment's anchor).
               href: serializeSourceReference({
                 sourceId: witness.sourceId,
@@ -618,7 +618,7 @@ function ClarificationRow({
                 createElement(
                   "a",
                   {
-                    // R5: the one canonical serializer builds the
+                    // The one canonical serializer builds the
                     // conflicting-evidence link (with the fragment).
                     href: serializeSourceReference({
                       sourceId: witness.sourceId,

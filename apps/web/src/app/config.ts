@@ -1,5 +1,5 @@
 /**
- * Typed client configuration seam (A4).
+ * Typed client configuration seam.
  *
  * The client has NO secrets by construction (AGENTS.md): only `VITE_*`
  * names ever reach the bundle. The names defined today are
@@ -25,9 +25,9 @@ export type ConnectionConfig =
     };
 
 /**
- * The media-gateway connection (H3 append, flagged on the same seam): how
+ * The media-gateway connection: how
  * the client reaches the Cloudflare Worker that serves authorized media
- * reads (D3's `/media/*` routes). Optional by design — a backend without
+ * reads (`/media/*` routes). Optional by design — a backend without
  * a gateway keeps every non-media surface working, and media surfaces say
  * so honestly instead of guessing a URL.
  */
@@ -40,7 +40,7 @@ export interface AppConfig {
   readonly connection: ConnectionConfig;
   /**
    * The media gateway Worker's base URL (VITE_GATEWAY_URL) behind the
-   * discriminated union (D4's capture uploads and H3's authorized media
+   * discriminated union (the capture uploads and the authorized media
    * reads share it): unconfigured degrades exactly those surfaces
    * honestly, never the whole connection state.
    */
@@ -54,7 +54,7 @@ export interface AppConfig {
 export interface AppEnvSource {
   readonly [key: string]: unknown;
   readonly VITE_CONVEX_URL?: unknown;
-  /** Public media-gateway base URL (no secret ever; D4/H3 share it). */
+  /** Public media-gateway base URL (no secret ever; capture and search share it). */
   readonly VITE_GATEWAY_URL?: unknown;
 }
 

@@ -1,5 +1,5 @@
 /**
- * The extensions lane's typed authority surface (C3): the contract entries
+ * The extensions lane's typed authority surface: the contract entries
  * it implements and the input types their handlers consume, mirroring the
  * findings lane's semantics module.
  *
@@ -32,7 +32,7 @@ export type ValidateExtensionValueInput = Schema.Schema.Type<
 
 /**
  * A representative table id used only by the pre-insert decode templates
- * (the D1/C2 pattern): proves the result schemas still accept the exact
+ * proves the result schemas still accept the exact
  * shapes this transaction constructs, BEFORE anything is written.
  */
 export const TEMPLATE_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f";

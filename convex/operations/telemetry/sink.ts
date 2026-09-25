@@ -1,5 +1,5 @@
 /**
- * The telemetry sink boundary (I2).
+ * The telemetry sink boundary.
  *
  * Axiom is the accepted observability destination, but account provisioning
  * is an OWNER action (no AXIOM_API_TOKEN exists in any environment yet; see
@@ -35,7 +35,7 @@ export interface SinkIngestResult {
 }
 
 /**
- * The closed reason strings (R27, issue #235): single definitions so the
+ * The closed reason strings: single definitions so the
  * forward-outcome classification in `./forward.ts` cannot drift from what
  * the sinks actually report. Status-class reasons carry the HTTP code.
  */

@@ -1,14 +1,14 @@
 /**
- * Guarded C1 proof fixtures (dev deployment only).
+ * Guarded projects proof fixtures (dev deployment only).
  *
- * Same pattern as the A3/B1/B3 probes: an ACTION checks the deployment
+ * Same pattern as the probes: an ACTION checks the deployment
  * guard variable (`KIERO_C1_PROOF_ENABLED === "1"`) and runs internal
  * mutations reachable only from this module. On a production deployment the
  * guard variable is absent and every entry fails closed.
  *
  * `c1ProofCompanyProjects` is the tenant-scoped inspection read the live
  * evidence asserts on: raw projects, retained alias rows, contacts, role
- * rows, D1 source-link rows and the company's published `projects.*` outbox
+ * rows, source-link rows and the company's published `projects.*` outbox
  * events (stable ids and preserved history after closure/reopen). It reads
  * only; the proof writes exclusively through the checked dispatch.
  */
@@ -157,9 +157,9 @@ export const seedDraftUploadInternal = internalMutation({
 
 /**
  * Seeds one draft upload for the proof person's live session (guarded), so
- * the live evidence can drive D1's REAL `sources.acceptSource` against a
- * C1-identified project (the source-link half of the closure proof). The
- * row shape mirrors D1's own guarded seeding exactly.
+ * the live evidence can drive the REAL `sources.acceptSource` against a
+ * identified project (the source-link half of the closure proof). The
+ * row shape mirrors its own guarded seeding exactly.
  */
 export const c1ProofSeedDraftUpload = action({
   args: { sessionId: v.id("sessions") },
@@ -173,16 +173,16 @@ export const c1ProofSeedDraftUpload = action({
   },
 });
 
-// --- sign-in code fixture (lease workaround, guarded like B1's own) ---------
+// --- sign-in code fixture (lease workaround, guarded like its own) ---------
 //
-// B1's `b1ProofSetCode` fixture lives in an UNCHANGED module whose deployed
+// `b1ProofSetCode` fixture lives in an UNCHANGED module whose deployed
 // bundle on this shared lease predates the deployment's proof-guard
 // variables, so it keeps answering `proof_guard_disabled` (Convex snapshots
 // env vars into the bundle at push time; only content-changed modules
 // re-bundle). This lane's probe module is freshly pushed, so the SAME
 // fixture — proof-domain addresses only, hashed exactly like the library
-// hashes codes — is offered here for C1's live evidence. The REAL issuance
-// and the REAL verification still run through B1's library path.
+// hashes codes — is offered here for the live evidence. The REAL issuance
+// and the REAL verification still run through the library path.
 
 const OTP_MAX_AGE_SECONDS = 15 * 60;
 
@@ -205,7 +205,7 @@ export const setSignInCodeInternal = internalMutation({
     if (!isProofFixtureEmail(args.email)) {
       return errorResult(unsupportedError("projects.c1Proof", "proof_domain_required"));
     }
-    // The account lookup matches B1's own fixture exactly: the library stores
+    // The account lookup matches its own fixture exactly: the library stores
     // providerAccountId as the address was passed, so the lookup uses the
     // exact string (no case folding — a folded lookup would miss the mixed
     // case a real issuance stores).

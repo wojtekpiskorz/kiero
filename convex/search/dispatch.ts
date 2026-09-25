@@ -1,14 +1,14 @@
 /**
- * Search command dispatch wiring (E5): the SAME checked path A3 proved, with
+ * Search command dispatch wiring: the SAME checked path the platform proved, with
  * this lane's handler registries.
  *
- * Two dispatch shapes, mirroring the sources (D1) and AI (E2) precedents:
+ * Two dispatch shapes, mirroring the sources and AI precedents:
  *
  * - the MUTATION dispatch (`dispatchSearchLifecycleCommand`) serves the two
  *   index-generation operations, which are administrative writes on global
  *   derived state: they run (and commit the generation row, the canonical
  *   event and the durable build job atomically) inside one Convex mutation.
- *   Identity resolves exactly like D1's accept path: the B1 live-session
+ *   Identity resolves exactly like the accept path: the live-session
  *   chain for users, the verified service session for the bridge path.
  *
  * - the ACTION dispatch (`dispatchSearchQueryCommand`) serves
@@ -17,7 +17,7 @@
  *   internal queries (actions have no db handle) and reusing the one query
  *   core (./query.ts runEvidenceQuery).
  *
- * Unimplemented search operations fail closed `unsupported` (the A3
+ * Unimplemented search operations fail closed `unsupported` (the platform
  * fail-closed contract); `search.startIndexGeneration` refuses anything but
  * the pinned initial candidate with a typed conflict.
  */

@@ -1,5 +1,5 @@
 /**
- * The upload ledger transactions (D2): one place for every state change of
+ * The upload ledger transactions: one place for every state change of
  * a resumable upload, each safe to retry.
  *
  * Ownership and tenancy are re-checked at EVERY step against the resolved
@@ -17,7 +17,7 @@
  * - a completed-but-unaccepted upload stays at stage `finalized` with its
  *   event published — recoverable through the ledger until reconciliation
  *   (past its grace, unaccepted, inactive) marks it `orphaned`;
- * - acceptance (D1's transaction, extended by D2) binds source, attachments
+ * - acceptance (the transaction, extended by uploads) binds source, attachments
  *   and ledger atomically and only then issues the saved receipt.
  */
 
@@ -547,7 +547,7 @@ export async function finalizeUploadTransaction(
       return errorResult(validationError("attachment_not_verified"));
     }
   }
-  // Pre-flight the registry entry (D1's structural pattern: every throwing
+  // Pre-flight the registry entry (the structural pattern: every throwing
   // step resolves before the first write).
   const eventEntry = events["sources.uploadFinalized"];
   if (eventEntry === undefined) {

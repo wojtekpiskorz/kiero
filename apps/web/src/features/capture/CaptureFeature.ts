@@ -1,16 +1,16 @@
 /**
- * The capture composer (D4, joined into the conversation by J2): the
+ * The capture composer (embedded in the conversation): the
  * mobile composer of one "wiadomość źródłowa" (CONTEXT.md): text, ONE
  * tap-to-start/tap-to-stop recording and several photos, with a stable,
- * recoverable local draft over the REAL D2 upload paths and D1 acceptance.
+ * recoverable local draft over the REAL upload paths and source acceptance.
  *
- * This file is the form composition only (split of D4 review round 1): the
+ * This file is the form composition only: the
  * draft store, recorder and send wiring live in use-capture-composer.ts
  * (one hook this form consumes), the five presentational views in views.ts.
  *
- * J2 join (issue #61): the composer MOUNTS INSIDE the conversation surface
- * ("Rozmowa firmy"), replacing both earlier send forms: J1's text-only
- * statement form and D4's separate /wpis route. The /wpis route and its
+ * The composer MOUNTS INSIDE the conversation surface
+ * ("Rozmowa firmy"), replacing both earlier send forms: the text-only
+ * statement form and the separate /wpis route. The /wpis route and its
  * nav entry retire with this join; this module exports the embedded
  * ComposerForm (plus its wiring seam props: a correction prefill and an
  * on-accepted callback) instead of a page root.
@@ -19,7 +19,7 @@
  * membership surfaces: the host feature registry chain stays importable
  * by the node test programs.
  *
- * What this composer guarantees (issue #32, unchanged by the join):
+ * What this composer guarantees:
  *
  * - ONE stable draft per signed-in person, persisted incrementally in the
  *   browser's storage: recording chunks land as MediaRecorder emits them,
@@ -35,9 +35,9 @@
  *   from the conversation's ?projekt= param, so the plain company view
  *   starts Auto and a project view retains its project context;
  * - the post-send processing vocabulary (accepted/processing/partial/
- *   processed/failed) renders from D1's source row, identical to the
+ *   processed/failed) renders from the source row, identical to the
  *   conversation surface;
- * - voice-only and photo-only sends are real messages (the J2 ruling):
+ * - voice-only and photo-only sends are real messages (the ruling):
  *   words of text OR at least one retained medium is substance enough.
  *
  * No styling, semantic controls only (the UX/UI track owns presentation).
@@ -64,7 +64,7 @@ export interface ComposerFormProps {
   /** The signed-in person's user id (the draft-store key). */
   readonly userId: string;
   /**
-   * A correction prefill (H1's "Korekta ustalenia" flow): when non-null,
+   * A correction prefill ("Korekta ustalenia" flow): when non-null,
    * its text is written into the draft ONCE and `onPrefillApplied`
    * fires, so the conversation can drop the request. The draft record
    * stays the single source of truth afterwards.

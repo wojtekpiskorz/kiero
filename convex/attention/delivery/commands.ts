@@ -1,5 +1,5 @@
 /**
- * Notification-delivery command entries (F2).
+ * Notification-delivery command entries.
  *
  * Two callable entries, one checked dispatch (the lane pattern):
  *
@@ -27,7 +27,7 @@ export const evaluateDueIntentsCommand = mutation({
 
 /**
  * The service path's transactional entry: the verified service session id
- * substitutes the bearer-verified identity (the A3 bridge pattern).
+ * substitutes the bearer-verified identity (the bridge pattern).
  */
 export const evaluateDueIntentsTransaction = internalMutation({
   args: { envelope: v.any(), serviceSessionId: v.string() },

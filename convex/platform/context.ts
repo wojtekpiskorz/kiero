@@ -1,5 +1,5 @@
 /**
- * Actor/session/tenant request context resolution (A3).
+ * Actor/session/tenant request context resolution.
  *
  * The canonical resolution every checked operation goes through:
  * verified identity -> live `sessions` row -> `users` row -> one active
@@ -7,7 +7,7 @@
  *
  * Identity sources (exactly two, both verified server-side):
  * - `identityFromConvexAuth`: Convex Auth identity from `ctx.auth` (the user
- *   path; B1 owns the sign-in product that issues it).
+ *   path; the sign-in product issues it).
  * - the Worker service bridge: the bearer credential verified at the HTTP
  *   boundary (see ./http.ts); the resulting identity maps to the service
  *   account's own session row.
@@ -62,7 +62,7 @@ export async function resolveRequestContext(
   }
   const sessionId = db.normalizeId("sessions", identity.subject);
   if (sessionId === null) {
-    return null; // not a well-formed Convex id (A2 note: normalizeId is the check)
+    return null; // not a well-formed Convex id (normalizeId is the check)
   }
   const session = await db.get(sessionId);
   if (session === null || session.revokedAtMs !== undefined) {
@@ -82,7 +82,7 @@ export async function resolveRequestContext(
   const membership = active[0];
   if (membership === undefined) {
     // v1: the earliest active membership is the user's one active firm
-    // ("Członkostwo w firmie", CONTEXT.md); B3 owns the authoritative rule.
+    // ("Członkostwo w firmie", CONTEXT.md); membership owns the authoritative rule.
     return null;
   }
   const company = await db.get(membership.companyId);
@@ -131,8 +131,8 @@ export const resolveServiceContext = internalQuery({
 });
 
 /**
- * E4 amendment: the author's live session row. Background analysis
- * pipelines (E3's text analysis, E4's join) act within the source author's
+ * The author's live session row. Background analysis
+ * pipelines (the text analysis, the join) act within the source author's
  * firm permissions through a server-resolved session, never client input,
  * never a fabricated identity. The newest live session wins; the indexed
  * scan stops at the first hit, so a long-lived author costs one read.

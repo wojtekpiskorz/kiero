@@ -1,13 +1,13 @@
 /**
- * AI integration dispatch wiring (E2): `integrations.executeModelCall`.
+ * AI integration dispatch wiring: `integrations.executeModelCall`.
  *
- * The adapters from `@kiero/providers` sit behind the SAME A3 checked path
+ * The adapters from `@kiero/providers` sit behind the SAME checked path
  * every other operation takes (`dispatchCommand`): registry lookup, context
  * resolution from a verified identity, authorization, contract input decode,
  * sanitized handler. This module follows the Worker-bridge dispatch template
  * (convex/platform/dispatch.ts) because provider calls are external effects:
  * they run in an ACTION, never inside the transaction that would commit a
- * domain change (the echo executor's protocol, A3).
+ * domain change (the echo executor's protocol).
  *
  * External-outcome discipline (echo template):
  * - the call happens exactly once per dispatched operation attempt here;
@@ -19,13 +19,13 @@
  *   reserves for them;
  * - if the action itself dies mid-call, no event is written: that absence is
  *   the observable "unknown outcome" reconciliation input for the operations
- *   owner (H4/I2), never a license for a blind retry.
+ *   owner, never a license for a blind retry.
  *
  * Named prerequisite (recorded honestly, not worked around): the certified
  * contracts have no durable job kind for model calls and no provider-call
  * table. Durable model-call executors (per-segment STT, extraction steps)
  * need a coordinated `DurableJobKind` addition in `@kiero/contracts`; the
- * processing pipeline lanes (D6/E3-E5) own those kinds, and their executors
+ * processing pipeline lanes own those kinds, and their executors
  * reuse the provider package's classification and recording rather than the
  * reverse. `processingAttempts` remains the per-step record once
  * steps exist.
@@ -298,7 +298,7 @@ async function executeDecodedPayload(
 }
 
 /**
- * Dispatches one AI command envelope through the A3 checked path from the
+ * Dispatches one AI command envelope through the checked path from the
  * verified bridge session. The provider call runs inside the action (never
  * in a transaction); its outcome is recorded through the outbox event.
  */
@@ -317,7 +317,7 @@ export async function dispatchAiCommand(
         intent: "execute",
         run: async (bridge, context, input, meta) => {
           // dispatchCommand already decoded the input against the contract
-          // entry; this is the same defensive re-read the A3 probe handlers
+          // entry; this is the same defensive re-read the probe handlers
           // use (one schema, one authority).
           const decoded = Schema.decodeUnknownSync(executeModelCallEntry.input)(input);
           const credentials = openRouterCredentials();
@@ -336,7 +336,7 @@ export async function dispatchAiCommand(
             // so nothing is published or reported under the wrong route.
             return errorResult(validationError("provider_payload_route_mismatch"));
           }
-          // E8 split follow-up, mirroring the OpenRouter guard: a route
+          // Mirroring the OpenRouter guard: a route
           // whose frozen order starts at the direct DeepSeek primary
           // refuses when DEEPSEEK_API_KEY is absent, after the pure payload
           // validation but still BEFORE any provider call. Honest typed
@@ -377,7 +377,7 @@ export async function dispatchAiCommand(
 }
 
 /**
- * The callable Convex entry for later joins (gateway/A4 composition): one
+ * The callable Convex entry for later joins (gateway/app composition): one
  * verified-session action running the checked AI dispatch.
  */
 export const executeModelCall = internalAction({

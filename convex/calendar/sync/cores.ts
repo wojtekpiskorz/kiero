@@ -1,6 +1,6 @@
 /**
- * Calendar sync decision cores (G3 pure): the reconciliation decision
- * table over G2's desired state, the unknown-outcome state machine of the
+ * Calendar sync decision cores (pure): the reconciliation decision
+ * table over the desired state, the unknown-outcome state machine of the
  * remote ledger, and the observation followups.
  *
  * No I/O, no Convex, no clock reads (instants arrive as arguments). Every
@@ -25,10 +25,10 @@ import type { DesiredGoogleEvent } from "@kiero/domain";
 // Vocabulary.
 // ---------------------------------------------------------------------------
 
-/** The remote-ledger outcome (G2's schema literal union; pinned by use). */
+/** The remote-ledger outcome (the schema literal union; pinned by use). */
 export type RemoteOutcome = "confirmed" | "absent" | "unknown";
 
-/** How a hide was learned ("Ukrycie kopii kalendarzowej", G2's vocabulary). */
+/** How a hide was learned ("Ukrycie kopii kalendarzowej", vocabulary). */
 export type HideOrigin = "user_request" | "deleted_in_google" | "moved_in_google";
 
 /** The bounded retry limits per (copy, semantic id, leg kind). */
@@ -59,7 +59,7 @@ export const KIERO_SEMANTIC_PROPERTY = "kiero.semanticId";
 // Row views the decisions consume (server-resolved only).
 // ---------------------------------------------------------------------------
 
-/** One copy's view: G2's desired state plus G3's remote ledger. */
+/** One copy's view: the desired state plus the remote ledger. */
 export interface CopySyncView {
   readonly copyId: string;
   readonly semanticId: string;
@@ -124,7 +124,7 @@ export function managedFieldsOf(payload: DesiredGoogleEvent): ManagedFields {
   };
 }
 
-/** Canonical JSON: sorted keys, no whitespace (G2's diff helper shape). */
+/** Canonical JSON: sorted keys, no whitespace (the diff helper shape). */
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map(canonicalJson).join(",")}]`;
@@ -145,7 +145,7 @@ export function managedFieldsMatch(observed: ManagedFields, desired: ManagedFiel
 
 /**
  * The create body: managed fields PLUS the first-write personal defaults
- * G2's payload carries (transparency + no reminders) and the private
+ * the payload carries (transparency + no reminders) and the private
  * extended property that makes a stray create OBSERVABLE later
  * (Events.list `privateExtendedProperty` filter, Google-documented).
  */
@@ -172,7 +172,7 @@ export function updateEventBody(payload: DesiredGoogleEvent): Record<string, unk
 }
 
 // ---------------------------------------------------------------------------
-// The attempt claim (concurrent-prepare serialization, round-2 finding 1).
+// The attempt claim (concurrent-prepare serialization).
 // ---------------------------------------------------------------------------
 
 /**
@@ -256,7 +256,7 @@ export function mustBeAbsent(copy: CopySyncView): boolean {
 }
 
 /**
- * THE decision table (the G2 integration contract, mechanically applied):
+ * THE decision table (the integration contract, mechanically applied):
  *
  * - projected && !hidden: no remote id -> create (first attempt only;
  *   every later attempt MUST observe first); remote id -> update when the
@@ -326,7 +326,7 @@ export function decideCopyLeg(
 
   // projected && !hidden from here on.
   if (copy.payload === null) {
-    // G2's construction makes this unreachable (a projected desire always
+    // the construction makes this unreachable (a projected desire always
     // carries a payload); the honest defense is a loud suspension, never
     // a guess.
     return { action: "suspend", reason: "payload_missing" };
@@ -584,7 +584,7 @@ export type MutationReport =
   /**
    * Uncertain: the effect may have happened. `cause: "timeout"` names a
    * bounded-deadline hit (the protocol's `unknown_timeout`) so the attempt
-   * rows and the job's externalOutcome can carry the A3 word; every other
+   * rows and the job's externalOutcome can carry the platform word; every other
    * uncertainty (5xx, unreadable body) stays causeless `unknown`.
    */
   | { readonly kind: "unknown"; readonly cause?: "timeout" };
@@ -756,7 +756,7 @@ export function observationFromMutation(
 // ---------------------------------------------------------------------------
 
 /**
- * The attempt-outcome word one MUTATION report implies (the A3
+ * The attempt-outcome word one MUTATION report implies (the platform
  * `ExternalOutcome` vocabulary: a definite answer — applied, or the
  * idempotent 404 — is a completed leg; a refused or access-lost shape is
  * a failure; `unknown` is uncertain, and a bounded-deadline hit carries

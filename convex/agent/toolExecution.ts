@@ -1,6 +1,6 @@
 /**
- * The answer loop's tool-execution half (E6; extracted from loop.ts by R14,
- * issue #187, as a pure move behind the existing typed contracts): running
+ * The answer loop's tool-execution half (extracted from loop.ts
+ * as a pure move behind the existing typed contracts): running
  * ONE decoded tool call the loop received from the provider.
  *
  * Three shapes exist and every declared tool must live on one of them (a
@@ -245,7 +245,7 @@ async function runCheckedExecution(
     }
     case "agent_resolve_clarification": {
       const args = call.arguments as { clarificationId: string; resolutionNote: string; evidenceIds: string[] };
-      // R1 (issue #126): resolve the cited handles against the run's current
+      // Resolve the cited handles against the run's current
       // evidence ledger — deduplicated, wire-shaped once (the pure mapping
       // lives beside the executor's input type). The reducer already refused
       // unresolved handles; one that vanished anyway refuses honestly.

@@ -1,14 +1,14 @@
 /**
- * The PWA update safe-point gate (I7): the ONE place that answers "may the
+ * The PWA update safe-point gate: the ONE place that answers "may the
  * update prompt appear RIGHT NOW?".
  *
- * Deferral rules (issue #59: "Recording, editing, and upload defer reload"):
+ * Deferral rules ("Recording, editing, and upload defer reload"):
  *
  * - WORK HOLDS: feature surfaces hold the update while work is in flight
  *   ("capture.recording", "capture.uploading", ...). A hold is a named,
  *   idempotent, releasable claim; the prompt waits until every hold is
  *   released. This is the certified adapter seam feature packages expose
- *   (the issue's own integration rule); D4's composer states map onto it
+ *   (the issue's own integration rule); the composer states map onto it
  *   one-to-one (recordingActive / sending).
  * - EDITING SETTLE: document-level input activity inside a short settle
  *   window also defers the prompt, so typing never meets a reload button

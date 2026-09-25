@@ -1,8 +1,8 @@
 /**
- * Pure WAV (RIFF/PCM) parsing, measuring and slicing (D6).
+ * Pure WAV (RIFF/PCM) parsing, measuring and slicing.
  *
  * ONE authority for the byte-level time mapping of PCM WAV audio, imported
- * by BOTH sides of the D6 seam:
+ * by BOTH sides of the seam:
  *
  * - `apps/media-worker` (this package): the media executor that serves
  *   `/probe` (duration/format) and `/segment` (ranged slices) over the
@@ -15,7 +15,7 @@
  * `Uint8Array`/`DataView` only, so it runs unchanged inside the Cloudflare
  * Worker, the EU container (Node) and Convex actions.
  *
- * Honest scope (recorded in the D6 evidence): PCM WAV in and PCM WAV out.
+ * Honest scope (recorded in the evidence): PCM WAV in and PCM WAV out.
  * Browser recorder containers (webm/ogg/...) need FFmpeg conversion — the
  * EU Container's job; until it deploys, non-WAV retained audio is refused
  * with a typed code, never silently mis-sliced.

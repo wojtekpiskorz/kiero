@@ -1,12 +1,12 @@
 /**
  * Sources and media module surface (architecture "Deep modules": Sources and
- * media). Implements lanes: D1 (accept), D2 (uploads), D3 (media reads),
- * D5 (photo normalization), D6 (audio), I3/I4 (export/deletion input).
+ * media). Covers acceptance, uploads, media reads,
+ * photo normalization, audio and export/deletion input.
  *
  * One immutable logical source, all-attachment acceptance, representation
  * versions, retained-image policy, dependent cleanup. Correcting a
  * statement happens by a NEW source; the original is never rewritten
- * (issue 8: "Korekta ustalenia ... Nie przepisuje wcześniejszej wiadomości").
+ * ("Korekta ustalenia ... Nie przepisuje wcześniejszej wiadomości").
  */
 
 import { Schema } from "effect";
@@ -65,17 +65,17 @@ export const sourcesOperations = {
     errorKinds: ["forbidden", "not_found", "conflict"],
   }),
   /**
-   * E7 amendment (additive, flagged; issue #115): the per-source project
-   * reassignment write H3's dossier named as its missing prerequisite. The
+   * The per-source project
+   * reassignment write the dossier named as its missing prerequisite. The
    * boss moves one "Wiadomość źródłowa" between projects or to/from
    * company-general by declaring the COMPLETE new project set (an empty
    * array means company-general). The source keeps its identity: read state,
    * evidence and the immutable original stay; only `sourceProjectLinks`
-   * move, and dependent findings re-assess through the C5 recomputation
+   * move, and dependent findings re-assess through the recomputation
    * seam. A set equal to the current links is a typed conflict (nothing to
    * change), so client retries can never double-fire the reaction.
    *
-   * R4 repair (issue #129): the complete replacement carries an
+   * The complete replacement carries an
    * observed-placement precondition. `expectedProjectIds` is the COMPLETE
    * project set the editor saw on the read that populated the form, captured
    * from the same snapshot as the dossier's `projectIds`. The transaction
@@ -85,7 +85,7 @@ export const sourcesOperations = {
    * reassignment. The key is REQUIRED on purpose: a pre-repair client that
    * omits it fails the input decode (a typed validation refusal) instead of
    * bypassing concurrency protection — an optional or defaulted
-   * precondition is exactly the hole R4 closes.
+   * precondition is exactly the hole the placement precondition closes.
    */
   "sources.reassignSource": operationEntry({
     kind: "operation",
@@ -95,7 +95,7 @@ export const sourcesOperations = {
       /** The complete new project set; empty means company-general knowledge. */
       projectIds: Schema.Array(tableIdSchema("projects")),
       /**
-       * R4 precondition (REQUIRED, issue #129): the complete project set the
+       * Placement precondition (REQUIRED): the complete project set the
        * editor observed when the form was loaded. Comparison ignores
        * ordering and duplicates; a mismatch from the current committed set
        * refuses `source_placement_stale` before any write, event or
@@ -145,13 +145,13 @@ export const sourcesEvents = {
     }),
   }),
   /**
-   * E7 amendment (additive, flagged; issue #115): the canonical publication
+   * The canonical publication
    * record of one project reassignment. The payload carries the COMMITTED
    * link set so downstream consumers (audit, search refresh, J joins) see
    * the placement after the move without re-deriving it. Drains into the
-   * C5 recomputation edge; the reassignment transaction registers that job
+   * recomputation edge; the reassignment transaction registers that job
    * itself under the same dedup identity, so the drain projection collapses
-   * onto the publisher's row (the D1/withdrawal discipline).
+   * onto the publisher's row (the acceptance/withdrawal discipline).
    */
   "sources.sourceReassigned": eventEntry({
     kind: "event",

@@ -1,6 +1,6 @@
 /**
- * E4 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable; the D6 pattern — every entry resolves the CALLER's identity
+ * Multimodal dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable; the pattern — every entry resolves the CALLER's identity
  * from the caller's own verified Convex Auth credential INSIDE the
  * internal function that does the work, because actions carry identity but
  * no database reader).
@@ -11,7 +11,7 @@
  *   every required input named with its honest status (the aggregate the
  *   evidence asserts on).
  * - `probeJoinState`: the tenant-scoped join inspection — run (versions,
- *   checkpoint), the E4 step journal, model attempts, transcript and
+ *   checkpoint), the step journal, model attempts, transcript and
  *   vision order rows, extraction versions, fragments and the join job.
  * - `probeOrderVision`: the vision order transaction as the caller (both
  *   byte channels; the guarded proof channel is sha-pinned to the retained
@@ -19,7 +19,7 @@
  * - `probeArmVisionUnavailable` / disarm: the deterministic fixture
  *   forcing BOTH vision routes unavailable — the live-proof channel for
  *   "the image pending".
- * - `probeResumeJoin`: the sanctioned bounded resume — re-registering the
+ * - `probeResumeJoin`: the bounded resume — re-registering the
  *   join job for one source (a definitely-failed row re-queues).
  * - `probeRestartJoin`: restart a failed join workflow from its journal.
  */
@@ -434,7 +434,7 @@ export const probeArmVisionUnavailable = action({
   },
 });
 
-// --- the sanctioned resume + workflow restart --------------------------------------
+// --- the resume + workflow restart --------------------------------------
 
 /** Re-registers the join job for one source (the bounded resume). */
 export const resumeJoinForSource = internalMutation({
@@ -478,7 +478,7 @@ export const probeResumeJoin = action({
   },
 });
 
-// --- the vision completion diagnostic (guarded, E4-owned) -------------------------
+// --- the vision completion diagnostic (guarded) -------------------------
 
 /**
  * Runs ONE vision adapter call over an order's pinned stash and records the

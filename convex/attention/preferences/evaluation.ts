@@ -1,12 +1,12 @@
 /**
- * Personal notification-preference evaluation (F1): the PURE seam F2/F4
- * consume at delivery time (issue 41: "Provide query functions for unread
+ * Personal notification-preference evaluation: the PURE seam notification intents and reminders
+ * consume at delivery time ("Provide query functions for unread
  * projections and delivery eligibility").
  *
  * Everything here is deterministic over its inputs — no Convex, no clock,
  * no environment — so the quiet-hour windows, the DST boundaries of the
  * company timezone and the suppression matrix are unit-testable without a
- * deployment (tests/f1/preferences.test.ts) while F2 re-runs the SAME
+ * deployment (tests/f1/preferences.test.ts) while notification intents re-run the SAME
  * functions inside its evaluator with live rows.
  *
  * Semantics pinned by the accepted notification decision (issue 7
@@ -25,7 +25,7 @@
  * - The author is not notified of their own entry, but MAY be notified of
  *   an agent clarification about it.
  * - Conversation mutes apply to source-entry notifications by scope;
- *   task-reminder mute is a separate personal control (F4's evaluation
+ *   task-reminder mute is a separate personal control (the evaluation
  *   consumes the same stored field).
  */
 
@@ -271,7 +271,7 @@ export function nextQuietHoursEndMs(
  * a personal control, or deferred until quiet hours end. ORDER matters and
  * mirrors the decision text: suppression reasons are checked before the
  * quiet-hours deferral so a suppressed notification is never deferred (and
- * a deferred one is re-evaluated by F2 after the window, when a read or
+ * a deferred one is re-evaluated by notification intents after the window, when a read or
  * mute can still suppress it).
  */
 export function decidePersonalDelivery(input: DeliveryDecisionInput): PersonalDeliveryDecision {
@@ -307,7 +307,7 @@ export function decidePersonalDelivery(input: DeliveryDecisionInput): PersonalDe
     }
   }
 
-  // The task-reminder mute is the separate personal control F4 evaluates
+  // The task-reminder mute is the separate personal control reminders evaluate
   // with the same stored field.
   if (input.kind === "task_reminder" && settings.taskRemindersMuted) {
     return { decision: "suppressed", reason: "muted_task_reminders" };

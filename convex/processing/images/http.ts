@@ -1,5 +1,5 @@
 /**
- * The images channel HTTP boundary (D5): the gateway executor's verified
+ * The images channel HTTP boundary: the gateway executor's verified
  * recording entry.
  *
  * `/processing/images/bridge` (POST) carries the WORKER's service credential:

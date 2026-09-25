@@ -1,5 +1,5 @@
 /**
- * The A3 proof function surface (guarded by the KIERO_PROBE_ENABLED
+ * The proof function surface (guarded by the KIERO_PROBE_ENABLED
  * deployment variable).
  *
  * Everything here is platform mechanics for the composition proof, no
@@ -8,7 +8,7 @@
  * - `probeEcho`: the checked command through the full dispatch path; its
  *   transaction publishes the canonical event and registers the durable
  *   echo job atomically. Callable directly (fails `unauthenticated` until
- *   B1 ships auth, and that failure is itself a proof row) and via the bridge.
+ *   sign-in exists, and that failure is itself a proof row) and via the bridge.
  * - `probeSeed`: idempotent dev fixtures (proof company/user/session and a
  *   source row for pipeline runs).
  * - `probeKickAnalysis`: transaction creates the processing run row and

@@ -1,9 +1,9 @@
 /**
- * Hydration rules (E5): the pure keep-or-drop decisions applied AFTER the
- * index matched, when the canonical D1/C2 records are re-read.
+ * Hydration rules: the pure keep-or-drop decisions applied AFTER the
+ * index matched, when the canonical source/finding records are re-read.
  *
  * "Results hydrate current canonical records before use; deleted/withdrawn
- * evidence and obsolete revisions cannot authorize an answer" (issue #39).
+ * evidence and obsolete revisions cannot authorize an answer".
  * The index is disposable derived data; these rules are the authority gate
  * every result row passes through, INDEPENDENT of the derived rows being
  * refreshed: a stale index row that names a withdrawn source or a superseded

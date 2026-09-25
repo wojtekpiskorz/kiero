@@ -1,11 +1,11 @@
 /**
- * The generated-ctx adapter (H4): maps the Convex mutation context onto the
- * GM processing store surfaces from ./store.ts, composed OVER B4's adapter
+ * The generated-ctx adapter: maps the Convex mutation context onto the
+ * GM processing store surfaces from ./store.ts, composed OVER the adapter
  * (`gmTx`) for every authority read/write; the GM authority seam is
- * consumed, not duplicated. The workflow restart mapping is E3's exported
+ * consumed, not duplicated. The workflow restart mapping is the exported
  * `restartAnalysisWorkflow`, consumed the same way.
  *
- * `normalizeId` is the proved id bridge (A3): the cores speak plain-string
+ * `normalizeId` is the proved id bridge: the cores speak plain-string
  * ids, typed index chains live only here. Projections stay bounded and
  * payload-free: inspection reads carry ids, states, versions and sanitized
  * closed kinds only, never source content or job input payloads.
@@ -137,7 +137,7 @@ export function processingTx(tx: MutationCtx): ProcessingTx {
       return views.sort((a, b) => a.attempt - b.attempt);
     },
     jobsOfRun: async (runId, limit) => {
-      // No by_run index exists on durableJobs (the A2 fragment owns the
+      // No by_run index exists on durableJobs (the fragment owns the
       // table): scope by the run's company through by_company, then filter
       // on processingRunId. Bounded output; alpha-scale scan.
       const runId2 = db.normalizeId("processingRuns", runId);
@@ -248,7 +248,7 @@ export function processingTx(tx: MutationCtx): ProcessingTx {
       if (from === "start") {
         await workflow.restart(tx, typed, {});
       } else {
-        // E3's own restart mapping (the helper's docblock names this GM path
+        // its own restart mapping (the helper's docblock names this GM path
         // as its consumer): one home for the stage restart semantics.
         await restartAnalysisWorkflow(tx, typed, from);
       }
@@ -271,7 +271,7 @@ export function processingTx(tx: MutationCtx): ProcessingTx {
         sourceId,
         kind: "reanalysis",
         ...(reanalysisOfRunId !== null && { reanalysisOfRunId }),
-        // The same placeholder seeds E3's own reanalysis path writes; the
+        // The same placeholder seeds its own reanalysis path writes; the
         // workflow's loadContextStage pins the real server-approved versions.
         pipelineVersion: REANALYSIS_PIPELINE_PLACEHOLDER,
         promptVersion: "none",

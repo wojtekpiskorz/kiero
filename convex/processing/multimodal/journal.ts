@@ -1,16 +1,16 @@
 /**
- * The E4 join journal: the step keyspace and fragment-ensuring helpers the
+ * The join journal: the step keyspace and fragment-ensuring helpers the
  * multimodal stages share.
  *
- * Keyspace discipline (the D6 precedent): the join anchors its steps to the
- * SAME run row E3's text stages and D6's segment steps journal — the
- * source's initial analysis run (or the reanalysis kicker's new run). E3
- * owns 10..200_000+, D6 owns 1_000_000+/5_000_000+; E4's stages and probe
+ * Keyspace discipline: the join anchors its steps to the
+ * SAME run row the text stages and the segment steps journal — the
+ * source's initial analysis run (or the reanalysis kicker's new run). Text analysis
+ * owns 10..200_000+, transcription owns 1_000_000+/5_000_000+; the stages and probe
  * markers live at dedicated bases far OUTSIDE both, and every (run,
  * sequence) lookup additionally guards on `stepKind`, so no lane can
  * cross-wire another's journal.
  *
- * `ensureAnchorFragment` extends E3's text-only `ensureFragment` to ALL
+ * `ensureAnchorFragment` extends the text-only `ensureFragment` to ALL
  * four anchor families of the fragment contract (text_range,
  * audio_interval, image_region, whole_source), matching by exact anchor so
  * replays reuse the fragment a prior execution created instead of minting
@@ -23,19 +23,19 @@ import type { Id } from "../../_generated/dataModel";
 import type { LocatedEvidence } from "@kiero/agent";
 
 /**
- * Step-sequence keyspace: E4 join stages (evaluate/vision/model/clarify/
- * publish) plus per-image vision step slots. Kept outside every E3 range
- * (10..~200_000+, the E3 probe markers) and every D6 range (1_000_000+,
+ * Step-sequence keyspace: join stages (evaluate/vision/model/clarify/
+ * publish) plus per-image vision step slots. Kept outside every range
+ * (10..~200_000+, the probe markers) and every range (1_000_000+,
  * 5_000_000+); pinned in tests/e4/keyspace.test.ts against the exported
  * constants of both lanes.
  */
 export const JOIN_STEP_BASE = 10_000_000;
 /** Per-image vision extraction step slots (JOIN_STEP_BASE + 1_000 + index). */
 export const JOIN_VISION_STEP_OFFSET = 1_000;
-/** Probe marker base for E4 (armed vision unavailability). */
+/** Probe marker base for the join (armed vision unavailability). */
 export const JOIN_MARKER_BASE = 15_000_000;
 
-// Stage sequence numbers inside the E4 keyspace.
+// Stage sequence numbers inside the keyspace.
 export const JOIN_EVALUATE_SEQUENCE = JOIN_STEP_BASE + 1;
 export const JOIN_LOAD_CONTEXT_SEQUENCE = JOIN_STEP_BASE + 2;
 export const JOIN_MODEL_SEQUENCE = JOIN_STEP_BASE + 3;
@@ -44,11 +44,11 @@ export const JOIN_CLARIFICATION_BASE = JOIN_STEP_BASE + 500;
 /** Publication-group steps start here (one per bounded group). */
 export const JOIN_GROUP_BASE = JOIN_STEP_BASE + 1_000;
 
-/** E4's own failure/outcome marker bases (the A3 crash-proof pattern). */
+/** its own failure/outcome marker bases (the crash-proof pattern). */
 export const JOIN_FAILURE_MARKER_BASE = 16_000_000;
 export const JOIN_OUTCOME_MARKER_BASE = 17_000_000;
 
-/** The step kinds E4 writes on `processingSteps` (lookup guards). */
+/** The step kinds the join writes on `processingSteps` (lookup guards). */
 export const JOIN_EVALUATE_STEP_KIND = "e4_evaluate_media";
 export const JOIN_VISION_STEP_KIND = "e4_vision_extraction";
 export const JOIN_MODEL_STEP_KIND = "e4_model_join";
@@ -169,7 +169,7 @@ type MarkerDb = Pick<MutationCtx["db"], "query">;
 /**
  * Whether the armed probe marker forcing BOTH vision routes unavailable
  * exists for one source (the deterministic "image extraction pending"
- * fixture; stepKind-guarded like D6's markers).
+ * fixture; stepKind-guarded like markers).
  */
 export async function visionUnavailableArmed(
   db: MarkerDb,
@@ -238,9 +238,9 @@ export function anchorOfEvidence(evidence: LocatedEvidence): JoinFragmentAnchor 
 type RunLookupDb = Pick<MutationCtx["db"], "query">;
 
 /**
- * The source's INITIAL analysis run (D6's anchoring rule): the earliest
- * run row by startedAtMs, the one run whose journal E3's text stages,
- * D6's segment steps and E4's join steps all anchor to. Indexed scan; the
+ * The source's INITIAL analysis run (the anchoring rule): the earliest
+ * run row by startedAtMs, the one run whose journal the text stages,
+ * the segment steps and the join steps all anchor to. Indexed scan; the
  * first row is the answer, nothing is collected or sorted in memory.
  */
 export async function initialAnalysisRun(

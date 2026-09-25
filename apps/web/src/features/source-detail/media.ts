@@ -1,5 +1,5 @@
 /**
- * The authorized media loader (H3): the one client-side path to D3's media
+ * The authorized media loader: the one client-side path to the media
  * channel.
  *
  * Media never gets a public URL: every load is a FRESH authenticated
@@ -12,7 +12,7 @@
  * in-memory object URL for the `<audio controls>`/`<img>` element; closing
  * the view revokes it.
  *
- * Two read paths, exactly D3's routes:
+ * Two read paths, exactly the routes:
  * - `/media/attachments/<id>` — the canonical read (the SERVER picks the
  *   current retained/received representation; this side never predicts it);
  * - `/media/representations/<id>` — the exact-version read media anchors
@@ -120,7 +120,7 @@ export async function probeAuthorizedRange(
 
 /**
  * The highlight box geometry for one image-region anchor against its
- * representation's own pixel space (E4's coordinate rule): percentage
+ * representation's own pixel space (the coordinate rule): percentage
  * offsets so the box lands on the same content whatever the rendered
  * size. Null when the space is unknown (the honest no-overlay case).
  */
@@ -156,7 +156,7 @@ export function mediaTimestamp(ms: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// The secure-channel image presentation (R23)
+// The secure-channel image presentation
 // ---------------------------------------------------------------------------
 
 /** The completed-order shape the image presentation overlays consume. */
@@ -178,7 +178,7 @@ export type ImagePresentation =
 /**
  * Decides what the secure-channel image view shows. The photo itself renders
  * on authorized bytes ALONE — a pending or failed OCR order must never hide
- * the boss's own retained photo (the R23 defect: the whole `<img>` was gated
+ * the boss's own retained photo (the defect: the whole `<img>` was gated
  * on a completed order). The OCR highlight boxes attach only when a completed
  * order pins this attachment's representation, because only that order's
  * coordinate space makes the boxes mean anything.

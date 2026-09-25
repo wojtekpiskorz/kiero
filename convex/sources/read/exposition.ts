@@ -1,5 +1,5 @@
 /**
- * Source-history exposition reads (H3, additive and flagged on the H1
+ * Source-history exposition reads (on the
  * memory-exposition precedent): the full dossier of ONE immutable source
  * and the paginated evidence chain that rests on it.
  *
@@ -8,7 +8,7 @@
  * project fragments, findings/provenance, corrections, withdrawals, and
  * dependent recomputation status", and "Paginate history rather than
  * loading one growing object". Two read-only cores serve that through the
- * SAME tenant rules as D1's conversation views: the company resolves from
+ * SAME tenant rules as the conversation views: the company resolves from
  * the verified context, the source row is tenant-checked, and every
  * joined row (links, representations, transcripts, segments, vision
  * orders, findings, revisions) is read through its own index — never
@@ -20,8 +20,8 @@
  *   (text, author, send snapshot), lifecycle INCLUDING the withdrawal
  *   record (reason, actor, time — history, never deletion), processing
  *   state, project links, every attachment with ALL retained/received
- *   representations (verification and D5 removal state included; which
- *   representation serves bytes stays D3's server-side selection, this
+ *   representations (verification and normalization removal state included; which
+ *   representation serves bytes stays the server-side selection, this
  *   read never predicts it), every transcript order with its verbatim
  *   segments (original-time anchors), every vision order with its
  *   observations (pixel anchors against the pinned representation's own
@@ -32,7 +32,7 @@
  *   revision it supported AND to the finding's CURRENT projection: the
  *   boss sees which finding rested on which fragment of this source, and
  *   what that finding says NOW (a later correction, or a withdrawal
- *   marking that leaves it `updating` — C5's recomputation status).
+ *   marking that leaves it `updating` — the recomputation status).
  */
 
 import { Schema } from "effect";
@@ -43,10 +43,10 @@ import type { Doc, Id } from "../../_generated/dataModel";
 import { deriveProcessingState } from "./rows";
 
 // ---------------------------------------------------------------------------
-// Wire schemas (decoded at the untrusted boundary like D1's own rows)
+// Wire schemas (decoded at the untrusted boundary like its own rows)
 // ---------------------------------------------------------------------------
 
-/** The four anchor families of a "Fragment źródła" (CONTEXT.md / E4). */
+/** The four anchor families of a "Fragment źródła" (CONTEXT.md). */
 export const FragmentAnchor = Schema.Union([
   Schema.Struct({
     _tag: Schema.Literal("text_range"),
@@ -75,14 +75,14 @@ const RepresentationWireRow = Schema.Struct({
   role: Schema.Literals(["received", "retained", "thumbnail", "processing"]),
   /** Present once verified durable (absent rows never serve reads). */
   verifiedAtMs: Schema.NullOr(Schema.Number),
-  /** D5's received-byte cleanup marker: the object is deliberately gone. */
+  /** the received-byte cleanup marker: the object is deliberately gone. */
   removedAtMs: Schema.NullOr(Schema.Number),
   width: Schema.NullOr(Schema.Number),
   height: Schema.NullOr(Schema.Number),
   durationMs: Schema.NullOr(Schema.Number),
   mimeType: Schema.NullOr(Schema.String),
   bytes: Schema.NullOr(Schema.Number),
-  /** D5's typed honest outcome that kept the RECEIVED original retained. */
+  /** the typed honest outcome that kept the RECEIVED original retained. */
   exceptionKind: Schema.NullOr(Schema.String),
 });
 
@@ -103,7 +103,7 @@ const SegmentWireRow = Schema.Struct({
   text: Schema.NullOr(Schema.String),
 });
 
-/** One transcript order (D6) with its complete segment manifest. */
+/** One transcript order with its complete segment manifest. */
 const TranscriptWireRow = Schema.Struct({
   transcriptId: Schema.String,
   state: Schema.Literals(["planning", "pending", "partial", "complete", "failed"]),
@@ -113,7 +113,7 @@ const TranscriptWireRow = Schema.Struct({
   segments: Schema.Array(SegmentWireRow),
 });
 
-/** One OCR observation: read text plus its pixel region (E4). */
+/** One OCR observation: read text plus its pixel region. */
 const ObservationWireRow = Schema.Struct({
   text: Schema.String,
   region: Schema.Struct({
@@ -124,7 +124,7 @@ const ObservationWireRow = Schema.Struct({
   }),
 });
 
-/** One vision order (E4) with its observations and coordinate space. */
+/** One vision order with its observations and coordinate space. */
 const VisionOrderWireRow = Schema.Struct({
   orderId: Schema.String,
   state: Schema.Literals(["pending", "complete", "failed"]),
@@ -187,7 +187,7 @@ export const SourceEvidenceRow = Schema.Struct({
   ]),
   citedRevisionId: Schema.String,
   citedRevision: Schema.Number,
-  // E7 amendment (additive, flagged): the reassignment scope marking joins
+  // The reassignment scope marking joins
   // the origin vocabulary on both the cited and the current revision.
   citedOrigin: Schema.Literals([
     "publication",
@@ -198,7 +198,7 @@ export const SourceEvidenceRow = Schema.Struct({
   citedRecordedAtMs: Schema.Number,
   fragmentId: Schema.NullOr(Schema.String),
   fragmentAnchor: Schema.NullOr(FragmentAnchor),
-  /** The finding's CURRENT projection (wire forms, like H1's history read). */
+  /** The finding's CURRENT projection (wire forms, like the history read). */
   currentRevisionId: Schema.NullOr(Schema.String),
   currentRevision: Schema.NullOr(Schema.Number),
   currentKnowledgeState: Schema.NullOr(Schema.Unknown),
@@ -237,7 +237,7 @@ type PageResult =
 /** How many segments one transcript read keeps (bounded, long audio included). */
 const MAX_SEGMENTS_PER_TRANSCRIPT = 500;
 
-/** How many observations one vision order read keeps (E4's own bound is 32). */
+/** How many observations one vision order read keeps (its own bound is 32). */
 const MAX_OBSERVATIONS_PER_ORDER = 64;
 
 // ---------------------------------------------------------------------------
@@ -361,7 +361,7 @@ async function visionOrdersOf(
   return Promise.all(
     orders.map(async (order) => {
       // The coordinate space is the pinned representation's OWN dimensions
-      // (E4: a re-normalization is a new representation and a new order, so
+      // (a re-normalization is a new representation and a new order, so
       // old anchors never move under the highlight that cites them).
       const representation = await db.get(order.representationId);
       return {
@@ -394,7 +394,7 @@ async function fragmentsOf(
 }
 
 /**
- * The full dossier of one immutable source, tenant-checked like D1's
+ * The full dossier of one immutable source, tenant-checked like the
  * source detail: a foreign or missing source answers the same closed
  * `not_found` (existence and tenancy are not disclosed).
  */
@@ -411,7 +411,7 @@ export async function readSourceExpositionRows(
   if (source === null) {
     return { ok: false, error: notFoundError("sources", "source_not_in_company") };
   }
-  // I4 append (flagged, the D3 media-access rule): a permanently deleted
+  // A permanently deleted
   // source's dossier is the same closed not-found - after the committed
   // tombstone no application read serves the source, and the refusal never
   // distinguishes deletion from nonexistence.
@@ -458,7 +458,7 @@ export async function readSourceExpositionRows(
  * The evidence chain resting on one source, one witness link per row,
  * paginated through `evidenceLinks.by_source` (oldest link first — a
  * stable index order, so paging never reshuffles the chain). Each row is
- * joined to the finding's CURRENT projection so corrections and C5's
+ * joined to the finding's CURRENT projection so corrections and the
  * recomputation markings are visible without a second growing read.
  */
 export async function readSourceEvidenceRows(

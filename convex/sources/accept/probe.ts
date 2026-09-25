@@ -1,11 +1,11 @@
 /**
- * D1 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, exactly like the A3 platform probes; shared plumbing lives in
+ * Sources dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable, exactly like the platform probes; shared plumbing lives in
  * ./probe_shared.ts).
  *
- * No business work happens here; these entries exist so the D1 evidence can
+ * No business work happens here; these entries exist so the evidence can
  * run against the REAL dev deployment without a development-auth shortcut:
- * the actor is always the service account's own session (the A3
+ * the actor is always the service account's own session (the platform
  * service-bridge identity) or an explicitly seeded second-company session,
  * resolved through the SAME canonical resolution and authorization seam as
  * production calls. Sessions are created server-side here; no identity is
@@ -14,7 +14,7 @@
  * - `probeAcceptSource`: dispatches one accept envelope through the checked
  *   path with the service identity (or a seeded session).
  * - `probeCrashAcceptance`: performs the FULL acceptance transaction and
- *   then THROWS before commit (the A3 no-orphan failure pattern), proving
+ *   then THROWS before commit (the no-orphan failure pattern), proving
  *   rollback of source, links, run, extraction, event and job together.
  * - `probeSeedProject` / `probeSeedUpload` / `probeSeedIsolation`: idempotent
  *   fixtures (a project or draft upload in the service company; a whole

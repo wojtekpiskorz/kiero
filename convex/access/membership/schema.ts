@@ -1,12 +1,11 @@
 /**
- * Access membership tables (A2 candidate, certified by A3; B3 amendment).
+ * Access membership tables.
  *
- * Owning implementer: B3 (membership, invitations, administrator transfer).
  * A company is separate from the accounts of the bosses who belong to it;
  * equal email addresses and contacts never confer membership. The structure
  * supports multiple memberships but a v1 ordinary user has one active firm.
  *
- * B3 amendment (issue #22):
+ * Notes:
  *
  * - `invitations` carries the acceptance code as a server-side SHA-256
  *   hash (`codeHash`), the issuing administrator, and a `rejected` state

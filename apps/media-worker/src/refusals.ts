@@ -1,5 +1,5 @@
 /**
- * The media protocol's closed refusal vocabulary (R32, the session-9
+ * The media protocol's closed refusal vocabulary (the
  * release blocker) — deliberately a ZERO-IMPORT leaf.
  *
  * `convex deploy` typechecks `convex/tsconfig.json` (no

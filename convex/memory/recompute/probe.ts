@@ -1,11 +1,11 @@
 /**
- * C5 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, exactly like the A3 platform probes and the C2 findings probes;
+ * Recompute dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable, exactly like the platform probes and the findings probes;
  * shared plumbing from convex/sources/probe_shared.ts).
  *
- * No business work happens here; these entries exist so the C5 evidence can
+ * No business work happens here; these entries exist so the evidence can
  * run against the REAL dev deployment without a development-auth shortcut:
- * the actor is always the service account's own session (the A3
+ * the actor is always the service account's own session (the platform
  * service-bridge identity) or an explicitly seeded second-company session,
  * resolved through the SAME canonical resolution and authorization seam as
  * production calls. Sessions are created server-side here; no identity is
@@ -13,7 +13,7 @@
  *
  * - `probeSeedRecomputeFixtures`: idempotent witnessed sources (run + text
  *   extraction + whole-source fragment each) the live script publishes
- *   findings against through C2's REAL checked dispatch probes.
+ *   findings against through the REAL checked dispatch probes.
  * - `probeSeedRecomputeIsolation`: a whole second company with its own
  *   user, membership, session and witnessed source for tenant isolation.
  * - `probeWithdrawSource`: the REAL `sources.withdrawSource` dispatch (the
@@ -21,7 +21,7 @@
  * - `probeRecomputeState`: the tenant-scoped inspection read (markings,
  *   updating findings, durable recompute/analysis jobs, reanalysis runs,
  *   memory events) the evidence script asserts on, plus the automation
- *   gate verdict for one finding (C4's dueness gate agrees by
+ *   gate verdict for one finding (the dueness gate agrees by
  *   construction: everything not `known` is excluded).
  */
 
@@ -46,7 +46,7 @@ const PROOF_TZ = "Europe/Warsaw";
 const PROOF_SENT_AT_MS = Date.parse("2026-09-08T16:30:00.000Z"); // 18:30 Warsaw
 const PROOF_PIPELINE_VERSION = "c5.proof/1";
 
-/** The C5 isolation fixture identity (its own company, never company A). */
+/** The isolation fixture identity (its own company, never company A). */
 const ISOLATION_EMAIL = "c5-isolation@kiero.invalid";
 const ISOLATION_COMPANY = "Kiero Dev Proof C (C5 isolation)";
 
@@ -255,7 +255,7 @@ export const seedRecomputeIsolation = internalMutation({
       .withIndex("by_company_user", (q) => q.eq("companyId", companyId).eq("userId", userId))
       .first();
     // `.first()` yields null (not undefined) when absent: the null check is
-    // load-bearing (the C2 probe comment documents the same trap).
+    // load-bearing (the probe comment documents the same trap).
     if (existingMembership === null) {
       await ctx.db.insert("memberships", {
         companyId,
@@ -410,7 +410,7 @@ export const recomputeState = internalQuery({
         currentRevisionId: finding.currentRevisionId ?? null,
         knowledgeTag: knowledgeTagOf(finding.knowledgeState),
         revisionCounter: finding.revisionCounter,
-        /** The automation gate verdict (agrees with C4's dueness gate). */
+        /** The automation gate verdict (agrees with the dueness gate). */
         automationEligible: knowledgeTagOf(finding.knowledgeState) === "known",
       })),
       revisions: revisionRows,

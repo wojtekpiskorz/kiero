@@ -1,5 +1,5 @@
 /**
- * The pinned documented export mechanism (I5): the globally pre-installed
+ * The pinned documented export mechanism: the globally pre-installed
  * `convex` CLI (the image pins convex@1.45.0 via `npm install -g`) driven
  * headless as `convex export --path <zip> --deployment <ref>`.
  *

@@ -1,10 +1,10 @@
 /**
  * The `processing.analyze_change_plan` executor and durable analysis
- * workflow (E3): text analysis into checked, durable memory change plans.
+ * workflow: text analysis into checked, durable memory change plans.
  *
- * Composition (issue #37): D1's accepted text sources, C1 project
- * identification, C2's checked publication and E2's chat adapter, staged
- * through the ONE canonical workflow engine (@convex-dev/workflow, the A3
+ * Composition: the accepted text sources, project
+ * identification, the checked publication and the chat adapter, staged
+ * through the ONE canonical workflow engine (@convex-dev/workflow, the platform
  * seam — this lane replaces the mechanical stage computations behind it):
  *
  * 1. `loadContextStage` (one mutation): the tenant-filtered analysis
@@ -26,8 +26,8 @@
  * 4. `publishGroupStage` (one mutation per bounded group): recheck the
  *    analysis's input revisions against CURRENT counters (mid-run
  *    staleness refuses the group), resolve `new:N` project handles through
- *    C1's `identifyProject`, build source-linked planned revisions with
- *    located text-range fragments, then prepare + publish through C2 with
+ *    `identifyProject`, build source-linked planned revisions with
+ *    located text-range fragments, then prepare + publish through the findings lane with
  *    the analysis revisions as CALLER expectations — the wiring that makes
  *    a stale plan refuse instead of overwriting a newer correction.
  *
@@ -159,7 +159,7 @@ export const loadContextStage = internalMutation({
       });
       throw new Error("analysis: source no longer active");
     }
-    // The run's version pins (idempotent patches: D1 seeded placeholder
+    // The run's version pins (idempotent patches: acceptance seeded placeholder
     // versions; the analysis records the real ones exactly once here).
     await ctx.db.patch(args.runId, {
       pipelineVersion: TEXT_ANALYSIS_PIPELINE_VERSION,
@@ -193,7 +193,7 @@ export const loadContextStage = internalMutation({
 });
 
 // ---------------------------------------------------------------------------
-// Stage 2: the bounded agent loop through E2's chat adapter.
+// Stage 2: the bounded agent loop through the chat adapter.
 // ---------------------------------------------------------------------------
 
 /** Records one provider call's attempts (step row + processingAttempts). */
@@ -261,7 +261,7 @@ export async function recordModelCallHandler(
         : typeof attempt.requestedModel === "string"
           ? attempt.requestedModel
           : null;
-    // E8 split (R14): the supplier comes from the record's per-attempt
+    // The supplier comes from the record's per-attempt
     // provider column (direct `deepseek` vs fallback `openrouter`), so
     // per-provider accounting reads the truth. Pre-split records lack
     // the optional column and keep their legacy `openrouter` semantics.
@@ -523,8 +523,8 @@ export const raiseClarificationStage = internalMutation({
 });
 
 // ---------------------------------------------------------------------------
-// Stage 3b: one bounded publication group through C1 identification and
-// C2's checked prepare/publish, atomically per group.
+// Stage 3b: one bounded publication group through project identification and
+// the checked prepare/publish, atomically per group.
 // ---------------------------------------------------------------------------
 
 /** The wire shape of one proposal as the workflow hands the group over. */
@@ -543,7 +543,7 @@ export interface GroupStageInput {
   readonly key: { kind: "company" | "project"; projectId: string | null };
   readonly proposals: GroupProposalWire[];
   readonly analysisRevisions: { findingId: string; revision: number }[];
-  /** The working name for a `new:N` handle (C1 identifies it here). */
+  /** The working name for a `new:N` handle (project identification resolves it here). */
   readonly bindingDisplayName?: string | null;
 }
 
@@ -580,7 +580,7 @@ export const publishGroupStage = internalMutation({
       return finish("succeeded", { outcome: "pending_segments", key: group.key });
     }
 
-    // --- resolve the group's scope (C1 identification for `new:N`) -----
+    // --- resolve the group's scope (project identification for `new:N`) -----
     let scopeProjectId: Id<"projects"> | null = null;
     if (group.key.kind === "project") {
       const handle = group.key.projectId ?? "";
@@ -645,7 +645,7 @@ export const publishGroupStage = internalMutation({
     if (decision.decision === "refuse") {
       // A newer correction landed between the analysis and the commit: the
       // plan analyzed a superseded world. Refuse honestly; a linked
-      // reanalysis is the only recovery (issue #8 precedence).
+      // reanalysis is the only recovery (the accepted precedence rule).
       return finish("succeeded", {
         outcome: "stale_refused",
         key: group.key,
@@ -694,7 +694,7 @@ export const publishGroupStage = internalMutation({
       });
     }
 
-    // --- C2 prepare + publish through the checked dispatch -------------
+    // --- findings prepare + publish through the checked dispatch -------------
     const session = await authorSessionId(ctx.db, source.authorUserId);
     if (session === null) {
       return finish("failed", { outcome: "failed", error: "actor_session_unavailable" });
@@ -712,7 +712,7 @@ export const publishGroupStage = internalMutation({
       return finish("failed", { outcome: "failed", error: prepared.error.code });
     }
     const changeSet = prepared.value as { changeSetId: Id<"changeSets"> };
-    // The caller expectations are the ANALYSIS's input revisions: C2's
+    // The caller expectations are the ANALYSIS's input revisions: the
     // stale-plan guard now protects this plan end-to-end.
     const published = await dispatchMemoryCommand(
       ctx,
@@ -946,7 +946,7 @@ export const analyzeChangePlanExecutor: JobExecutor = {
  * the named stage ("model" for provider-window failures, with a fresh
  * bounded step-retry budget; "group" for the publication crash proofs,
  * where journaled earlier stages — including a completed provider action —
- * replay without re-execution). A3 restart semantics.
+ * replay without re-execution). Platform restart semantics.
  */
 export async function restartAnalysisWorkflow(
   ctx: MutationCtx,

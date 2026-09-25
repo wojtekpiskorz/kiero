@@ -16,20 +16,20 @@
  *   become centimeters).
  * - Definitions are bounded data, never executable schema code.
  *
- * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
+ * Certified by platform on 2026-09-09 (docs/implementation/contracts/README.md).
  *
- * C3 amendments (the owning lane completes the candidate surface, additive
- * and flagged on the B3/C2 precedent):
+ * Notes (the owning lane completes the candidate surface, additive
+ * and flagged on the precedent):
  * - `ExtensionFieldShape.kind` narrows to `DefinitionFieldKind`: a definition
  *   FIELD may be one of the seven scalar kinds or a bounded `list` with a
- *   scalar `itemKind`. `object` stays a legal VALUE kind (the A2 value
+ *   scalar `itemKind`. `object` stays a legal VALUE kind (the value
  *   vocabulary is untouched) but is not a legal FIELD kind: a multi-field
  *   definition version IS the object type, so an object field would demand
  *   the nesting this contract forbids.
  * - `unit` (quantity fields) and `itemKind` (list fields) make meaning
  *   machine-checkable: a version that changes a field's unit is an
  *   incompatible change, and near-duplicate names with incompatible units
- *   can be told apart mechanically (issue #26 focused verification).
+ *   can be told apart mechanically (focused verification).
  * - The bounded-array helper and its bounds are exported so the definition
  *   operation inputs share the exact value-contract bounds.
  */
@@ -77,7 +77,7 @@ export const MAX_LIST_ITEMS = 64;
  * check is piped AFTER `Schema.mutable` because piping checks before
  * `Schema.mutable` rebuilds the schema WITHOUT them on effect 4.0.0-rc.112.
  *
- * C3: exported (additive) so definition operation inputs reuse the exact
+ * Exported (additive) so definition operation inputs reuse the exact
  * value-contract bounds instead of restating them.
  */
 export const boundedMutableArray = <S extends Schema.Codec<unknown, unknown, never, never>>(
@@ -109,7 +109,7 @@ export const ExtensionValue = Schema.Union([
 export type ExtensionValue = Schema.Schema.Type<typeof ExtensionValue>;
 
 /**
- * The single-source kind arrays (C3, the bounds pattern): every kind schema
+ * The single-source kind arrays (the bounds pattern): every kind schema
  * below is BUILT from one of these, so a vocabulary change is one edit and
  * the arrays, the schemas and the domain rule layer cannot drift apart.
  */
@@ -128,15 +128,15 @@ export const SCALAR_FIELD_KINDS = [
 /** What a definition FIELD may take: the scalar kinds plus bounded lists. */
 export const DEFINITION_FIELD_KINDS = [...SCALAR_FIELD_KINDS, "list"] as const;
 
-/** The full A2 value vocabulary: scalar kinds plus objects and lists. */
+/** The full value vocabulary: scalar kinds plus objects and lists. */
 export const EXTENSION_FIELD_KINDS = [...SCALAR_FIELD_KINDS, "object", "list"] as const;
 
 /**
- * The full A2 value vocabulary, as a schema. This names the VALUE space
+ * The full value vocabulary, as a schema. This names the VALUE space
  * (what an ExtensionValue branch may be); the tagged union
  * `ScalarExtensionValue`/`ExtensionValue` is the enforcing schema, and
  * definition FIELDS pin to the narrower `DefinitionFieldKind` (`object` is
- * not a legal field kind). Kept as the certified A2 export for consumers
+ * not a legal field kind). Kept as the certified export for consumers
  * that reason about the value vocabulary as one set.
  */
 export const ExtensionFieldKind = Schema.Literals(EXTENSION_FIELD_KINDS);
@@ -144,14 +144,14 @@ export type ExtensionFieldKind = Schema.Schema.Type<typeof ExtensionFieldKind>;
 
 /**
  * The scalar subset of the value vocabulary: the kinds a definition FIELD or
- * a list item may take (C3). Everything bounded ends here — objects and
+ * a list item may take. Everything bounded ends here — objects and
  * lists are containers, never members.
  */
 export const ScalarFieldKind = Schema.Literals(SCALAR_FIELD_KINDS);
 export type ScalarFieldKind = Schema.Schema.Type<typeof ScalarFieldKind>;
 
 /**
- * The kinds a definition FIELD may take (C3): the seven scalar kinds plus a
+ * The kinds a definition FIELD may take: the seven scalar kinds plus a
  * bounded `list` of one scalar kind. `object` is deliberately absent — a
  * multi-field definition version IS the object type; an object field would
  * demand the recursive nesting the value contract forbids.
@@ -164,7 +164,7 @@ export type DefinitionFieldKind = Schema.Schema.Type<typeof DefinitionFieldKind>
  * append-only: a version never rewrites its snapshot, and a meaning/kind
  * change requires a new version (or a new definition plus migration).
  *
- * C3: `unit` is required for quantity fields and `itemKind` for list fields
+ * `unit` is required for quantity fields and `itemKind` for list fields
  * (enforced by the domain rule layer, kept optional on the wire shape so the
  * stored snapshot decodes without a migration); enum fields declare their
  * closed option set in `options`.

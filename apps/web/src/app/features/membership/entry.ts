@@ -1,9 +1,8 @@
 /**
- * Membership feature entry (B3): the FIRST mounted host feature — the
- * sanctioned sign-in wiring point (issue #22 names mounting B1's sign-in
- * into the A4 host as this lane's host-composition edit).
+ * Membership feature entry: the FIRST mounted host feature — the
+ * sign-in wiring point.
  *
- * An unauthenticated visitor reaches sign-in here (B1's state machine and
+ * An unauthenticated visitor reaches sign-in here (the state machine and
  * copy, composed JSX-free from ../sign-in/state.ts so this registry chain
  * stays importable by the node test programs); an authenticated member
  * reaches the membership surface (company admission, invitations, roles,

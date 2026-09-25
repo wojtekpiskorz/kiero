@@ -1,8 +1,8 @@
 /**
- * Linking store surfaces (B2): plain-data snapshots and the narrow
+ * Linking store surfaces: plain-data snapshots and the narrow
  * interfaces every linking core consumes.
  *
- * B1's `UserPolicyUser` pattern: cores work with plain-string ids and
+ * `UserPolicyUser` pattern: cores work with plain-string ids and
  * snapshot views; `normalizeId` is the proved bridge at each Convex
  * boundary (the generated-ctx adapter in ./storeAdapter.ts and the
  * Convex Auth callback adapter in ./authHook.ts). In-memory fakes
@@ -120,7 +120,7 @@ export interface LinkingTx extends LinkingStore {
     id: string,
     patch: { confirmedAtMs?: number; codeHash?: string; expiresAtMs?: number },
   ): Promise<void>;
-  /** Reads and rewrites one issuance-throttle row (B1's decideIssuance). */
+  /** Reads and rewrites one issuance-throttle row (decideIssuance). */
   applyIssuanceThrottle(identifier: string, nowMs: number): Promise<boolean>;
   insertRecovery(row: {
     userId: string;
@@ -131,7 +131,7 @@ export interface LinkingTx extends LinkingStore {
     clearedAccountIds: string[];
     clearedGoogleSubject: boolean;
   }): Promise<void>;
-  /** Revokes one registry row through B1's canonical revocation core. */
+  /** Revokes one registry row through the canonical revocation core. */
   revokeRegistrySession(args: {
     actorUserId: string;
     targetSessionId: string;

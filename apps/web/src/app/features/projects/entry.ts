@@ -1,5 +1,5 @@
 /**
- * Projects (project context) feature entry (A4 placeholder; the projects
+ * Projects (project context) feature entry (the projects
  * lane owns the real implementation).
  *
  * A project exists from the first client inquiry; the surface reaches

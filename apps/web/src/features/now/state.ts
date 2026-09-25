@@ -1,8 +1,8 @@
 /**
- * "Co teraz" feature state (H2): the Polish copy, the per-user grouping
+ * "Co teraz" feature state: the Polish copy, the per-user grouping
  * rules and the record deep-link contract of the /co-teraz screen.
  *
- * The query-param keys are the parity-pinned pair G4's calendar copies
+ * The query-param keys are the parity-pinned pair the calendar copies
  * link back into (`subjectLinkPath` in `packages/domain/calendar` builds
  * `/co-teraz?zadanie=<id>` / `/co-teraz?zdarzenie=<id>`); this screen
  * owns the route, so this module owns the keys' one typed home on the
@@ -21,10 +21,10 @@ import { sessionFailureHints } from "../conversation/state";
 import { zoneOffsetOf } from "../company/time";
 import type { ProjectJoin } from "../work/WorkFeature";
 
-/** The query-param task deep-link key (G4 parity: /co-teraz?zadanie=<id>). */
+/** The query-param task deep-link key (/co-teraz?zadanie=<id>). */
 export const TASK_PARAM = "zadanie";
 
-/** The query-param event deep-link key (G4 parity: /co-teraz?zdarzenie=<id>). */
+/** The query-param event deep-link key (/co-teraz?zdarzenie=<id>). */
 export const EVENT_PARAM = "zdarzenie";
 
 /** Reads one string search param (empty reads as absent). */

@@ -1,5 +1,5 @@
 /**
- * The guarded backups proof surface (I5), the A3/I2 probe pattern: actions
+ * The guarded backups proof surface, the probe pattern: actions
  * check the deployment variable `KIERO_PROBE_ENABLED` and then run the REAL
  * internal functions, so live evidence (tests/i5/live-proof.mjs) never
  * depends on scheduler timing or the service credential while the entries
@@ -10,7 +10,7 @@
  *   boundary runs, minus the bearer (the guard replaces it).
  * - `probeState`: the composed backups state read.
  * - `probeSeedRetainedMedia` / `probeSeedDeletion`: dev fixtures for the
- *   D3 inventory and the I4 ledger seams.
+ *   media inventory and the ledger seams.
  * - `probeSeedManifest`: past-dated retention fixtures (48h/14d sweeps and
  *   deleted-source expiry verification without time travel).
  * - `probeClear`: removes this lane's proof artifacts between passes.
@@ -32,7 +32,7 @@ function probeDisabled(): ResultEnvelope {
 
 /**
  * Acquires (or refuses) a run lease. The optional `nowMs` is a PROOF
- * FIXTURE (the G3 fake-Google precedent): a proof-only clock override that
+ * FIXTURE (the fake-Google precedent): a proof-only clock override that
  * lets the live proof target a slot other than the current one - completed
  * scenarios must not wait out the schedule grid, and an immediate re-begin
  * of a verified slot is `already_complete` by design. It only feeds the tx's
@@ -138,7 +138,7 @@ export const probeState = action({
   },
 });
 
-/** Seeds one retained-media fixture row (D3 inventory seam; dev proof only). */
+/** Seeds one retained-media fixture row (media inventory seam; dev proof only). */
 export const probeSeedRetainedMedia = action({
   args: {
     objectKey: v.string(),
@@ -157,7 +157,7 @@ export const probeSeedRetainedMedia = action({
   },
 });
 
-/** Seeds one content-free deletion/revocation ledger row (I4 seam). */
+/** Seeds one content-free deletion/revocation ledger row. */
 export const probeSeedDeletion = action({
   args: {
     kind: v.string(),

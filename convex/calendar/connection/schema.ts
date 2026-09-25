@@ -1,15 +1,13 @@
 /**
- * Calendar connection table (A2 candidate, certified by A3; lifecycle
- * implemented by G1, issue #45).
+ * Calendar connection table.
  *
- * Owning implementer: G1 (optional authorization and connection lifecycle).
  * Connection lifecycle is separate from sign-in: a boss connects a personal
  * dedicated Google calendar ("Kalendarz Kiero w Google") for ONE company
  * scope. Kiero holds the authoritative agreements; the calendar only
  * projects them one way. Nothing in this table is identity: disconnecting
  * never touches `users`, `sessions` or Convex Auth rows.
  *
- * G1 amendment over the certified A2 shape (this fragment is G1's owned
+ * Changes over the certified shape (this fragment is the owned
  * file; the table NAME stays in the closed inventory):
  * - `state` gains `pending_authorization` (server-owned OAuth flow) and the
  *   row now carries the data-dictionary fields: Google account identity,
@@ -20,7 +18,7 @@
  * - OAuth correlation (`oauthStateHash`, PKCE verifier) and credential
  *   material live ONLY on this server-side row and never cross a client
  *   boundary (the state value itself is stored as a SHA-256 hash, exactly
- *   like B3 invitation codes).
+ *   like invitation codes).
  *
  * Tables: calendarConnections.
  */

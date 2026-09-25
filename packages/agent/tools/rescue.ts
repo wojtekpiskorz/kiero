@@ -1,5 +1,5 @@
 /**
- * The text-encoded tool-call rescue (E6): the inherited flash-model
+ * The text-encoded tool-call rescue: the inherited flash-model
  * defect fix, pure and deterministic so it stays unit-testable.
  *
  * When the model writes `{"narzedzie":...,"argumenty":...}` as PROSE

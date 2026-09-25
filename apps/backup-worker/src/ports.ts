@@ -1,11 +1,11 @@
 /**
- * The backup executor's ports (I5): the three external systems the pipeline
+ * The backup executor's ports: the three external systems the pipeline
  * touches, as small typed interfaces so the SAME pipeline runs:
  *
  * - in the EU backup Container against real R2 S3 endpoints + the pinned
  *   Convex CLI export (production path; typed `not_configured` refusals
  *   until the owner injects the per-bucket tokens, the honest-pending
- *   pattern proved by D6), and
+ *   pattern of the media worker), and
  * - in live proofs/tests against in-memory or CLI transports.
  *
  * The Convex protocol (lease/complete/fail/sweep) is also a port: the
@@ -87,7 +87,7 @@ export interface ProtocolBeginAcquired {
   readonly leaseExpiresAtMs: number;
   /** The media objects this run must copy and verify (purge drops removed). */
   readonly media: readonly ProtocolBeginMediaEntry[];
-  /** Purge-recorded drops already excluded from `media` (I4 seam). */
+  /** Purge-recorded drops already excluded from `media`. */
   readonly purgedDrops: readonly { objectKey: string; sourceId: string }[];
   /** The content-free deletion/revocation ledger to carry separately. */
   readonly ledger: readonly ProtocolBeginLedgerEntry[];

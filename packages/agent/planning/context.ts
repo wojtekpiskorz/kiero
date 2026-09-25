@@ -1,5 +1,5 @@
 /**
- * The analysis context shape (E3): the tenant-filtered, bounded snapshot of
+ * The analysis context shape: the tenant-filtered, bounded snapshot of
  * current structured state one text-analysis run reads (protocol step 6:
  * "Read relevant current structured state ... and record the revisions used
  * in a change plan").
@@ -13,7 +13,7 @@
  * revision the ANALYSIS used. The publish stage passes exactly these as the
  * CALLER expectations of `memory.publishChangeSet`, so a correction that
  * lands mid-run (or before a paused plan publishes) refuses the plan instead
- * of overwriting the newer truth (C2's stale-plan guard; issue #8).
+ * of overwriting the newer truth (the stale-plan guard).
  */
 
 import type { CoverageSnapshot } from "./coverage";
@@ -76,7 +76,7 @@ export interface ContextFinding {
    * The source the CURRENT revision was published from (null for explicit
    * corrections), with that source's send time — the pair the reanalysis
    * guard needs: re-running an OLDER source cannot revert a newer
-   * source-backed truth (issue #8).
+   * source-backed truth.
    */
   readonly currentProvenanceSourceId: string | null;
   readonly currentProvenanceSourceSentAtMs: number | null;

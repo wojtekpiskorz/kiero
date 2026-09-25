@@ -1,5 +1,5 @@
 /**
- * The canonical source-reference route contract (R5, issue #130).
+ * The canonical source-reference route contract.
  *
  * ONE serializer/parser owns the stable in-app link to a "Wiadomość
  * źródłowa": `/zrodlo?zrodlo=<encoded-id>` — the dossier route the host
@@ -9,7 +9,7 @@
  *   anchor the dossier highlights;
  * - an optional `projekt` param: NAVIGATION CONTEXT ONLY. It can never
  *   grant access: the dossier's own backend reads stay the authority on
- *   tenancy and lifecycle (B3), and a malformed or foreign value is
+ *   tenancy and lifecycle, and a malformed or foreign value is
  *   dropped, never honored.
  *
  * The form is relative (no host): the same string serves in-app anchors,
@@ -68,7 +68,7 @@ export interface SourceReference {
 
 /**
  * Serializes one reference into the canonical relative link. This is the
- * ONLY sanctioned way an in-app consumer builds a source URL; the backend
+ * ONLY way an in-app consumer builds a source URL; the backend
  * half (convex/sources/target.ts) serves push payloads and export records
  * the same form.
  */

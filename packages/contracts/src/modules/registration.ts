@@ -11,7 +11,7 @@
  * registered name actually exists in a module surface, so a typo'd
  * producer/consumer edge fails loudly instead of silently never firing.
  *
- * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
+ * Certified by platform on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";

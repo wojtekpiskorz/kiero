@@ -1,18 +1,18 @@
 /**
- * The telemetry cron orchestrator (I2).
+ * The telemetry cron orchestrator.
  *
  * Kept in its own module (not `functions.ts`) deliberately: a Convex module
  * whose own exports are referenced through `internal` from INSIDE the same
  * module creates a type cycle through the generated api and those exports
  * drop out of the generated type. Cross-module references (this file) are
- * the sanctioned pattern - the same reason A3's probe actions live apart
+ * the pattern - the same reason the probe actions live apart
  * from the mutations they drive.
  *
  * `cronTick` runs every TELEMETRY_TICK_INTERVAL_MS (./heartbeat.ts) from
  * convex/crons.ts: incident scan, cost threshold evaluation, windowed
  * retention, then best-effort sink forward.
  *
- * R27 (issue #235): the sink forward's outcome is recorded durably - the
+ * The sink forward's outcome is recorded durably - the
  * closed status class of every attempt (refused, unreachable, ok) persists
  * on the attempted event rows and on the `telemetry.sink` tick ledger row
  * (see ./forward.ts), so a failing Convex->Axiom leg is diagnosable from
@@ -45,7 +45,7 @@ export interface CronTickSummary {
   };
   readonly forwarded: SinkIngestResult & {
     readonly attempted: number;
-    /** R27: the attempt's closed status class (the durable copy is persisted). */
+    /** The attempt's closed status class (the durable copy is persisted). */
     readonly status: ForwardStatus;
   };
 }
@@ -61,7 +61,6 @@ async function forwardRecentToSink(
       : nullSink(SINK_REASON_NOT_CONFIGURED);
 
   // The deployment's closed environment label through the ONE shared rule
-  // (R13: this read previously lived as one of five drifting copies).
   const environment = deploymentEnvironment(process.env.KIERO_ENVIRONMENT);
 
   const nowMs = Date.now();
@@ -93,7 +92,7 @@ async function forwardRecentToSink(
     ),
   );
   const result = await sink.ingest(events);
-  // R27 (issue #235): the outcome is no longer dropped. Both classes land in
+  // The outcome is no longer dropped. Both classes land in
   // markForwarded - "ok" marks the rows delivered, a refusal persists the
   // class on them and on the telemetry.sink tick row the health surface reads.
   const status = classifySinkResult(result);

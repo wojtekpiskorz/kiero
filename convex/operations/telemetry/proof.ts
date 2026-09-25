@@ -1,5 +1,5 @@
 /**
- * The guarded telemetry proof surface (I2), same pattern as A3's probe
+ * The guarded telemetry proof surface, same pattern as the probe
  * (`KIERO_PROBE_ENABLED` deployment variable; actions check the variable and
  * run internal functions, so evidence scripts never depend on scheduler
  * timing while the entries stay unreachable with the guard off).

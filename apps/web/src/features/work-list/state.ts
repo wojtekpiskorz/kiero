@@ -1,7 +1,7 @@
 /**
  * Work list ("Co teraz" work half) feature state: Polish copy, the
  * task/item/event vocabularies rendered for product text, and the
- * closed-error classification for the C4 surface.
+ * closed-error classification for the surface.
  *
  * The task-state, checklist-mark and event-state labels come from the pure
  * domain rules (`packages/domain/work`) through one relative import: the

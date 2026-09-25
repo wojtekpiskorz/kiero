@@ -1,9 +1,9 @@
 /**
- * F1 read-state dev proofs (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, exactly like the A3 platform and D1 lane probes; the lane's
+ * Read-state dev proofs (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable, exactly like the platform and text-source probes; the lane's
  * shared people fixtures live in convex/attention/probe_shared.ts).
  *
- * No business work happens here; these entries exist so the F1 evidence can
+ * No business work happens here; these entries exist so the evidence can
  * run against the REAL dev deployment without a development-auth shortcut:
  * every actor is a server-seeded session resolved through the SAME
  * canonical resolution and authorization seam as production calls, and no

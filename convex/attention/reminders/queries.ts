@@ -1,7 +1,7 @@
 /**
- * Task-reminder queries (F4): the task/reminder projections H2's "Co
- * teraz" surface consumes (issue 44: "emit ... task/reminder projections
- * for H2") and the diagnostic reads the probes assert on.
+ * Task-reminder queries: the task/reminder projections "Co
+ * teraz" surface consumes
+ * and the diagnostic reads the probes assert on.
  *
  * `myTaskReminders` is the personal read: the caller's own task-reminder
  * intents (their lifecycle state, due time, suppressed reason and the
@@ -60,7 +60,7 @@ function scheduleView(anchor: Doc<"reminderSchedules">) {
  * `notificationIntents`, and the index orders states lexicographically, so
  * a recipient-prefix-only window fills with delivered history (`delivered`
  * sorts before `pending`) and the pending queue would go silently empty
- * (PR #102 review round 1, finding 4). Per-state windows keep the pending
+ * . Per-state windows keep the pending
  * slice complete no matter how much history accumulates.
  */
 async function remindersInState(
@@ -76,7 +76,7 @@ async function remindersInState(
 }
 
 /**
- * The wire row shapes of `myTaskReminders`' ok value (H2 append, flagged
+ * The wire row shapes of `myTaskReminders`' ok value (an
  * additive export: the personal projection imports the server's own types
  * instead of hand-declaring a twin).
  */
@@ -108,7 +108,7 @@ export interface MyTaskRemindersWire {
 
 /**
  * The public client path: the caller's OWN reminder intents and active
- * snoozes (the H2 personal projection; read-only).
+ * snoozes (the personal projection; read-only).
  */
 export const myTaskReminders = query({
   args: {},

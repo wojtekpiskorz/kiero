@@ -1,13 +1,13 @@
 /**
- * "Co teraz" feature entry (A4 host wiring point; H2's mount).
+ * "Co teraz" feature entry.
  *
  * Reachable straight from the module entries, without a mandatory
  * dashboard: the current obligations of the firm and of the signed-in
- * boss. H2 replaces this lane's pending placeholder with the real
+ * boss. The entry mounts the real
  * per-user screen: assigned and unassigned open work (closed projects'
  * remaining obligations included), events awaiting explicit confirmation,
- * open questions across firm and project memory, and F4's personal
- * reminder/snooze state. The route owns G4's parity-pinned deep links
+ * open questions across firm and project memory, and the personal
+ * reminder/snooze state. The route owns the parity-pinned deep links
  * (`/co-teraz?zadanie=<id>` / `?zdarzenie=<id>`, subjectLinkPath).
  */
 

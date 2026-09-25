@@ -1,6 +1,6 @@
 /**
- * The vision-extraction stage (E4): one bounded provider pass over ONE
- * retained image representation, through E2's vision adapter (GLM then
+ * The vision-extraction stage: one bounded provider pass over ONE
+ * retained image representation, through the vision adapter (GLM then
  * Gemini; never the text-only route), with the typed partial-safe
  * refusals.
  *
@@ -117,7 +117,7 @@ function openRouterCredentials(): OpenRouterCredentials | null {
   return { apiKey };
 }
 
-/** The supported vision mime types of E2's inline image content parts. */
+/** The supported vision mime types of the inline image content parts. */
 type VisionMime = "image/png" | "image/jpeg" | "image/webp";
 
 function visionMimeOf(mimeType: string | undefined): VisionMime | null {
@@ -130,7 +130,7 @@ function visionMimeOf(mimeType: string | undefined): VisionMime | null {
 /**
  * Resolves one representation's bytes through the order's channel. The
  * production channel asks the configured media executor for an image read
- * (`op: "image"`, served by the media protocol since R22); its closed
+ * (`op: "image"`, served by the media protocol); its closed
  * refusals (404/413/422) map to the typed resumable state below.
  */
 async function resolveImageBytes(
@@ -312,7 +312,7 @@ export async function recordVisionOutcomeTransaction(
   }
   const nowMs = Date.now();
   if (outcome.kind === "failed") {
-    // Honest pending with the sanitized reason (resumable; D6's pattern).
+    // Honest pending with the sanitized reason (resumable; pattern).
     await ctx.db.patch(order._id, {
       state: "pending",
       ...(outcome.errorKind === undefined ? {} : { lastErrorKind: outcome.errorKind }),

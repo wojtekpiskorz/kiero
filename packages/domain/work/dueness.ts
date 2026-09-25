@@ -1,5 +1,5 @@
 /**
- * Temporal bindings and derived dueness (C4 domain half, pure).
+ * Temporal bindings and derived dueness (domain half, pure).
  *
  * Tasks and events bind to temporal FINDINGS by reference ("Zdarzenie i
  * zadanie mogą korzystać z tej samej daty i źródła; nie utrzymują
@@ -152,8 +152,7 @@ function endOfDateOnly(bound: DateOnlyWire): DueMoment {
 export type TermUnusableReason =
   | "unknown"
   | "conflicted"
-  // C5 amendment (forced by the KnowledgeState `updating` variant, flagged):
-  // an updating-until-revalidated conclusion never drives a due moment.
+  // An updating-until-revalidated conclusion never drives a due moment.
   | "updating"
   | "not_applicable"
   | "not_temporal"

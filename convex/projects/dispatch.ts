@@ -1,11 +1,11 @@
 /**
- * Projects command dispatch wiring (C1): the SAME checked path A3 proved and
- * B1/B3/D1 reuse, with this lane's handler registry and policy.
+ * Projects command dispatch wiring: the SAME checked path the platform proved and
+ * identity, membership and sources reuse, with this lane's handler registry and policy.
  *
  * `dispatchProjectsCommand` is @kiero/runtime's `dispatchCommand` over the
- * B3-preceded identity resolution: provision-or-refresh the B1 live session,
+ * Identity resolution (as in membership): provision-or-refresh the live session,
  * then the canonical chain (user -> earliest active membership -> company)
- * whose rows B3 owns. The resolved context is the ONLY company scope — no
+ * whose rows membership owns. The resolved context is the ONLY company scope — no
  * client input names a company. The handlers run inside ONE Convex mutation,
  * so each state change and its canonical `projects.*` event commit atomically.
  *
@@ -90,8 +90,8 @@ export function projectsHandlers(): HandlerRegistry<MutationCtx> {
 
 /**
  * Dispatches one company-scoped projects command envelope inside ONE Convex
- * mutation transaction, through the checked path with B1's identity source
- * and the C1 policy. Unimplemented operations fail closed `unsupported`.
+ * mutation transaction, through the checked path with the identity source
+ * and the policy. Unimplemented operations fail closed `unsupported`.
  */
 export async function dispatchProjectsCommand(
   ctx: MutationCtx,

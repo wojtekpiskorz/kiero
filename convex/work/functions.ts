@@ -1,16 +1,17 @@
 /**
- * The C4 Convex function surface (generated-call APIs).
+ * The work Convex function surface (generated-call APIs).
  *
  * One core set, two callable entries (no drift by construction):
  *
  * - `dispatchWork` (public mutation): the typed command dispatch for the
  *   company-scoped work operations (changeTask, changeTaskState,
  *   changeChecklistItem, promoteChecklistItem, changeEvent,
- *   changeEventState), with B1 identity resolution and the C4 policy. Each
+ *   changeEventState), with identity resolution and the policy. Each
  *   command, its history row and its canonical event commit atomically
  *   inside the mutation.
  * - `workOverview` (public query): the barebones work read. It resolves
- *   the actor through the SAME canonical read-only chain B1/B3/C1 protected
+ *   the actor through the SAME canonical read-only chain the identity,
+ * membership and projects protected
  *   reads use, and everything it returns is derived from the RESOLVED
  *   company scope — no company, task or event id is ever accepted from
  *   client input, so no other tenant's row can appear. Dueness and

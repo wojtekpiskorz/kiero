@@ -1,6 +1,6 @@
 /**
- * The ONE marking-commit core every memory-side marking lane shares (C2's
- * findings lane; extracted in E7 review round 1, issue #115): the commit
+ * The ONE marking-commit core every memory-side marking lane shares (the
+ * findings lane): the commit
  * loop that writes one marking revision per pre-validated finding,
  * projects it onto the finding row and publishes `memory.findingRevised`,
  * all inside the caller's transaction.
@@ -64,7 +64,7 @@ export interface MarkingStamp {
 }
 
 /**
- * The typed outcome of one marking core (review round 1: the ok payload is
+ * The typed outcome of one marking core (the ok payload is
  * typed, so callers never re-assert the shape the core just built): the
  * marked roots, their new revision ids (the cascade carriers' dedup) and
  * their re-analysis targets, or the closed refusal.
@@ -79,7 +79,7 @@ export type MarkingOutcome =
         readonly findingId: Id<"findings">;
         readonly revisionId: Id<"findingRevisions">;
       }>;
-      /** The marked findings' provenance sources (E3 re-analysis groups). */
+      /** The marked findings' provenance sources (re-analysis groups). */
       readonly targets: RecomputeTarget[];
     }
   | { readonly _tag: "error"; readonly error: ClosedError };
@@ -107,7 +107,7 @@ export async function commitMarkings(
   if (findingRevised === undefined) {
     return { _tag: "error", error: validationError("memory_events_missing") };
   }
-  // The pre-insert decode template (the D1 pattern): proves the event
+  // The pre-insert decode template: proves the event
   // payload still accepts the exact shape this loop constructs, BEFORE
   // anything is written.
   Schema.decodeUnknownSync(findingRevised.payload)({

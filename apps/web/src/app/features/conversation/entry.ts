@@ -1,30 +1,30 @@
 /**
- * Company conversation feature entry (A4 host wiring point).
+ * Company conversation feature entry.
  *
  * "Rozmowa firmy" is the authenticated default route (execution charter:
  * the application starts in the company conversation; project context and
  * "Co teraz" are reachable without a mandatory dashboard).
  *
- * H1's mount: the full conversation UI — company and project projections of
- * the one history, unread badges (F1), honest processing states, correction-
+ * the mount: the full conversation UI — company and project projections of
+ * the one history, unread badges, honest processing states, correction-
  * as-new-source, and the canonical per-source deep link (`?zrodlo=<id>`;
- * ASCII param, Polish keying). J1's core-text controls
+ * ASCII param, Polish keying). The core-text controls
  * graduated into the conversation feature (the proved send loop and its
- * copy are preserved verbatim); the minimal J1 mount was replaced through
+ * copy are preserved verbatim); the first minimal mount was replaced through
  * this declared entry without duplicating backend state or making a second
  * conversation store.
  *
- * J2's join (issue #61): ALL capture modes mount here — D4's composer
+ * ALL capture modes mount here — the composer
  * (text + one recording + photos over the recoverable-draft engine, with
- * the voice-only ruling) embeds as the one send form, and E6's answer
+ * the voice-only ruling) embeds as the one send form, and the answer
  * loop runs per question message ("Zapytaj agenta"). The separate /wpis
- * capture route retired with this join.
+ * capture route is retired.
  *
  * Consumed operations are the commands the surface issues (the send pair —
- * now through the composer's upload engine — plus F1's read marking); the
- * answer action is E6's public `agent/loop:askAgent` entry. Reads ride the
- * lane-owned public queries (D1 conversation views, F1 read-state
- * projection, C2 memory reads), exactly like the earlier mounts declared.
+ * now through the composer's upload engine — plus the read marking); the
+ * answer action is the public `agent/loop:askAgent` entry. Reads ride the
+ * lane-owned public queries (conversation views, read-state
+ * projection, memory reads).
  */
 
 import { createElement } from "react";

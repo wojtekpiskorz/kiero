@@ -1,17 +1,17 @@
 /**
- * The backup inventory reads (I5): the D3 retained-media inventory and the
- * I4 content-free deletion/revocation ledger, read inside the begin
+ * The backup inventory reads: the retained-media inventory and the
+ * content-free deletion/revocation ledger, read inside the begin
  * transaction so one run's snapshot anchor and its reference list are
  * decided atomically.
  *
  * - The retained-media inventory is every VERIFIED `retained` representation
- *   (D5's archival evidence; the received-original exception also lands in
+ *   (the archival evidence; the received-original exception also lands in
  *   a `retained` row). Unverified rows are not archival evidence yet and
  *   are excluded; a still-building set that loses such an object is not
  *   incomplete.
  * - The deletion ledger is carried SEPARATELY from the database export
  *   (its own hashed file inside the set) so a restore can replay
- *   deletions/revocations that postdate any snapshot (I6 seam). Rows are
+ *   deletions/revocations that postdate any snapshot. Rows are
  *   content-free by schema; nothing here expands them.
  */
 
@@ -24,13 +24,13 @@ export interface InventoryEntry {
   readonly objectKey: string;
   /** The representation's recorded content hash (etag- or sha256-based). */
   readonly contentHash: string;
-  /** Object size in bytes when the ledger recorded it (D5). */
+  /** Object size in bytes when the ledger recorded it. */
   readonly bytes: number | null;
   /** The owning source when the attachment was already accepted. */
   readonly sourceId: string | null;
 }
 
-/** One content-free deletion/revocation record (I4 schema, verbatim). */
+/** One content-free deletion/revocation record (deletion schema, verbatim). */
 export interface LedgerEntry {
   readonly recordId: string;
   readonly companyId: string;
@@ -95,7 +95,7 @@ export async function deletionLedgerSnapshot(db: QueryCtx["db"]): Promise<Ledger
 
 /**
  * The media keys dropped at build time because their sources have purge
- * records (I4 seam): a purge recorded at or before the run's completion
+ * records: a purge recorded at or before the run's completion
  * means the source's retained media must not enter THIS set. Keys whose
  * sourceId is unknown stay in the set (conservative: completeness first).
  */

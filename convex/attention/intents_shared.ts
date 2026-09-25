@@ -3,15 +3,15 @@
  * (the convex/attention/probe_shared.ts precedent for lane-crossing
  * helpers).
  *
- * PR #102 review round 1, finding 2: the reminder lane (F4) had copied
+ * The reminder lane had copied
  * `settleIntent`, `deferIntent`, `settingsOf`, `activeMemberIds`,
  * `scheduleEvaluationAt`, the ensure-by-dedup insert and the
- * sweep/hop skeleton verbatim from F2's `delivery/operations.ts`, leaving
+ * sweep/hop skeleton verbatim from `delivery/operations.ts`, leaving
  * about a hundred intent-lifecycle lines maintained twice inside one
- * module (with F3's push transport as the third reader to come). They
- * live once here now. F4 consumes this module; F2's delivery lane
+ * module (with the push transport as the third reader to come). They
+ * live once here now. Reminders consume this module; the delivery lane
  * migrates its own copies onto it in its own lane, so this file edits no
- * F2-owned path.
+ * notification-intents path.
  *
  * Everything here is the MECHANICAL half of intent evaluation: rows,
  * dedup, terminal decisions, the scheduled evaluator chain. The semantic
@@ -81,7 +81,7 @@ export type IntentSettlement =
 /**
  * Records one terminal intent decision and publishes the canonical
  * `attention.intentDelivered` event (the outcome field carries all three
- * terminal states; F2's failed arm and the suppress/deliver arms of both
+ * terminal states; the failed arm and the suppress/deliver arms of both
  * lanes share this one writer, so the event shape can never drift
  * between evaluators).
  */

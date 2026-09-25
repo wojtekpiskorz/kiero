@@ -1,5 +1,5 @@
 /**
- * The index-write authority (E5): the one transactional path derived search
+ * The index-write authority: the one transactional path derived search
  * rows are written or deleted through.
  *
  * Every write re-validates against the generation it claims:
@@ -8,7 +8,7 @@
  *   and refuses all writes;
  * - every embedding must be a non-empty, finite, exactly-generation-
  *   dimensioned vector. A wrong-dimension or malformed vector FAILS THE
- *   INDEX WRITE (issue #39 focused verification): nothing from the batch
+ *   INDEX WRITE (focused verification): nothing from the batch
  *   commits, the job records the typed failure, and incompatible vectors
  *   are never mixed into one index;
  * - every row's tenant linkage is re-checked against the canonical record

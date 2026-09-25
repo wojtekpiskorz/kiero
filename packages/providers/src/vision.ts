@@ -1,5 +1,5 @@
 /**
- * The image-extraction adapter (E2; route amended by E8).
+ * The image-extraction adapter.
  *
  * Image reading rides the chat adapter's typed request shape with inline
  * image content parts, routed over the accepted vision order: DIRECT
@@ -7,7 +7,7 @@
  * `input_image` data URLs on the Responses wire) first, then the authorized
  * OpenRouter fallback positions (GLM, then Gemini — both verified
  * vision-capable). Extraction results are always structured: the caller's
- * Effect Schema contract (E4 owns the real extraction schema) is pinned as
+ * Effect Schema contract (multimodal extraction owns the real schema) is pinned as
  * schema-constrained generation on whichever transport serves the attempt
  * and the completion must decode through it, so the result value's type
  * follows that codec (tools are not declared here; a tool turn in the value

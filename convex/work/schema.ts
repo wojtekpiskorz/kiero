@@ -1,16 +1,13 @@
 /**
- * Work tables: tasks, checklists, events (A2 candidate, certified by A3;
- * completed by C4 for the tasks / independent checklists / dated events
- * lane).
+ * Work tables: tasks, checklists, events.
  *
- * Owning implementer: C4 (tasks, independent checklists, dated events).
  * Task completion is independent of checklist completion (a done task may
  * keep unchecked items, which retain their own state and history). Event
  * occurrence and task deadlines are distinct unless they explicitly share a
  * dated finding; both bind to temporal findings by reference, never by
  * copying values.
  *
- * C4 amendments (the owning lane completes the candidate fragment):
+ * Notes (the owning lane completes the candidate fragment):
  * - `tasks.linkedEventId`: the explicit link from a task to the event it
  *   serves (the receiving task of a delivery); sharing the event's dated
  *   finding stays a separate explicit binding.

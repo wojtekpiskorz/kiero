@@ -1,17 +1,17 @@
 /**
- * The `attention.deliver_push` durable executor (F3).
+ * The `attention.deliver_push` durable executor.
  *
- * The certified consumer edge (A2/A3's registry, `attention.intentDelivered
+ * The certified consumer edge (the registry, `attention.intentDelivered
  * -> attention.deliver_push`, projected by the outbox drain) lands here:
  * every delivered notification intent gets ONE bounded per-device push
  * pass. The transport POST cannot run inside a mutation transaction, so
- * the executor hands the leg to its action half (the G3 external-action
+ * the executor hands the leg to its action half (the external-action
  * template); every durable decision happens in that action's
  * prepare/complete mutation pair.
  *
- * The job kind was part of the certified A2 vocabulary from the start
+ * The job kind was part of the certified vocabulary from the start
  * (`packages/contracts/src/jobs.ts`); this lane registers its executor
- * input and implementation (the sanctioned registry append).
+ * input and implementation (the registry append).
  */
 
 import { Schema } from "effect";

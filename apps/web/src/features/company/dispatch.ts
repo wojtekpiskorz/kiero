@@ -1,5 +1,5 @@
 /**
- * The shared checked-dispatch runner (H2 review round 1): one hook every
+ * The shared checked-dispatch runner: one hook every
  * command-driving surface calls, parameterized by the surface's mutation
  * and hint map. The work forms, the extensions sections and the Co teraz
  * controls previously held three drifting copies (useWorkDispatch,

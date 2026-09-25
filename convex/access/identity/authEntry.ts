@@ -16,7 +16,7 @@
  * `createOrUpdateUser` is REPLACED by the Kiero policy (./userPolicy.ts):
  * the library default would implicitly link accounts by verified email,
  *   which the accepted identity rules forbid — linking requires both
- *   proofs and is B2's operation. The B2 amendment below keeps that rule
+ *   proofs and is operation. The amendment below keeps that rule
  *   and adds the two explicit ceremony hooks (./linking/authHook.ts):
  *
  * - a Google sign-in that RESUMES an account records the fresh Google
@@ -26,7 +26,7 @@
  *   explicit link commit (returning the ceremony's user id is the
  *   library's supported manual-linking mechanism — the provider account
  *   row attaches in the same transaction). Without a ceremony the
- *   original B1 rejection stands, unchanged.
+ *   original rejection stands, unchanged.
  *
  * Sessions: total and inactivity lifetimes are pinned to the accepted
  * 30-day rule. The app-side live-session registry (./resolution.ts)
@@ -35,7 +35,7 @@
  *
  * `convex/auth.ts` re-exports the returned functions (the client and the
  * platform look them up under the `auth` module path). `signIn` is the
- * R26 data-carrying wrapper around the library action: every classified
+ * data-carrying wrapper around the library action: every classified
  * refusal reaches the client as `ConvexError` data, never as message
  * text a production deployment would sanitize.
  */
@@ -170,7 +170,7 @@ const authConfig: ConvexAuthConfig = {
       : []),
   ],
   session: {
-    // The accepted session rule (issue #4): reauthentication after 30
+    // The accepted session rule: reauthentication after 30
     // days total, expiry after 30 days of inactivity.
     totalDurationMs: 30 * 24 * 60 * 60 * 1000,
     inactiveDurationMs: 30 * 24 * 60 * 60 * 1000,
@@ -199,7 +199,7 @@ const authConfig: ConvexAuthConfig = {
       // collection filter (same pattern as the users lookup below).
       if (args.type === "email") {
         const identifier = `issuance:email_code:${normalizeEmail(input.profile.email)}`;
-        // B2 amendment: the row read/write is the ONE shared budget core
+        // The row read/write is the ONE shared budget core
         // (./issuanceLimit.ts commitIssuanceAttempt); this inline adapter is
         // the generic-callback db half. A blocked attempt writes nothing
         // (rewriting the row would keep pushing the recovery window and
@@ -262,7 +262,7 @@ const authConfig: ConvexAuthConfig = {
         // The library's callback types expose only the generic data model,
         // so this lookup uses the collection filter (correct, typed; the
         // `email` index serves the library's own lookups). Sign-in volume
-        // is tiny; B2's linking adapter moves this behind a typed seam.
+        // is tiny; the linking adapter moves this behind a typed seam.
         const docs = await ctx.db
           .query("users")
           .filter((q) => q.eq(q.field("email"), normalizeEmail(input.profile.email)))
@@ -284,7 +284,7 @@ const authConfig: ConvexAuthConfig = {
       });
 
       if (decision.action === "reject") {
-        // B2 amendment — the explicit linking ceremony (issue #21): before
+        // The explicit linking ceremony: before
         // the method-conflict rejection stands, the linking module decides
         // whether an active ceremony proves BOTH methods for this address.
         // Only Google-direction sign-ins reach this branch with a proof
@@ -310,9 +310,9 @@ const authConfig: ConvexAuthConfig = {
         }
         // Polish product copy: the address belongs to an identity using a
         // different sign-in method; no detail about that identity is
-        // disclosed. Verified method linking is B2's operation (account
+        // disclosed. Verified method linking is the operation (account
         // settings; both proofs). Twin literal pinned by tests/b1+b2; the
-        // closed code rides the ConvexError DATA (R26), the marker + copy
+        // closed code rides the ConvexError DATA, the marker + copy
         // stay in the message for logs.
         throw new ConvexError<AccessRefusalData>(
           accessRefusalData(
@@ -323,7 +323,7 @@ const authConfig: ConvexAuthConfig = {
       }
       if (decision.action === "resume") {
         // The policy works with plain id strings; the Convex write surface
-        // wants branded ids. normalizeId is the proved bridge (A3).
+        // wants branded ids. normalizeId is the proved bridge.
         const userId = ctx.db.normalizeId("users", decision.userId);
         if (userId === null) {
           throw new Error("createOrUpdateUser: nieprawidłowy identyfikator osoby");
@@ -331,7 +331,7 @@ const authConfig: ConvexAuthConfig = {
         if (args.profile.emailVerified === true) {
           await ctx.db.patch(userId, { emailVerificationTime: Date.now() });
         }
-        // B2 amendment — record the fresh Google proof when the resumed
+        // Record the fresh Google proof when the resumed
         // account's ceremony awaits it (no ceremony: one bounded lookup,
         // no writes). This is the google leg of an email-direction
         // ceremony; everything else is untouched.
@@ -354,7 +354,7 @@ const authConfig: ConvexAuthConfig = {
         createdAtMs: Date.now(),
       });
       // The generic insert returns a plain string; the callback contract
-      // wants the branded user id. normalizeId is the proved bridge (A3).
+      // wants the branded user id. normalizeId is the proved bridge.
       const createdId = ctx.db.normalizeId("users", created);
       if (createdId === null) {
         throw new Error("createOrUpdateUser: nieprawidłowy identyfikator osoby");
@@ -404,7 +404,7 @@ function isEmailCodeVerification(args: {
 
 /**
  * Rounds the library's plain verification-leg Errors into structured
- * refusals (R26 review round 1: the budget mislabel). SERVER-SIDE, before
+ * refusals (the budget mislabel). SERVER-SIDE, before
  * sanitization erases the message — the only place the two stable library
  * literals are still readable. Anything else returns UNCHANGED, so a
  * genuine crash on the leg propagates as itself. Exported pure for tests.
@@ -426,7 +426,7 @@ export function wrapLibraryVerificationRefusal(error: unknown): unknown {
 }
 
 /**
- * The exported sign-in action (R26): the library's `auth:signIn` wrapped
+ * The exported sign-in action: the library's `auth:signIn` wrapped
  * so every refusal reaches the client as STRUCTURED `ConvexError` data.
  *
  * Our own refusals (issuance budget, method conflict, delivery failure)

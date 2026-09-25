@@ -1,12 +1,9 @@
 /**
- * Vision-extraction order tables (E4 fragment: the multimodal join).
- *
- * Owning implementer: E4 (`convex/processing/multimodal/**`); H4 inspects
- * the rows, J2 composes them into the cross-module join surface.
+ * Vision-extraction order tables (the multimodal join).
  *
  * Vocabulary pins (architecture + CONTEXT.md):
  * - One `visionOrders` row is ONE vision-extraction order over one VERIFIED
- *   retained image representation (D5's deterministic selection defines the
+ *   retained image representation (the deterministic selection defines the
  *   inspectable representation; a re-normalization is a NEW representation
  *   and therefore a NEW order — coordinates never move under old anchors).
  * - The order is NOT a durable job of its own: the join workflow drives it
@@ -14,7 +11,7 @@
  *   idempotent extraction registration). The row carries the state so a
  *   later join (or a linked reanalysis) resumes instead of re-charging the
  *   provider.
- * - Byte channels follow D6's model: `media_worker` is production (the
+ * - Byte channels follow the model: `media_worker` is production (the
  *   configured executor over R2; typed honest refusal leaves the order
  *   blocked-resumable), `proof_inline` is the guarded dev-proof channel
  *   whose stash is sha-256-pinned to the retained representation's
@@ -23,7 +20,7 @@
  *   exhaustion records a sanitized `lastErrorKind` and keeps the order
  *   `pending` (resumable), never a fake complete and never terminal.
  *
- * E4 registration of the fragment (the sanctioned small coordinated change,
+ * Registration of the fragment (the small coordinated change,
  * docs/implementation/contracts/README.md): the table name is added to
  * `TABLE_ID_NAMES` in @kiero/contracts and the import/spread in
  * convex/schema.ts.
@@ -50,9 +47,9 @@ export const multimodalTables = {
     representationId: shared.mediaRepresentationId,
     /** The run whose journal the join's vision step anchors to. */
     processingRunId: shared.processingRunId,
-    /** E4 vision pipeline version of this order (immutable per order). */
+    /** Vision pipeline version of this order (immutable per order). */
     pipelineVersion: v.string(),
-    /** E2 routing configuration the vision route ran under (immutable per order). */
+    /** Provider routing configuration the vision route ran under (immutable per order). */
     visionRoutingVersion: v.string(),
     /** How the order resolves representation bytes (visible, never implicit). */
     bytesChannel: v.union(
@@ -60,7 +57,7 @@ export const multimodalTables = {
       v.literal("media_worker"),
       /**
        * Guarded dev-proof channel only: the proof script supplies bytes
-       * sha-pinned to the retained representation's contentHash (D6's
+       * sha-pinned to the retained representation's contentHash (the
        * pattern; production flows never use it).
        */
       v.literal("proof_inline"),
@@ -79,7 +76,7 @@ export const multimodalTables = {
     extractionId: v.optional(shared.extractionId),
     /**
      * The verbatim recorded observations at completion (bounded JSON of
-     * text+region pairs, the vision counterpart of D6's per-segment text):
+     * text+region pairs, the vision counterpart of the per-segment text):
      * the durable record the joined analysis reads observations from. The
      * extraction's fragments carry the same regions as honest anchors.
      */

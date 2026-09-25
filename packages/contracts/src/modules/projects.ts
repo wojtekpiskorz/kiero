@@ -1,6 +1,6 @@
 /**
  * Projects module surface (architecture "Deep modules": Projects and work,
- * the projects half). Implements lanes: C1.
+ * the projects half).
  *
  * Stable identity, firm-unique codenames reserved through rename/closure,
  * fixed project stages plus a separate pause mark, contact roles without

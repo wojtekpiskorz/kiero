@@ -1,7 +1,6 @@
 /**
- * Audit and diagnostic tables (A2 candidate, certified by A3; amended by I2).
+ * Audit and diagnostic tables.
  *
- * Owning implementer: I2 (redacted diagnostics, health, cost alerts).
  * Audit records are canonical protected data with actor and change/run
  * references. Diagnostic events are redacted, bounded to the accepted 30-day
  * window, and exclude raw messages, audio/images, transcripts, prompts and
@@ -10,7 +9,7 @@
  * exist (redaction by construction, not by convention). GM activity is
  * audited and excluded from alpha success metrics.
  *
- * I2 amendments (see docs/implementation/contracts/README.md):
+ * Notes (see docs/implementation/contracts/README.md):
  * - `diagnosticEvents`: closed kind union, origin (`serviceName`,
  *   `environment`), `dedupKey` (incident scans diagnose one row once),
  *   required `forwardedAtMs` (0 = not yet forwarded to the external sink)
@@ -23,13 +22,13 @@
  *   (PLN minor units) behind the accepted 400/500 PLN alert thresholds,
  *   with per-level cooldown bookkeeping.
  *
- * B4 amendment (issue #23, coordinated with I2): `auditRecords` carries the
+ * `auditRecords` carries the
  * GM request's stated basis and closed outcome plus a `by_grant_time` index;
  * the protected record the issue requires ("GM actor, target company,
  * operation, reason and outcome") and the read path for the alpha-metrics
- * exclusion and H4's audit views.
+ * exclusion and the audit views.
  *
- * R27 amendment (issue #235, additive fields only - no new table): the
+ * The
  * diagnosticEvents and healthHeartbeats fragments carry the closed
  * `forwardStatus` class of each sink-forward attempt (`./forward.ts`), so a
  * refused or unreachable Convex->Axiom leg is durable and diagnosable from
@@ -52,7 +51,7 @@ const diagnosticEventKind = v.union(
   ...DIAGNOSTIC_EVENT_KINDS.map((kind) => v.literal(kind)),
 );
 
-/** Closed sink-forward status class union pinned to the single R27 definition. */
+/** Closed sink-forward status class union pinned to the single definition in ./forward.ts. */
 const forwardStatus = v.union(
   ...FORWARD_STATUSES.map((status) => v.literal(status)),
 );
@@ -75,7 +74,7 @@ export const telemetryTables = {
     changeSetId: v.optional(shared.changeSetId),
     processingRunId: v.optional(shared.processingRunId),
     /**
-     * B4 amendment (issue #23): the GM actor's stated basis ("podstawa") and
+     * The GM actor's stated basis ("podstawa") and
      * the closed outcome of the audited action. Optional because only GM
      * requests are required to state both; every GM row fills them ("ok" or
      * the closed error code) together with `gmGrantId`, which stays the
@@ -84,7 +83,7 @@ export const telemetryTables = {
     gmBasis: v.optional(v.string()),
     outcome: v.optional(v.string()),
     /**
-     * H4 amendment (issue #52, the B4 precedent): the processing operation's
+     * The processing operation's
      * target revision as the operator stated it; the inspected run state
      * (`<runId>@<state>`) or the source's inspected latest run
      * (`source@<runId>|none`). Bounded, ids and closed states only.
@@ -116,9 +115,9 @@ export const telemetryTables = {
     /** 0 = not yet forwarded to the external sink; set on best-effort delivery. */
     forwardedAtMs: shared.tsMs,
     /**
-     * R27 (issue #235): the closed status class of the LAST forward attempt
+     * The closed status class of the LAST forward attempt
      * on this row ("ok" exactly when `forwardedAtMs` was set; a refusal
-     * class leaves `forwardedAtMs` 0 for retry). Absent = pre-R27 row, or
+     * class leaves `forwardedAtMs` 0 for retry). Absent = older row, or
      * the 1h forward window slid past before any attempt. Status class
      * only - never response bodies or credential material.
      */
@@ -135,7 +134,7 @@ export const telemetryTables = {
    * pings; the recorder keeps a bounded tail per service. Silence is judged
    * externally (monitor on absent sink events) AND internally (staleness).
    *
-   * R27 amendment (issue #235): the telemetry tick writes the
+   * The telemetry tick writes the
    * `telemetry.sink` rows itself (one per run, same bounded tail) - the
    * persisted record of the Convex->Axiom forward leg that exists even
    * when zero events forward.
@@ -144,7 +143,7 @@ export const telemetryTables = {
     serviceName: heartbeatService,
     status: v.union(v.literal("ok"), v.literal("degraded")),
     /**
-     * R27: on `telemetry.sink` rows only - the closed status class of that
+     * On `telemetry.sink` rows only - the closed status class of that
      * tick's forward attempt. Absent = the tick ran with an empty forward
      * window (no ingest attempted); the class never carries payloads.
      */

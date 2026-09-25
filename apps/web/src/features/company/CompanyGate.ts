@@ -1,6 +1,6 @@
 /**
- * The shared company-feature gate (H1 review round 1): the connection
- * gate, the Convex auth wiring, B1's sign-in walk and the B3 membership
+ * The shared company-feature gate: the connection
+ * gate, the Convex auth wiring, the sign-in walk and the membership
  * gate every member-facing surface rides, extracted from the two
  * hand-copies this PR had added (conversation and memory). Older features
  * that hand-roll the same stack (membership, calendar, work-list, project
@@ -69,7 +69,7 @@ const gateCopy = {
 /**
  * The company-feature root: connection gate, auth wiring and membership
  * gate around one member continuation. Unauthenticated visitors reach
- * B1's sign-in walk; members without a company reach the admission
+ * the sign-in walk; members without a company reach the admission
  * pointer; members continue into the feature's own surface.
  */
 export function CompanyFeatureGate({
@@ -107,7 +107,7 @@ function CompanyConnectedRoot({
   });
 }
 
-/** Authentication gate: B1's shared sign-in walk; members continue here. */
+/** Authentication gate: the shared sign-in walk; members continue here. */
 function CompanyAuthGate({
   title,
   member,

@@ -1,5 +1,5 @@
 /**
- * The C1 projects policy: the lane's registration over the platform
+ * The projects policy: the lane's registration over the platform
  * authorization seam.
  *
  * Every projects operation is ordinary collaborative boss work — any active
@@ -11,8 +11,8 @@
  * tenant scope must match the actor's resolved company.
  *
  * The company scope itself never comes from client input: the dispatch
- * resolves it from the B1 live-session identity through the canonical chain
- * (user -> earliest active membership -> company) the same way B3's
+ * resolves it from the live-session identity through the canonical chain
+ * (user -> earliest active membership -> company) the same way the
  * membership dispatch does. Cross-company references are then row-level
  * checks inside each transaction (indistinguishable from missing rows).
  */
@@ -25,7 +25,7 @@ import {
 /** Bundle-evolution marker for deployment env refreshes (content, not comment). */
 export const PROJECTS_LANE_POLICY_MARKER = "c1-env-refresh-2";
 
-/** C1's registered projects policy (the authoritative rule set for this lane). */
+/** the registered projects policy (the authoritative rule set for this lane). */
 export const projectsLanePolicy: AccessPolicy = {
   policyId: "projects.c1-projects-v1",
   authorize: async (context, request) => {

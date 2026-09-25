@@ -1,13 +1,13 @@
 /**
- * The multimodal decoded-call reducer (E4): validation and accumulation of
+ * The multimodal decoded-call reducer: validation and accumulation of
  * a JOINED agent plan — decoded, never executed.
  *
- * This composes E3's pure planning surface (scope equality, quote
+ * This composes the pure planning surface (scope equality, quote
  * location, server-side value anchoring, correction discipline) with the
  * joined evidence families of ./grounding: text quotes over the author
- * text, transcript quotes over D6's completed segments (original-time
+ * text, transcript quotes over the completed segments (original-time
  * interval anchors) and observation handles from COMPLETED vision
- * extractions (image-region anchors). The validation rules are E3's,
+ * extractions (image-region anchors). The validation rules are the text-analysis rules,
  * carried over modality by modality; what differs is the evidence
  * admission: a proposal may ground in ANY inspectable part, and the parts
  * the run did not inspect offer NOTHING to ground in (there are no
@@ -50,7 +50,7 @@ import {
 import type { JoinVisionObservation } from "./vision";
 import type { JoinedCoverageSnapshot } from "./coverage";
 
-/** The joined context: E3's analysis context plus the joined media parts. */
+/** The joined context: the analysis context plus the joined media parts. */
 export interface JoinAnalysisContext {
   readonly base: AnalysisContext;
   readonly coverage: JoinedCoverageSnapshot;
@@ -259,7 +259,7 @@ function applyUpsertJoin(
     );
   }
 
-  // Value construction (server-side anchoring, E3's rules; the tax-basis
+  // Value construction (server-side anchoring, the rules; the tax-basis
   // quote may now come from any evidence family).
   let valueWire: unknown;
   switch (args.value._tag) {
@@ -316,7 +316,7 @@ function applyUpsertJoin(
     }
   }
 
-  // Correction discipline (E3's rules, unchanged in the joined world).
+  // Correction discipline (the rules, unchanged in the joined world).
   const existing = findContextFinding(context.base, scope.scope, args.semanticKey);
   if (args.intent === "correct") {
     if (args.replacesFindingId === null) {
@@ -386,7 +386,7 @@ function applyUpsertJoin(
   };
 }
 
-/** Applies one decoded `projects_identify` call (E3's rules). */
+/** Applies one decoded `projects_identify` call (rules). */
 function applyIdentifyJoin(
   state: MultimodalPlanningState,
   context: AnalysisContext,

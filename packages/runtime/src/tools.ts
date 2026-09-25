@@ -7,8 +7,8 @@
  * that interface after `Schema.toStandardJSONSchemaV1` attaches the
  * `~standard.jsonSchema` converter (target draft-07).
  *
- * This module is the one wiring between the A2 contract schemas and that
- * converter. It makes no provider calls; E2 reuses it against OpenRouter.
+ * This module is the one wiring between the contract schemas and that
+ * converter. It makes no provider calls; Provider routing reuses it against OpenRouter.
  */
 
 import { Schema } from "effect";

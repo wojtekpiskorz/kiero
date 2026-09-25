@@ -1,8 +1,8 @@
 /**
- * prepareChangeSet (C2): stage the checked plan with captured expectations.
+ * prepareChangeSet: stage the checked plan with captured expectations.
  *
  * Runs inside ONE Convex mutation (through the checked dispatch, exactly
- * like D1's acceptance). Reference resolution happens in a SINGLE pass: the
+ * like acceptance). Reference resolution happens in a SINGLE pass: the
  * loop over the planned revisions both validates every reference and builds
  * the normalized staged row — the resolved finding documents are in hand
  * exactly once, so the captured expectations come from the same read that
@@ -152,7 +152,7 @@ export async function performPrepareChangeSet(
       derivesFrom.push(basisFinding._id);
     }
 
-    // C3 seam (additive, flagged): extension values validate against their
+    // Extension values validate against their
     // exact stored definition version at prepare too — the plan is refused
     // before staging when the value cannot be interpreted under its version.
     const encodedValue = encodeFindingValue(entry.value);

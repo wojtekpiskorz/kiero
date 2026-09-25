@@ -1,5 +1,5 @@
 /**
- * The media executor's segment protocol (D6): bounded, honest, closed — and
+ * The media executor's segment protocol: bounded, honest, closed — and
  * the ONE HTTP boundary implementation shared by the Cloudflare Worker entry
  * (./index.ts), the EU container's Node server (./container-main.ts) and the
  * container's Durable Object proxy, so the three surfaces cannot drift.
@@ -11,12 +11,12 @@
  *        -> {format: "wav", audioBase64, durationMs}
  * - `image`  {objectKey}            -> {format: "image", imageBase64, mimeType, bytes}
  *
- * Byte discipline (the review-round-1 structural fix): NOTHING reads whole
+ * Byte discipline: NOTHING reads whole
  * objects unbounded. `probe` parses headers from an 8 KiB window; `segment`
  * computes the frame-aligned byte window for the asked interval and issues
  * exactly ONE ranged read of that window — a 10-hour recording is segmented
  * with two bounded reads per segment, never a gigabyte in an isolate.
- * `image` (E4's vision byte channel, R22) reads ONE capped window: the
+ * `image` (the vision byte channel) reads ONE capped window: the
  * vision adapter takes inline png/jpeg/webp of retained-representation
  * size, anything beyond the cap answers `object_too_large` instead of
  * entering the isolate (see MAX_IMAGE_BYTES for the retained-original
@@ -30,7 +30,7 @@
  * with a closed code — no stack, no key material, no raw payloads.
  *
  * Non-WAV retained audio (the composer's webm/opus) is CONVERTED to PCM WAV
- * (R30, the voice byte channel) through an INJECTED converter
+ * (the voice byte channel) through an INJECTED converter
  * (`AudioConverter`): the FFmpeg-backed implementation (./convert.ts) runs
  * only on the container surface, where the image ships the binary — every
  * other surface keeps the honest `format_requires_container` refusal,
@@ -89,7 +89,7 @@ export type SegmentRequest =
   | { op: "segment"; objectKey: string; startMs: number; endMs: number }
   | { op: "image"; objectKey: string };
 
-/** The image mime types the vision adapter accepts (E2's inline set). */
+/** The image mime types the vision adapter accepts (the inline set). */
 export type ImageMime = "image/png" | "image/jpeg" | "image/webp";
 
 /** Every protocol response; refusals carry a closed code only. */
@@ -100,7 +100,7 @@ export type SegmentResponse =
   | { ok: false; code: SegmentRefusal };
 
 // The ONE spelling of the refusal union lives in the zero-import leaf
-// ./refusals.ts (R32: the Convex deploy typecheck reaches it through
+// ./refusals.ts (the Convex deploy typecheck reaches it through
 // convex/processing/audio/media.ts and cannot compile this file's
 // extension imports). Re-exported here for the worker surfaces.
 export type { SegmentRefusal } from "./refusals.ts";
@@ -111,7 +111,7 @@ export const HEAD_WINDOW_BYTES = 8_192;
 
 /**
  * The largest object the `image` op will read (inclusive window): the twin
- * of D5's `MAX_INPUT_BYTES` (convex/processing/images/protocol.ts — the
+ * of `MAX_INPUT_BYTES` (convex/processing/images/protocol.ts — the
  * container build boundary blocks importing it here, so the value is
  * documented, not shared). Normalized retained representations (≤4096px
  * edge, q85) land far below it. The retained-original exception row is
@@ -311,7 +311,7 @@ function protocolStatus(response: SegmentResponse): number {
 }
 
 /**
- * Surface-specific dependencies of the shared boundary (R30): the container
+ * Surface-specific dependencies of the shared boundary: the container
  * server injects the FFmpeg-backed converter (the image ships the binary)
  * and states what its /healthz should report about conversion; the Worker
  * entry injects nothing (its isolates cannot spawn, so non-WAV audio keeps

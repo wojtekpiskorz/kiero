@@ -1,5 +1,5 @@
 /**
- * The shared, JSX-free sign-in walk (B1 surface): card, session bootstrap
+ * The shared, JSX-free sign-in walk: card, session bootstrap
  * and the authenticated gate.
  *
  * Why this file exists: the host feature registry chain is compiled by the
@@ -10,11 +10,11 @@
  * that age separately. Host features render `AuthenticatedGate` with
  * their own continuation; the standalone root passes its session panel.
  *
- * Behavior is B1's, verbatim: email-code two-step (send code, then code +
+ * Behavior: email-code two-step (send code, then code +
  * the same email), Google only when the deployment reports it configured,
  * distinct copy for wrong/expired codes, rate limiting, delivery failures
  * and the method-conflict policy message; then registry provisioning with
- * B1's honest denial views — including the requiresSignIn distinction
+ * the honest denial views — including the requiresSignIn distinction
  * (only sessions that truly ended offer the sign-in-again path) — before
  * any authenticated continuation renders with the provisioned session id.
  */
@@ -179,10 +179,10 @@ export function SignInCard(): ReactNode {
 
 /**
  * The authentication gate: sign-in card for visitors; for the freshly
- * authenticated, registry provisioning (B1's `ensureSessionRegistry`,
+ * authenticated, registry provisioning (`ensureSessionRegistry`,
  * idempotent) with honest denial views, then the caller's authenticated
  * continuation. The continuation receives the provisioned session id —
- * B1's standalone root needs it for its device-session panel; host
+ * the standalone root needs it for its device-session panel; host
  * features may ignore it.
  */
 export function AuthenticatedGate({ continuation }: {
@@ -231,7 +231,7 @@ function SessionBootstrap({ continuation }: {
   }, [ensureSession]);
 
   if (denied !== null) {
-    // B1's distinction, verbatim: only denials whose only sensible next
+    // the distinction, verbatim: only denials whose only sensible next
     // step is signing in again offer the button; registry_missing shows
     // its notice (the bootstrap retries on the next mount) without a
     // sign-out.
@@ -251,7 +251,7 @@ function SessionBootstrap({ continuation }: {
 }
 
 /**
- * R18 armor: the continuation is invoked inside this DEDICATED leaf
+ * The continuation is invoked inside this DEDICATED leaf
  * fiber, never inside SessionBootstrap's own. A gate that passes a bare
  * component (the shape that caused React #310 nine times) then has its
  * hooks counted in a fiber that mounts fresh when the session resolves

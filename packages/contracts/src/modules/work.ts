@@ -1,6 +1,6 @@
 /**
  * Work module surface (architecture "Deep modules": Projects and work, the
- * work half). Implements lanes: C4, F4 (reminders read side).
+ * work half). Covers work and the reminders read side.
  *
  * Separate task and event semantics, independent parent/checklist completion,
  * executor/coordinator split, temporal findings bound by reference: a task
@@ -41,7 +41,7 @@ export const ChecklistItemState = Schema.Literals(["open", "checked"]);
 export type ChecklistItemState = Schema.Schema.Type<typeof ChecklistItemState>;
 
 /**
- * C4 amendment (flagged, additive; C2 precedent): the evidence basis of one
+ * The evidence basis of one
  * work change. Every change records actor and time from the resolved
  * context; when the agent (or a boss) acts FROM a source message, the
  * source is the basis ("Każda zmiana zachowuje autora, czas i podstawę").
@@ -64,7 +64,7 @@ export const workOperations = {
       /** Binding to the temporal finding that carries the deadline, if any. */
       deadlineFindingId: Schema.NullOr(tableIdSchema("findings")),
       /**
-       * C4 amendment (flagged, additive): the event this task is deliberately
+       * The event this task is deliberately
        * linked to ("Może mieć powiązane zadania"), e.g. the receiving task of
        * a delivery. The link is explicit; sharing the event's dated finding
        * remains a separate explicit binding (`deadlineFindingId`).
@@ -106,7 +106,7 @@ export const workOperations = {
     errorKinds: ["forbidden", "not_found", "validation", "conflict"],
   }),
   /**
-   * C4 amendment (flagged, additive): converts one checklist point into a
+   * Converts one checklist point into a
    * separate, linked task ("Jeśli punkt wymaga własnego odpowiedzialnego
    * lub terminu, można przekształcić go w osobne, powiązane zadanie"). The
    * point keeps its state and history and gains the link; the new task is
@@ -184,8 +184,8 @@ export const workEvents = {
     }),
   }),
   /**
-   * C4 amendment (flagged, additive): an event's title or time binding
-   * changed without a state change — the Calendar projection (G2) must
+   * An event's title or time binding
+   * changed without a state change — the Calendar projection must
    * learn about a re-bound time the same way it learns about a state move.
    */
   "work.eventChanged": eventEntry({

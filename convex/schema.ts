@@ -1,5 +1,5 @@
 /**
- * Convex schema composition entry (A2 candidate, amended by A3).
+ * Convex schema composition entry.
  *
  * This file composes the modular domain fragments and nothing else: table
  * definitions and indexes live in each domain's schema fragment, shared
@@ -13,7 +13,7 @@
  * directions. Drift of either side fails loudly here, long before
  * deployment.
  *
- * A3 certification amendment: `defineSchema` now receives the literal
+ * Platform certification amendment: `defineSchema` now receives the literal
  * spread (not the checked `Record`) so per-table INDEX types survive into
  * the generated data model: `withIndex("by_dedup", ...)` and friends
  * typecheck against real index names instead of only system indexes. The
@@ -33,33 +33,33 @@ import { extensionsTables } from "./memory/extensions/schema";
 import { workTables } from "./work/schema";
 import { acceptTables } from "./sources/accept/schema";
 import { uploadsTables } from "./sources/uploads/schema";
-// D6 amendment (flagged coordinated change): the audio STT fragment.
+// The audio STT fragment.
 import { audioTables } from "./processing/audio/schema";
-// E4 amendment (flagged coordinated change): the multimodal-join fragment.
+// The multimodal-join fragment.
 import { multimodalTables } from "./processing/multimodal/schema";
 import { platformTables } from "./platform/schema";
 import { searchTables } from "./search/schema";
 import { readStateTables } from "./attention/read-state/schema";
 import { preferencesTables } from "./attention/preferences/schema";
 import { deliveryTables } from "./attention/delivery/schema";
-// F3 append (flagged shared-file change, the sibling pattern): the web
+// The web
 // push transport fragment (per-device delivery rows).
 import { pushTables } from "./attention/push/schema";
-// F4 amendment (flagged shared-file change, the F1/F2 precedent): the
+// The
 // task-reminder schedule anchors and personal snoozes.
 import { remindersTables } from "./attention/reminders/schema";
 import { calendarConnectionTables } from "./calendar/connection/schema";
 import { calendarProjectionTables } from "./calendar/projection/schema";
-// G3 append (flagged shared-file change, the G1/G2 precedent): the sync
+// The sync
 // attempt ledger and the proof-only fake-event store.
 import { calendarSyncTables } from "./calendar/sync/schema";
 import { exportsTables } from "./operations/exports/schema";
 import { deletionTables } from "./operations/deletion/schema";
 import { backupsTables } from "./operations/backups/schema";
 import { telemetryTables } from "./operations/telemetry/schema";
-// R25 append (flagged coordinated change, the F3/G3 precedent): the answer
+// The answer
 // loop's durable record family — per-ask answerRuns and per-turn answerTurns
-// (the E6 named prerequisite, issue #230).
+// .
 import { answerTables } from "./agent/schema";
 
 const fragments: ReadonlyArray<Record<string, TableDefinition>> = [

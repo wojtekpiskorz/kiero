@@ -1,6 +1,6 @@
 /**
- * The manual-recovery core (B2): the checked command's implementation.
- * B4 supplies the only alpha invoker (GM authority); B2's guarded dev
+ * The manual-recovery core: the checked command's implementation.
+ * GM access supplies the only alpha invoker (GM authority); the guarded dev
  * action (./probe.ts) runs it for evidence.
  *
  * One transaction:

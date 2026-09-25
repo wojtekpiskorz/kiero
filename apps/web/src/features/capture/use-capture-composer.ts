@@ -1,8 +1,8 @@
 /**
- * The composer's wiring (D4): ONE hook that owns the draft store, the
+ * The composer's wiring: ONE hook that owns the draft store, the
  * recorder and the send engine, so the feature file only renders.
  *
- * Everything here is the review-round-1 state model, unchanged except
+ * Everything here is the state model, unchanged except
  * where noted:
  *
  * - the draft RECORD is the single source of truth for the project scope:
@@ -15,7 +15,7 @@
  * - every record mutation with an await inside (chunk appends, flag sets,
  *   photo writes, the debounced text flush) is serialized on ONE promise
  *   queue, so no mutation can overwrite the record with a stale snapshot
- *   (review round 2's lost-update class);
+ *   (lost-update class);
  * - the send reads the record and, on a confirmed receipt, clears
  *   honestly and starts the next scoped draft. The record mirrors NO
  *   upload session: recoverability is the stable draftId, which the
@@ -73,11 +73,11 @@ function freshDraftId(): string {
 }
 
 /**
- * The ONE fresh-draft seeding rule (review round 1): a new draft's scope
+ * The ONE fresh-draft seeding rule: a new draft's scope
  * comes from the conversation route's ?projekt= param: the plain company
  * view starts Auto (company-wide), a project view retains its project.
  * After this, the stored record is the single authority the pill renders
- * (the separate /wpis route retired with the J2 join).
+ * (the separate /wpis route retired with the join).
  */
 export function scopedFreshDraft(userId: string, nowMs: number): DraftRecord {
   return {
@@ -161,7 +161,7 @@ export function useCaptureComposer(userId: string): CaptureComposer {
     [],
   );
 
-  // ONE serialized queue over the record mutations (review round 2):
+  // ONE serialized queue over the record mutations:
   // appends, flag sets, stop/start persists, photo writes and the
   // debounced text flush all read the record when their turn comes, so
   // last-writer-wins can never overwrite a newer mutation with a stale
@@ -550,7 +550,7 @@ export function useCaptureComposer(userId: string): CaptureComposer {
       return;
     }
     const authorText = record.text.trim();
-    // The J2 material rule, client half: words of text OR at least one
+    // The material rule, client half: words of text OR at least one
     // retained medium (a recording with chunks or any photo). The server
     // re-decides against VERIFIED attachments; this gate only keeps the
     // button honest about what can possibly be accepted.
@@ -601,7 +601,7 @@ export function useCaptureComposer(userId: string): CaptureComposer {
             }
           },
           // No onSession: the record deliberately mirrors NO upload
-          // session (round 2). Recoverability is the stable draftId; the
+          // session. Recoverability is the stable draftId; the
           // resume path re-prepares with it and trusts the server's answer.
         },
       );
@@ -702,7 +702,7 @@ export function useCaptureComposer(userId: string): CaptureComposer {
   }
 
   // The honest submit state: words OR retained media, gateway ready, idle
-  // (the J2 material rule's client half; the server re-decides on verified
+  // (the material rule's client half; the server re-decides on verified
   // attachments).
   const sendEnabled =
     !sending &&

@@ -1,5 +1,5 @@
 /**
- * F1 notification-preference dev proofs (guarded by the deployment's
+ * Notification-preference dev proofs (guarded by the deployment's
  * KIERO_PROBE_ENABLED variable; shared plumbing in
  * convex/attention/probe_shared.ts).
  *

@@ -1,11 +1,11 @@
 /**
- * The agent's answer tool set (E6): typed evidence search, the structured
+ * The agent's answer tool set: typed evidence search, the structured
  * source-backed answer, clarification create/resolve, domain changes
  * (task/event) and extension-value validation — a small typed surface over
- * C2-C4's checked operations (issue #40).
+ * the memory and work lanes' checked operations.
  *
  * These Effect Schemas are the DECODE authority for tool arguments coming
- * back through E2's chat adapter: the adapter decodes accumulated argument
+ * back through the chat adapter: the adapter decodes accumulated argument
  * JSON against the schema the caller declares, so by the time a call
  * reaches the answer reducer its arguments are DECODED typed values, never
  * executed strings. Malformed arguments fail closed in the adapter
@@ -51,13 +51,13 @@ export const ASK_CLARIFICATION_TOOL = "agent_ask_clarification" as const;
 /** Tool name of resolving an open clarification with a new basis. */
 export const RESOLVE_CLARIFICATION_TOOL = "agent_resolve_clarification" as const;
 
-/** Tool name of the task domain change (C4 `work.changeTask`). */
+/** Tool name of the task domain change (`work.changeTask`). */
 export const CHANGE_TASK_TOOL = "agent_change_task" as const;
 
-/** Tool name of the event domain change (C4 `work.changeEvent`). */
+/** Tool name of the event domain change (`work.changeEvent`). */
 export const CHANGE_EVENT_TOOL = "agent_change_event" as const;
 
-/** Tool name of the extension-value validation (C3 validate-value). */
+/** Tool name of the extension-value validation (extensions validate-value). */
 export const VALIDATE_EXTENSION_TOOL = "agent_validate_extension_value" as const;
 
 /** Ledger handles: `ev` + positive counter. */
@@ -140,7 +140,7 @@ export type ResolveClarificationArgs = Schema.Schema.Type<
   typeof ResolveClarificationArgs
 >;
 
-/** The input schema of `agent_change_task` (C4 `work.changeTask`). */
+/** The input schema of `agent_change_task` (`work.changeTask`). */
 export const ChangeTaskArgs = Schema.Struct({
   /** Null creates; otherwise must address a live task of this company. */
   taskId: Schema.NullOr(Schema.NonEmptyString),
@@ -164,7 +164,7 @@ export const ChangeTaskArgs = Schema.Struct({
 });
 export type ChangeTaskArgs = Schema.Schema.Type<typeof ChangeTaskArgs>;
 
-/** The input schema of `agent_change_event` (C4 `work.changeEvent`). */
+/** The input schema of `agent_change_event` (`work.changeEvent`). */
 export const ChangeEventArgs = Schema.Struct({
   eventId: Schema.NullOr(Schema.NonEmptyString),
   projectId: Schema.NonEmptyString,
@@ -181,7 +181,7 @@ export const ChangeEventArgs = Schema.Struct({
 });
 export type ChangeEventArgs = Schema.Schema.Type<typeof ChangeEventArgs>;
 
-/** The input schema of `agent_validate_extension_value` (C3). */
+/** The input schema of `agent_validate_extension_value`. */
 export const ValidateExtensionValueArgs = Schema.Struct({
   /** The extension definition version the value claims to fit. */
   versionId: Schema.NonEmptyString,
@@ -191,7 +191,7 @@ export type ValidateExtensionValueArgs = Schema.Schema.Type<
   typeof ValidateExtensionValueArgs
 >;
 
-/** One declared tool for E2's `ChatToolSpec` (name + description + codec). */
+/** One declared tool for `ChatToolSpec` (name + description + codec). */
 export interface AnswerToolSpec {
   readonly name:
     | typeof SEARCH_EVIDENCE_TOOL

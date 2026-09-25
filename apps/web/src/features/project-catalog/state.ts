@@ -1,7 +1,7 @@
 /**
  * Project catalog feature state: Polish copy, the stage/role vocabularies
  * rendered for product text, and the closed-error classification for the
- * C1 surface.
+ * projects surface.
  *
  * The stage, contact-kind and contact-role labels come from the pure domain
  * rules (`packages/domain/projects`) through one relative import: the Polish

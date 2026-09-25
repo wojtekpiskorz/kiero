@@ -13,7 +13,7 @@
  *   net and gross may coexist as separate findings, and changing the basis
  *   creates a revision rather than rewriting history.
  *
- * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
+ * Certified by platform on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema, BigDecimal } from "effect";
@@ -65,7 +65,7 @@ export type MoneyCertainty = Schema.Schema.Type<typeof MoneyCertainty>;
 
 /**
  * Business role of the amount. Closed vocabulary from the accepted memory
- * contract (issue 8): price proposal, agreed price, material cost, deposit
+ * contract: price proposal, agreed price, material cost, deposit
  * received, estimated labor. Extending it is a coordinated contract change.
  */
 export const MoneyRole = Schema.Literals([

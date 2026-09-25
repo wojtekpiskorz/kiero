@@ -1,17 +1,17 @@
 /**
- * Guarded G2 proof fixtures (dev deployment only).
+ * Guarded Calendar projection proof fixtures (dev deployment only).
  *
- * Same pattern as the A3/B1/C4 probes: an ACTION checks the deployment
+ * Same pattern as the probes: an ACTION checks the deployment
  * guard variable (`KIERO_G2_PROOF_ENABLED === "1"`) and runs internal
  * functions reachable only from this module. On any other deployment the
  * variable is absent and every entry fails closed.
  *
  * Why these exist (honest scope): the owner has not supplied Google OAuth
- * client credentials (the same owner action B1/G1 recorded), so no proof
+ * client credentials (a recorded owner action), so no proof
  * can walk the real accounts.google.com consent. The live evidence runs
- * the REAL projection pipeline — G1's fake-Google connection flow (its
- * guarded proof endpoints), C2's real memory dispatch for the dated
- * findings, C4's real work dispatch for the tasks/events, and G2's own
+ * the REAL projection pipeline — the fake-Google connection flow (its
+ * guarded proof endpoints), the real memory dispatch for the dated
+ * findings, the real work dispatch for the tasks/events, and its own
  * real pass action — and these fixtures only READ state and invoke the
  * pass explicitly. The live Google legs stay BLOCKED-owner-action.
  *
@@ -99,7 +99,7 @@ export const projectionStateInternal = internalQuery({
 
 /**
  * The company's `calendar.copyProjected` outbox rows (internal read): the
- * exact canonical events G3 consumes, so the live evidence can pin the
+ * exact canonical events reconciliation consumes, so the live evidence can pin the
  * DERIVATION BASIS each publish carried (create vs update paths).
  */
 async function copyProjectedEvents(db: QueryCtx["db"], companyId: Id<"companies">) {
@@ -149,7 +149,7 @@ export const g2ProofProjectionState = action({
 /**
  * The guarded entry that runs the REAL projection pass action for one
  * connection (or every connection): the per-pass credential recheck and
- * the atomic desired-state transaction, exactly as G3 will trigger them.
+ * the atomic desired-state transaction, exactly as reconciliation triggers them.
  */
 export const g2ProofRunPass = action({
   args: { connectionId: v.optional(v.id("calendarConnections")) },

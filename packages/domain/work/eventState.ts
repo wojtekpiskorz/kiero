@@ -1,5 +1,5 @@
 /**
- * Event state rules (C4 domain half, pure).
+ * Event state rules (domain half, pure).
  *
  * Vocabulary ("Zdarzenie", "Stan zdarzenia", CONTEXT.md): a delivery,
  * meeting or other element of the work's course, for which known dates and
@@ -8,7 +8,7 @@
  * Anulowane, and "Upływ planowanej daty nie potwierdza, że zdarzenie
  * nastąpiło".
  *
- * Rules encoded here (issue 9, "Zadanie i zdarzenie"):
+ * Rules encoded here ("Zadanie i zdarzenie"):
  *
  * - An event is NOT a task: no executor, no coordinator, no checklist, no
  *   overdue obligation. A date in a statement creates an event; only an

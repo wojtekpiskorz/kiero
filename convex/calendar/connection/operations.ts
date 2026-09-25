@@ -1,20 +1,20 @@
 /**
- * Calendar connection transactions (G1): the write halves of the cores,
+ * Calendar connection transactions: the write halves of the cores,
  * each inside ONE Convex mutation.
  *
  * Every step that can throw (row lookups, decodes, hashing, sealing) runs
- * BEFORE the first insert/patch (the B3 atomicity contract). The external
+ * BEFORE the first insert/patch (the atomicity contract). The external
  * legs NEVER run inside a transaction: mutations cannot fetch, and the
  * callback protocol is deliberately split into
  * `prepareCallbackTransaction` (consume the single-use state, re-check
  * membership) -> the httpAction's bounded external calls -> one terminal
- * `completeCallbackTransaction`, mirroring the A3 echo template
+ * `completeCallbackTransaction`, mirroring the echo template
  * (intent commits first, the effect leaves the transaction, the outcome is
  * recorded exactly once).
  *
  * Environment names consumed here (values are owner-supplied, never
  * committed): AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET (the owner's Google
- * Cloud OAuth client, shared with B1's sign-in), KIERO_CALENDAR_TOKEN_KEY
+ * Cloud OAuth client, shared with the sign-in), KIERO_CALENDAR_TOKEN_KEY
  * (credential sealing), KIERO_CALENDAR_REDIRECT_URI (explicit redirect
  * override), and the proof-only names guarded by KIERO_G1_PROOF_ENABLED
  * (see ./proof.ts).
@@ -242,7 +242,7 @@ export async function performStartAuthorization(
     // belongs to (the canonical chain resolved their CURRENT firm; the
     // status read reports the row as the membership-lost stop): the
     // restart re-scopes the row instead of refusing — otherwise a
-    // re-joined boss could never reconnect (round-2 major 1).
+    // re-joined boss could never reconnect.
     decision = { kind: "start" };
   }
   if (decision.kind === "refuse") {
@@ -276,7 +276,7 @@ export async function performStartAuthorization(
       // re-check would hold the stale firm against them forever. A
       // re-scope also drops the old firm's calendar/account/credential
       // knowledge: the new firm's first confirmed connection creates a
-      // dedicated calendar named for IT (issue #45), and no cross-firm
+      // dedicated calendar named for IT, and no cross-firm
       // binding can survive a failed flow (the switch-restore path needs
       // a known calendar id, which a re-scope clears).
       ...(existing.companyId !== args.companyId
@@ -421,7 +421,7 @@ export const prepareCallbackTransaction = internalMutation({
       // Membership loss is a STOP, not a flow failure: unlike an expired
       // flow, it never restores the previous binding — the user's company
       // scope is gone, so the connection (and its credentials) must not
-      // survive it (issue #45: membership loss follows the stop/cleanup
+      // survive it (membership loss follows the stop/cleanup
       // path).
       await ctx.db.patch(row._id, {
         oauthStateHash: undefined,
@@ -668,10 +668,10 @@ export async function performDisconnect(
  * `membership_lost`, credentials cleared, unconfirmed cleanup recorded).
  * Called by the refresh capability's re-check (./functions.ts) whenever it
  * finds a connected row whose firm is no longer the user's active firm.
- * The DURABLE fan-out — B3's membership-revocation event stopping the
+ * The DURABLE fan-out — the membership-revocation event stopping the
  * calendar connection without waiting for a refresh — is a named
- * prerequisite on the access lane (see the G1 report); G1 does not edit
- * B3's files.
+ * prerequisite on the access lane; this lane does not edit
+ * files.
  */
 export const disconnectForMembershipTransaction = internalMutation({
   args: { userId: v.id("users") },
@@ -688,7 +688,7 @@ export const disconnectForMembershipTransaction = internalMutation({
  * (tests, the barebones UI, future integrators); the OAuth callback runs
  * the same connected transition with credentials through
  * completeCallbackTransaction. A connection completed here records
- * credentialStorage "none": without a credential capability G2 projection
+ * credentialStorage "none": without a credential capability projection
  * stays idle — an honest state, never a fake one.
  */
 export async function performConnectCalendar(

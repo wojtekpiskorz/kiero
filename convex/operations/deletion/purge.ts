@@ -1,6 +1,6 @@
 /**
- * The permanent-deletion initiating transaction (I4): `sources.purgeSource`,
- * the certified contract entry issue #56 owns.
+ * The permanent-deletion initiating transaction: `sources.purgeSource`,
+ * the certified contract entry.
  *
  * ONE Convex mutation does everything ("first tombstones the logical source
  * and revokes all application reads atomically, then enumerates ... durable
@@ -23,11 +23,11 @@
  *   derivative family, each carrying the 24-hour deadline;
  * - EVENT + JOB: the canonical `sources.sourcePurged` event and the durable
  *   `deletion.purge_source` registration commit under the SAME dedup key
- *   (the D1/withdrawal discipline), so the reaction can never be lost and a
+ *   (the acceptance/withdrawal discipline), so the reaction can never be lost and a
  *   replay never double-registers. `operations.deletionRecorded` publishes
- *   the ledger entry for I5's backup sets and I6's restore replay;
+ *   the ledger entry for the backup sets and the restore replay;
  * - EAGER EXPORT INVALIDATION: every pre-terminal export linked to the
- *   source runs through I3's one-row invalidation core in this same
+ *   source runs through the one-row invalidation core in this same
  *   transaction (the per-request download check remains the immediate
  *   guard either way).
  *
@@ -76,7 +76,7 @@ export const PURGED_SUPPORT_REASON = "source_purged: trwałe usunięcie wiadomo�
 
 /**
  * A representative table id used only by the pre-insert decode templates
- * (the D1 pattern): proves the event payloads and the executor input still
+ * proves the event payloads and the executor input still
  * accept the exact shapes this transaction constructs, BEFORE anything is
  * written.
  */
@@ -84,7 +84,7 @@ const REGISTRATION_TEMPLATE_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f";
 
 /**
  * Everything that can throw or refuse during registration, resolved BEFORE
- * the first write (the D1 acceptance discipline): a failure here leaves
+ * the first write (the acceptance discipline): a failure here leaves
  * nothing committed, while the same failure after the patch would commit a
  * purged source with no purge reaction.
  */
@@ -260,7 +260,7 @@ export async function performPurgeSource(
     payload: { deletionRecordId },
     dedupKey: `operations.deletionRecorded:${deletionRecordId}`,
   });
-  // The eager I3 seam: every pre-terminal linked export invalidates NOW,
+  // The eager export seam: every pre-terminal linked export invalidates NOW,
   // in the same transaction (the per-request download check stays the
   // immediate guard even before any drain runs).
   await invalidateExportsForSourceCore(tx, source._id, "source_purged", nowMs);

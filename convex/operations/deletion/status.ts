@@ -1,5 +1,5 @@
 /**
- * The administrator's deletion reads (I4): the impact preview before the
+ * The administrator's deletion reads: the impact preview before the
  * explicit confirmation, and the pending/complete/failed cleanup status
  * after it. Both are read-only, content-free projections (counts, opaque
  * identities and machine states only): the impact preview never shows the

@@ -1,15 +1,15 @@
 /**
- * Projects transactions (C1): the write halves of the pure domain rules in
+ * Projects transactions: the write halves of the pure domain rules in
  * `packages/domain/projects`, each inside ONE Convex mutation.
  *
  * Every entry runs through the typed command dispatch (./dispatch.ts):
- * envelope decode -> registry -> B1 identity resolution (provision-or-refresh
- * + the canonical chain) -> the C1 policy -> contract input decode ->
+ * envelope decode -> registry -> identity resolution (provision-or-refresh
+ * + the canonical chain) -> the policy -> contract input decode ->
  * handler. The company scope always comes from the RESOLVED context; a
  * cross-company project/contact reference is indistinguishable from a
  * missing one (`not_found`, no existence leak).
  *
- * ATOMICITY (the B3/D1 discipline): every step that can throw (validations,
+ * ATOMICITY (the discipline): every step that can throw (validations,
  * row loads, domain decisions) runs BEFORE the first insert/patch; between
  * the first write and the return only pre-validated writes and total decodes
  * of transaction-generated values remain. State changes publish their

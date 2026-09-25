@@ -1,10 +1,9 @@
 /**
- * The barebones firm-export feature (I3): the Polish status/download screen
- * issue #55 registers through A4 ("Register a simple Polish status/download
- * screen through A4; defer shared full composition to J").
+ * The barebones firm-export feature: the Polish status/download screen
+ * registered through the app host.
  *
  * JSX-free on purpose (createElement only): the host feature registry chain
- * is imported by node test programs (the A4/B3/F3 pattern). Every durable
+ * is imported by node test programs. Every durable
  * change goes through the checked dispatch (`operations.requestExport`,
  * admin-only server-side); the status comes from the authenticated
  * `exportsStatus` query; the download button fetches the gateway route with

@@ -1,5 +1,5 @@
 /**
- * The emit boundary (I2): the ONE write path into `diagnosticEvents`.
+ * The emit boundary: the ONE write path into `diagnosticEvents`.
  *
  * Every producer - Convex lanes (in-transaction), the HTTP ingest endpoint,
  * the incident scan, the cost evaluator, the gateway - goes through
@@ -15,7 +15,7 @@
  * telemetry, not canonical domain history (architecture: "Treat telemetry
  * delivery as best effort and canonical audit/domain records as authority").
  * The registered `operations.diagnosticEmitted` domain event stays available
- * for the checked GM dispatch path (H4/B4 wiring).
+ * for the checked GM dispatch path (processing inspection and GM wiring).
  */
 
 import type { MutationCtx } from "../../_generated/server";

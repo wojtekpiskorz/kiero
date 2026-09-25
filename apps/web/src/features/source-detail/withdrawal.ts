@@ -1,11 +1,11 @@
 /**
- * The withdrawal block of the source dossier (C5's audited surface): the
+ * The withdrawal block of the source dossier (the audited surface): the
  * honest record of a completed withdrawal (WithdrawnRecord) and the
  * WithdrawControl that performs it. Split from SourceDetailFeature.ts in
- * E7 review round 1 to keep that file under the size budget (the media.ts
+ * to keep that file under the size budget (like media.ts
  * and reassign.ts precedents).
  *
- * The control dispatches C5's audited `sources.withdrawSource` through the
+ * The control dispatches the audited `sources.withdrawSource` through the
  * accept lane's public command: the ONE operation-agnostic sources
  * dispatch table every sources write on this surface rides (the envelope
  * carries the operation), with the explicit disclosure that withdrawal is
@@ -42,7 +42,7 @@ export function WithdrawnRecord({
   );
 }
 
-/** The audited withdrawal control of one active source (C5). */
+/** The audited withdrawal control of one active source. */
 export function WithdrawControl({ sourceId }: { readonly sourceId: string }): ReactNode {
   const withdraw = useMutation(api.sources.accept.commands.acceptSourceCommand);
   const [reason, setReason] = useState("");

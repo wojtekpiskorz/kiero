@@ -1,16 +1,16 @@
 /**
- * Sources command dispatch wiring (D1): the SAME checked path A3 proved,
+ * Sources command dispatch wiring: the SAME checked path the platform proved,
  * with the sources lane's own handler registry.
  *
  * `dispatchSourcesCommand` is @kiero/runtime's `dispatchCommand` over the
  * canonical context resolution (verified identity -> session -> user -> one
  * active membership -> company) and the platform authorization seam
- * (`membershipPolicy` until B1/B3 register the authoritative rules). Two
+ * (`membershipPolicy` until identity and membership register the authoritative rules). Two
  * identity sources exist and only two, both verified server-side:
  *
  * - Convex Auth (`ctx.auth`) — the user path; the public mutation uses it
- *   and honestly fails `unauthenticated` until B1 ships the sign-in product.
- * - the service bridge — a verified service session id (the A3-proved
+ *   and honestly fails `unauthenticated` without a signed-in session.
+ * - the service bridge — a verified service session id (the platform-proved
  *   Worker identity), used by the internal transactional entry and the
  *   guarded dev-proof actions. There is no development-auth shortcut.
  *
@@ -46,7 +46,7 @@ import {
   performReassignment,
   reassignSourceEntry,
 } from "../reassign/reassignment";
-// I4 registration (flagged, the C5/E7 precedent): the permanent-deletion
+// The permanent-deletion
 // operation `sources.purgeSource` implements its declared contract entry
 // from the deletion lane's own module (../../operations/deletion/purge.ts):
 // the tombstone, the content-free ledger, the purge stages, the canonical
@@ -62,14 +62,14 @@ import {
 /**
  * Handler table for sources mutation-transaction dispatches (exported for tests).
  *
- * C5 registration (additive, flagged on the C3 merged-table precedent): the
+ * The
  * withdrawal operation `sources.withdrawSource` implements the declared
  * sources contract entry from the recomputation lane's own module — the
  * lifecycle transition, the canonical event and the durable recompute
  * registration commit atomically there; this table only wires the checked
  * path to it.
  *
- * E7 registration (additive, flagged, same precedent): the project
+ * The project
  * reassignment `sources.reassignSource` implements its declared entry from
  * the reassignment lane's own module (../reassign/reassignment): the link
  * set change, its canonical event and the durable scope re-assessment
@@ -98,7 +98,7 @@ export function sourcesHandlers(): HandlerRegistry<MutationCtx> {
         return performReassignment(tx, context, decoded, meta.idempotencyKey);
       },
     },
-    // I4 registration (flagged, the C5 precedent): permanent deletion is an
+    // Permanent deletion is an
     // administer-intent operation - the membership policy decides from the
     // CURRENT resolved role on every request.
     "sources.purgeSource": {
@@ -117,9 +117,8 @@ export function sourcesHandlers(): HandlerRegistry<MutationCtx> {
  * verified before this point); without it, Convex Auth is the only identity
  * source. Unimplemented sources operations fail closed `unsupported`.
  *
- * J1 prerequisite repair (same defect C4 flagged on C2's public entries):
- * the user path resolves through B1's live-session chain
- * (`resolveAccessContextWithProvisioning` — the B3 projects-dispatch
+ * The user path resolves through the live-session chain
+ * (`resolveAccessContextWithProvisioning` — the projects-dispatch
  * pattern), because the platform-generic `identityFromConvexAuth` subject
  * (`<userId>|<authSessions id>`) is not a sessions-registry id and
  * ordinary user tokens failed `no_verified_identity` on this public

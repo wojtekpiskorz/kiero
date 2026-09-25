@@ -1,5 +1,5 @@
 /**
- * The B4 Convex function surface (generated-call APIs).
+ * The GM access Convex function surface (generated-call APIs).
  *
  * Entry ways, one core each (no drift by construction):
  *
@@ -16,7 +16,7 @@
  *   alpha-ending) — every one re-resolves current GM authority inside the
  *   transaction.
  * - `gmOnboardCommand` (public ACTION): the issuance leg whose email
- *   delivery must run outside the transaction (B3's pattern verbatim).
+ *   delivery must run outside the transaction (the pattern verbatim).
  * - `gmOverview` (public query): the barebones UI read — the actor's OWN
  *   mode state plus the directory of firms under open alpha activation.
  *   Company internals leave the database only through the audited

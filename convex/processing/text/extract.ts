@@ -1,8 +1,8 @@
 /**
- * The `processing.extract_fragments` executor (E3): the durable reaction to
+ * The `processing.extract_fragments` executor: the durable reaction to
  * `sources.sourceAccepted` (the registered consumer edge this lane owns).
  *
- * D1's acceptance registers this job atomically with `{sourceId,
+ * the acceptance registers this job atomically with `{sourceId,
  * extractionId}` and seeds the text extraction row plus the initial
  * analysis run: the author's words are their own extraction (provider
  * `kiero`, model `author-text`), so text extraction is deterministic — no
@@ -11,7 +11,7 @@
  * - validate the source (an active source supports extraction; a withdrawn
  *   one fails honestly) and resolve the text extraction through the run
  *   journal (the drain projection may hand `extractionId: null`; exactly
- *   one text extraction exists per D1 source, resolved in-company);
+ *   one text extraction exists per text source, resolved in-company);
  * - record the extract step idempotently and ensure the whole-source
  *   fragment exists (the honest fallback basis per CONTEXT.md: "Gdy nie da
  *   się wiarygodnie wskazać fragmentu, podstawą pozostaje cały materiał");
@@ -69,7 +69,7 @@ export const extractFragmentsExecutor: JobExecutor = {
     if (extractionId === null) {
       return { outcome: "failed", errorKind: "text_extraction_missing", retryable: false };
     }
-    // The processing run D1 seeded with the acceptance (this job's run).
+    // The processing run acceptance seeded with the acceptance (this job's run).
     if (job.processingRunId === undefined) {
       return { outcome: "failed", errorKind: "processing_run_missing", retryable: false };
     }

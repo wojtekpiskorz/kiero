@@ -1,5 +1,5 @@
 /**
- * R2 object helpers for the images lane (D5): the ONLY place this lane
+ * R2 object helpers for the images lane: the ONLY place this lane
  * reads received bytes, writes retained/thumbnail objects and deletes
  * verified-away received originals in the private EU media bucket.
  *

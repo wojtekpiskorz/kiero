@@ -1,9 +1,9 @@
 /**
- * Extension definition command handlers (C3): the four operations this lane
+ * Extension definition command handlers: the four operations this lane
  * registers in the SAME checked dispatch the findings lane uses.
  *
  * The handlers receive the dispatch's DECODED input and forward it (the
- * C2/B3 handler pattern — see the double-decode caveat in
+ * findings/membership handler pattern — see the double-decode caveat in
  * memory/findings/dispatch.ts); each single type assertion is backed by the
  * runtime's guarantee that the value was decoded through THIS entry's input
  * schema. The findings dispatch merges this registry into its own; nothing

@@ -1,5 +1,5 @@
 /**
- * Gateway images routes (D5): the executor surface the Convex durable job
+ * Gateway images routes: the executor surface the Convex durable job
  * calls.
  *
  * - `POST /images/normalize` — drives ONE `processing.normalize_photo` job

@@ -1,5 +1,5 @@
 /**
- * Per-person source read-state pure decisions (F1).
+ * Per-person source read-state pure decisions.
  *
  * "Nieprzeczytany wpis" (CONTEXT.md): an entry the user has not yet seen
  * nor explicitly marked read. Seeing the ORIGINAL message changes its state
@@ -13,7 +13,7 @@
  *
  * - a transition decision that makes repeated marks idempotent (same state
  *   => no write, no event), and
- * - an unread projection over D1 `SourceConversationRow.sourceId`s (the
+ * - an unread projection over `SourceConversationRow.sourceId`s (the
  * same canonical source identity every view row carries).
  */
 
@@ -83,7 +83,7 @@ export function projectReadState(
   return entries;
 }
 
-/** The unread count of a projection (for badge-style consumers: H1). */
+/** The unread count of a projection (for badge-style consumers). */
 export function countUnread(entries: readonly ReadStateEntry[]): number {
   return entries.filter((entry) => !entry.read).length;
 }

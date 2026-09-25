@@ -1,5 +1,5 @@
 /**
- * The findings lane's typed authority surface (C2): the contract entries it
+ * The findings lane's typed authority surface: the contract entries it
  * implements, the input types their handlers consume, the one proved
  * encode/decode set for the semantic values crossing this lane's persisted
  * rows, and the pre-insert template id every writing core shares.
@@ -23,7 +23,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export const readCurrentFindingsEntry = memoryOperations["memory.readCurrentFindings"];
-// H1 amendment (additive, flagged): the boss-facing exposition reads.
+// The boss-facing exposition reads.
 export const readFindingHistoryEntry = memoryOperations["memory.readFindingHistory"];
 export const readClarificationsEntry = memoryOperations["memory.readClarifications"];
 export const prepareChangeSetEntry = memoryOperations["memory.prepareChangeSet"];
@@ -63,7 +63,7 @@ export const decodeTemporalValue = Schema.decodeUnknownSync(TemporalValue);
 /**
  * The `_tag` of an encoded knowledge state, or null for anything that is
  * not one — the only field the marking and recomputation decisions read.
- * C5 addition (flagged): one extractor for the executor and the probes;
+ * One extractor for the executor and the probes;
  * rows keep the full encoded state.
  */
 export function knowledgeTagOf(encoded: unknown): string | null {
@@ -76,7 +76,7 @@ export function knowledgeTagOf(encoded: unknown): string | null {
 
 /**
  * A representative table id used only by the pre-insert decode templates
- * (D1's pattern): proves the result/event schemas still accept the exact
+ * proves the result/event schemas still accept the exact
  * shapes this transaction constructs, BEFORE anything is written.
  */
 export const TEMPLATE_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f";

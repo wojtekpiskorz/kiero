@@ -1,5 +1,5 @@
 /**
- * Capture feature state (D4): the Polish copy of the mobile composer and
+ * Capture feature state: the Polish copy of the mobile composer and
  * the closed-vocabularies it renders.
  *
  * Product text uses the accepted glossary exactly (CONTEXT.md): the
@@ -115,7 +115,7 @@ export function recorderFailureCopy(failure: RecorderFailure): string {
 /**
  * Extra Polish context for the machine codes this surface can meet (the
  * session hints compose from the conversation surface; gateway codes from
- * the D2 protocol keep their exact server meanings).
+ * the protocol keep their exact server meanings).
  */
 const captureFailureHints: Partial<Record<string, string>> = {
   ...sessionFailureHints,

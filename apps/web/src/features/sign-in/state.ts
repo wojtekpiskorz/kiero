@@ -29,7 +29,7 @@ export type SignInState =
 
 /**
  * Machine markers OUR server-side errors keep in their message for logs.
- * Classification no longer keys on them (R26: the closed code rides the
+ * Classification no longer keys on them (the closed code rides the
  * ConvexError data); they stay matched only as the no-data fallback. The
  * server literals are pinned equal to these by tests/b1.
  */

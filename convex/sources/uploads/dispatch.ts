@@ -1,7 +1,7 @@
 /**
- * Sources uploads dispatch wiring (D2): the SAME checked path A3/D1 proved,
+ * Sources uploads dispatch wiring: the SAME checked path the platform proved,
  * with ONE identity source — the END USER's verified Convex Auth session
- * (B1's live-session resolution feeding A3's canonical chain).
+ * (the live-session resolution feeding the canonical chain).
  *
  * 1. The certified client operations (`sources.prepareUpload`,
  *    `sources.resumeUpload`) dispatch through @kiero/runtime's
@@ -139,13 +139,13 @@ export function uploadsHandlers(): HandlerRegistry<MutationCtx> {
   };
 }
 
-/** The ONE identity source: the caller's verified live session (B1 -> A3). */
+/** The ONE identity source: the caller's verified live session (identity -> platform). */
 const resolveContext = (tx: MutationCtx): Promise<RequestContext | null> =>
   resolveAccessContextWithProvisioning(tx.db, tx.auth, Date.now(), DEFAULT_DEVICE_LABEL);
 
 /**
  * Dispatches one certified sources uploads command envelope inside a
- * mutation transaction, as the authenticated user (B1 identity source).
+ * mutation transaction, as the authenticated user (identity source).
  */
 export async function dispatchUploadsCommand(
   ctx: MutationCtx,

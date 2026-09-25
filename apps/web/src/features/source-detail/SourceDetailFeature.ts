@@ -1,38 +1,38 @@
 /**
- * The source-detail feature (H3): "Źródło" — the full history surface of
+ * The source-detail feature: "Źródło" — the full history surface of
  * ONE immutable "Wiadomość źródłowa".
  *
  * JSX-free on purpose (createElement only), like the conversation and
  * memory surfaces: the host feature registry chain stays importable by the
  * node test programs.
  *
- * - the dossier: `sources.read.views.sourceExposition` (the H3-flagged
+ * - the dossier: `sources.read.views.sourceExposition` (the
  *   read) — immutable authored content, lifecycle WITH the withdrawal
  *   record (actor, time, reason), processing state, project links, every
  *   attachment with all retained/received representations, transcript
  *   segments with original-time anchors, OCR observations with pixel
  *   anchors, and every fragment anchor;
  * - the evidence chain: `sources.read.views.sourceEvidence` (the
- *   H3-flagged paginated read) — every witness link joined to the finding's
- *   CURRENT projection, so corrections and C5's recomputation markings are
+ *   paginated read) — every witness link joined to the finding's
+ *   CURRENT projection, so corrections and the recomputation markings are
  *   visible per finding ("Pokaż więcej" pages it; never one growing read);
- * - the withdrawal control: C5's audited `sources.withdrawSource` through
+ * - the withdrawal control: the audited `sources.withdrawSource` through
  *   the same sources dispatch the send path uses — with the explicit
  *   disclosure that withdrawal is NOT permanent deletion (CONTEXT.md
  *   "Źródło wycofane" keeps content and history);
- * - the reassignment control (E7's mount, issue #115): the certified
+ * - the reassignment control (the mount): the certified
  *   `sources.reassignSource` over the same dispatch: the boss moves the
  *   message between projects or to company-general knowledge by declaring
  *   the complete new set; the links table stays the single source of truth
- *   and dependent findings re-assess through C5's recomputation;
+ *   and dependent findings re-assess through the recomputation;
  * - media anchors: audio playback and image display load EXCLUSIVELY
- *   through D3's authorized channel (fresh authenticated request per
+ *   through the authorized channel (fresh authenticated request per
  *   load; image highlights render over the EXACT representation whose
  *   pixel space the anchor's coordinates are in);
  * - read state: opening the original marks it read for this person in
- *   every view (F1's idempotent command, like the conversation surface).
+ *   every view (the idempotent command, like the conversation surface).
  *
- * All routes enforce B3 access through the backend operations themselves;
+ * All routes enforce membership access through the backend operations themselves;
  * this surface never reads around them.
  */
 
@@ -116,7 +116,7 @@ function SourceDetailMain({
   readonly overview: MemberOverview;
 }): ReactNode {
   const projects = useQueryState({ query: api.projects.functions.projectsOverview, args: {} });
-  // The canonical deep link (R5): the dossier route with its encoded
+  // The canonical deep link: the dossier route with its encoded
   // `zrodlo` param, inspected through the one source-route contract — this
   // surface IS the full-history expansion of that link, fetched by id and
   // independent of every feed's pagination. The inspection union is kept
@@ -210,7 +210,7 @@ function SourceDetailBody({
       ? Schema.decodeUnknownSync(SourceEvidencePage)(evidence.data.value)
       : null;
 
-  // One read marking per view-open of the original (F1, idempotent server
+  // One read marking per view-open of the original (idempotent server
   // side): seeing the original changes this person's state everywhere.
   const markedFor = useRef<string | null>(null);
   useEffect(() => {
@@ -234,7 +234,7 @@ function SourceDetailBody({
   // above every early return: the exposition and evidence queries settle
   // at different instants, so a hook below a pending-state return would
   // change the hook count across the loading -> success transition and
-  // crash the route (Rules of Hooks; caught live on /zrodlo by R5's
+  // crash the route (Rules of Hooks; caught live on /zrodlo by the
   // browser leg).
   useEffect(() => {
     if (evidencePage === null) {
@@ -271,13 +271,13 @@ function SourceDetailBody({
   }
   const row = Schema.decodeUnknownSync(SourceExpositionRow)(exposition.data.value);
 
-  // The canonical link this surface displays and copies (R5): the same
+  // The canonical link this surface displays and copies: the same
   // serializer every consumer uses, whole-source (no fragment pin).
   const canonicalUrl =
     typeof window === "undefined"
       ? null
       : `${window.location.origin}${serializeSourceReference({ sourceId, fragmentId: null, projectId: null })}`;
-  // The project context the conversation link scopes to (R5): the deep
+  // The project context the conversation link scopes to: the deep
   // link's navigation param when the boss arrived with one, else the
   // row's first project, else the company-wide conversation.
   const conversationProjectId = navigationProjectId ?? row.projectIds[0] ?? null;
@@ -334,7 +334,7 @@ function SourceDetailBody({
         createElement(
           "a",
           {
-            // Navigation into the conversation scope only (R5): the
+            // Navigation into the conversation scope only: the
             // legacy ?zrodlo= deep link now redirects back to this
             // dossier, so the project context — the link's param or the
             // row's first project — is what scopes the conversation view.
@@ -620,7 +620,7 @@ function ImageAttachmentView({
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "denied" | "unavailable">("idle");
   // The EXACT retained representation the OCR anchors are coordinates in
-  // (D3's exact-version read); fall back to the attachment read when no
+  // (the exact-version read); fall back to the attachment read when no
   // completed order pins one.
   // Per-attachment correlation: an order reads ONE attachment; without the
   // filter, every image view would load the first order's representation
@@ -683,7 +683,7 @@ function ImageAttachmentView({
     state === "denied" ? createElement("p", { role: "alert" }, copy.mediaDenied) : null,
     state === "unavailable" ? createElement("p", { role: "alert" }, copy.mediaUnavailable) : null,
     attachment === undefined ? null : createElement(RepresentationList, { representations: attachment.representations }),
-    // R23: the photo renders on authorized bytes alone; the OCR highlight
+    // The photo renders on authorized bytes alone; the OCR highlight
     // boxes attach only under the completed order that pins this
     // representation's pixel space (a pending/failed order hides nothing).
     presentation.state === "none"

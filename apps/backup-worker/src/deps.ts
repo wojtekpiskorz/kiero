@@ -1,12 +1,12 @@
 /**
- * The container-side dependency wiring (I5): builds the real BackupDeps from
+ * The container-side dependency wiring: builds the real BackupDeps from
  * the container runtime env (the DO class forwards the Worker's vars and
  * secrets by NAME). NODE-ONLY (imports the CLI exporter); the Worker surface
  * never imports this file - it proxies to the container.
  *
  * Every missing credential produces a typed not-configured stub so a run
  * still executes the protocol (lease attempt, heartbeat, honest failure)
- * instead of silently doing nothing - the D6 honest-pending pattern.
+ * instead of silently doing nothing - the honest-pending pattern.
  */
 
 import { ConvexCliExporter } from "./convex-export.ts";
@@ -55,7 +55,7 @@ class NotConfiguredMedia implements MediaReader {
 }
 
 /**
- * The typed not-configured refusal set (review round 2 finding 4): every
+ * The typed not-configured refusal set: every
  * method answers its channel's closed refusal instead of throwing an
  * untyped error that surfaces as 500 internal.
  */

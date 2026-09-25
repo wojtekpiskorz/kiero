@@ -1,5 +1,5 @@
 /**
- * Search internal views (E5): the read halves the action-side query core and
+ * Search internal views: the read halves the action-side query core and
  * the guarded probes drive through `runQuery` (actions have no db handle).
  *
  * Every view is tenant-scoped by a SERVER-RESOLVED company id (the context
@@ -22,7 +22,7 @@ export type ScopedContext = RequestContext & {
   readonly normalizedCompanyId: Id<"companies"> | null;
 };
 
-/** Resolves the USER context through the B1 live-session chain (app path). */
+/** Resolves the USER context through the live-session chain (app path). */
 export const userContext = internalQuery({
   args: {},
   handler: async (ctx): Promise<ScopedContext | null> => {

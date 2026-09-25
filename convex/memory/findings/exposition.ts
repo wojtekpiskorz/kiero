@@ -1,18 +1,18 @@
 /**
- * Boss-facing memory exposition reads (H1, additive and flagged on the B3
+ * Boss-facing memory exposition reads (on the membership
  * precedent): the revision history with provenance, and the shared
  * clarifications list.
  *
- * C2 proved the immutable rows (findingRevisions with origin/reason/actor,
+ * The findings lane proved the immutable rows (findingRevisions with origin/reason/actor,
  * evidenceLinks, clarifications) and the current projection read
- * (`memory.readCurrentFindings`); issue #49 additionally requires that a
+ * (`memory.readCurrentFindings`) additionally requires that a
  * boss can "inspect old/current revisions and provenance" and answer a
  * displayed sourced clarification. These two cores are the minimal
  * read-only surfaces for that, through the SAME tenant rules as the
  * existing reads: company resolved from the verified context, project
  * scope tenant-checked, everything ordered and bounded.
  *
- * R2 (issue #127) makes this read ride the ONE shared clarification
+ * R2 makes this read ride the ONE shared clarification
  * content rule (`clarificationContentRuleOf` in ./references, the lane's
  * rule-text home): a link whose source's CONTENT is gone (missing,
  * cross-company or `purged`) is dead, possibly derived text redacts to
@@ -48,9 +48,9 @@ const MAX_REVISION_ROWS = 200;
 /** How many clarifications one scope read keeps (bounded read). */
 const MAX_CLARIFICATION_ROWS = 100;
 
-// R2 (issue #127): the shared purge-redaction rule (`clarificationContentRuleOf`)
+// The shared purge-redaction rule (`clarificationContentRuleOf`)
 // and the two redaction constants live in ./references, the lane's one rule
-// home beside `requireSource` and R1's `checkResolutionEvidenceReference`, so
+// home beside `requireSource` and `checkResolutionEvidenceReference`, so
 // this read, the agent context loader and the stored purge never drift apart.
 /** One revision row in its wire form (value/knowledgeState encoded). */
 export interface RevisionWireRow {
@@ -58,9 +58,9 @@ export interface RevisionWireRow {
   readonly revision: number;
   readonly value: unknown;
   readonly knowledgeState: unknown;
-  // E7 amendment (additive, flagged): reassignment_marking joins the origin
+  // Reassignment_marking joins the origin
   // vocabulary (the contracts wire above is the decode authority).
-  // I4 amendment (additive, flagged, the E7 precedent): purge_marking.
+  // Purge_marking.
   readonly origin:
     | "publication"
     | "correction"
@@ -102,7 +102,7 @@ export interface ClarificationWireRow {
     readonly sourceId: string;
   }[];
   /**
-   * R1 amendment (additive, flagged): the recorded basis of the resolution —
+   * The recorded basis of the resolution —
    * null while open; `legacy_unknown` for PRE-REPAIR resolved rows whose
    * basis was never stored (never a guessed manual decision).
    */
@@ -111,7 +111,7 @@ export interface ClarificationWireRow {
     | "manual_boss_decision"
     | "legacy_unknown"
     | null;
-  /** R1: the persisted evidence references (empty unless source-backed). */
+  /** The persisted evidence references (empty unless source-backed). */
   readonly resolutionEvidence: readonly {
     readonly sourceId: string;
     readonly fragmentId: string | null;
@@ -122,7 +122,7 @@ export interface ClarificationWireRow {
    * derived from was permanently deleted (or its link is otherwise dead).
    */
   readonly questionRedacted: boolean;
-  /** R2: same, for the resolution note of resolved rows. */
+  /** Same, for the resolution note of resolved rows. */
   readonly resolutionNoteRedacted: boolean;
 }
 
@@ -172,7 +172,7 @@ export async function readFindingHistoryRows(
   // Newest MAX_REVISION_ROWS, restored to oldest-first for display: the
   // live end (the revision the "aktualne" badge marks) must never fall off
   // the truncation, and past the cap the oldest history is the safe end to
-  // drop (round-2 ride-along).
+  // drop.
   const revisionDocs = (
     await db
       .query("findingRevisions")
@@ -215,10 +215,10 @@ export async function readFindingHistoryRows(
  * The clarifications of one scope (open and resolved, oldest first): the
  * shared open questions a boss may answer, with the sourced contradiction
  * each one is about. Resolved rows keep their author, note and time, plus
- * the R1 basis and the persisted evidence references of a source-backed
+ * the basis and the persisted evidence references of a source-backed
  * resolution (pre-repair rows read as `legacy_unknown`).
  *
- * R2 (issue #127): every row rides the ONE shared content rule, so the
+ * Every row rides the ONE shared content rule, so the
  * read redacts from the tombstone on — question and note text that
  * possibly derived from PERMANENTLY DELETED content reads as the fixed
  * Polish copy (never a summary), content-dead references are absent, and
@@ -293,7 +293,7 @@ export async function readClarificationRows(
         fragmentId: entry.fragmentId,
         sourceId: entry.sourceId,
       })),
-      // R1: an open row has no basis; a resolved row carries its stored
+      // An open row has no basis; a resolved row carries its stored
       // basis, and a PRE-REPAIR row (basis never stored) reads as the
       // explicit `legacy_unknown` — an unknown historical agent resolution
       // is never labeled a manual boss decision.
@@ -305,7 +305,7 @@ export async function readClarificationRows(
         sourceId: reference.sourceId,
         fragmentId: reference.fragmentId,
       })),
-      // R2: the honest redaction flags of this row's text.
+      // The honest redaction flags of this row's text.
       questionRedacted: rule.questionRedacted,
       resolutionNoteRedacted: rule.resolutionNoteRedacted,
     });

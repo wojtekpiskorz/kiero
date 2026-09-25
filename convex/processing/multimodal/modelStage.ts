@@ -1,14 +1,14 @@
 /**
- * Stage 4 of the `processing.join_multimodal` workflow (E4): the bounded
- * joined agent loop through E2's chat adapter.
+ * Stage 4 of the `processing.join_multimodal` workflow: the bounded
+ * joined agent loop through the chat adapter.
  *
  * Decoded tool calls accumulate through the multimodal reducer — never
  * execute. The dialogue encoding (the assistant's serialized tool calls,
- * the `WYNIK NARZĘDZIA` result turns) is E3's own prompt builders
+ * the `WYNIK NARZĘDZIA` result turns) is its own prompt builders
  * (`assistantToolCallsMessage`/`toolResultMessage`), imported rather than
  * inlined: `JOIN_PROMPT_VERSION` claims a versioned dialogue encoding, and
  * sharing the builders is what keeps the join's message bytes in lockstep
- * with E3's when either lane adjusts the format.
+ * with the when either lane adjusts the format.
  */
 
 import { v } from "convex/values";
@@ -170,7 +170,7 @@ export const modelJoinStage = internalAction({
         const hasValidatedWork =
           state.proposals.length > 0 || state.clarifications.length > 0;
         if ((kind === "output_rejected" || kind === "unknown_tool") && hasValidatedWork) {
-          break; // keep the validated partial plan (E3's semantics)
+          break; // keep the validated partial plan (the semantics)
         }
         throw new Error(`join: provider_failed:${kind}`);
       }

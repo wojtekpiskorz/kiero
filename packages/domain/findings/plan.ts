@@ -1,11 +1,11 @@
 /**
- * Pure change-plan decisions (C2): plan consistency, the stale-plan guard
+ * Pure change-plan decisions: plan consistency, the stale-plan guard
  * and correction supersession.
  *
  * The publish mutation rechecks every one of these against the CURRENT
  * database state inside its own transaction; these functions are the
  * decision cores it (and the focused tests) run. "Ponowne przetworzenie
- * starszego źródła nie może cofnąć późniejszej jawnej poprawki" (issue 8):
+ * starszego źródła nie może cofnąć późniejszej jawnej poprawki" :
  * precedence is decided by the expected-revision check, never by arrival or
  * completion time.
  */

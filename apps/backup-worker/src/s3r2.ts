@@ -1,6 +1,6 @@
 /**
  * Minimal SigV4 client for the EU R2 buckets over their S3-compatible
- * endpoints (I5), the D6 `s3r2.ts` reader pattern extended to the write
+ * endpoints, the `s3r2.ts` reader pattern extended to the write
  * side this lane owns: PUT (with sha256 metadata), HEAD, GET, DELETE and
  * LIST (the orphan-cleanup listing). Hand-rolled on WebCrypto so the
  * container image needs no added dependency.

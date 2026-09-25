@@ -1,7 +1,7 @@
 /**
- * The reassignment control (E7's mount, issue #115; R4's stale refusal,
- * issue #129): the boss moves one "Wiadomość źródłowa" between projects or
- * to company-general knowledge by declaring the COMPLETE new project set
+ * The reassignment control (with the stale refusal): the boss moves one
+ * "Wiadomość źródłowa" between projects or to company-general knowledge by
+ * declaring the COMPLETE new project set
  * through the certified `sources.reassignSource` over the same sources
  * dispatch the withdrawal control uses. Split from SourceDetailFeature.ts
  * to keep that file under the size budget (the media.ts precedent).
@@ -9,9 +9,9 @@
  * The dispatch entry is the accept lane's public command, exactly like the
  * WithdrawControl on the same dossier page: ONE operation-agnostic
  * dispatch table serves every sources write, and the envelope carries the
- * operation (review round 1 deleted this lane's duplicate entry pair).
+ * operation (deleted this lane's duplicate entry pair).
  *
- * R4 (issue #129): a COMPLETE replacement carries the observed-placement
+ * A COMPLETE replacement carries the observed-placement
  * precondition. The form snapshots the server placement it was populated
  * with (`observed`, the same exposition read that preselected the
  * checkboxes) and every submit declares it as `expectedProjectIds`. A
@@ -70,7 +70,7 @@ export type ReassignOutcome =
   | { readonly _tag: "refused"; readonly code: string; readonly message: string; readonly stale: boolean }
   | { readonly _tag: "lost" };
 
-/** The typed stale-refusal code (R4's contract constant). */
+/** The typed stale-refusal code (the contract constant). */
 export const SOURCE_PLACEMENT_STALE = "source_placement_stale";
 
 /**
@@ -117,7 +117,7 @@ export interface ReassignFormState {
   readonly selected: ReadonlySet<string>;
   /** The server placement this form was last synced to (the precondition). */
   readonly observed: ReadonlySet<string>;
-  /** R4: a stale refusal arrived; the authoritative read drives the form. */
+  /** A stale refusal arrived; the authoritative read drives the form. */
   readonly stale: boolean;
 }
 
@@ -167,7 +167,7 @@ export function ReassignControl({
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
 
-  // R4's reload: while the form is stale, the authoritative detail read
+  // the reload: while the form is stale, the authoritative detail read
   // (this surface's live `currentProjectIds` prop, the same snapshot that
   // names the dossier's placement) keeps driving the selection, so a
   // subscription update that lands after the refusal still refreshes it.

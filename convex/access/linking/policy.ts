@@ -1,7 +1,7 @@
 /**
- * The verified-linking policy: pure decisions over ceremony views (B2).
+ * The verified-linking policy: pure decisions over ceremony views.
  *
- * The product rule (issue #21, docs/research/auth-identity-facts.md):
+ * The product rule (docs/research/auth-identity-facts.md):
  * matching email text is NEVER proof that two identities belong to one
  * person. A link commits only when BOTH methods carry a FRESH proof inside
  * ONE ceremony, and every rejection is a typed machine code (the UI and
@@ -22,7 +22,7 @@
  *   ceremony must finish inside LINKING_WINDOW_MS;
  * - a link that would merge two established accounts (the target method's
  *   credential already belongs to another user row) is rejected: there is
- *   no supported resolution in B2 (GM-assisted recovery is B4's).
+ *   no supported resolution here (GM-assisted recovery lives in ../gm).
  *
  * The decision halves are pure and unit-tested (tests/b2); the Convex
  * db-halves in storeAdapter.ts are thin adapters over fake-able surfaces.
@@ -38,7 +38,7 @@ import {
 
 /*
  * The typed rejection union now lives in the shared closed vocabulary
- * (../errorCodes.ts, R26) so client and server pin ONE list; re-exported
+ * (../errorCodes.ts) so client and server pin ONE list; re-exported
  * here because every linking module and test historically imports it
  * from this policy module.
  */
@@ -196,7 +196,7 @@ export type GoogleLinkDecision =
 
 /**
  * Decides the Google OAuth callback that arrives while the address's
- * email-code account would collide (B1's `method_conflict` path). The
+ * email-code account would collide (`method_conflict` path). The
  * commit requires: exactly one user row at the profile's address (the
  * ceremony owner, without a Google subject), exactly one active ceremony
  * for that address targeting Google with a fresh first proof, the profile
@@ -205,7 +205,7 @@ export type GoogleLinkDecision =
  */
 export function decideGoogleCallbackLink(args: {
   profile: GoogleLinkProfile;
-  /** User rows at the profile's normalized address (B1's conflict lookup). */
+  /** User rows at the profile's normalized address (the conflict lookup). */
   usersWithEmail: readonly AccountView[];
   /** Non-terminal ceremonies at the profile's normalized address. */
   attemptsAtEmail: readonly AttemptView[];
@@ -401,7 +401,7 @@ export const LINK_REJECTED_MARKER = "[kiero:link_rejected]";
 
 /**
  * The structured payload every linking refusal throws as `ConvexError`
- * data (R26): the closed-vocabulary code plus the marker/copy message for
+ * data: the closed-vocabulary code plus the marker/copy message for
  * logs and older clients. Convex preserves `error.data` through
  * production sanitization; the message is never classified on again.
  */

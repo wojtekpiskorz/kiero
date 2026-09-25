@@ -1,12 +1,12 @@
 /**
- * Text-source acceptance: the D1 transaction body plus its pure decisions.
+ * Text-source acceptance: the transaction body plus its pure decisions.
  *
  * The transaction (protocol step 3 of the source processing protocol) runs
  * inside ONE Convex mutation: reference checks and current authorization
  * happen first, then the immutable source, its project links, the initial
  * processing run, the text extraction, the canonical `sources.sourceAccepted`
  * event and the durable `processing.extract_fragments` registration commit
- * together through the A3 transactional publication primitives.
+ * together through the transactional publication primitives.
  *
  * ATOMICITY IS STRUCTURAL, NOT WRITE-ORDER-DEPENDENT. The checked dispatch
  * converts any handler throw into a sanitized `unavailable` envelope and a
@@ -24,10 +24,10 @@
  * The text of a source is its own extraction: the author's words need no
  * model, so acceptance records the `text` extraction version (provider
  * `kiero`, model `author-text`) and the initial analysis run it belongs to.
- * E3 owns executing the registered extract/analyze work with real pipeline
- * versions; D1 only registers it.
+ * Text analysis owns executing the registered extract/analyze work with real pipeline
+ * versions; acceptance only registers it.
  *
- * D2 amendment (attachment-bearing sources, flagged in the issue report):
+ * Notes (attachment-bearing sources, flagged in the issue report):
  * the reference-check phase additionally runs the uploads lane's
  * all-attachments-durable gate (`verifyAttachmentsForAcceptance`) — the
  * upload must be finalized with its declaration fully materialized, every
@@ -36,19 +36,19 @@
  * verified attachments (`attachments.sourceId`) and the ledger row
  * (`uploads.acceptedSourceId`) inside the SAME transaction, with the
  * verified ids in the `sources.sourceAccepted` payload. Text-only uploads
- * keep the exact D1 semantics.
+ * keep the exact text-only semantics.
  *
  * Pure decisions (fingerprint, replay/conflict, state derivation for reads)
  * live here so tests/d1 can prove them without a deployment.
  *
- * J2 amendment (issue #61, flagged): the voice-only ruling. A source's
+ * The voice-only ruling. A source's
  * material rule is `validateSourceMaterial` — words of author text OR at
  * least one VERIFIED attachment (the gate's ids, never the declaration).
  * The text extraction row still seeds for every source (zero words are
  * the author's own extraction: coverage and evidence anchoring stay
  * coherent), but the `processing.extract_fragments` registration runs
  * only when words exist; a voice-only source's analysis arrives through
- * the `sources.sourceAccepted` event's E4 join projection.
+ * the `sources.sourceAccepted` event's multimodal join projection.
  */
 
 import { Schema } from "effect";
@@ -82,10 +82,10 @@ export type AcceptSourceInput = Schema.Schema.Type<typeof acceptSourceEntry.inpu
 /** The result type of `sources.acceptSource` (the saved receipt). */
 export type AcceptSourceReceipt = Schema.Schema.Type<typeof acceptSourceEntry.result>;
 
-/** Retry policy of the registered durable processing (bounded, like A3). */
+/** Retry policy of the registered durable processing (bounded, like the platform). */
 export const PROCESSING_RETRY_POLICY = { maxAttempts: 3, backoffBaseMs: 2_000 } as const;
 
-/** Version labels of the D1 acceptance registration (E3 pins its own later). */
+/** Version labels of the acceptance registration (text analysis pins its own later). */
 export const ACCEPTANCE_PIPELINE_VERSION = "d1.accept/1";
 export const TEXT_EXTRACTION_PIPELINE_VERSION = "d1.text/1";
 export const TEXT_EXTRACTION_PROVIDER = "kiero";
@@ -109,12 +109,12 @@ export type Validated<T> = { readonly ok: true; readonly value: T } | {
 };
 
 /**
- * The J2 voice-only ruling (issue #61): a wiadomość źródłowa "może łączyć
+ * The voice-only ruling: a wiadomość źródłowa "może łączyć
  * tekst, nagranie i zdjęcia" (CONTEXT.md) — the channels combine, none is
  * mandatory. A source needs substance in AT LEAST ONE channel: words of
  * author text OR at least one verified attachment. Empty text with a
  * retained recording or photos is a valid voice-only/photo-only message
- * (its analysis runs through the E4 multimodal join); empty text with NO
+ * (its analysis runs through the multimodal join); empty text with NO
  * attachment stays the honest `author_text_empty` refusal. The length
  * cap applies whenever text is present at all. This is the ONE author
  * text rule: the acceptance transaction runs it once, after the
@@ -412,8 +412,8 @@ export async function performAcceptance(
     }
   }
 
-  // --- D2: the all-attachments-durable gate (protocol step 3) --------------
-  // Text-only uploads pass through unchanged (D1 semantics). An upload WITH
+  // --- The all-attachments-durable gate (protocol step 3) --------------
+  // Text-only uploads pass through unchanged (text-only semantics). An upload WITH
   // attachments is acceptable only when the upload is finalized, the
   // declaration is fully materialized, EVERY attachment is durably completed
   // (gateway-verified R2 completion) and EVERY attachment carries a VERIFIED
@@ -425,7 +425,7 @@ export async function performAcceptance(
     return errorResult(attachmentGate.error);
   }
 
-  // --- the material rule (J2): words OR verified retained media -----------
+  // --- the material rule: words OR verified retained media -----------
   // Runs here (after the gate) so the decision reads the VERIFIED attachment
   // ids, never the untrusted declaration. A voice-only/photo-only message
   // is a valid wiadomość źródłowa; an empty text with nothing retained is
@@ -439,7 +439,7 @@ export async function performAcceptance(
   }
   // The author's words are their own text extraction (possibly zero words:
   // the row still seeds, so coverage and evidence anchoring stay coherent;
-  // the E4 join owns a voice-only source's analysis). E3's extract/analyze
+  // the join owns a voice-only source's analysis). The extract/analyze
   // jobs are registered only when words exist — analyzing an empty text
   // would be a pointless model turn over nothing.
   const hasAuthorWords = input.authorText.trim().length > 0;
@@ -511,7 +511,7 @@ export async function performAcceptance(
     processingRunId,
     createdAtMs: nowMs,
   });
-  // --- D2: bind the verified attachments and the ledger row atomically -----
+  // --- Bind the verified attachments and the ledger row atomically -----
   // Only pre-validated patches of already-verified ids remain here (the gate
   // resolved every attachment id and its durability before the first insert),
   // so the structural no-partial-commit argument is unchanged: the source,
@@ -541,7 +541,7 @@ export async function performAcceptance(
   if (hasAuthorWords) {
     // The text pipeline registration (extract -> analyze) runs only when
     // the author wrote words. A voice-only source's analysis arrives
-    // through the sourceAccepted event's E4 join projection (the outbox
+    // through the sourceAccepted event's multimodal join projection (the outbox
     // edge), which resolves this same initial run.
     await registerDurableJob(tx, {
       kind: "processing.extract_fragments",

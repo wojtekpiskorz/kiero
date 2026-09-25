@@ -1,13 +1,13 @@
 /**
- * Multimodal evidence grounding (E4): locating a proposal's evidence in the
+ * Multimodal evidence grounding: locating a proposal's evidence in the
  * joined inspectable parts of ONE source ("Fragment źródła": a text
  * fragment, an audio range or an image region; CONTEXT.md).
  *
  * The three grounding families, each with its own anchor authority:
  *
- * - text: E3's `locateQuote` over the immutable author text -> a
+ * - text: `locateQuote` over the immutable author text -> a
  *   `text_range` anchor on the text extraction;
- * - audio: a verbatim quote located in ONE D6 segment's text -> that
+ * - audio: a verbatim quote located in ONE transcript segment's text -> that
  *   segment's ORIGINAL-TIME interval (`audio_interval`, the segment's
  *   [startMs, endMs) over the source audio timeline, never segment-relative
  *   offsets) on the transcript's stt extraction version;
@@ -51,7 +51,7 @@ export type TranscriptQuoteLocation =
 
 /**
  * Locates one quote in the assembled transcript: exact-first then the same
- * whitespace/case-tolerant token walk E3 uses, INSIDE one segment's text —
+ * whitespace/case-tolerant token walk text analysis uses, INSIDE one segment's text —
  * a quote spanning two segments does not locate (the anchor must name one
  * original-time interval; the honest fallback for a spanning statement is
  * two quotes, one per segment).

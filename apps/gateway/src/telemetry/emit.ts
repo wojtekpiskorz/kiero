@@ -1,8 +1,7 @@
 /**
- * The gateway telemetry surface (I2): request-scoped redacted events for the
+ * The gateway telemetry surface: request-scoped redacted events for the
  * architecture's GW -> OBS flow.
  *
- * Round-1 repairs:
  * - Delivery is scheduled through `ctx.waitUntil` when the Worker runtime
  *   provides an ExecutionContext: best-effort telemetry is NEVER on the
  *   request critical path (the response is already on its way when the
@@ -11,7 +10,7 @@
  *   sink.ts`: ingest POST, metadata flattening, redactionsApplied injection,
  *   injectable fetch) - this module no longer reimplements any of it.
  * - The environment tag is the ONE shared closed-label rule
- *   (`@kiero/runtime`'s `deploymentEnvironment`, R13): the Worker's
+ *   (`@kiero/runtime`'s `deploymentEnvironment`): the Worker's
  *   `ENVIRONMENT` binding classifies exactly like `KIERO_ENVIRONMENT`
  *   everywhere else (absent/unknown honestly means dev).
  *

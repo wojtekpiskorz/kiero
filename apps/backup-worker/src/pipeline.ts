@@ -1,5 +1,5 @@
 /**
- * The run pipeline (I5): one complete-backup run against the ports.
+ * The run pipeline: one complete-backup run against the ports.
  *
  * Order of operations is the completeness contract:
  *
@@ -36,7 +36,7 @@ import {
 } from "./ports.ts";
 // The grace constant, the orphan rule and the canonical JSON form come from
 // the lane's own PURE decision module (convex/operations/backups/slot.ts -
-// an I5-owned path on both sides of this import): ONE definition, no
+// a backup-owned path on both sides of this import): ONE definition, no
 // executor/server drift.
 import {
   canonicalJson,
@@ -48,7 +48,7 @@ import { sha256BytesHex } from "./hash.ts";
 /** The single hash helper re-exported under its established pipeline name. */
 export { sha256BytesHex as sha256HexOf };
 
-/** The immutable manifest document (published last; versioned for I6). */
+/** The immutable manifest document (published last; versioned for restore). */
 export interface ManifestDocument {
   readonly manifestVersion: "i5.complete.1";
   readonly slotMs: number;
@@ -66,7 +66,7 @@ export interface ManifestDocument {
   readonly droppedPurged: readonly { objectKey: string; sourceId: string }[];
 }
 
-/** The pool/set key layout (part of the I6 restore contract). */
+/** The pool/set key layout (part of the restore contract). */
 export function mediaPoolKey(objectKey: string): string {
   return `media/${objectKey}`;
 }
@@ -241,7 +241,7 @@ export async function runBackup(
     verifiedMedia.push({ objectKey: stagedObject.objectKey, sha256: hash, bytes: back.bytes.length });
   }
 
-  // 5. the deletion ledger carried SEPARATELY (I4 seam, content-free).
+  // 5. the deletion ledger carried SEPARATELY (content-free).
   const ledger = begin.ledger;
   const ledgerBytes = new TextEncoder().encode(canonicalJson(ledger));
   const ledgerSha = await sha256BytesHex(ledgerBytes);

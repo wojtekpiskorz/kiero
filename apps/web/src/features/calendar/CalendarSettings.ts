@@ -1,14 +1,14 @@
 /**
- * The Calendar settings and sync diagnostics surface (G4): the personal
- * operation view over G2's projection and G3's reconciliation, on the same
- * /kalendarz screen as G1's connection lifecycle.
+ * The Calendar settings and sync diagnostics surface: the personal
+ * operation view over the projection and the reconciliation, on the same
+ * /kalendarz screen as the connection lifecycle.
  *
  * JSX-free on purpose (createElement only), like the connection panel: the
  * host feature registry chain stays importable by the node test programs.
  *
  * Everything rendered comes from the three lane reads the issue names
- * (G1 calendarStatus drives the surrounding panel; here G3 syncOverview
- * for diagnostics and G2 projectionOverview for the copies list) and every
+ * (calendarStatus drives the surrounding panel; here syncOverview
+ * for diagnostics and projectionOverview for the copies list) and every
  * write rides the certified typed dispatches: `calendar.setCopyHidden`
  * (personal hide/restore) and `calendar.reconcileCopy` (check this copy
  * now). No success is ever shown over pending or failed work; the ONLY
@@ -16,8 +16,8 @@
  * failed or uncertain.
  *
  * The personal project scope is editable through the certified
- * `calendar.setSelection` write (G5, issue #107): the scope section's
- * mounted follow-up over G4's honest not-yet-available notice. The saved
+ * `calendar.setSelection` write: the scope section's
+ * mounted follow-up over the honest not-yet-available notice. The saved
  * choice is personal and applies at the next synchronization pass.
  */
 
@@ -41,13 +41,13 @@ import {
 } from "./state";
 
 // ---------------------------------------------------------------------------
-// The settings root (two lane reads; the connection panel above owns G1's).
+// The settings root (two lane reads; the connection panel above owns the connection read).
 // ---------------------------------------------------------------------------
 
 /**
  * The settings surface: rendered under the connection panel whenever a
  * calendar connection row exists. `actionsEnabled` is honest about whether
- * the copy commands can be served right now (G1's connected state); a
+ * the copy commands can be served right now (the connected state); a
  * stopped connection still shows its diagnostics and cleanup residue.
  */
 export function CalendarSettings({ actionsEnabled }: { readonly actionsEnabled: boolean }): ReactNode {
@@ -144,8 +144,8 @@ export function DiagnosticsSection({
 
 // ---------------------------------------------------------------------------
 // The personal project scope: the certified calendar.setSelection write
-// (G5, issue #107) mounted as the honest editor. G4 rendered the
-// not-yet-available notice here; this section is its sanctioned follow-up.
+// mounted as the honest editor. It replaces the earlier
+// not-yet-available notice.
 // ---------------------------------------------------------------------------
 
 /**
@@ -223,7 +223,7 @@ export function ScopeSection({ selection }: { readonly selection: SelectionView 
                   "ul",
                   null,
                   // Closed projects stay selectable: they keep retained
-                  // obligations the projection still copies (G2's rule).
+                  // obligations the projection still copies (rule).
                   ...[...projects.data.active, ...projects.data.closed].map((project) =>
                     createElement(
                       "li",

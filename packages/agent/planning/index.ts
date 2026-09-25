@@ -1,5 +1,5 @@
 /**
- * @kiero/agent/planning: the pure planning surface for text analysis (E3).
+ * @kiero/agent/planning: the pure planning surface for text analysis.
  *
  * Small public interface, Convex-free and model-free by construction:
  *
@@ -8,7 +8,7 @@
  *   version it must record;
  * - the three tool input schemas (`memory_upsert_finding`,
  *   `projects_identify`, `memory_ask_clarification`): the decode authority
- *   for tool arguments coming back through E2's chat adapter;
+ *   for tool arguments coming back through the chat adapter;
  * - `applyDecodedCall`: the decoded-not-executed reducer that validates a
  *   decoded call against the context and accumulates the plan;
  * - `boundPublicationGroups` + `decideGroupPublish`: bounded source-linked
@@ -21,7 +21,7 @@
  * - coverage honesty: a missing required segment is pending, and a
  *   text-only run cannot claim to have inspected a pending image.
  *
- * The Convex-coupled halves (workflow stages, durable executors, C2
+ * The Convex-coupled halves (workflow stages, durable executors, findings
  * publication transactions, provider calls) live in convex/processing/text.
  */
 

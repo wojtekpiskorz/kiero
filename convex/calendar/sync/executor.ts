@@ -1,7 +1,7 @@
 /**
- * The `calendar.reconcile_outcome` durable executor (G3).
+ * The `calendar.reconcile_outcome` durable executor.
  *
- * The certified consumer edge (A3's registry,
+ * The certified consumer edge (the registry,
  * `calendar.copyOutcomeRecorded -> calendar.reconcile_outcome`) lands here:
  * every RECORDED OUTCOME CHANGE durably schedules ONE bounded
  * reconciliation of that copy. Together with the sync pass this is the

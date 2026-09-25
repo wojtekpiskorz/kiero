@@ -1,5 +1,5 @@
 /**
- * Segment byte resolution for the STT workflow actions (D6).
+ * Segment byte resolution for the STT workflow actions.
  *
  * The workflow owner (Convex) never holds bucket credentials. Segments
  * resolve through exactly two channels, both recorded on the order row:
@@ -9,11 +9,11 @@
  *   configuration or an unreachable executor is a TYPED refusal — the
  *   transcript stays pending/partial, never a fabricated slice.
  * - `proof_inline` (guarded dev proofs only): the proof script supplies the
- *   SAME bytes it uploaded through the real D2 chain; the stash is
+ *   SAME bytes it uploaded through the real chain; the stash is
  *   length- and sha-256-pinned at order time, so the channel can only
  *   replay bytes that are durably in R2, and rows carry the channel
  *   honestly. It exists because the container runtime and the media S3
- *   token are BLOCKED owner actions (see the D6 evidence), and the durable
+ *   token are BLOCKED owner actions, and the durable
  *   flow itself is the deliverable.
  *
  * Slicing arithmetic is the ONE shared authority (`@kiero/media-worker/wav`):
@@ -22,7 +22,7 @@
  */
 
 import { base64ToBytes, bytesToBase64, parseWav, sliceWav, wavDurationMs } from "@kiero/media-worker/wav";
-// R32: the leaf import — the Convex deploy typecheck (convex/tsconfig.json,
+// The leaf import — the Convex deploy typecheck (convex/tsconfig.json,
 // no allowImportingTsExtensions) must not reach segment-service.ts through
 // this type; the zero-import ./refusals leaf is the importable spelling.
 import type { SegmentRefusal } from "@kiero/media-worker/refusals";
@@ -30,7 +30,7 @@ import { sha256HexOfBytes } from "./segmentation";
 
 /**
  * Typed refusal codes of byte resolution (closed vocabulary). The protocol's
- * own codes (`SegmentRefusal`) are carried through since R30: a 422-class
+ * own codes (`SegmentRefusal`) are carried through: a 422-class
  * answer's JSON body names the real cause (`format_requires_container`,
  * `conversion_*`, ...) and it survives into `audioTranscripts.lastErrorKind`
  * instead of the generic `media_worker_refused` collapse.
@@ -90,7 +90,7 @@ interface SegmentCall {
 }
 
 /**
- * The ONE media-executor call skeleton (review finding 4): URL/token guard,
+ * The ONE media-executor call skeleton: URL/token guard,
  * bearer POST, closed status mapping and JSON decode. Both call sites
  * (`/probe`, `/segment`) shape-check the decoded body themselves; this
  * helper owns everything they would otherwise duplicate.
@@ -118,7 +118,7 @@ async function callMediaWorker(
   // (executor not configured) are all DEFINITE refusals; anything else
   // unexpected is unreachable-grade. A definite refusal's body carries the
   // protocol's typed `code` — carry it through when it is a known closed
-  // code so `lastErrorKind` names the real cause (R30); non-JSON or unknown
+  // code so `lastErrorKind` names the real cause; non-JSON or unknown
   // bodies keep the generic `media_worker_refused`.
   if (
     response.status === 401 || response.status === 404 || response.status === 413 ||

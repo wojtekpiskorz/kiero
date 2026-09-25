@@ -1,30 +1,30 @@
 /**
- * The search feature (H3): "Szukaj" — evidence search over E5's
+ * The search feature: "Szukaj" — evidence search over the
  * tenant-safe versioned retrieval.
  *
  * JSX-free on purpose (createElement only), like the conversation and
  * memory surfaces: the host feature registry chain stays importable by the
  * node test programs.
  *
- * - the query: `search/commands:queryEvidence` (the PUBLIC action E5
+ * - the query: `search/commands:queryEvidence` (the PUBLIC action the search lane
  *   owns) through the checked envelope dispatch — text, transcript and
  *   OCR evidence plus current findings, with the optional Polish
  *   barebones filters (project, author, send-date range) and a cursor;
- * - the coverage disclosure: the E5 result's coverage literal is shown
+ * - the coverage disclosure: the result's coverage literal is shown
  *   VERBATIM with its Polish explanation — `text_only` and `degraded`
  *   state plainly that a missing hit is retrieval coverage, never proof
  *   the fact does not exist;
  * - hydration before rendering: every source hit re-reads its canonical
- *   D1 row (`sources.read.views.sourceDetail`) so the result NEVER
+ *   source row (`sources.read.views.sourceDetail`) so the result NEVER
  *   renders a snippet a stale vector row claims — the server already
  *   dropped what tenant checks, lifecycle or the current revision
- *   superseded (E5's keep rules), and the row the UI shows is the
+ *   superseded (the keep rules), and the row the UI shows is the
  *   canonical record, not the index;
- * - the authoritative open: source hits deep-link through R5's one shared
+ * - the authoritative open: source hits deep-link through the one shared
  *   serializer (`../source-detail/source-route`) into the canonical
  *   dossier route with its encoded `zrodlo` param (the source URL's
  *   full-history expansion, with the matched fragment's anchor
- *   highlighted); finding hits expand to C2's `memory.readFindingHistory`
+ *   highlighted); finding hits expand to `memory.readFindingHistory`
  *   (the current revision with provenance) and link their evidence
  *   through the same serializer;
  * - paging: `isDone`/cursor honored with a "Pokaż więcej" button — pages
@@ -155,7 +155,7 @@ function SearchMain({ overview }: { readonly overview: MemberOverview }): ReactN
         // live disclosure for what the user currently sees).
         return { ...decoded, entries: [...current.entries, ...decoded.entries] };
       });
-      // E5's cursor is the last served entry's id (the next page starts
+      // the cursor is the last served entry's id (the next page starts
       // strictly after it); isDone true means nothing follows.
       const lastId = decoded.entries.at(-1)?.searchEntryId;
       setCursor(decoded.isDone || lastId === undefined ? null : lastId);
@@ -309,7 +309,7 @@ function ResultEntryRow({
 }
 
 /**
- * One source-backed hit, hydrated against the canonical D1 row BEFORE any
+ * One source-backed hit, hydrated against the canonical source row BEFORE any
  * snippet renders: the UI shows what the source record says, never what a
  * stale index row claims.
  */
@@ -355,7 +355,7 @@ function SourceHit({
       createElement(
         "a",
         {
-          // R5: the one canonical serializer builds the hit's link, with
+          // The one canonical serializer builds the hit's link, with
           // the matched fragment's anchor when the entry pins one.
           href: serializeSourceReference({
             sourceId,
@@ -369,7 +369,7 @@ function SourceHit({
   );
 }
 
-/** One finding hit: expandable to C2's revision history read (current first). */
+/** One finding hit: expandable to the revision history read (current first). */
 function FindingHit({ entry }: { readonly entry: ResultEntry }): ReactNode {
   const findingId = entry.findingId ?? null;
   const [expanded, setExpanded] = useState(false);
@@ -421,7 +421,7 @@ function FindingDetails({ findingId }: { readonly findingId: string }): ReactNod
               createElement(
                 "a",
                 {
-                  // R5: the one canonical serializer builds the evidence
+                  // The one canonical serializer builds the evidence
                   // link (with the fragment's anchor).
                   href: serializeSourceReference({
                     sourceId: witness.sourceId,

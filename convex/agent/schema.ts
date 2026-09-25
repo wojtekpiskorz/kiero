@@ -1,5 +1,5 @@
 /**
- * The answer loop's durable record family (R25, issue #230 — the E6 named
+ * The answer loop's durable record family (the named
  * prerequisite the loop's own header declared: "durable answer/tool-attempt
  * record rows need a shared table family the closed contracts inventory does
  * not declare yet").
@@ -14,12 +14,12 @@
  *   (`runId`, `turnIndex`) — the loop is an ACTION, so its mutation calls
  *   are replay-safe by key, not by transaction.
  *
- * Sanitization is the diagnosticEvents discipline (I2): NO raw model
+ * Sanitization is the diagnosticEvents discipline: NO raw model
  * payloads, tool arguments, prompts or transcripts — only names, closed
  * codes/classes, counts, latencies and ONE bounded final-text excerpt (the
  * same excerpt the answer result already returns to callers).
  *
- * The vocabulary honesty note: the provider seam (E2/E8) collapses finish
+ * The vocabulary honesty note: the provider seam collapses finish
  * `length`/`content_filter`, malformed tool-call JSON and schema mismatches
  * into the single `output_rejected` failure kind BEFORE the loop can observe
  * them. `finishReasonClass` therefore declares the full class vocabulary but
@@ -67,7 +67,7 @@ export type AnswerTurnFinishClass = (typeof ANSWER_TURN_FINISH_CLASSES)[number];
 
 /**
  * Which decode path produced the turn's dispatched calls: the provider's
- * native tool calls, the text-encoded rescue (E6's inherited flash-model
+ * native tool calls, the text-encoded rescue (the inherited flash-model
  * defect fix), or no calls at all.
  */
 export const ANSWER_TURN_CALLS_ORIGINS = [
@@ -91,7 +91,7 @@ export type AnswerTurnProvider = (typeof ANSWER_TURN_PROVIDERS)[number];
 
 /**
  * The sanitized provider failure kinds a rejected turn records — exactly
- * E2's closed classification (the `satisfies` pin rejects a name this
+ * the closed classification (the `satisfies` pin rejects a name this
  * vocabulary does not own; a MISSING kind fails typecheck at the loop's
  * recording call site, where the full `ProviderFailureKind` union must
  * assign into it).
@@ -134,7 +134,7 @@ export const answerTables = {
     startedAtMs: shared.tsMs,
     // Finalize-time fields (absent until the run finished).
     outcome: v.optional(vocabularyOf(ANSWER_RUN_OUTCOMES)),
-    /** The E2 failure kind; present exactly on a `provider_failed` run. */
+    /** The failure kind; present exactly on a `provider_failed` run. */
     failureKind: v.optional(answerFailureKindValue),
     turnCount: v.optional(shared.counter),
     refreshCount: v.optional(shared.counter),

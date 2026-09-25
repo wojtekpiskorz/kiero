@@ -1,7 +1,7 @@
 /**
- * The G1 Calendar OAuth HTTP boundary (Convex deployment site routes).
+ * The Calendar OAuth HTTP boundary (Convex deployment site routes).
  *
- * Routes (wired by the sanctioned append in convex/http.ts):
+ * Routes (wired by the append in convex/http.ts):
  *
  * - `POST /calendar/oauth/start`: the authorization start. The caller
  *   presents the USER's Convex access token (Authorization header); Convex
@@ -15,7 +15,7 @@
  *   ONE bounded token exchange -> scope enforcement -> find-or-create the
  *   dedicated calendar -> record the connection. Answers a minimal Polish
  *   HTML status page (barebones; no styling) whose "Wróć do Kiero" link
- *   targets the configured application origin (R10:
+ *   targets the configured application origin (
  *   `KIERO_CALENDAR_APP_BASE_URL`), never the deployment host itself and
  *   never anything the caller supplied.
  * - `POST /calendar/oauth/callback/complete`: the SAME protocol entered by
@@ -82,10 +82,10 @@ function originOf(request: Request): string {
 }
 
 // ---------------------------------------------------------------------------
-// The configured application return origin (R10).
+// The configured application return origin.
 // ---------------------------------------------------------------------------
 
-// The resolver lives in the PURE shared home ./return.ts (the R12
+// The resolver lives in the PURE shared home ./return.ts (the
 // gateway leg imports the same definition; see that module's header).
 // Re-exported here so this boundary's public surface is unchanged.
 export { CALENDAR_APP_BASE_URL_ENV, calendarAppReturnHref } from "./return";
@@ -110,7 +110,7 @@ export const calendarStartHandler = httpAction(async (ctx, request) => {
   );
   if (resolved === null) {
     // A verified person without an active firm has no company scope for a
-    // connection (sign-in alone never confers it — same rule as B3).
+    // connection (sign-in alone never confers it — same rule as membership).
     return jsonResponse(403, errorResult(forbiddenError("no_company_scope", "company")));
   }
   let body: { mode?: unknown; acknowledgeUnknownCreation?: unknown } = {};
@@ -348,7 +348,7 @@ export const calendarCallbackHandler = httpAction(async (ctx, request) => {
   const state = url.searchParams.get("state") ?? "";
   const code = url.searchParams.get("code");
   const error = url.searchParams.get("error");
-  // Server-side configuration only (R10): the request itself (origin,
+  // Server-side configuration only: the request itself (origin,
   // query, headers) never influences where the page's link leads.
   const returnHref = calendarAppReturnHref(process.env);
   if (state.length === 0) {

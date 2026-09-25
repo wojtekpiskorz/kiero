@@ -1,14 +1,14 @@
 /**
- * The session-controls core (B2): revoke every OTHER device session of
- * the actor through B1's canonical revocation core (one call per session,
- * the current device stays). Per-device revocation is B1's own
+ * The session-controls core: revoke every OTHER device session of
+ * the actor through the canonical revocation core (one call per session,
+ * the current device stays). Per-device revocation is its own
  * `revokeSession`; this loop only batches it.
  */
 
 import type { LinkingTx } from "./store";
 
 /**
- * Revokes every OTHER device session of the actor through B1's canonical
+ * Revokes every OTHER device session of the actor through the canonical
  * revocation core (one call per session; the current device stays).
  */
 export async function revokeOtherSessionsCore(

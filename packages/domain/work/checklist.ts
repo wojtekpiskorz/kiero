@@ -1,12 +1,12 @@
 /**
- * Checklist rules (C4 domain half, pure).
+ * Checklist rules (domain half, pure).
  *
  * Vocabulary ("Checklista zadania", CONTEXT.md): a ONE-level list of points
  * inside a task, using the task's responsibility and deadline. The task's
  * state and the points' completion are independent: a task may be Wykonane
  * with unchecked points, which keep their own state and history.
  *
- * Rules encoded here (issue 9):
+ * Rules encoded here:
  *
  * - A point has a description, a completion mark, history and a change
  *   basis. Checking a point records progress of the LIST; it never reads

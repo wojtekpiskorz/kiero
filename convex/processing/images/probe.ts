@@ -1,13 +1,13 @@
 /**
- * D5 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, exactly like the D1/D2 probes; shared plumbing in
+ * Image-normalization dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable, exactly like the probes; shared plumbing in
  * convex/sources/probe_shared.ts).
  *
- * No business work happens here; these entries exist so the D5 evidence can
+ * No business work happens here; these entries exist so the evidence can
  * run against the REAL dev deployment, the REAL Worker/R2 path and the REAL
  * normalizer. Every inspection entry resolves the CALLER's identity from
  * that caller's own verified Convex Auth credential (the proof script signs
- * in real fixture persons, B1's email-code flow — the B3/D2 evidence
+ * in real fixture persons, the email-code flow — the evidence
  * pattern) and scopes every row to the caller's company: a person of
  * company B reading company A's attachment is the cross-tenant denial
  * proof. No identity is ever accepted from client input and the service

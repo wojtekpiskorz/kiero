@@ -1,10 +1,10 @@
 /**
- * Pure catalog-reuse rules (C3): label normalization (Polish-aware), the
+ * Pure catalog-reuse rules: label normalization (Polish-aware), the
  * stable key, name similarity and the typed reuse verdicts.
  *
  * "Before creating a definition, expose catalog search and similarity
  * candidates to the agent, while requiring meaning and type compatibility
- * rather than a name match" (issue #26). The verdict therefore NEVER says
+ * rather than a name match". The verdict therefore NEVER says
  * "reuse" on a name alone: a near-duplicate name is either a reuse candidate
  * (the structure is compatible) or a NAME CONFLICT (the meaning differs —
  * create a distinct definition, never a silent reuse). Equivalent names with

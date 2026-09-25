@@ -1,7 +1,7 @@
 /**
- * Task-reminder scheduling model (F4): the PURE decision core the
+ * Task-reminder scheduling model: the PURE decision core the
  * recompute transaction and the due-time evaluator run (issue 44:
- * "durable reminder evaluation from C4 task state and F1 personal
+ * "durable reminder evaluation from task state and personal
  * preferences").
  *
  * Everything here is deterministic over its inputs - no Convex, no clock,
@@ -9,10 +9,10 @@
  * company timezone, the overdue-day arithmetic and the missed-slot policy
  * are unit-testable without a deployment (tests/f4/reminders.test.ts)
  * while ./operations.ts re-runs the SAME functions inside its
- * transactions over live rows (the F2 `delivery/model.ts` precedent).
+ * transactions over live rows (the `delivery/model.ts` precedent).
  *
  * Semantics pinned by the accepted decisions (issue 44's bounded solution,
- * issue 7's notification resolution, CONTEXT.md):
+ * the accepted notification resolution, CONTEXT.md):
  *
  * - "Przypomnienie o zadaniu" is based on the TASK, never on conversation
  *   read state; its recipient is the task's coordinator ("Koordynator
@@ -23,16 +23,16 @@
  *   DELIVERY metadata, never an invented task time.
  * - For overdue work ONE current daily summary at 07:00: a date-only term
  *   is overdue only after its company-local day ends, and the FIRST daily
- *   overdue summary is the next day at 07:00 (issue 44 acceptance). A
+ *   overdue summary is the next day at 07:00. A
  *   zoned date/time term is overdue at its instant; its first summary is
  *   the next 07:00 after that instant.
  * - Undated tasks remain only in Co teraz: no reminder slot exists for a
  *   missing or unusable term, and a reminder for a contested date stays
- *   suspended (the dueness `term_unusable` outcomes, C4's rule verbatim).
+ *   suspended (the dueness `term_unusable` outcomes, the rule verbatim).
  * - A newly created, re-dated or reassigned task whose reminder time
  *   already passed gets ONE prompt as soon as quiet hours permit, without
  *   replaying every missed alert: an ideal instant in the past clamps to
- *   the recompute instant (the quiet-hours deferral is F1's seam, applied
+ *   the recompute instant (the quiet-hours deferral is the seam, applied
  *   later). An edit that leaves the term and the recipients unchanged
  *   never re-prompts: its slots keep their identity, so the clamp only
  *   ever applies to a schedule that is genuinely fresh.
@@ -59,10 +59,10 @@ export const TIMED_LEAD_MS = 60 * 60 * 1_000;
 export type ReminderSlotKind = "pre_due" | "overdue";
 
 /**
- * The closed death-reason vocabulary the F4 evaluator records on
+ * The closed death-reason vocabulary the evaluator records on
  * suppressed task-reminder intents. `muted_task_reminders` is a member of
- * F2's `SUPPRESSED_REASONS` verbatim (the shared column's reserved entry);
- * the rest are F4's own re-check outcomes.
+ * `SUPPRESSED_REASONS` verbatim (the shared column's reserved entry);
+ * the rest are its own re-check outcomes.
  */
 export const TASK_REMINDER_SUPPRESSED_REASONS = [
   "task_unresolved",
@@ -79,7 +79,7 @@ export type TaskReminderSuppressedReason =
 
 /**
  * Every reason a reminder intent may die with: this lane's re-check
- * vocabulary plus the F1 seam's suppression members (only the reminder
+ * vocabulary plus the seam's suppression members (only the reminder
  * mute is REACHABLE for the `task_reminder` kind, but the settle call
  * accepts the seam's closed result without a cast).
  */
@@ -195,7 +195,7 @@ function clampedSlot(
 
 /**
  * Derives one task's reminder schedule; a pure function of (state, bound
- * term, recompute instant, company timezone). The dueness rules are C4's
+ * term, recompute instant, company timezone). The dueness rules are the
  * verbatim (the task domain owns what a term means); this model owns only
  * WHEN a reminder about it fires.
  */

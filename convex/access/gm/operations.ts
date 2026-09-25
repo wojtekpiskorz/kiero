@@ -1,11 +1,11 @@
 /**
- * GM transactions (B4): the write halves of the cores, each inside ONE
+ * GM transactions: the write halves of the cores, each inside ONE
  * Convex mutation — and each writing its protected audit row in the SAME
  * transaction as its effect (the issue's "every GM read and command
  * produces a protected audit record with GM actor, target company,
  * operation, reason and outcome").
  *
- * ATOMICITY: like B3, every step that can throw (lookups, schema decodes,
+ * ATOMICITY: like membership, every step that can throw (lookups, schema decodes,
  * hashing) runs BEFORE the first insert/patch; between the first write and
  * the return only pre-validated writes and total decodes of
  * transaction-generated values remain. DENIED attempts under a VALID
@@ -13,9 +13,9 @@
  * trail records refusals; attempts without any open grant have no grant to
  * attribute and simply fail closed (nothing GM-attributable happened).
  *
- * The recovery transaction composes B2's checked command
+ * The recovery transaction composes the checked command
  * (recoverAccountCommand) with the RESOLVED GM actor — the named
- * prerequisite B2 staged — so the accountRecoveries ledger records the real
+ * prerequisite the linking lane staged — so the accountRecoveries ledger records the real
  * operator while the same transaction writes the GM audit row.
  */
 
@@ -213,8 +213,8 @@ export async function performExitGmMode(
 
 /**
  * The audited GM inspection read over one target company: the read-side
- * surface over processingRuns / durableJobs (A3/I2 state). The retry and
- * reanalysis ACTIONS are H4's; this is the authority + audit spine they
+ * surface over processingRuns / durableJobs. The retry and
+ * reanalysis ACTIONS belong to processing inspection; this is the authority + audit spine they
  * build on. Company internals leave the database ONLY through this audited
  * command.
  */
@@ -276,7 +276,7 @@ export async function performGmInspectCompany(
 /**
  * The onboarding transaction: firm + alpha activation + first-administrator
  * invitation, under GM authority and in ONE transaction. The GM never gains
- * a membership; the first administrator enters through B3's ordinary
+ * a membership; the first administrator enters through the ordinary
  * admission path when they accept the invitation. The single-use code
  * crosses to the ACTION wrapper exactly once (email delivery) and never
  * appears in any client-visible result.
@@ -518,9 +518,9 @@ export async function performGmEndCompanyAlpha(
 }
 
 /**
- * The recovery runner this lane composes: B2's checked command under the
+ * The recovery runner this lane composes: the checked command under the
  * RESOLVED GM actor. Production wires the mutation ctx (dispatch.ts);
- * tests run the same B2 core over an in-memory store, proving the actor.
+ * tests run the same core over an in-memory store, proving the actor.
  */
 export type GmRecoveryRunner = (
   input: { userId: string; verificationBasis: string },
@@ -528,10 +528,10 @@ export type GmRecoveryRunner = (
 ) => Promise<ResultEnvelope>;
 
 /**
- * The GM recovery invocation: B2's checked command under the RESOLVED GM
- * actor. The B2 core (sessions, provider accounts, Google subject cleared;
+ * The GM recovery invocation: the checked command under the RESOLVED GM
+ * actor. The core (sessions, provider accounts, Google subject cleared;
  * users row, membership and authorship untouched) and this lane's audit
- * row commit in ONE transaction — the named prerequisite B2 staged for
+ * row commit in ONE transaction — the prerequisite the linking lane staged for
  * exactly this caller.
  */
 export async function performGmRecoverAccount(
@@ -561,7 +561,7 @@ export async function performGmRecoverAccount(
     return errorResult(notFoundError("users", "account_not_found"));
   }
 
-  // Same transaction: the B2 core records the REAL GM actor in the
+  // Same transaction: the core records the REAL GM actor in the
   // accountRecoveries ledger; the audit row lands beside it.
   const result = await runRecovery(
     { userId: input.userId, verificationBasis: basis.value },

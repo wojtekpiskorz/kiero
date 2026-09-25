@@ -1,15 +1,15 @@
 /**
- * The joined coverage loader (E4): DB rows -> the pure views
+ * The joined coverage loader: DB rows -> the pure views
  * packages/agent/extraction consumes.
  *
  * Everything is scoped through the source (tenant isolation rides the
  * source row the caller already validated):
  *
  * - attachments of the source, by kind (audio/image);
- * - D6 transcript orders per audio attachment (state + lastErrorKind +
+ * - transcript orders per audio attachment (state + lastErrorKind +
  *   extraction) and the ASSEMBLED segment text of the newest completed
  *   order (original-time intervals, verbatim provider text);
- * - D5 representation rows per image attachment -> the deterministic
+ * - normalized representation rows per image attachment -> the deterministic
  *   retained selection (`decideRetainedSelection` imported from the images
  *   protocol, never mirrored) -> the vision orders over THAT
  *   representation, whose NEWEST completed one supplies the extraction
@@ -157,7 +157,7 @@ export async function loadCompletedTranscriptSegments(
 ): Promise<TranscriptSegmentView[]> {
   // The shared rule, newest first: the first order seen per attachment is
   // its newest completed version, the same function the coverage decision
-  // uses (round-3: the third hand-rolled copy of this selection).
+  // uses (the third hand-rolled copy of this selection).
   const newest = new Map<string, TranscriptOrderView>();
   for (const order of completedByNewest(view.transcriptOrders)) {
     if (!newest.has(order.attachmentId)) {

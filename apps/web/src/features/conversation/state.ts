@@ -1,10 +1,10 @@
 /**
- * Conversation feature state (H1): Polish copy and the closed-error
+ * Conversation feature state: Polish copy and the closed-error
  * classification for the conversation surface.
  *
- * The send-path copy and failure hints graduate from J1's core-text
+ * The send-path copy and failure hints graduate from the core-text
  * feature (apps/web/src/features/core-text was the first text-to-memory
- * loop; H1 replaced that mount with the full conversation UI). The copy
+ * loop, since replaced by the full conversation UI). The copy
  * renders exactly what is there: no hour is invented for a day, and a
  * conflicted or updating finding can never read as settled (those finding
  * renderers live in the memory feature's own state, ../memory/state.ts).
@@ -74,7 +74,7 @@ export const conversationCopy = {
   detailState: "Stan przetwarzania",
   detailLinkLabel: "Bezpośredni odnośnik do tej wiadomości (działa w każdym widoku):",
   markReadFailure: "Nie udało się zapisać stanu przeczytania. Spróbuj ponownie.",
-  // Agent answer (J2: E6's loop joined into this surface)
+  // Agent answer (the answer loop inside this surface)
   answerRefused:
     "Agent nie mógł rozpocząć odpowiedzi (brak uprawnień albo sesja wygasła). Zaloguj się ponownie i spróbuj jeszcze raz.",
   answerMissingSource: "Ta wiadomość nie jest już dostępna — agent nie może o nią pytać.",
@@ -84,7 +84,7 @@ export const conversationCopy = {
 
 /**
  * The processing-state vocabulary, derived from durable rows. The map is
- * TYPED by D1's `SourceProcessingState` (the producing schema), so the
+ * TYPED by `SourceProcessingState` (the producing schema), so the
  * authority flows from the schema to the copy: a state added or removed in
  * convex/sources/read/rows.ts fails this build, not a render.
  */
@@ -138,7 +138,7 @@ export function failureHint(code: string, serverMessage: string): string {
 /**
  * The just-sent notice for the source's derived processing state. Every
  * state is distinct: `partial` (some required segments of a multi-material
- * message still pending) must never read as the failed copy — the day D1
+ * message still pending) must never read as the failed copy — the day the backend
  * derives it, the boss is told part of the work succeeded.
  */
 export function justSentNotice(state: SourceProcessingType): string {
@@ -165,7 +165,7 @@ export function instantLabel(ms: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// The F1 read-state projection shape (decoded at the untrusted boundary)
+// The read-state projection shape (decoded at the untrusted boundary)
 // ---------------------------------------------------------------------------
 
 /**
@@ -197,7 +197,7 @@ export function correctionPrefill(originalText: string, sentAtMs: number): strin
 }
 
 // ---------------------------------------------------------------------------
-// The agent answer payload (J2: E6's askAgent result, decoded at the
+// The agent answer payload (the askAgent result, decoded at the
 // untrusted boundary and rendered with glossary-exact labels)
 // ---------------------------------------------------------------------------
 
@@ -269,7 +269,7 @@ export type AnswerRefusalWire = Schema.Schema.Type<typeof AnswerRefusalWire>;
 export const AnswerResultWire = Schema.Union([AnswerRunWire, AnswerRefusalWire]);
 export type AnswerResultWire = Schema.Schema.Type<typeof AnswerResultWire>;
 
-/** Copy for the agent-answer panel (J2; glossary terms exact). */
+/** Copy for the agent-answer panel (glossary terms exact). */
 export const answerCopy = {
   askButton: "Zapytaj agenta o tę wiadomość",
   asking: "Agent szuka odpowiedzi w źródłach firmy…",

@@ -1,21 +1,21 @@
 /**
- * E7 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * Reassignment dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
  * variable, exactly like the sibling sources probes). Shared plumbing
  * lives in convex/sources/probe_shared.ts, whose fixture and inspection
- * bodies this lane's deltas ride: review round 1 replaced a verbatim
- * transcription of C5's probe with those shared pieces, keeping only the
+ * bodies this lane reuses instead of a verbatim transcription, keeping
+ * only the
  * lane-specific fixtures and wire-row mapping below.
  *
- * No business work happens here; these entries exist so the E7 evidence can
+ * No business work happens here; these entries exist so the evidence can
  * run against the REAL dev deployment without a development-auth shortcut:
- * the actor is always the service account's own session (the A3
+ * the actor is always the service account's own session (the platform
  * service-bridge identity) or an explicitly seeded second-company session,
  * resolved through the SAME canonical resolution and authorization seam as
  * production calls. Sessions are created server-side here; no identity is
  * ever accepted from client input.
  *
  * - `probeSeedReassignFixtures`: two fresh projects and witnessed,
- *   project-linked sources per proof run (the C5 fixture pattern, plus the
+ *   project-linked sources per proof run (the fixture pattern, plus the
  *   project links whose movement is the operation under proof).
  * - `probeSeedReassignIsolation`: a whole second company with user,
  *   membership, session, project and a LINKED witnessed source, so the
@@ -57,7 +57,7 @@ import {
   serviceIdentityUnavailable,
 } from "../probe_shared";
 
-/** The E7 proof stamp every fixture row carries. */
+/** The proof stamp every fixture row carries. */
 const PROOF_STAMP = {
   timezone: "Europe/Warsaw",
   sentAtMs: Date.parse("2026-09-10T09:00:00.000Z"),
@@ -65,7 +65,7 @@ const PROOF_STAMP = {
   fingerprintPrefix: "e7-proof:",
 } as const;
 
-/** The E7 isolation fixture identity (its own company, never company A). */
+/** The isolation fixture identity (its own company, never company A). */
 const ISOLATION = {
   email: "e7-isolation@kiero.invalid",
   companyName: "Kiero Dev Proof E (E7 isolation)",
@@ -80,7 +80,7 @@ function sanitizedTag(runTag: string): string {
 
 // --- fixtures -------------------------------------------------------------------
 
-/** Seeds the service company's E7 proof fixtures (guarded). */
+/** Seeds the service company's reassignment proof fixtures (guarded). */
 export const seedReassignFixtures = internalMutation({
   args: { runTag: v.string() },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
@@ -186,7 +186,7 @@ export const probeSeedReassignIsolation = action({
  * Dispatches `sources.reassignSource` through the REAL sources dispatch,
  * riding the accept lane's transaction entry (the withdrawal-proof
  * precedent: one operation-agnostic dispatch table, the envelope carries
- * the operation; review round 1 deleted this lane's duplicate pair).
+ * the operation; deleted this lane's duplicate pair).
  */
 export const probeReassignSource = action({
   args: { envelope: v.any(), sessionId: v.optional(v.string()) },
@@ -260,7 +260,7 @@ export const reassignState = internalQuery({
         scopeProjectId: finding.scopeProjectId ?? null,
         knowledgeTag: knowledgeTagOf(finding.knowledgeState),
         revisionCounter: finding.revisionCounter,
-        /** The automation gate verdict (agrees with C4's dueness gate). */
+        /** The automation gate verdict (agrees with the dueness gate). */
         automationEligible: knowledgeTagOf(finding.knowledgeState) === "known",
       })),
       revisions: revisionRows,

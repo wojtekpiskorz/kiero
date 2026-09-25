@@ -1,12 +1,12 @@
 /**
  * The sign-in user policy: which person identity a provider sign-in
- * creates or resumes (B1).
+ * creates or resumes.
  *
- * Kiero rule (accepted in the identity research and the issue #4 grilling):
+ * Kiero rule (accepted in the identity research and the product decisions):
  * a provider token identifies a person, but NEVER links methods by email
  * equality. Email-code proof controls the mailbox; Google proof controls
  * the Google account (stable `sub`, per Google's guidance). Linking the
- * two requires both proofs and is B2's explicit operation.
+ * two requires both proofs and is the explicit operation.
  *
  * Therefore this policy, which replaces Convex Auth's default
  * `createOrUpdateUser` (whose default would implicitly link by verified

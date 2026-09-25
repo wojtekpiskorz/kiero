@@ -1,8 +1,8 @@
 /**
- * The export worker's envelope constructors (I3): the wire shape of the
+ * The export worker's envelope constructors: the wire shape of the
  * typed result envelopes this worker answers to the Convex build action.
  * Zero-dependency on purpose — the container image runs plain Node with no
- * bundled workspace packages (the D6 zero-dependency ruling) — while the
+ * bundled workspace packages (the zero-dependency ruling) — while the
  * Convex side still DECODES every answer through the one certified
  * `ResultEnvelope` schema (convex/operations/exports/executor.ts), so a
  * malformed answer can never be mistaken for success. The shapes here are

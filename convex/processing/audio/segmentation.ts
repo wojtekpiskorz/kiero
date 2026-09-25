@@ -1,5 +1,5 @@
 /**
- * Pure segmentation and transcript-status decisions (D6).
+ * Pure segmentation and transcript-status decisions.
  *
  * Every decision that makes long audio "bounded resumable segments" is a
  * pure function here, so tests/d6 can prove boundaries, resume bookkeeping,
@@ -30,7 +30,7 @@ export interface SegmentationConfig {
   readonly minTailSegmentMs: number;
 }
 
-/** The initial D6 segmentation configuration (30s decoder-bounded segments). */
+/** The initial segmentation configuration (30s decoder-bounded segments). */
 export const DEFAULT_SEGMENTATION_CONFIG: SegmentationConfig = {
   targetSegmentMs: 30_000,
   minTailSegmentMs: 2_000,
@@ -105,7 +105,7 @@ export function planSegments(
   return { ok: true, segments };
 }
 
-/** The states a checkpoint row can carry (D6 never writes "running": an
+/** The states a checkpoint row can carry (transcription never writes "running": an
  * interrupted pass leaves the segment `pending`, which resume re-attempts). */
 export type SegmentState = "pending" | "succeeded" | "failed";
 

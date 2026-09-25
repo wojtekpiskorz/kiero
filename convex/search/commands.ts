@@ -1,9 +1,9 @@
 /**
- * Search callable entries (E5).
+ * Search callable entries.
  *
  * - `searchLifecycleCommand` (public mutation): the app path for the two
  *   index-generation operations. Identity comes from Convex Auth only and
- *   resolves through the B1 live-session chain inside the dispatch.
+ *   resolves through the live-session chain inside the dispatch.
  * - `searchLifecycleTransaction` (internal mutation): the verified service
  *   path (the bridge pattern; guarded dev proofs use it too).
  * - `queryEvidence` (public action): the app read path; the query-side

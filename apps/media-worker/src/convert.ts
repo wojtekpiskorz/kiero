@@ -1,5 +1,5 @@
 /**
- * Container-only FFmpeg conversion (R30, the voice byte channel): non-WAV
+ * Container-only FFmpeg conversion (the voice byte channel): non-WAV
  * retained audio (the composer's `audio/webm;codecs=opus`) converts to ONE
  * complete PCM WAV file so the segment protocol's exact measure/slice
  * discipline applies to it unchanged.

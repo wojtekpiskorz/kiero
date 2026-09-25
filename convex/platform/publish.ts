@@ -149,7 +149,7 @@ export interface JobRegistrationResult {
  * `durableJobs` row and schedules the executor, all in the caller's
  * transaction.
  *
- * ONE row per dedup key (the round-2 structural invariant): when
+ * ONE row per dedup key: when
  * re-registration is allowed (a DEFINITE failure), the existing row is
  * patched back to queued instead of inserting a sibling. Attempts are NOT
  * reset, so the row's `maxAttempts` bounds total executions across ALL

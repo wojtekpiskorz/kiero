@@ -1,9 +1,9 @@
 /**
- * Calendar feature entry (G1 connection lifecycle + G4 settings and sync
+ * Calendar feature entry (connection lifecycle + settings and sync
  * diagnostics): the Polish barebones entry point for the optional personal
  * Google calendar ("Kalendarz Kiero w Google").
  *
- * R16 (issue #198) withholds this surface from the v1 PWA composition: the
+ * The v1 host withholds this surface from the v1 PWA composition: the
  * owner deferred the Google Calendar integration beyond v1 (ADR
  * docs/adr/calendar-deferral-2026-09.md). The entry switches to the
  * registry's pending state, and the composition withholds the recorded
@@ -23,12 +23,12 @@ export const calendarFeatureEntry = appFeatureEntry({
   consumedOperations: [
     "calendar.connectCalendar",
     "calendar.disconnectCalendar",
-    // G4 additions: the personal hide/restore and the check-this-copy
+    // The personal hide/restore and the check-this-copy
     // commands the settings surface issues through the typed dispatches.
     "calendar.setCopyHidden",
     "calendar.reconcileCopy",
-    // G5 addition (issue #107): the personal project-selection write the
-    // scope section's editor issues (G4's own pin-amendment precedent).
+    // The personal project-selection write the
+    // scope section's editor issues (its own pin-amendment precedent).
     "calendar.setSelection",
   ],
   implementation: "pending",

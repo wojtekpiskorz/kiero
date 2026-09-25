@@ -1,6 +1,6 @@
 /**
- * The vision-extraction order transaction (E4): one order over one VERIFIED
- * retained representation, the vision counterpart of D6's STT orders.
+ * The vision-extraction order transaction: one order over one VERIFIED
+ * retained representation, the vision counterpart of the STT orders.
  *
  * Semantics:
  * - One order = one future immutable vision extraction VERSION over the
@@ -12,10 +12,10 @@
  *   pin extractionId, extractions pin representationId).
  * - Ordering again over the SAME representation replays the SAME order
  *   (idempotent); a definitely-failed order may be resumed by re-running
- *   this entry (the sanctioned bounded resume).
+ *   this entry (the bounded resume).
  * - The proof byte channel is accepted only on probe-guarded deployments
  *   and only with bytes whose sha-256 equals the retained representation's
- *   `contentHash` (a STRONGER pin than D6's length pin: the stash can only
+ *   `contentHash` (a STRONGER pin than the length pin: the stash can only
  *   replay bytes that are durably the retained object).
  */
 
@@ -110,7 +110,7 @@ export async function orderVisionExtraction(
   }
 
   // The run whose journal the join's vision steps anchor to (the source's
-  // initial analysis run, D6's anchoring rule).
+  // initial analysis run, the anchoring rule).
   const runId = await initialAnalysisRun(tx.db, attachment.sourceId as Id<"sources">);
   if (runId === null) {
     return errorResult(validationError("processing_run_missing"));

@@ -1,5 +1,5 @@
 /**
- * The EU container's own HTTP entry (D6): a zero-dependency Node server the
+ * The EU container's own HTTP entry: a zero-dependency Node server the
  * Dockerfile starts on $PORT. Cloudflare Containers proxy HTTP to this
  * process through the app's Durable Object — and the protocol it serves is
  * the ONE shared handler (./segment-service.ts `handleMediaProtocol`), the
@@ -7,7 +7,7 @@
  * node:http streams to a Web `Request` and writes the handler's `Response`
  * back: there is no second copy of the boundary to drift.
  *
- * R30: this surface is where FFmpeg conversion lives (the image ships the
+ * This surface is where FFmpeg conversion lives (the image ships the
  * binary; the isolates cannot spawn). At startup the process verifies the
  * binary once and injects the converter into the shared handler when — and
  * only when — it is actually there; /healthz then states the verified truth

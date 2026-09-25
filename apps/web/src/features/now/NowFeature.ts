@@ -1,6 +1,6 @@
 /**
- * The "Co teraz" feature (H2): the per-user /co-teraz screen this lane
- * owns (G4's calendar copies deep-link into it through the parity-pinned
+ * The "Co teraz" feature: the per-user /co-teraz screen this lane
+ * owns (the calendar copies deep-link into it through the parity-pinned
  * `?zadanie=<id>` / `?zdarzenie=<id>` params).
  *
  * JSX-free on purpose (createElement only), like the sibling surfaces.
@@ -15,7 +15,7 @@
  *   someone explicitly marks Odbyło się or Anulowane (never by the clock);
  * - open questions ("Sprawy do wyjaśnienia") across firm memory and every
  *   project, answerable in place;
- * - the boss's own reminder state (F4): pending/delivered/suppressed
+ * - the boss's own reminder state: pending/delivered/suppressed
  *   intents and the personal snooze, which suspends only THIS boss's
  *   reminders about ONE task and never moves the task's deadline.
  *
@@ -79,7 +79,7 @@ export function NowFeature(): ReactNode {
 }
 
 // ---------------------------------------------------------------------------
-// The personal reminder projection (F4's myTaskReminders, envelope-decoded)
+// The personal reminder projection (myTaskReminders, envelope-decoded)
 // ---------------------------------------------------------------------------
 
 
@@ -110,7 +110,7 @@ function useMyTaskReminders(): RemindersState {
   return { state: "ok", data: value };
 }
 
-/** The reminder-state line of one task (personal, from F4's projection). */
+/** The reminder-state line of one task (personal, from projection). */
 function reminderLine(taskId: string, reminders: RemindersState): string {
   if (reminders.state === "unavailable") {
     return copy.remindersUnavailable;
@@ -456,7 +456,7 @@ function TaskStateControl({ task }: { readonly task: TaskView }): ReactNode {
   );
 }
 
-/** The per-task personal snooze (F4: one task, one boss, one chosen moment). */
+/** The per-task personal snooze (one task, one boss, one chosen moment). */
 function SnoozeControl({
   task,
   companyTimezone,
@@ -643,7 +643,7 @@ function ScopeQuestions({
 type ConflictingWitness = ClarificationWireRow["conflictingEvidence"][number];
 
 /**
- * The conflicting-evidence list of one open question (R5): each witness
+ * The conflicting-evidence list of one open question: each witness
  * links through the one canonical serializer into the dossier. Exported
  * for the deterministic surface test (renderToString), like the work
  * surface's exported rows.

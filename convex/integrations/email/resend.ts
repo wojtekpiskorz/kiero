@@ -1,7 +1,7 @@
 /**
  * The Resend adapter: the one HTTP delivery path for application email.
  *
- * Reusable by design — B1's sign-in OTP and B3's invitations both send
+ * Reusable by design — the sign-in OTP and the invitations both send
  * through `sendViaResend`; only the rendered copy differs (./copy.ts).
  *
  * Server-side key handling: the API key is read from the environment by
@@ -18,7 +18,7 @@
  *   the caller replacing, not duplicating, the pending message).
  *
  * The HTTP call enforces an explicit `AbortController` deadline
- * (A3 finding: `AbortSignal.timeout` is not guaranteed in the Convex
+ * (platform finding: `AbortSignal.timeout` is not guaranteed in the Convex
  * action runtime). No provider payload, header or URL crosses the seam.
  */
 

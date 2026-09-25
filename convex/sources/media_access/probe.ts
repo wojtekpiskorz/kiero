@@ -1,14 +1,14 @@
 /**
- * D3 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, the D1/D2 probe pattern; shared plumbing in
+ * Media-access dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable, the probe pattern; shared plumbing in
  * ../probe_shared.ts).
  *
- * No business work happens here; these entries exist so the D3 evidence can
+ * No business work happens here; these entries exist so the evidence can
  * run against the REAL dev deployment, the REAL gateway Worker and the REAL
  * EU R2 bucket. Every entry resolves the CALLER's identity from that
  * caller's own verified Convex Auth credential (the proof script signs in
- * real fixture persons through B1's email-code flow with fixture codes —
- * the B3 evidence pattern); no identity is ever accepted from client input
+ * real fixture persons through the email-code flow with fixture codes —
+ * the evidence pattern); no identity is ever accepted from client input
  * and the service account is never substituted.
  *
  * - `probeMediaAccess`: runs the SAME per-user resolution the HTTP
@@ -17,7 +17,7 @@
  *   on the real deployment this way.
  * - `probeSetSourceLifecycle`: fixture control for the source-lifecycle
  *   proofs — moves one of the CALLER'S OWN company's accepted sources to
- *   `withdrawn` or `purged` (the C5/I4 operations own the real lifecycle
+ *   `withdrawn` or `purged` (the operations own the real lifecycle
  *   commands; this control only lets the evidence reach the states).
  */
 

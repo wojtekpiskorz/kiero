@@ -1,14 +1,12 @@
 /**
- * Derived search records (A2 candidate, certified by A3; completed by E5
- * for tenant-safe versioned retrieval).
+ * Derived search records.
  *
- * Owning implementer: E5 (indexing/retrieval), H3 (UI reads).
  * Search indexes are disposable derived data, never authority. Entries carry
  * their index generation; incompatible model, dimensions or text preparation
  * requires a new generation and verified cutover. Absence of a semantic hit
  * is never absence of a fact.
  *
- * E5 amendments (the owning lane completes the candidate fragment):
+ * Notes (the owning lane completes the candidate fragment):
  * - `searchEntries.sourceId`: the canonical link for source-backed entries
  *   (message text, transcript, OCR), denormalized so hydration re-checks
  *   source lifecycle and tenant scope without a fragment hop, and scoped
@@ -24,7 +22,7 @@
  *   limit, so the semantic half ranks same-generation rows in-action after
  *   the company filter (the final vector design is the excluded search
  *   track; see @kiero/retrieval similarity).
- * - `searchIndexGenerations.providerRouteVersion`: the frozen E2 route label
+ * - `searchIndexGenerations.providerRouteVersion`: the frozen provider route label
  *   the generation rode, so model + dimensions + preparation + ROUTE are
  *   versioned together (the bounded solution's four versioning axes).
  *
@@ -43,11 +41,11 @@ export const searchTables = {
     sourceFragmentId: v.optional(shared.sourceFragmentId),
     findingId: v.optional(shared.findingId),
     /**
-     * E5: the canonical source this entry was derived from, when it is
+     * The canonical source this entry was derived from, when it is
      * source-backed (message text, transcript segment, OCR region).
      */
     sourceId: v.optional(shared.sourceId),
-    /** E5: the revision a finding-backed entry was prepared from. */
+    /** The revision a finding-backed entry was prepared from. */
     findingRevisionId: v.optional(shared.findingRevisionId),
     /** Versioned text preparation output. */
     preparedText: v.string(),
@@ -67,7 +65,7 @@ export const searchTables = {
     embeddingModel: v.string(),
     textPreparationVersion: v.string(),
     dimensions: v.float64(),
-    /** E5: the frozen E2 provider route label this generation rode. */
+    /** The frozen provider route label this generation rode. */
     providerRouteVersion: v.string(),
     state: v.union(
       v.literal("building"),

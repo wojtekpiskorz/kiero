@@ -1,19 +1,19 @@
 /**
- * Per-pass connection decisions (G2 pure): whether ONE projection pass may
+ * Per-pass connection decisions (pure): whether ONE projection pass may
  * publish desired states at all, and what the connection's sync row must
  * record when it may not.
  *
- * The connection is rechecked PER PASS (issue #46): the durable
+ * The connection is rechecked PER PASS: the durable
  * revocation stop from the access lane is still a lazy prerequisite, and a
  * refresh whose outcome is UNKNOWN means "do not publish, do not retry
  * blindly" — the pass suspends with no desired-state writes and hands the
- * decision to reconciliation (G3). Partial writes are impossible by
+ * decision to reconciliation. Partial writes are impossible by
  * construction: the suspend decision is made BEFORE any copy row is read
  * or written.
  */
 
 /**
- * The typed refresh outcomes G1's credential capability reports. One
+ * The typed refresh outcomes the credential capability reports. One
  * runtime list owns the vocabulary (the transaction's argument validator
  * is typed against the derived union, so drift fails typecheck).
  */
@@ -51,7 +51,7 @@ export type ProjectionMode =
 /**
  * The per-pass mode from the rechecked connection plus the credential
  * capability's outcome. Order matters: a lost membership stops everything
- * (G1 already persisted the stop on the refresh path); an unknown refresh
+ * (the connection lane already persisted the stop on the refresh path); an unknown refresh
  * suspends with the reconciliation handoff; only a confirmed refresh (or
  * an honestly absent credential on a still-connected row, which the
  * refresh action reports itself) can project — and "no credential" never
@@ -88,10 +88,10 @@ export function decideProjectionMode(
 
 /**
  * The sync-row transition one pass applies. A pass that projected leaves
- * `idle` (desired state is current; G3 does the Google legs); a suspended
+ * `idle` (desired state is current; reconciliation does the Google legs); a suspended
  * pass records `needs_reconcile` with its machine reason — the honest
- * "pending changes / needs attention" signal the boss and G3 read.
- * (`syncing` is G3's to set while its Google legs are in flight.)
+ * "pending changes / needs attention" signal the boss and reconciliation read.
+ * (`syncing` is the to set while its Google legs are in flight.)
  */
 export function decideSyncStateTransition(
   mode: ProjectionMode,

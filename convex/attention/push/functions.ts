@@ -1,14 +1,14 @@
 /**
- * The F3 Convex function surface (generated-call APIs).
+ * The web push Convex function surface (generated-call APIs).
  *
  * `runPushDeliveryAttempt` is the durable `attention.deliver_push`
- * executor's action half (the G3 prepare -> leg -> record template): the
+ * executor's action half (the prepare -> leg -> record template): the
  * transport POST leaves the transaction, so the mutation pair
  * (preparePushDelivery / completePushLegs) owns every durable decision
  * while this action only performs the bounded provider legs.
  *
- * `pushSafetyNetTick` is the cron safety net (the F2 evaluator-cron and
- * I2 outbox-cron precedent): under total scheduler loss, or after a job
+ * `pushSafetyNetTick` is the cron safety net (the evaluator-cron and
+ * outbox-cron precedent): under total scheduler loss, or after a job
  * exhausted its bounded attempts with retryable legs left, stale pending
  * per-device rows keep converging; the same tick runs the revocation
  * hygiene pass that persists the honest disabled state for subscriptions
@@ -103,7 +103,7 @@ function normalizeReport(report: {
   }
 }
 
-/** Records the delivery job's terminal/queued state (the G3 completion). */
+/** Records the delivery job's terminal/queued state (the completion). */
 export const completePushJob = internalMutation({
   args: {
     jobKey: v.string(),
@@ -152,7 +152,7 @@ export const completePushJob = internalMutation({
   },
 });
 
-/** The job-row read the executor action starts from (the G3 shape). */
+/** The job-row read the executor action starts from. */
 export const jobInputForPush = internalQuery({
   args: { jobKey: v.string() },
   handler: async (ctx, args) => {

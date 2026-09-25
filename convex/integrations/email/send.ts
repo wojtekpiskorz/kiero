@@ -1,8 +1,8 @@
 /**
  * Application email facade: render + deliver one Kiero email.
  *
- * B1's sign-in OTP calls `deliverApplicationEmail` from its provider
- * config (convex/access/identity/authEntry.ts); B3's invitations will
+ * the sign-in OTP calls `deliverApplicationEmail` from its provider
+ * config (convex/access/identity/authEntry.ts); the invitations will
  * call the same function with the invitation template. The facade keeps
  * ONE delivery path with typed, sanitized outcomes (the adapter owns the
  * HTTP details; this file owns template selection and the Polish error

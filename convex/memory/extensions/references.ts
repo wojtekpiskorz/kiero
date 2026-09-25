@@ -1,6 +1,6 @@
 /**
  * Shared tenant-scoped reference checks and usage bookkeeping for the
- * extensions lane (C3), mirroring the findings lane's references module.
+ * extensions lane, mirroring the findings lane's references module.
  *
  * Visibility rule: a company sees its OWN definitions and the SHARED
  * definitions (companyId absent). Anything else — missing or another firm's

@@ -1,5 +1,5 @@
 /**
- * Quote location (E3): mapping the model's verbatim evidence quote onto a
+ * Quote location: mapping the model's verbatim evidence quote onto a
  * stable text range of the source ("Fragment źródła": "fragment tekstu",
  * with honest whole-material fallback per CONTEXT.md).
  *

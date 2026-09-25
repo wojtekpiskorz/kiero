@@ -1,10 +1,10 @@
 /**
- * The single redaction definition for Kiero diagnostics (I2).
+ * The single redaction definition for Kiero diagnostics.
  *
  * PURE MODULE: no Convex or Node imports, so the gateway Worker and
  * the Convex functions share ONE sanitizer (the architecture's GW -> OBS flow
  * must not grow a second, drifting copy). Its single import is the shared
- * deployment label pattern from @kiero/runtime (itself Convex-free): R13's
+ * deployment label pattern from @kiero/runtime (itself Convex-free): the
  * consolidation of the environment label set that used to live here as a
  * private regex twin.
  *
@@ -49,13 +49,11 @@ export const DIAGNOSTIC_EVENT_KINDS = [
   // Monitor group 2: recovery/health (incl. backend-silence detection)
   "ops.health.heartbeat",
   "ops.health.silence_detected",
-  // I5 append (issue #57, flagged shared-file change - the sibling pattern):
-  // complete-backup freshness. Emitted by the backups freshness check when
+  // Complete-backup freshness. Emitted by the backups freshness check when
   // the newest VERIFIED manifest's SNAPSHOT age exceeds one hour (or runs
   // exist but none ever verified); deduped per staleness episode.
   "ops.backup.stale",
-  // I4 append (issue #56, flagged shared-file change - the I5 precedent):
-  // permanent-deletion 24-hour tracking. Emitted by the deletion purge tick
+  // Permanent-deletion 24-hour tracking. Emitted by the deletion purge tick
   // when a derivative family's stage is still un-purged past its deadline;
   // deduped per stage per hour (the tick's deadline slides hourly).
   "ops.deletion.overdue",
@@ -89,12 +87,12 @@ export const METADATA_KEY_FORMATS = {
   /**
    * Closed snake_case error/state/outcome kinds (sanitized, no payloads).
    *
-   * R28: producers emit actionable failures as `kind:detail` composites -
+   * Producers emit actionable failures as `kind:detail` composites -
    * the closed-error `${_tag}:${code}` pair (e.g.
-   * `unavailable:images_executor_unavailable`, I11's live finding) and the
+   * `unavailable:images_executor_unavailable`, the live finding) and the
    * lane-prefixed refusal kinds (`withdrawal_marking_refused:<code>`). The
    * format admits exactly one of two closed branches:
-   * - colon-free: the pre-R28 shape, unchanged (ErrorCode-width snake_case);
+   * - colon-free: the original shape, unchanged (ErrorCode-width snake_case);
    * - one optional colon: both segments closed-format snake_case - the kind
    *   segment at most 32 chars (the longest producer prefix,
    *   `withdrawal_marking_refused`, is 26), the detail segment carrying the
@@ -109,7 +107,7 @@ export const METADATA_KEY_FORMATS = {
   outcome: /^[a-z][a-z0-9_]{1,31}$/,
   status: /^[a-z][a-z0-9_]{1,31}$/,
   jobKind: /^[a-z][a-z0-9_.]{2,63}$/,
-  /** I4 append (flagged): the deletion purge stage vocabulary (dotless). */
+  /** The deletion purge stage vocabulary (dotless). */
   stageKind: /^[a-z][a-z0-9_]{1,31}$/,
   eventName: /^[a-z][a-z0-9_.]{2,63}$/,
   /** Non-negative integer counters/latencies in milliseconds. */
@@ -136,7 +134,7 @@ export const METADATA_KEY_FORMATS = {
   basis: /^(observed|estimate)$/,
   level: /^(warning_400|alert_500)$/,
   serviceName: /^[a-z][a-z0-9_.-]{2,63}$/,
-  /** The closed deployment label set, shared with the classification rule (R13). */
+  /** The closed deployment label set, shared with the classification rule. */
   environment: DEPLOYMENT_ENVIRONMENT_PATTERN,
   /** Gateway route path (starts with `/`, no query strings possible). */
   route: /^\/[a-z0-9/_-]{1,120}$/,

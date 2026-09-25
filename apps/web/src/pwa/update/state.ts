@@ -1,8 +1,8 @@
 /**
- * The PWA update surface's Polish copy (I7): the update prompt shown only
+ * The PWA update surface's Polish copy: the update prompt shown only
  * at a safe point, and the closed vocabulary the update flow reports.
  *
- * Product text: "szkic" is D4's established capture-surface word for
+ * Product text: "szkic" is the established capture-surface word for
  * the composer's local state (a draft that is local until the server
  * confirms; it is not a CONTEXT.md glossary term), and the thing being
  * updated is the Kiero application the boss is looking at.

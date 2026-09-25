@@ -1,10 +1,10 @@
 /**
- * The B4 GM lane policy: the authoritative rule set for the GM dispatch
- * surface, layered OVER B3's membership rules (not instead of them).
+ * The GM lane policy: the authoritative rule set for the GM dispatch
+ * surface, layered OVER the membership rules (not instead of them).
  *
- * What decides where (mirroring B3's documented split):
+ * What decides where (mirroring the documented split):
  *
- * - Session liveness is enforced BEFORE this policy, by the B1 identity
+ * - Session liveness is enforced BEFORE this policy, by the identity
  *   resolution the GM dispatch composes (provision-or-refresh); a denied
  *   session resolves no authority and fails `unauthenticated`.
  * - `decideGmRequest` decides HERE, over resolved facts only — and RUNS in
@@ -20,7 +20,7 @@
  * The two-way fail-closed routing — member operations never route through
  * the GM dispatch and GM operations never route through the membership
  * dispatch — is STRUCTURAL: the registries themselves (GM_OPERATIONS here,
- * B1/B3's handler tables there) contain no foreign names. The focused
+ * the identity and membership handler tables there) contain no foreign names. The focused
  * verification pins it against those real registries; no second,
  * hand-maintained copy of their names exists here.
  */
@@ -38,7 +38,7 @@ export const GM_OPERATIONS: readonly string[] = [
 
 /** The decision inputs: resolved facts about the acting request. */
 export interface GmRequestFacts {
-  /** A live, unrevoked session resolved (B1 identity source). */
+  /** A live, unrevoked session resolved (identity source). */
   readonly hasLiveSession: boolean;
   /** An open gmAccessGrants row for the session's user. */
   readonly hasOpenGrant: boolean;

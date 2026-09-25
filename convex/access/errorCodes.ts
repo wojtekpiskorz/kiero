@@ -1,11 +1,11 @@
 /**
- * The ONE closed vocabulary of access refusal codes (R26, issue #232).
+ * The ONE closed vocabulary of access refusal codes.
  *
- * B5's live qualification (defect D1) proved that classifying sign-in and
+ * The live qualification proved that classifying sign-in and
  * linking refusals by ERROR MESSAGE TEXT cannot work on a production-type
  * deployment: Convex sanitizes messages to "Server Error", so the honest
  * Polish copies keyed on `[kiero:…]` markers and library strings never
- * rendered. From R26 on, every classified refusal is thrown as a
+ * rendered. Every classified refusal is thrown as a
  * `ConvexError` whose DATA carries one of the codes below — Convex
  * preserves `error.data` through production sanitization, so the client
  * decodes the code and never regexes the message.
@@ -96,7 +96,7 @@ export function decodeAccessRefusalCode(data: unknown): AccessRefusalCode | null
 }
 
 /**
- * Error-taking decoder: THE one `.data` extraction cast (R26 review round 1
+ * Error-taking decoder: THE one `.data` extraction cast (review
  * — one per surface drifts; one in the leaf does not). Accepts any thrown
  * value, returns the closed code or null.
  */

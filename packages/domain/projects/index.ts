@@ -1,6 +1,6 @@
 /**
  * @kiero/domain/projects: the pure semantic rules for the projects half of
- * the "Projects and work" deep module (C1).
+ * the "Projects and work" deep module.
  *
  * Everything here is total functions over small row views: no db, no
  * Convex, no clock. The transaction halves in `convex/projects/` adapt these
@@ -11,7 +11,7 @@
  *
  * Consumers reach this folder through explicit relative imports until the
  * coordinated package exports amendment lands (a shared-file need reported
- * by C1: `packages/domain/package.json` exports and `src/index.ts`
+ * by the projects domain: `packages/domain/package.json` exports and `src/index.ts`
  * re-exports are bootstrap-owned, not lane-owned).
  */
 

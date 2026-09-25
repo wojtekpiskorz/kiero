@@ -1,5 +1,5 @@
 /**
- * The permanent-deletion durable executor (I4): `deletion.purge_source`.
+ * The permanent-deletion durable executor: `deletion.purge_source`.
  *
  * The registered consumer of `sources.sourcePurged` (the projection this
  * lane owns in convex/platform/outbox.ts). The initiating transaction
@@ -11,26 +11,26 @@
  * - `findings_marking` (in transaction): findings whose current revision
  *   rested only on the purged source become explicitly unknown through the
  *   shared marking core (./marking.ts), and every marked root hands its
- *   dependents to the C5 cascade (`memory.dependentsMarkedStale` carriers).
+ *   dependents to the cascade (`memory.dependentsMarkedStale` carriers).
  * - `transcripts` (in transaction): the source's transcript manifests and
  *   verbatim segment texts, vision orders, extraction versions and
  *   fragments are DELETED (this is permanent deletion, not withdrawal
  *   history); an in-flight change set of the source fails with the typed
  *   purge reason so a late AI plan cannot publish over the tombstone
- *   (E3's publish re-check stays the structural guard). R2 (issue #127):
+ *   (the publish re-check stays the structural guard). R2:
  *   BEFORE the fragments leave, the clarification content linked through
- *   them (and through R1 resolution evidence) is purged in one idempotent
+ *   them (and through resolution evidence) is purged in one idempotent
  *   per-source pass — associations removed, possibly derived text
  *   replaced with the fixed redaction copy, content-free audit metadata
  *   recorded, surviving ACTIVE references kept.
  * - `search_index` (in transaction): the source's derived search rows go
- *   through E5's own delete core (the same one the `refresh_source` drain
+ *   through its own delete core (the same one the `refresh_source` drain
  *   edge calls), so this stage is the 24-hour VERIFICATION authority even
  *   if the drain reaction lagged.
  * - `notification_work` (in transaction): the source's pending or
  *   evaluating notification intents suppress with the machine purge reason
  *   (the due-time lifecycle re-check remains the structural guard), and
- *   R3 terminally suppresses every affected still-pending push delivery
+ *   Deletion terminally suppresses every affected still-pending push delivery
  *   row - prepared payloads included - replacing the stored payload with
  *   non-content data so no retry can transport the deleted preview;
  *   settled rows (delivered/failed/unknown) keep their honest truth.
@@ -40,12 +40,12 @@
  * - `media_objects` (external): the R2 object keys of the source's
  *   attachments and representations leave through the gateway's purge
  *   route (the Worker owns the bucket); the effect leaves the transaction
- *   (the echo/I3 external protocol) and the action records the outcome.
+ *   (the echo/export external protocol) and the action records the outcome.
  *
  * Every stage is idempotent: a retry re-runs un-purged stages and skips
  * purged ones; the job succeeds only when no pending stage remains. The
  * stage rows are the administrator's pending/complete/failed status, and
- * I2's incident scan sees the exhausted job row (`ops.job.attempts_exhausted`).
+ * the incident scan sees the exhausted job row (`ops.job.attempts_exhausted`).
  */
 
 import { v } from "convex/values";
@@ -165,7 +165,7 @@ async function purgeFindingsMarking(tx: MutationCtx, stage: StageRow): Promise<v
 
 /** The transcripts/extractions/fragments stage (permanent row deletion). */
 async function purgeTranscripts(tx: MutationCtx, stage: StageRow): Promise<void> {
-  // R2 (issue #127): FIRST the clarifications the fragments anchor. Their
+  // FIRST the clarifications the fragments anchor. Their
   // content purge must run while the fragment rows still exist (it finds
   // linked cases through them): links to the deleted source are removed,
   // possibly derived text is replaced with the fixed redaction copy, and
@@ -211,7 +211,7 @@ async function purgeTranscripts(tx: MutationCtx, stage: StageRow): Promise<void>
   for (const fragment of fragments) {
     await tx.db.delete(fragment._id);
   }
-  // In-flight publication plans of the purged source fail honestly; E3's
+  // In-flight publication plans of the purged source fail honestly; the
   // publish re-check keeps this belt from ever being load-bearing.
   const changeSets = await tx.db
     .query("changeSets")
@@ -228,7 +228,7 @@ async function purgeTranscripts(tx: MutationCtx, stage: StageRow): Promise<void>
   await markStagePurged(tx, stage);
 }
 
-/** The search stage (E5's delete core; the 24-hour verification authority). */
+/** The search stage (the delete core; the 24-hour verification authority). */
 async function purgeSearchIndex(tx: MutationCtx, stage: StageRow): Promise<void> {
   await deleteSourceEntries(tx, stage.sourceId);
   await markStagePurged(tx, stage);
@@ -285,7 +285,7 @@ async function pushIntentAffectedByPurge(
 /**
  * The notification stage: pending/evaluating intents suppress with the
  * machine purge reason (the due-time lifecycle re-check remains the
- * structural guard), and R3 (issue #128) terminally suppresses every
+ * structural guard), and it terminally suppresses every
  * AFFECTED still-pending push delivery row - including prepared payloads
  * whose intent already delivered - replacing the stored payload with
  * non-content data so a retry can never transport the deleted preview.
@@ -310,7 +310,7 @@ async function purgeNotificationWork(
       });
     }
   }
-  // R3: the affected-work scan rides the company-state index (bounded to
+  // The affected-work scan rides the company-state index (bounded to
   // this firm's pending rows), and every affected intent's pending rows go
   // through the ONE production suppressor the prepare path uses, so the
   // stored payload replacement can never drift between the two writers.
@@ -535,7 +535,7 @@ async function runStage(
 }
 
 // ---------------------------------------------------------------------------
-// The external media purge action (the echo/I3 external protocol).
+// The external media purge action (the echo/export external protocol).
 // ---------------------------------------------------------------------------
 
 const HTTP_TIMEOUT_MS = 30_000;
@@ -591,7 +591,7 @@ export const mediaPurgeWorkFor = internalQuery({
   },
 });
 
-/** The classification of one gateway purge call (the I3 shape). */
+/** The classification of one gateway purge call. */
 export type PurgeCallClassification =
   | { readonly kind: "succeeded" }
   | { readonly kind: "failed"; readonly retryable: boolean; readonly errorKind: string }

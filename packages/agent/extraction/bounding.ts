@@ -1,8 +1,8 @@
 /**
- * Completeness-based publication bounding (E4): turning the joined plan
+ * Completeness-based publication bounding: turning the joined plan
  * into bounded groups split BY EVIDENCE COMPLETENESS.
  *
- * E3 bounds groups by scope (firm memory vs each project) and pulls
+ * Text analysis bounds groups by scope (firm memory vs each project) and pulls
  * derivations into their basis's group. The join keeps that rule and adds
  * the partial-safe split INSIDE a scope: within one scope, proposals whose
  * evidence is entirely inspectable (text over the author's words, intervals
@@ -25,7 +25,7 @@
  *   structurally; this re-proves it at the boundary);
  * - `groupGroundingComplete`: a group publishes only when every evidence
  *   kind it uses is complete in the CURRENT coverage snapshot — the
- *   publish stage re-runs this against a FRESH read before C2.
+ *   publish stage re-runs this against a FRESH read before publication.
  */
 
 import { revisionSnapshotOf, sameScope, type AnalysisContext } from "../planning/context";
@@ -40,7 +40,7 @@ import type {
   MultimodalPlanningState,
 } from "./reducer";
 
-/** The stable identity of one publication group (E3's shape). */
+/** The stable identity of one publication group. */
 export interface JoinGroupKey {
   readonly kind: "company" | "project";
   /** The `new:N` handle for a to-be-created project, else the project id. */
@@ -53,7 +53,7 @@ export interface MultimodalPublicationGroup {
   readonly proposals: readonly MultimodalFindingProposal[];
   /** Whether every proposal's evidence is complete in the bounding snapshot. */
   readonly waitForMedia: boolean;
-  /** Input-revision expectations from the analysis context (E3's anchor). */
+  /** Input-revision expectations from the analysis context (anchor). */
   readonly analysisRevisions: readonly { findingId: string; revision: number }[];
 }
 
@@ -102,7 +102,7 @@ export function mediaClaimsBackedByCompleteInputs(
   return plan.proposals.every((proposal) => proposalGroundingComplete(proposal, coverage));
 }
 
-/** The group key of one scope (E3's derivation, unchanged). */
+/** The group key of one scope (the derivation, unchanged). */
 export function joinGroupKeyOfScope(scope: {
   readonly kind: "company" | "project";
   readonly projectId?: string | null;
@@ -116,7 +116,7 @@ export function joinGroupKeyOfScope(scope: {
  * Bounds the joined plan: one group per (scope x completeness) pair —
  * within a scope, the publishable proposals and the media-waiting
  * proposals form SEPARATE groups, so waiting never blocks publishing and
- * publishing never drags an ungrounded claim along. Derivations keep E3's
+ * publishing never drags an ungrounded claim along. Derivations keep the
  * rule (they commit with their basis; a foreign-scope basis drops
  * fail-closed).
  */
@@ -158,7 +158,7 @@ export function boundMultimodalGroups(
 }
 
 /**
- * The honest joined-group outcome vocabulary (E3's, with the media wait
+ * The honest joined-group outcome vocabulary (text analysis's, with the media wait
  * made first-class).
  */
 export type JoinGroupOutcome =

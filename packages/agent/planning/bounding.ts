@@ -1,5 +1,5 @@
 /**
- * Publication-group bounding (E3): turning the accumulated plan into
+ * Publication-group bounding: turning the accumulated plan into
  * bounded, source-linked, logically dependent groups (protocol step 7: a
  * delivery event and its deliberately linked receiving task publish
  * together; independent information for another project can complete
@@ -19,7 +19,7 @@
  *   (the stage-one context snapshot): the publish stage passes them as the
  *   CALLER expectations, so a newer correction mid-run (or before a paused
  *   plan publishes) refuses the group instead of overwriting the newer
- *   truth (C2's stale-plan guard wired; issue #8 precedence).
+ *   truth (the stale-plan guard wired precedence).
  */
 
 import {
@@ -108,7 +108,7 @@ export function boundPublicationGroups(
 
 /**
  * The honest group outcome vocabulary recorded per group against one
- * source (issue #37: "committed, awaiting clarification, pending and
+ * source ("committed, awaiting clarification, pending and
  * failed groups remain explicit against one source").
  */
 export type GroupOutcome =
@@ -129,7 +129,7 @@ export interface GroupPublishReadiness {
   readonly currentRevisions: Readonly<Record<string, number>>;
 }
 
-/** The decision: publish through C2, or refuse honestly. */
+/** The decision: publish through the findings lane, or refuse honestly. */
 export type GroupPublishDecision =
   | { readonly decision: "publish" }
   | { readonly decision: "refuse"; readonly code: "analysis_context_stale" };
@@ -139,7 +139,7 @@ export type GroupPublishDecision =
  * address by id) must still be at the revision the analysis saw. A newer
  * correction between stage one and commit means the plan analyzed a
  * superseded world: refuse — reanalysis as a linked NEW run is the only
- * recovery, never an overwrite (issue #8).
+ * recovery, never an overwrite.
  */
 export function decideGroupPublish(
   readiness: GroupPublishReadiness,

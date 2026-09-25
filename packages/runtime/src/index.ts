@@ -1,5 +1,5 @@
 /**
- * @kiero/runtime: the platform runtime (A3).
+ * @kiero/runtime: the platform runtime.
  *
  * Small public interface, deep internals (execution charter: "Effect
  * execution, checked runtime interfaces, durable stage registration"):
@@ -9,7 +9,7 @@
  *   decode, sanitized handlers). Invalid input reaches no domain effect.
  * - `VerifiedIdentity`, `resolveContextFrom*`, `RequestContext`,
  *   `AccessPolicy`/`membershipPolicy`: the actor/session/tenant context and
- *   the authorization seam B1/B3 plug authoritative rules into.
+ *   the authorization seam identity and membership plug authoritative rules into.
  * - `decideEventPublication`, `decideJobRegistration`, `nextDeliveryState`,
  *   `backoffDelayMs`, `reconcileMayRetry`: the single definition of outbox
  *   idempotency, retry and uncertain-outcome rules used by the transactional
@@ -22,11 +22,11 @@
  *   environment label rule (the set, and the absent/unknown/empty-means-dev
  *   classification) the telemetry cron, the backups boundary, the redaction
  *   format set, the Calendar return resolver and the gateway telemetry
- *   surface all route through (R13).
+ *   surface all route through.
  * - `runDomainEffect`: Effect 4 RC execution inside Convex functions with a
  *   bounded deadline and defect sanitization.
  * - `toolJsonSchema`: the TanStack AI standard-schema -> JSON-schema
- *   conversion over A2 contract schemas (no provider calls).
+ *   conversion over contract schemas (no provider calls).
  *
  * The Convex-coupled halves (real table access, the native scheduler, the
  * workflow engine, HTTP boundaries) live in `convex/platform/**` and

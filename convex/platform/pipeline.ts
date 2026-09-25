@@ -1,5 +1,5 @@
 /**
- * The durable processing pipeline (A3): @convex-dev/workflow, the one
+ * The durable processing pipeline: @convex-dev/workflow, the one
  * canonical workflow engine, composed with the native scheduler.
  *
  * What remains here is the platform's OWN mechanical proof workflow
@@ -14,7 +14,7 @@
  * whose stage N fails deterministically leaves stages 1..N-1 committed
  * exactly once; restarting from the journal resumes AFTER them without
  * re-executing committed stages, verified by counting step rows. The
- * `WorkflowManager` instance this module owns also powers E3's real
+ * `WorkflowManager` instance this module owns also powers the real
  * text-analysis workflow (convex/processing/text/analyze.ts), which
  * replaced the mechanical executor for `processing.analyze_change_plan`
  * behind the same seam.

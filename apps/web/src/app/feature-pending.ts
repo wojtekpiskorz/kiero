@@ -1,6 +1,6 @@
 /**
  * The shared honest placeholder screen for pending host feature entries
- * (A4): a pending entry states "W przygotowaniu.", explains what is
+ * (Polish copy): a pending entry states "W przygotowaniu.", explains what is
  * missing in Polish, and lists the contract operations the feature will
  * consume once its owning lane mounts it. Written with `createElement`
  * (no JSX) to keep the composed registry importable from the root node

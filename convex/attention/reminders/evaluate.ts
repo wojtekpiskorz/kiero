@@ -1,6 +1,6 @@
 /**
- * The reminder evaluator's scheduled/cron entries (F4): the durable
- * execution side of `attention.evaluateDueReminders` (the F2
+ * The reminder evaluator's scheduled/cron entries: the durable
+ * execution side of `attention.evaluateDueReminders` (the notification-intents
  * `delivery/evaluate.ts` pattern - native Convex scheduler plus a cron
  * safety net).
  *

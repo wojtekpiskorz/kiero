@@ -9,7 +9,7 @@
  * semantics. Reanalysis is a linked NEW run; it can never overwrite a newer
  * correction.
  *
- * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
+ * Certified by platform on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";
@@ -21,17 +21,16 @@ export const DurableJobKind = Schema.Literals([
   "processing.extract_fragments",
   "processing.analyze_change_plan",
   "processing.normalize_photo",
-  // E4 amendment (flagged coordinated change, the D6 precedent): the
+  // The
   // multimodal-join executor over one mixed source's extraction outcomes
-  // (issue #38).
+  // .
   "processing.join_multimodal",
   "memory.publish_change_set",
   "memory.recompute_dependents",
-  // A3 certification rename (one concept, one name): the module surface is
+  // Platform certification rename (one concept, one name): the module surface is
   // `attention`, so the job kinds follow it (was `notifications.*`).
   "attention.evaluate_due_intents",
-  // F4 amendment (issue #44, flagged coordinated change, the F2/D6
-  // precedent): the task-reminder scheduling job kind - the durable
+  // The task-reminder scheduling job kind - the durable
   // reaction to the work task events and bound-deadline revisions
   // (`convex/attention/reminders/executor.ts` implements it).
   "attention.schedule_task_reminders",
@@ -43,8 +42,8 @@ export const DurableJobKind = Schema.Literals([
   "backups.verify_manifest",
   "search.index_generation",
   "access.cleanup_revocation",
-  // A3 certification amendment: the platform's own external-delivery proof
-  // executor (echo stand-in for provider calls; E2 later points the same
+  // Platform certification amendment: the platform's own external-delivery proof
+  // executor (echo stand-in for provider calls; provider routing points the same
   // mechanism at OpenRouter).
   "platform.echo_delivery",
 ]);

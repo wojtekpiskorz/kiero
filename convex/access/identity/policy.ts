@@ -1,7 +1,7 @@
 /**
- * The B1 access policy, registered over the platform default.
+ * The access policy, registered over the platform default.
  *
- * The A3 authorization seam (packages/runtime/src/context.ts) says B1/B3
+ * The authorization seam (packages/runtime/src/context.ts) says identity and membership
  * register the authoritative implementation over `membershipPolicy`. The
  * live-session guarantees — upstream session existence, explicit
  * revocation, the 30-day inactivity rule — are enforced BEFORE the policy
@@ -12,7 +12,7 @@
  * checks once its app session is revoked or inactive.
  *
  * Role, tenant-scope, admin and GM semantics stay the platform defaults
- * until B3 replaces this registration with the authoritative rule set
+ * until membership replaces this registration with the authoritative rule set
  * (last-admin constraints, invitation admission, GM audit integration).
  */
 
@@ -25,9 +25,9 @@ import {
 } from "@kiero/runtime";
 
 /**
- * B1's registered policy: delegates to the platform default after the
+ * the registered policy: delegates to the platform default after the
  * live-session resolution has already gated the context. Swapping this
- * object (not the resolution) is how B3 takes over authorization.
+ * object (not the resolution) is how membership takes over authorization.
  */
 export const liveSessionPolicy: AccessPolicy = {
   policyId: "access.b1-live-session-v1",
@@ -35,7 +35,7 @@ export const liveSessionPolicy: AccessPolicy = {
     context: RequestContext | null,
     request: AccessRequest,
   ): Promise<AuthorizationDecision> => {
-    // Pre-condition owned by B1's resolution: a context exists only for a
+    // Pre-condition owned by the resolution: a context exists only for a
     // live, unrevoked, active session. Documented, not re-checked here —
     // the resolution is the single authority for session validity.
     return await membershipPolicy.authorize(context, request);

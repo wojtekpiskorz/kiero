@@ -1,13 +1,13 @@
 /**
- * The barebones permanent-deletion feature (I4): the administrator-only
+ * The barebones permanent-deletion feature: the administrator-only
  * impact preview, the explicit confirmation and the pending/complete/failed
- * cleanup status issue #56 registers ("Expose an administrator-only
+ * cleanup status ("Expose an administrator-only
  * unstyled impact preview and explicit permanent-delete confirmation, with
  * pending/complete/failed external-cleanup state. This is a real
  * registered feature, distinct from ordinary withdrawal").
  *
  * JSX-free on purpose (createElement only): the host feature registry chain
- * is imported by node test programs (the A4/I3 pattern). Every durable
+ * is imported by node test programs. Every durable
  * change goes through the SAME checked sources dispatch the conversation
  * uses (`sources.purgeSource`, administer intent decided server-side from
  * the CURRENT membership role); the preview and status come from the

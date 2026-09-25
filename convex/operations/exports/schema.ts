@@ -1,8 +1,6 @@
 /**
- * Firm export tables (A2 candidate, certified by A3; completed by I3 for
- * consistent snapshots with protected downloads, issue #55).
+ * Firm export tables.
  *
- * Owning implementer: I3.
  * A firm export is a background archive (HTML index, versioned JSON,
  * history, retained media) at a consistent snapshot time. Downloads require
  * current administrator access, stay available 24 hours after completion,
@@ -10,7 +8,7 @@
  * deleted. Platform backups and auth secrets are never part of a firm
  * export; other tenants never appear.
  *
- * I3 completion of the candidate fragment (every added column is OPTIONAL so
+ * Additions to the certified fragment (every added column is OPTIONAL so
  * earlier rows stay valid):
  *
  * - `buildToken`: the identity of the build attempt currently allowed to
@@ -24,7 +22,7 @@
  *   (`ARCHIVE_SCHEMA_VERSION` in ./protocol.ts).
  * - `etag`/`bytes`: the published object's ledger record; the download
  *   gateway verifies the live R2 object against them and serves nothing on
- *   drift (the D3 discipline).
+ *   drift (the discipline).
  * - `completedAtMs`, `invalidatedAtMs`, `failedAtMs`, `cleanedAtMs` and the
  *   sanitized closed `failureKind`/`invalidationReason`: the auditable
  *   lifecycle after `available` (the status stays readable after the bytes

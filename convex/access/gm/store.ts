@@ -1,8 +1,8 @@
 /**
- * The GM transaction store surface (B4).
+ * The GM transaction store surface.
  *
  * The minimal read/write surface the GM transactional cores consume,
- * following the B1/B2 store pattern: plain-string ids (the Convex adapter
+ * following the store pattern: plain-string ids (the Convex adapter
  * normalizes branded ids exactly once, at the adapter), direct per-entity
  * methods, no query-chain types — so an in-memory fake (tests/b4) implements
  * it line by line and the cores stay unit-testable without a deployment.

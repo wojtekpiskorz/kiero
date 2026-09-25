@@ -1,5 +1,5 @@
 /**
- * Inflection-tolerant evidence matching (E6, pre-E5): the pure string
+ * Inflection-tolerant evidence matching: the pure string
  * half of the tenant-scoped evidence search, unit-testable without
  * Convex (the internalQuery in convex/agent/evidence.ts composes it).
  *
@@ -93,7 +93,7 @@ export function overlapLocation(
   }
   const matchStart = Math.min(...matched.map((token) => token.start));
   const matchEnd = Math.max(...matched.map((token) => token.end));
-  // Widen to the containing sentence (nearest . ! ? boundaries).
+  // Widen to the containing sentence (nearest. ! ? boundaries).
   let start = matchStart;
   while (start > 0 && !".!?".includes(authorText[start - 1] ?? "")) {
     start -= 1;

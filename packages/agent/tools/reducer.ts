@@ -1,12 +1,12 @@
 /**
- * The answer-contract reducer (E6): validation of the structured answer
+ * The answer-contract reducer: validation of the structured answer
  * and its citations against the tenant-filtered answer context — decoded,
  * never trusted.
  *
- * E2's chat adapter hands each tool call back with its arguments DECODED
+ * the chat adapter hands each tool call back with its arguments DECODED
  * against the declared schema; this reducer then validates the decoded
  * arguments against the answer context and the run's evidence ledger. The
- * load-bearing rules (issue #40 acceptance):
+ * load-bearing rules:
  *
  * - GROUNDED VS UNGROUNDED: every factual statement (`direct`,
  *   `corroboration`) must cite at least one ledger handle that resolves;
@@ -16,7 +16,7 @@
  * - CORROBORATION IS A SECOND WITNESS: `corroboration` needs at least two
  *   citations from DIFFERENT sources — one source stated twice is not
  *   independent confirmation.
- * - THE UPDATING GATE (C5): evidence grounding an updating finding never
+ * - THE UPDATING GATE: evidence grounding an updating finding never
  *   grounds an established statement; the finding is disclosed, not
  *   asserted. The same gate covers conflicted findings — a contradiction
  *   the model cannot resolve in context is a clarification, not a guess.
@@ -479,9 +479,9 @@ function applyChangeEvent(
 
 /**
  * Applies one decoded answer-flow call. Arguments must already be DECODED
- * (E2's adapter guarantees this); a call whose arguments fail the deeper
+ * (the adapter guarantees this); a call whose arguments fail the deeper
  * context validation is refused with a Polish tool result the model can
- * correct in a later turn. Unknown tool names are refused — though E2's
+ * correct in a later turn. Unknown tool names are refused — though the
  * adapter already fails those closed.
  *
  * Note: `agent_search_evidence` and `agent_validate_extension_value` are

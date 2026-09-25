@@ -1,5 +1,5 @@
 /**
- * The Convex protocol client over the verified HTTP boundary (I5): the
+ * The Convex protocol client over the verified HTTP boundary: the
  * container's transport for lease/complete/fail/sweep/state. Bearer is the
  * deployment's shared service credential (digest-compared server side);
  * a missing credential is a typed refusal, never a silent skip.

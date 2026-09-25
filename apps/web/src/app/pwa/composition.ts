@@ -1,8 +1,8 @@
 /**
- * PWA manifest/service-worker entry composition (A4 preparation).
+ * PWA manifest/service-worker entry composition.
  *
  * This module only PREPARES the composition seams; it registers nothing
- * yet. F3 owns the push module, I7 owns the update behavior, and the
+ * yet. The push module owns push, the update module owns updates, and the
  * manifest/service-worker scripts arrive with them. Two hard rules are
  * encoded here for those lanes:
  *
@@ -11,7 +11,7 @@
  * - no service-worker cache may serve protected data in a way that
  *   bypasses current access checks (execution charter / issue 19 AC):
  *   protected reads stay behind live authorized queries. Stated here for
- *   F3/I7; nothing in this module enforces it.
+ *   the push and update modules; nothing in this module enforces it.
  *
  * The module deliberately avoids DOM global types (structural handle,
  * globalThis probing) so the node-side test program can import it without
@@ -24,7 +24,7 @@ export interface ServiceWorkerRegistrationHandle {
   readonly scope: string;
 }
 
-/** Push handling module slot (F3 owns the implementation). */
+/** Push handling module slot (implemented in ../../pwa/push.ts). */
 export interface PushEntryModule {
   /** FeatureId-pattern identifier of the owning module (e.g. `push.webPush`). */
   readonly moduleId: string;
@@ -32,7 +32,7 @@ export interface PushEntryModule {
   register(registration: ServiceWorkerRegistrationHandle): Promise<void>;
 }
 
-/** Update behavior module slot (I7 owns the implementation). */
+/** Update behavior module slot (implemented in ../../pwa/update). */
 export interface UpdateEntryModule {
   /** FeatureId-pattern identifier of the owning module (e.g. `update.pwa`). */
   readonly moduleId: string;
@@ -52,7 +52,7 @@ export interface PwaComposition {
 
 /**
  * Composes the PWA entries. Today every slot is null: no worker exists,
- * so nothing is registered and no cache can exist. F3/I7 attach their
+ * so nothing is registered and no cache can exist. The push and update modules attach their
  * modules together with the worker script that owns them.
  */
 export function composePwaEntries(input: {
@@ -93,11 +93,11 @@ function serviceWorkerContainer(): ServiceWorkerContainerLike | undefined {
  * Registers the composed service worker plan. A no-op while no script is
  * composed; outside browsers it also stays a no-op.
  *
- * I7 append (flagged shared-file change, the D4/F3 sibling pattern): the
+ * The
  * registration handle this composition created is now handed to the
  * composed module hooks, so push registration and the safe update flow
- * ride the ONE registration path this seam owns. F3's push hook stays
- * passive by its own contract; I7's update hook starts the safe-point
+ * ride the ONE registration path this seam owns. The push hook stays
+ * passive by its own contract; the update hook starts the safe-point
  * flow for the worker's scope. The two hooks run as independent legs:
  * push registration must never wait on the update flow's first poll,
  * which is network-bound (the backend health read) exactly on the

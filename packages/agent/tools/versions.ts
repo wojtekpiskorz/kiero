@@ -1,9 +1,9 @@
 /**
- * Version labels and bounds of the answer-tools surface (E6).
+ * Version labels and bounds of the answer-tools surface.
  *
  * The answer flow records which prompt, tool schema and model/route
  * configuration produced an answer, so every recorded answer stays
- * interpretable against the versions that produced it (the E3 precedent:
+ * interpretable against the versions that produced it (the precedent:
  * wording changes are version bumps, never silent edits). Bounds keep one
  * answer run single-digit provider requests with a reviewable shape.
  */

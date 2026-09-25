@@ -1,7 +1,7 @@
 /**
- * Pure withdrawal-recomputation rules (C5): the revalidation-state decisions
+ * Pure withdrawal-recomputation rules: the revalidation-state decisions
  * that decide what happens to affected findings — the "Źródło wycofane"
- * half C2's marking core does not cover (derivation-only dependents located
+ * half the marking core does not cover (derivation-only dependents located
  * through findingDependencies).
  *
  * Protocol step 8 (architecture design): "Dependent inferred conclusions
@@ -12,12 +12,12 @@
  * `known`), and the marking is replaced only by a newer publication or an
  * explicit correction — revalidation.
  *
- * Deliberately NO traversal lives here (review round 2): the durable
+ * Deliberately NO traversal lives here: the durable
  * cascade's mechanism is marking idempotence — a finding is marked at most
  * once, so the walk terminates without a visited set, and cycle safety is
  * pinned where the graph invariant is enforced (findings/provenance's
  * `wouldCreateCycle`, checked at prepare and publish). Graph walks for
- * later consumers (E5 search reindexing, I4 purge) arrive with those lanes.
+ * later consumers (search reindexing, purge) use the same rules.
  *
  * Everything here is pure (no I/O, no Convex); the durable executor in
  * convex/memory/recompute runs these decisions inside its own transaction
@@ -56,7 +56,7 @@ export interface KnowledgeTagLike {
 
 /**
  * Whether one knowledge state is the updating-until-revalidated marking.
- * The named predicate consumers (notifications, Calendar, E6) gate on —
+ * The named predicate consumers (notifications, Calendar, agent answers) gate on —
  * work/dueness already refuses every state other than `known`, so the two
  * gates cannot disagree (tests/c5 pins the agreement).
  */
@@ -147,7 +147,7 @@ export function decideDependentRecomputation(
   }
   if (input.cause !== "derivation") {
     // Shared-evidence and assignment dependents are facts with their own
-    // witnesses; the witness-based marking core (C2) already judged them
+    // witnesses; the witness-based marking core already judged them
     // against the withdrawn source. Derivation conclusions are the ones
     // whose BASIS moved.
     return { decision: "retain", basis: "witness_judged_elsewhere" };
@@ -170,7 +170,7 @@ export function decideDependentRecomputation(
 // Bounded recomputation groups (the reanalysis registrations).
 // ---------------------------------------------------------------------------
 
-/** One dependent eligible for linked re-analysis through the E3 seam. */
+/** One dependent eligible for linked re-analysis through the seam. */
 export interface RecomputeTarget {
   readonly findingId: string;
   /** The source the dependent's current revision was published from. */

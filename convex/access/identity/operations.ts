@@ -1,13 +1,13 @@
 /**
- * Access identity operations (B1): the revocation core and the typed
- * command dispatch registered through the A3 runtime seam.
+ * Access identity operations: the revocation core and the typed
+ * command dispatch registered through the runtime seam.
  *
  * `dispatchAccessCommand` is the same checked path as the platform's
  * probe dispatch (`dispatchCommand` from @kiero/runtime): envelope decode
- * -> operation registry -> B1 identity resolution (provision-or-refresh
- * the live session, then A3's canonical chain) -> the B1 policy
+ * -> operation registry -> identity resolution (provision-or-refresh
+ * the live session, then the canonical chain) -> the policy
  * (`liveSessionPolicy` over `membershipPolicy`) -> contract input decode
- * -> handler. This is the producer registration B2/B3/GM consume for
+ * -> handler. This is the producer registration linking, membership and GM consume for
  * their boundaries; auth package tables are never exposed.
  *
  * `revokeSessionCore` is the single revocation implementation shared by
@@ -110,7 +110,7 @@ export async function revokeSessionCore(
   }
   if (session.userId !== args.actorUserId) {
     // Device management is self-service; revoking other users' sessions
-    // belongs to B3's administrator surface.
+    // belongs to the administrator surface.
     return { result: errorResult(forbiddenError("not_own_session", "session")) };
   }
   if (session.revokedAtMs !== undefined) {
@@ -165,7 +165,7 @@ export async function buildAccessSnapshot(
   });
 }
 
-/** The B1 handler table for the typed access operations. */
+/** The handler table for the typed access operations. */
 function accessHandlers(): HandlerRegistry<MutationCtx> {
   return {
     ...linkingHandlers(),
@@ -176,7 +176,7 @@ function accessHandlers(): HandlerRegistry<MutationCtx> {
         if (sessionId !== context.actor.sessionId) {
           // The client's session belief is stale; only the resolved
           // current session may be read. (Declared errorKinds widen by
-          // this one forbidden case; recorded for B2/B3 contract pass.)
+          // this one forbidden case; recorded for the linking/membership contracts.)
           return errorResult(forbiddenError("session_scope_mismatch", "session"));
         }
         const userId = tx.db.normalizeId("users", context.actor.userId);
@@ -221,9 +221,9 @@ function accessHandlers(): HandlerRegistry<MutationCtx> {
 }
 
 /**
- * The B1 dispatch entry: the checked command path with the live-session
- * identity source and B1 policy. Operations not listed here (invitations,
- * GM mode — B3/B4) stay fail-closed `unsupported`. The B2 amendment
+ * The dispatch entry: the checked command path with the live-session
+ * identity source and identity policy. Operations not listed here (invitations,
+ * GM mode) stay fail-closed `unsupported`. The amendment
  * composes the linking handlers (`access.linkVerifiedMethod`) into the
  * same registry: one dispatch, one checked path, no drift.
  */

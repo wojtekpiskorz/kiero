@@ -1,6 +1,6 @@
 /**
- * The EU export container's own HTTP entry (I3): a zero-dependency Node
- * server the Dockerfile starts on $PORT (the D6 media-worker pattern).
+ * The EU export container's own HTTP entry: a zero-dependency Node
+ * server the Dockerfile starts on $PORT (the media-worker pattern).
  * Cloudflare Containers proxy HTTP to this process through the app's
  * Durable Object — and the protocol it serves is the ONE shared handler
  * (./service.ts `handleBuild`/`handleCleanup`/`handleHealth`), the same

@@ -1,8 +1,8 @@
 /**
- * The photo-normalization durable executor (D5): `processing.normalize_photo`.
+ * The photo-normalization durable executor: `processing.normalize_photo`.
  *
  * The architecture's external-call protocol applied to image normalization
- * (the echo template, A3):
+ * (the echo template):
  *
  * 1. the transactional half (execute) hands the effect to the external
  *    ACTION — R2 reads/writes and the normalizer never run inside the

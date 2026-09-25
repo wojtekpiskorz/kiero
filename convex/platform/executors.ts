@@ -1,63 +1,63 @@
 /**
- * Executor implementation registry (A3 composition point).
+ * Executor implementation registry (the composition point).
  *
  * One file imports every executor implementation so parallel lanes register
  * under their own owned files and this map stays the single dispatch table
  * keyed by job kind. Kinds without an implementation here fail closed with
  * the sanitized `unsupported` error in ./jobs.ts: a registration never
- * claims business work (A2 honest-failure contract).
+ * claims business work (honest-failure contract).
  *
  * Current implementations:
  * - `platform.echo_delivery` (./echo.ts): the external-delivery proof
  *   executor with uncertain-outcome recording and reconciliation.
- * - `processing.analyze_change_plan` (../processing/text/analyze.ts, E3):
+ * - `processing.analyze_change_plan` (../processing/text/analyze.ts):
  *   the real text-analysis workflow over processingRuns/processingSteps
  *   through @convex-dev/workflow - the bounded agent loop, clarifications
- *   and checked per-group publication (replaces the A3 mechanical proof
+ *   and checked per-group publication (replaces the mechanical proof
  *   executor behind the same seam; pipeline.ts keeps the mechanical proof
  *   workflow itself for its own crash/restart evidence).
- * - `processing.extract_fragments` (../processing/text/extract.ts, E3): the
+ * - `processing.extract_fragments` (../processing/text/extract.ts): the
  *   durable reaction to `sources.sourceAccepted` - deterministic text
  *   extraction bookkeeping plus the follow-on analysis registration.
- * - `access.cleanup_revocation` (../access/membership/cleanup.ts, B3): the
+ * - `access.cleanup_revocation` (../access/membership/cleanup.ts): the
  *   durable revocation fan-out the access lane owns (device-session
  *   revocation after membership removal; the declared consumer proof of
  *   `access.membershipRevoked` / `access.sessionRevoked`).
- * - `memory.recompute_dependents` (../memory/recompute/executor.ts, C5):
+ * - `memory.recompute_dependents` (../memory/recompute/executor.ts):
  *   the durable withdrawal-recomputation executor - the withdrawal marking
  *   plus the dependency-aware updating cascade and the linked re-analysis
  *   registrations (the declared consumer proof of `sources.sourceWithdrawn`,
  *   `memory.dependentsMarkedStale` and `memory.findingRevised`).
- * - `processing.transcribe_segment` (../processing/audio/executor.ts, D6):
+ * - `processing.transcribe_segment` (../processing/audio/executor.ts):
  *   the resumable per-segment STT workflow over one audio transcript order
- *   (the first model-call executor; the contracts amendment E2 named as
- *   its prerequisite, registered in @kiero/contracts by D6, flagged).
- * - `processing.normalize_photo` (../processing/images/executor.ts, D5):
+ *   (the first model-call executor; the contracts amendment provider routing named as
+ *   its prerequisite, registered in @kiero/contracts).
+ * - `processing.normalize_photo` (../processing/images/executor.ts):
  *   the accepted-photo normalization executor (architecture protocol step
  *   4) with the echo-template uncertain-outcome semantics.
- * - `processing.join_multimodal` (../processing/multimodal/join.ts, E4):
+ * - `processing.join_multimodal` (../processing/multimodal/join.ts):
  *   the multimodal join over one mixed source's extraction outcomes —
- *   partial-safe analysis groups joined from text, D6 transcript versions
- *   and D5-backed vision extractions (text-only sources no-op here; E3's
+ *   partial-safe analysis groups joined from text, transcript versions
+ *   and normalized-photo vision extractions (text-only sources no-op here; the
  *   analyze owns them).
- * - `calendar.reconcile_outcome` (../calendar/sync/executor.ts, G3): the
+ * - `calendar.reconcile_outcome` (../calendar/sync/executor.ts): the
  *   per-copy Calendar reconciliation executor (observe before any retry,
  *   one bounded leg per attempt, uncertain outcomes block blind retries).
- * - `attention.evaluate_due_intents` (../attention/delivery/executor.ts,
- *   F2): the durable notification-intent reaction to the three consumed
+ * - `attention.evaluate_due_intents` (../attention/delivery/executor.ts):
+ *   the durable notification-intent reaction to the three consumed
  *   events (acceptance creates source intents, a raised clarification
  *   creates the addressed agent-question intent, a published change set
  *   only wakes the evaluator).
- * - `search.index_generation` (../search/executor.ts, E5): the versioned
- *   derived-index executor. Full generation builds through E2's embedding
+ * - `search.index_generation` (../search/executor.ts): the versioned
+ *   derived-index executor. Full generation builds through the embedding
  *   adapter plus the scoped lifecycle refreshes (withdrawal/purge drops a
  *   source's rows; a revised finding rebuilds from its current revision).
- * - `attention.deliver_push` (../attention/push/executor.ts, F3): the
+ * - `attention.deliver_push` (../attention/push/executor.ts): the
  *   web-push transport executor - one bounded per-device delivery pass
  *   per delivered notification intent (the declared consumer proof of
  *   `attention.intentDelivered`).
  * - `attention.schedule_task_reminders`
- *   (../attention/reminders/executor.ts, F4): the durable task-reminder
+ *   (../attention/reminders/executor.ts): the durable task-reminder
  *   scheduling reaction to the work task events and bound-deadline
  *   revisions (the semantic slot recompute per task change).
  */
@@ -73,37 +73,37 @@ import { cleanupRevocationExecutor } from "../access/membership/cleanup";
 import { recomputeDependentsExecutor } from "../memory/recompute/executor";
 import { transcribeSegmentExecutor } from "../processing/audio/executor";
 import { normalizePhotoExecutor } from "../processing/images/executor";
-// E4 amendment (flagged coordinated change): the multimodal-join executor.
+// The multimodal-join executor.
 import { joinMultimodalExecutor as e4JoinMultimodalExecutor } from "../processing/multimodal/join";
 import { attentionIntentsExecutor } from "../attention/delivery/executor";
-// F4 append (flagged shared-file change, the F2 precedent): the
-// task-reminder scheduling executor implementation lives in F4's owned
+// The
+// task-reminder scheduling executor implementation lives in the owned
 // path; this registry entry is its composition point.
 import { taskRemindersExecutor } from "../attention/reminders/executor";
 
-// F3 append (flagged shared-file change, the G3 precedent): the web-push
-// transport executor implementation lives in F3's owned path; this
+// The web-push
+// transport executor implementation lives in the owned path; this
 // registry entry is its composition point.
 import { pushDeliveryExecutor } from "../attention/push/executor";
 
-// G3 append (flagged shared-file change, the D5/D6 precedent): the
-// calendar.reconcile_outcome executor implementation lives in G3's owned
+// The
+// calendar.reconcile_outcome executor implementation lives in the owned
 // path; this registry entry is its composition point.
 import { reconcileOutcomeExecutor } from "../calendar/sync/executor";
 
-// I3 append (flagged shared-file change, the G3 precedent): the firm-export
-// archive build executor implementation lives in I3's owned path
+// The firm-export
+// archive build executor implementation lives in the owned path
 // (convex/operations/exports/executor.ts); this registry entry is its
 // composition point.
 import { buildArchiveExecutor } from "../operations/exports/executor";
 
-// E5 append (flagged shared-file change, the G3 precedent): the
-// search.index_generation executor implementation lives in E5's owned path
+// The
+// search.index_generation executor implementation lives in the owned path
 // (convex/search/executor.ts); this registry entry is its composition point.
 import { searchIndexExecutor } from "../search/executor";
 
-// I4 append (flagged shared-file change, the G3/E5 precedent): the
-// deletion.purge_source executor implementation lives in I4's owned path
+// The
+// deletion.purge_source executor implementation lives in the owned path
 // (convex/operations/deletion/executor.ts); this registry entry is its
 // composition point.
 import { purgeSourceExecutor } from "../operations/deletion/executor";
@@ -153,14 +153,14 @@ export const jobExecutors: Record<string, JobExecutor> = {
   [reconcileOutcomeExecutor.jobKind]: reconcileOutcomeExecutor,
   [attentionIntentsExecutor.jobKind]: attentionIntentsExecutor,
 
-  // E5 append (flagged shared-file change): the derived-search executor.
+  // The derived-search executor.
   [searchIndexExecutor.jobKind]: searchIndexExecutor,
   [pushDeliveryExecutor.jobKind]: pushDeliveryExecutor,
   [taskRemindersExecutor.jobKind]: taskRemindersExecutor,
 
-  // I3 append (flagged shared-file change): the firm-export archive build.
+  // The firm-export archive build.
   [buildArchiveExecutor.jobKind]: buildArchiveExecutor,
 
-  // I4 append (flagged shared-file change): the permanent-deletion purge.
+  // The permanent-deletion purge.
   [purgeSourceExecutor.jobKind]: purgeSourceExecutor,
 };

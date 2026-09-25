@@ -1,5 +1,5 @@
 /**
- * Calendar projection transactions (G2): the write halves of the pure
+ * Calendar projection transactions: the write halves of the pure
  * projection rules, each inside ONE Convex mutation.
  *
  * One projection pass per connection: recheck the connection (the durable
@@ -13,10 +13,10 @@
  * no partial desired-state writes are possible because the suspend
  * decision precedes every copy read.
  *
- * The Google legs are NOT here: `googleEventId`/`remoteOutcome` stay G3's
- * remote ledger. G2 only ever sets the initial `unknown` and resets it
+ * The Google legs are NOT here: `googleEventId`/`remoteOutcome` stay the
+ * remote ledger. Projection only ever sets the initial `unknown` and resets it
  * when the semantic id is re-minted under a different Google account (the
- * old calendar's linkage honestly stops being knowable; G3 reconciles).
+ * old calendar's linkage honestly stops being knowable; reconciliation resolves it).
  */
 
 import { v } from "convex/values";
@@ -259,7 +259,7 @@ export const applyProjectionPassTransaction = internalMutation({
 
     if (mode.kind === "suspend") {
       // NO desired-state writes: the suspension is recorded honestly and
-      // the decision belongs to reconciliation (G3).
+      // the decision belongs to reconciliation.
       const reason = mode.reason;
       if (syncRow === null && connection !== null) {
         await ctx.db.insert("calendarSyncState", {
@@ -440,7 +440,7 @@ async function applyCopyAction(
         ? { desiredRevisionId: desired.derivationRevisionId as Id<"findingRevisions"> }
         : {}),
       // An account switch re-mints the semantic id: the old calendar's
-      // linkage honestly stops being knowable (G3 reconciles the new one).
+      // linkage honestly stops being knowable (reconciliation resolves the new one).
       ...(semanticRebound ? { googleEventId: undefined, remoteOutcome: "unknown" as const } : {}),
       // NOTE: `hidden`/`hiddenOrigin`/`hiddenAtMs` are deliberately never
       // patched here — a personal hide survives every re-derivation
@@ -488,7 +488,7 @@ async function applyCopyAction(
  * - Only an explicit restore through this operation clears it. A NEW,
  *   different subject starts unhidden (rows are created with hidden:false
  *   and never inherit anything).
- * - A copy the user deleted or moved in Google becomes a hide once G3's
+ * - A copy the user deleted or moved in Google becomes a hide once the
  *   reconciliation observes it; it will be recorded here with
  *   `hiddenOrigin: "deleted_in_google" | "moved_in_google"` — a hide is a
  *   hide however it was learned.
@@ -533,7 +533,7 @@ export async function performSetCopyHidden(
 }
 
 // ---------------------------------------------------------------------------
-// Personal project selection (calendar.setSelection, G5).
+// Personal project selection (calendar.setSelection).
 // ---------------------------------------------------------------------------
 
 /**
@@ -559,7 +559,7 @@ export async function performSetCopyHidden(
  *   this one, so the selection survives every pass unchanged until the
  *   boss edits it here again. No event is published: the certified module
  *   surface has no selection event, and the pass consuming the column is
- *   G2's designed trigger, not a fan-out G5 invents.
+ *   the designed trigger, not an invented fan-out.
  */
 export async function performSetSelection(
   ctx: MutationCtx,

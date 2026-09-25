@@ -1,5 +1,5 @@
 /**
- * The Convex Auth callback hooks (B2 amendment of the B1 auth entry).
+ * The Convex Auth callback hooks (the linking extension of the auth entry).
  *
  * The library calls `createOrUpdateUser` from its own generic mutation
  * context (untyped data model), which is why this adapter exists
@@ -11,7 +11,7 @@
  * - `recordGoogleProofHook`: a Google sign-in RESUMED an existing account
  *   — if that account's ceremony awaits its fresh Google first proof, the
  *   proof is recorded. No ceremony: one bounded lookup, no writes.
- * - `googleLinkFromCallbackHook`: B1's sign-in user policy decided
+ * - `googleLinkFromCallbackHook`: the sign-in user policy decided
  *   `method_conflict` (a Google sign-in whose address collides with an
  *   email-code account). The hook replaces the rejection with the explicit
  *   link commit exactly when an active ceremony proves BOTH methods
@@ -166,7 +166,7 @@ export type { AttemptPatch };
 
 /**
  * Records the fresh Google proof after a RESUMED Google sign-in. Called by
- * the B1 auth entry's createOrUpdateUser on every oauth resume; a no-op
+ * the auth entry's createOrUpdateUser on every oauth resume; a no-op
  * when the account has no awaiting email-direction ceremony.
  */
 export async function recordGoogleProofHook(
@@ -186,9 +186,9 @@ export async function recordGoogleProofHook(
 
 /**
  * Resolves the explicit link commit for a `method_conflict` Google
- * sign-in. Called by the B1 auth entry INSTEAD of throwing the conflict
+ * sign-in. Called by the auth entry INSTEAD of throwing the conflict
  * error; when no ceremony proves both methods the typed reason keeps the
- * original rejection (the caller then fails exactly like B1 did).
+ * original rejection (the caller then fails exactly as without linking).
  */
 export async function googleLinkFromCallbackHook(
   ctx: GenericMutationCtx<AnyDataModel>,

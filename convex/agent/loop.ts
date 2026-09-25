@@ -1,11 +1,11 @@
 /**
- * The bounded answer loop and the public answer entry (E6): a boss's
+ * The bounded answer loop and the public answer entry: a boss's
  * question source routed through the agent with typed tools.
  *
- * Composition (issue #40): D1's accepted question source, C2-C4's checked
- * operations, C5's updating gate (applied by the context loader), E2's
+ * Composition: the accepted question source, the memory and work lanes' checked
+ * operations, the updating gate (applied by the context loader), the
  * chat adapter (`runChatTurn`, the application-owned model route with no
- * user or GM selector) and the E3 loop convention (decoded tool calls,
+ * user or GM selector) and the loop convention (decoded tool calls,
  * deterministic turn encoding, bounded turns).
  *
  * The loop is an ACTION (the external effect is the provider call); every
@@ -15,7 +15,7 @@
  * re-validated against the tenant-filtered context by the pure reducer,
  * and finally executed by the same checked cores the UI dispatches.
  * `dispatchAnswerToolCall` (the tool-execution half, extracted to
- * ./toolExecution.ts by R14 behind its existing typed contracts) owns the
+ * ./toolExecution.ts behind its existing typed contracts) owns the
  * routing of every declared tool name through these halves; a tool
  * declared in the vocabulary but absent from that dispatch is dead and
  * fails the routing test.
@@ -30,9 +30,8 @@
  * that ran and said current.
  *
  * The structured answer returns in the command result for company
- * conversation views (H1 renders it; J2/J3 qualify it). The E6 named
- * prerequisite — durable answer/tool-attempt record rows — landed as R25
- * (issue #230): the loop now records every run and every provider turn
+ * conversation views (the conversation UI renders it). Every
+ * run and every provider turn is recorded
  * into the answerRuns/answerTurns table family through ONE idempotent
  * internal mutation per turn (./record.ts), names/codes/classes/latencies
  * only, with NO loop behavior changes; the clarifications and domain
@@ -82,7 +81,7 @@ import { ANSWER_EXCERPT_MAX_CHARS, noteRunFinalized, noteRunStart, noteTurn } fr
 
 // The tool-execution half keeps its loop.ts export surface (the routing
 // tests and any sibling import the seam from here); the implementation
-// moved to ./toolExecution.ts unchanged (R14, issue #187).
+// moved to ./toolExecution.ts unchanged.
 export {
   dispatchAnswerToolCall,
   type DispatchedAnswerCall,
@@ -91,7 +90,7 @@ export {
 
 /**
  * The answer-flow pipeline version (loop shape, tool routing). Bumped to
- * e6.answer/3 by the E8 coordinated lane: the loop's recorded wire
+ * e6.answer/3 by the coordinated lane: the loop's recorded wire
  * encoding changed from prose renderings to NATIVE tool rounds, which
  * changes how recorded runs are interpreted (versions promise
  * interpretability against the flow that produced each answer).
@@ -100,9 +99,9 @@ export const ANSWER_FLOW_PIPELINE_VERSION = "e6.answer/3" as const;
 
 /**
  * The model-configuration version label recorded with every answer,
- * composed exactly the way E3's analyze.ts composes its label: the routing
+ * composed exactly the way analyze.ts composes its label: the routing
  * namespace plus the frozen routing configuration version, so the label
- * follows every routing change (E8 moved the chat route to direct
+ * follows every routing change (the provider split moved the chat route to direct
  * DeepSeek with the authorized fallback, e8.0) without a coordinated loop
  * edit.
  */
@@ -143,7 +142,7 @@ export interface AnswerRunResult {
   readonly refreshes: number;
   readonly observedModels: readonly string[];
   readonly finalText: string;
-  /** The E2 failure kind, recorded only on a provider_failed run. */
+  /** The failure kind, recorded only on a provider_failed run. */
   readonly failure?: string;
   readonly turnLog: readonly TurnLogEntry[];
 }
@@ -175,7 +174,7 @@ export const loadAnswerStage = internalMutation({
 // ---------------------------------------------------------------------------
 // Stage 2: the bounded answer loop (one action). The tool-execution half
 // (ExecutionOutcome, the search/checked-execution runners, the staleness
-// gate and dispatchAnswerToolCall) lives in ./toolExecution.ts since R14;
+// gate and dispatchAnswerToolCall) lives in ./toolExecution.ts;
 // this file keeps the round-resumable core and the driving wrappers.
 // ---------------------------------------------------------------------------
 
@@ -195,7 +194,7 @@ function turnLogEntry(
 
 /**
  * One replayed message turn in the wire shape both halves understand
- * (E8: native tool rounds instead of prose renderings, so a multi-turn
+ * (native tool rounds instead of prose renderings, so a multi-turn
  * loop replays identically on the direct DeepSeek transport and the
  * OpenRouter fallback).
  */
@@ -245,7 +244,7 @@ export async function startAnswerRun(
     throw new Error(`agent: ${stage.error ?? "context_load_failed"}`);
   }
   const context = stage.context;
-  // R25: the run's durable start row (idempotent per runId, best-effort —
+  // The run's durable start row (idempotent per runId, best-effort —
   // a dropped row degrades diagnostics, never the ask). Recorded at the
   // loop's true start checkpoint: the context load succeeded, so the run
   // has a world to answer against.
@@ -274,7 +273,7 @@ export async function startAnswerRun(
 }
 
 /**
- * Runs ONE model round of the answer loop: one provider turn through E2's
+ * Runs ONE model round of the answer loop: one provider turn through the
  * adapter, then every returned tool call executed through its checked path
  * (search query, reducer validation, checked executions, the staleness
  * recheck before an answer lands). Returns the next resumable state, or the
@@ -292,7 +291,7 @@ export async function runAnswerRound(
   if (openRouterKey === undefined || openRouterKey === "") {
     throw new Error("agent: provider_key_not_configured:OPENROUTER_API_KEY");
   }
-  // E8 split: the answer loop runs on the direct DeepSeek primary route
+  // Provider split: the answer loop runs on the direct DeepSeek primary route
   // with the authorized OpenRouter fallback, so BOTH keys are required
   // configuration. Names only are reported, never values; a missing key
   // fails fast instead of burning a provider attempt that is doomed to a
@@ -342,7 +341,7 @@ export async function runAnswerRound(
         ...meta,
       },
     );
-    // R25: the run's durable finalize (outcome, failure kind, counts, the
+    // The run's durable finalize (outcome, failure kind, counts, the
     // bounded excerpt) — ONE patch-shaped mutation, its own replay,
     // best-effort like every recording half.
     await noteRunFinalized(ctx, {
@@ -367,7 +366,7 @@ export async function runAnswerRound(
       content: [{ kind: "text", text: finalTurnInstruction() }],
     });
   }
-  // R25: the provider turn's timing pair (the durable turn row's latency)
+  // The provider turn's timing pair (the durable turn row's latency)
   // and the route record's serving attempt, captured before the branch.
   const turnStartedAtMs = Date.now();
   const call = await runChatTurn(credentials, {
@@ -379,7 +378,7 @@ export async function runAnswerRound(
   const attempt = call.record.attempts.at(-1);
   if (call.outcome.outcome === "failed") {
     const kind = call.outcome.failure.kind;
-    // R25: the rejected turn's record row (ONE idempotent mutation per
+    // The rejected turn's record row (ONE idempotent mutation per
     // turn). The finish class is honestly "unknown": the provider seam
     // collapses finish length/content_filter, malformed tool-call JSON and
     // schema mismatches into the single failure kind before the loop can
@@ -438,7 +437,7 @@ export async function runAnswerRound(
           arguments: toolCall.arguments,
         }))
       : parseTextToolCalls(turn.text);
-  // R25: the decoded turn's record row (ONE idempotent mutation per turn):
+  // The decoded turn's record row (ONE idempotent mutation per turn):
   // the tool-call NAMES only — never raw payloads or arguments — plus which
   // decode path produced them (native round or the text-encoded rescue).
   await noteTurn(ctx, {
@@ -467,7 +466,7 @@ export async function runAnswerRound(
       turns < MAX_ANSWER_TURNS
     ) {
       // Text is not an answer: the nudge repeats until the model uses a
-      // tool or the turn budget's final instruction lands (E3 precedent).
+      // tool or the turn budget's final instruction lands.
       // After a clarification the question REPLACES the answer (prompt
       // rule 8), so a text finish there is a legitimate end.
       messages.push({
@@ -480,7 +479,7 @@ export async function runAnswerRound(
   }
   // Native tool round: the assistant's calls replay as the provider's own
   // function_call items (not prose), keeping the loop's history portable
-  // across the direct and fallback transports (E8).
+  // across the direct and fallback transports.
   messages.push({
     role: "assistant-tool-calls",
     calls: activeCalls.map((call) => ({
@@ -625,7 +624,7 @@ export const askPermission = internalQuery({
 /**
  * Runs the answer flow for one question source. The caller must be a
  * signed-in member of the source's company (the tenant check); the model
- * route stays application-owned (E2's frozen order, no user or GM
+ * route stays application-owned (the frozen order, no user or GM
  * selector), and every write the flow performs runs through the checked
  * domain path under the question author's server-resolved firm scope.
  */

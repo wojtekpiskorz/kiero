@@ -1,12 +1,12 @@
 /**
- * Notification-preference mutation transaction (F1):
+ * Notification-preference mutation transaction:
  * `attention.changeNotificationPreferences`.
  *
  * ONE Convex mutation performs the whole change: resolve the actor's own
  * preference row, validate every PRESENT patch key (the contract made the
  * keys optional — omission leaves that control unchanged, which is the
  * acceptance criterion "can be changed independently"), and upsert the ONE
- * row per user+company. There is no event to publish: F2 re-reads
+ * row per user+company. There is no event to publish: notification intents re-read
  * preferences at due time (reactive consistency comes from Convex queries,
  * not notifications).
  *
@@ -171,7 +171,7 @@ export async function performChangeNotificationPreferences(
     return errorResult(forbiddenError("actor_scope_unresolved"));
   }
 
-  // Validate present keys BEFORE the first write (the D1 structural rule:
+  // Validate present keys BEFORE the first write (the structural rule:
   // every failing check leaves nothing committed).
   let mutedProjectIds: Id<"projects">[] | undefined;
   if (input.mutedProjectIds !== undefined) {

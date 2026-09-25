@@ -1,13 +1,12 @@
 /**
- * Personal notification preferences (A2 candidate, certified by A3;
- * amended by F1).
+ * Personal notification preferences.
  *
- * Owning implementer: F1. Muting and quiet hours are personal: they defer
+ * Muting and quiet hours are personal: they defer
  * or suppress push delivery for one boss without changing task deadlines,
  * reminders of other bosses, or information availability in the app
  * (CONTEXT.md "Godziny ciszy", "Strefa czasu firmy").
  *
- * F1 amendment (issue #41, flagged): the certified A2 candidate stored a
+ * The certified candidate stored a
  * per-source mute list; the accepted notification decision (issue 7
  * resolution) defines the personal vocabulary as DISTINCT controls, so each
  * control is one field and each can be changed independently through
@@ -21,10 +20,10 @@
  *   ("Mają one osobne, osobiste wyciszenie wpisów firmowych").
  * - `taskRemindersMuted`: the personal task-reminder mute, separate from
  *   conversation mutes ("Wyciszenie rozmowy i wyciszenie przypomnień ...
- *   są osobnymi, osobistymi ustawieniami"). F1 stores and round-trips it;
- *   F4's reminder evaluation consumes it.
+ *   są osobnymi, osobistymi ustawieniami"). This lane stores and round-trips it;
+ *   the reminder evaluation consumes it.
  * - `hidePreviewContent`: the personal preview-content preference
- *   ("Użytkownik może ukryć treść podglądów"). F3/H lanes consume it when
+ *   ("Użytkownik może ukryć treść podglądów"). Web push and the UI consume it when
  *   rendering push payloads.
  * - `quietHoursStartMinute`/`quietHoursEndMinute`: the PERSONAL quiet-hours
  *   window as minute-of-day bounds interpreted in the company timezone.
@@ -33,7 +32,7 @@
  *   reverts to that default.
  *
  * Snooze ("Odroczenie przypomnień") is deliberately NOT here: it is a
- * per-user-per-task deferral owned by F4 (convex/attention/reminders/**).
+ * per-user-per-task deferral in convex/attention/reminders.
  *
  * Tables: notificationPreferences.
  */
@@ -56,7 +55,7 @@ export const preferencesTables = {
     mutedProjectIds: v.array(shared.projectId),
     /** Personal mute of company entries (general/unassigned). */
     companyEntriesMuted: v.boolean(),
-    /** Personal task-reminder mute (consumed by F4's reminder evaluation). */
+    /** Personal task-reminder mute (consumed by the reminder evaluation). */
     taskRemindersMuted: v.boolean(),
     /** Personal preference hiding notification preview content. */
     hidePreviewContent: v.boolean(),

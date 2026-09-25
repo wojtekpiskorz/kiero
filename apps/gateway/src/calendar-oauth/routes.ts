@@ -1,5 +1,5 @@
 /**
- * Calendar OAuth gateway routes (G1, issue #45).
+ * Calendar OAuth gateway routes.
  *
  * The Worker's authorization-gateway half of the Calendar connection
  * lifecycle ("apps/gateway: Cloudflare authorization gateway and streamed
@@ -15,23 +15,23 @@
  * - `GET /platform/calendar/oauth/callback`: Google's redirect target on
  *   the Worker. It forwards the single-use state and the code to the
  *   deployment's verified bridge completion route (service credential ->
- *   the A3 bridge check; the callback itself re-checks membership), then
+ *   the bridge check; the callback itself re-checks membership), then
  *   renders a minimal Polish HTML status page. No token, code or state
  *   value is ever echoed, logged or put into the page. The page's
  *   "Wróć do Kiero" footer targets the CONFIGURED application origin
- *   (R12: `KIERO_CALENDAR_APP_BASE_URL` on this Worker), resolved by the
- *   SAME R10 resolver the direct Convex callback uses — never "/" on the
+ *   (`KIERO_CALENDAR_APP_BASE_URL` on this Worker), resolved by the
+ *   SAME resolver the direct Convex callback uses — never "/" on the
  *   Worker host and never anything the caller supplied.
  *
  * Paths live under the existing `/platform/` route prefix the Worker
  * serves, so registration is the documented imports-only append in
  * ../composition/registry.ts (the shared fetch handler stays untouched;
- * see the G1 evidence for the composition note).
+ * see the evidence for the composition note).
  */
 
 import { calendarComplete, calendarStart, type CalendarBridgeEnv } from "./client";
 import { answerOrNull } from "../../../../convex/calendar/connection/answers";
-// The R10 return resolver from its PURE shared home (the same ruling as
+// The return resolver from its PURE shared home (the same ruling as
 // `answerOrNull` above): ONE definition of where the callback page's
 // link leads, shared by the direct Convex callback and this Worker page.
 import {
@@ -52,7 +52,7 @@ function jsonResponse(status: number, body: unknown): Response {
 }
 
 /**
- * Resolves the page's return target through the R10 resolver from THIS
+ * Resolves the page's return target through the resolver from THIS
  * Worker's bindings only — a literal two-key mapping onto the resolver's
  * contract: the PWA origin passes through under the same deployment
  * variable name, and the Worker's `ENVIRONMENT` label (the same closed
@@ -69,7 +69,7 @@ function gatewayReturnHref(env: CalendarBridgeEnv): string | null {
   return calendarAppReturnHref(resolverInput);
 }
 
-/** The G1 Calendar OAuth route provider. */
+/** The Calendar OAuth route provider. */
 export const calendarOAuthRoutes: readonly GatewayRoute[] = [
   {
     method: "GET",
@@ -100,7 +100,7 @@ export const calendarOAuthRoutes: readonly GatewayRoute[] = [
       const state = url.searchParams.get("state") ?? "";
       const code = url.searchParams.get("code");
       const error = url.searchParams.get("error");
-      // Server-side configuration only (R12): the request itself (host,
+      // Server-side configuration only: the request itself (host,
       // query, headers) never influences where the page's link leads.
       const returnHref = gatewayReturnHref(env);
       if (state.length === 0) {

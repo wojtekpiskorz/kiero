@@ -1,9 +1,9 @@
 /**
- * The send engine (D4): one logical message's attachments through the REAL
- * D2 resumable-upload protocol (gateway Worker routes over R2, Convex
- * ledger behind them), then D1's atomic acceptance.
+ * The send engine: one logical message's attachments through the REAL
+ * resumable-upload protocol (gateway Worker routes over R2, Convex
+ * ledger behind them), then the atomic acceptance.
  *
- * RECOVERABILITY CONTRACT (issue #32): the draft id is ONE stable identity
+ * RECOVERABILITY CONTRACT: the draft id is ONE stable identity
  * used as (a) the prepare draftId, so a re-prepare of the same material
  * returns the SAME ledger row and upload id, and (b) the acceptance
  * idempotency key, so a lost-response retry can never create a second
@@ -67,7 +67,7 @@ export type StepError =
   | { readonly kind: "network"; readonly detail: string }
   | { readonly kind: "envelope"; readonly code: string; readonly message: string };
 
-/** The D2 gateway routes the engine drives (prepare/begin fused route). */
+/** The gateway routes the engine drives (prepare/begin fused route). */
 export interface UploadGateway {
   prepare(input: {
     readonly draftId: string;
@@ -108,7 +108,7 @@ export interface SendHooks {
    * Reports the begun session once prepare returns (an observer hook for
    * progress UIs and the deterministic tests). Recoverability does NOT
    * depend on it: the stable draftId re-prepares into the same session,
-   * and the draft record deliberately mirrors nothing (round 2).
+   * and the draft record deliberately mirrors nothing.
    */
   onSession?(session: { readonly uploadId: string; readonly attachments: readonly SessionAttachment[] }): void;
 }
@@ -204,10 +204,10 @@ export async function runSend(
   }
   hooks.onSession?.({ uploadId: prepared.uploadId, attachments: prepared.attachments });
 
-  // TEXT-ONLY material (J2 join repair, flagged): no attachment exists, so
+  // TEXT-ONLY material: no attachment exists, so
   // there is nothing to upload, complete or finalize: the draft-stage
-  // upload row IS the durable object D1's text-only acceptance consumes
-  // (J1's proved semantics, now through the same engine). Finalizing an
+  // upload row IS the durable object the text-only acceptance consumes
+  // (the proved semantics, now through the same engine). Finalizing an
   // attachment-less upload is impossible by contract (begin and finalize
   // both require declared attachments), so the engine goes straight to
   // acceptance.
@@ -395,7 +395,7 @@ export const GATEWAY_REQUEST_TIMEOUT_MS = 60_000;
 
 /**
  * The real UploadGateway over the deployed Worker: every call carries the
- * signed-in person's Convex Auth token (the D2 per-user channel; the Worker
+ * signed-in person's Convex Auth token (the per-user channel; the Worker
  * forwards it and Convex re-resolves access before any R2 byte).
  */
 export function createGatewayUploadGateway(

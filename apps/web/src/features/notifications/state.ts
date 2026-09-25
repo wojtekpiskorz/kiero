@@ -1,5 +1,5 @@
 /**
- * Polish copy for the web push settings screen (F3). CONTEXT.md terms:
+ * Polish copy for the web push settings screen. CONTEXT.md terms:
  * Firma, Szef, Przypomnienie o zadaniu, Godziny ciszy. Barebones scope:
  * plain semantic text, no styling.
  */

@@ -1,5 +1,5 @@
 /**
- * Application services context (A4).
+ * Application services context.
  *
  * Carries the typed config seam to every host
  * component. Written with `createElement` (no JSX) so the composed feature

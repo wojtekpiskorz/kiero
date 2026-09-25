@@ -1,5 +1,5 @@
 /**
- * The ONE bytes-to-sha256-hex helper of the backup executor (I5): WebCrypto
+ * The ONE bytes-to-sha256-hex helper of the backup executor: WebCrypto
  * only, no imports, so the same definition runs in the Worker runtime and
  * in the Node container (the store, the exporter and the pipeline all hash
  * through it; a mirror per module was a drift hazard).

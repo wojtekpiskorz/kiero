@@ -1,6 +1,6 @@
 /**
- * Memory/findings command dispatch wiring (C2): the SAME checked path A3
- * proved and B3/D1 reuse, with this lane's handler registry.
+ * Memory/findings command dispatch wiring: the SAME checked path the platform
+ * proved and membership/sources reuse, with this lane's handler registry.
  *
  * Two identity sources exist and only two, both verified server-side (see
  * convex/platform/context.ts): Convex Auth (`ctx.auth`) for the user path,
@@ -54,7 +54,7 @@ import type {
  * is reachable through the SAME checked command path (the barebones UI query
  * in ./functions.ts is the reactive convenience read).
  *
- * C3 amendment (additive, flagged): the extension operations this dispatch
+ * Notes (additive, flagged): the extension operations this dispatch
  * left fail-closed `unsupported` are now registered from the extensions
  * lane's own registry (memory.defineExtension, versionExtensionDefinition,
  * searchExtensionCatalog, validateExtensionValue) — one merged handler table,
@@ -63,7 +63,7 @@ import type {
  * The dispatch decodes the envelope input ONCE and hands the handler the
  * DECODED value (packages/runtime command.ts passes `decodedInput.value`).
  * The handlers below therefore FORWARD that value — re-decoding it (the
- * B3/D1 handler pattern) only works while every field is an untransformed
+ * membership/sources handler pattern) only works while every field is an untransformed
  * wire shape: schema-transformed values do not decode twice (Effect
  * BigDecimal accepts a decimal string once, then is a BigDecimal), so money
  * plans would always fail with `input_rejected_by_contract_schema`. The
@@ -119,9 +119,9 @@ export function memoryHandlers(): HandlerRegistry<MutationCtx> {
  * path (identity verified before this point); without it, Convex Auth is
  * the only identity source.
  *
- * J1 prerequisite repair (the C4 flag): the user path resolves through
- * B1's live-session chain (`resolveAccessContextWithProvisioning` — the
- * B3 projects-dispatch pattern), because the platform-generic
+ * (the flag) The user path resolves through
+ * the live-session chain (`resolveAccessContextWithProvisioning` — the
+ * projects-dispatch pattern), because the platform-generic
  * `identityFromConvexAuth` subject (`<userId>|<authSessions id>`) is not a
  * sessions-registry id and ordinary user tokens failed
  * `no_verified_identity`. Provisioning keeps the first command after a

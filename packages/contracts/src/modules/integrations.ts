@@ -1,6 +1,6 @@
 /**
  * Integrations module surface (architecture "Deep modules": Integrations).
- * Implements lanes: E2 (providers), D6 (STT), B1 (email), G1–G3 (Calendar
+ * Covers providers, STT, email and Calendar
  * OAuth flow owned by gateway routes).
  *
  * Provider-specific decoding, capability-aware fallback, external outcome

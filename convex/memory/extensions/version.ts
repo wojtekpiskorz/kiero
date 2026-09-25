@@ -1,5 +1,5 @@
 /**
- * versionExtensionDefinition (C3): append the NEXT immutable version of a
+ * versionExtensionDefinition: append the NEXT immutable version of a
  * definition.
  *
  * Runs inside ONE Convex mutation. The compatibility rule is the pure
@@ -9,7 +9,7 @@
  * refuse `conflict` — those reinterpret historic values and require a NEW
  * DEFINITION or an explicit migration ("Version millimetres to an
  * incompatible centimetre meaning and require a new definition or explicit
- * migration", issue #26 focused verification).
+ * migration" focused verification).
  *
  * Shared definitions are read-only here: publishing a shared version is
  * product code's move, and no firm actor may change every tenant's catalog.

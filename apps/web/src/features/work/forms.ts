@@ -1,10 +1,10 @@
 /**
- * Work feature forms (H2): the checked-command controls of the /praca
+ * Work feature forms: the checked-command controls of the /praca
  * surface. JSX-free (createElement only), node-importable like the rest.
  *
  * Every form rides the one shared `useCheckedDispatch` hook
  * (`../company/dispatch`), parameterized by the work mutation and the
- * work hint map: the command goes through C4's checked dispatch with the
+ * work hint map: the command goes through the checked dispatch with the
  * revision the boss actually sees (`expectedRevision` from the loaded
  * overview), so a concurrent change refuses honestly instead of
  * overwriting. Term bindings come from the current findings of the chosen

@@ -1,5 +1,5 @@
 /**
- * The cost-alert model (I2): all-in monthly spend accounting with the
+ * The cost-alert model: all-in monthly spend accounting with the
  * accepted 400 PLN warning / 500 PLN stronger alert and per-level cooldown.
  *
  * PURE MODULE (shared definition; mirrored in infra/observability/

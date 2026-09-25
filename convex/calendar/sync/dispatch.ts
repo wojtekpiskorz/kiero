@@ -1,6 +1,6 @@
 /**
- * Calendar sync command dispatch wiring (G3): the SAME checked path A3
- * proved and G1/G2 reuse, with this lane's handler registry and policy.
+ * Calendar sync command dispatch wiring: the SAME checked path the platform
+ * proved and connection/projection reuse, with this lane's handler registry and policy.
  *
  * The registry implements exactly ONE certified operation —
  * `calendar.reconcileCopy` (write): the actor's explicit request that ONE
@@ -10,7 +10,7 @@
  * — the certified path — and answers the copy's CURRENT recorded outcome
  * (possibly `unknown`; the scheduled observation resolves it).
  *
- * Everything resolves through B1's identity source (provision-or-refresh,
+ * Everything resolves through the identity source (provision-or-refresh,
  * then the canonical user -> earliest active membership -> company chain),
  * so a revoked membership fails `unauthenticated` before any handler runs.
  */
@@ -34,7 +34,7 @@ import { registerDurableJob } from "../../platform/publish";
 // The contract entry this handler implements (decode authority).
 export const reconcileCopyEntry = calendarOperations["calendar.reconcileCopy"];
 
-/** G3's registered policy: the certified membership semantics, unchanged. */
+/** the registered policy: the certified membership semantics, unchanged. */
 export const calendarSyncPolicy: AccessPolicy = {
   policyId: "calendar.g3-sync-v1",
   authorize: async (context, request) => {
@@ -61,7 +61,7 @@ export function calendarSyncHandlers(): HandlerRegistry<MutationCtx> {
 
 /**
  * `calendar.reconcileCopy`: ownership is the actor's OWN copy (the same
- * rule G2's setCopyHidden applies — a foreign copy is not_found, no
+ * rule setCopyHidden applies — a foreign copy is not_found, no
  * existence leak). A healthy connected row gets the durable
  * reconciliation job registered IN this transaction; anything that cannot
  * serve reconciliation now answers the certified `unavailable` error
@@ -104,7 +104,7 @@ export async function performReconcileCopy(
   // cannot duplicate an external effect, because every executor path
   // funnels through `prepareCopyAttempt`, which CLAIMS the attempt on the
   // copy row — the OCC-retried loser counts the winner's row and declines
-  // behind the open-attempt guard (round-2 finding 1). The job layer's
+  // behind the open-attempt guard. The job layer's
   // dedup-by-dedup-key would be the wrong tool here anyway: a stable
   // per-copy key would make the boss's second click a forever no-op after
   // the first job succeeds.
@@ -120,8 +120,8 @@ export async function performReconcileCopy(
 
 /**
  * Dispatches one calendar sync command envelope inside ONE mutation
- * transaction, through the checked path with B1's identity source and the
- * G3 policy.
+ * transaction, through the checked path with the identity source and the
+ * reconciliation policy.
  */
 export async function dispatchCalendarSyncCommand(
   ctx: MutationCtx,

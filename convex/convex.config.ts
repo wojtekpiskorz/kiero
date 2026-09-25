@@ -1,5 +1,5 @@
 /**
- * Convex app definition (A3).
+ * Convex app definition.
  *
  * Registers the @convex-dev/workflow component: the ONE canonical durable
  * workflow engine (architecture "Deployment and ownership"; no second engine

@@ -1,13 +1,13 @@
 /**
- * The C2 Convex function surface (generated-call APIs).
+ * The findings Convex function surface (generated-call APIs).
  *
  * One core set, three callable entries (no drift by construction):
  *
  * - `dispatchMemoryCommand` (public mutation): the typed command dispatch
  *   for the findings operations — Convex Auth identity only.
  * - `dispatchMemoryTransaction` (internal mutation): the service-bridge
- *   path (verified service session id; the A3/D1 pattern) used by the
- *   guarded proof actions and, later, by C5's durable executor.
+ *   path (verified service session id; the pattern) used by the
+ *   guarded proof actions and, later, by the durable executor.
  * - `readCurrentFindings` (public query): the reactive current-memory read;
  *   resolves the actor through the SAME canonical chain and decodes the
  *   scope through the operation's contract schema (Effect decoding at the
@@ -15,8 +15,8 @@
  *   encoded (wire) value shapes — see ./semantics.ts.
  *
  * `markWithdrawnSource` (internal mutation) exposes the withdrawal marking
- * core over the service bridge: the operation exists now (issue #25's
- * withdrawal-marking proof); C5's recomputation executor and the sources
+ * core over the service bridge: the operation exists now (the
+ * withdrawal-marking proof); the recomputation executor and the sources
  * lane's withdraw command drive it in the composed product.
  */
 
@@ -59,7 +59,7 @@ export const dispatchMemoryCommandEntry = mutation({
 
 /**
  * The service path's transactional entry: the verified service session id
- * substitutes the bearer-verified identity (the A3 bridge pattern).
+ * substitutes the bearer-verified identity (the bridge pattern).
  */
 export const dispatchMemoryTransaction = internalMutation({
   args: { envelope: v.any(), serviceSessionId: v.string() },
@@ -71,9 +71,9 @@ export const dispatchMemoryTransaction = internalMutation({
 export const readCurrentFindings = query({
   args: { scope: v.any() },
   handler: async (ctx, args) => {
-    // J1 prerequisite repair (the C4 flag): the read path resolves through
-    // B1's live-session chain (no provisioning — queries never write), the
-    // same pattern B3's public reads use. The platform-generic subject is
+    // (the flag) The read path resolves through
+    // the live-session chain (no provisioning — queries never write), the
+    // same pattern the public reads use. The platform-generic subject is
     // not a sessions-registry id, so ordinary user tokens previously failed
     // `no_verified_identity` here.
     const context = await resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
@@ -94,7 +94,7 @@ export const readCurrentFindings = query({
 });
 
 /**
- * The withdrawal-marking entry over the service bridge (internal): C5's
+ * The withdrawal-marking entry over the service bridge (internal): the
  * `memory.recompute_dependents` executor (cause `source_withdrawn`) calls
  * this same core; the guarded probe proves it live today.
  */
@@ -115,11 +115,11 @@ export const markWithdrawnSource = internalMutation({
   },
 });
 
-// --- H1 exposition reads (additive, flagged on the B3 precedent) ---------------
+// --- Exposition reads ---------------
 //
 // The same two-callable-shape discipline as the current-findings read: a
-// public query on the B1 live-session chain (the client path), and an
-// internal twin on the A3 service-bridge identity for the guarded dev
+// public query on the live-session chain (the client path), and an
+// internal twin on the service-bridge identity for the guarded dev
 // proofs. Cores live in ./exposition.ts; rows carry their encoded wire
 // shapes.
 

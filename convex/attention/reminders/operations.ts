@@ -1,5 +1,5 @@
 /**
- * Task-reminder transactions (F4): the durable schedule recompute, the
+ * Task-reminder transactions: the durable schedule recompute, the
  * due-time evaluator and the personal snooze (issue 44's bounded
  * solution).
  *
@@ -17,7 +17,7 @@
  *   re-reads the task (state, coordinator, deadline anchor, schedule
  *   epoch) so the FINAL recipient and state decide, re-arms the next
  *   daily overdue slot, applies the personal snooze, then hands the batch
- *   to F1's `decidePersonalDelivery` seam (mute suppresses; quiet hours
+ *   to `decidePersonalDelivery` seam (mute suppresses; quiet hours
  *   defer) and delivers ONE collapsed current summary per recipient.
  *   Reading a source changes nothing here: task reminders never consult
  *   read state.
@@ -98,10 +98,10 @@ interface DeadlineBinding {
   readonly temporal: TemporalValueWire | null;
 }
 
-/** The term view the schedule derivation consumes (C4's binding shape). */
+/** The term view the schedule derivation consumes (the binding shape). */
 type DeadlineView = Pick<DeadlineBinding, "knowledgeState" | "temporal">;
 
-/** Reads one deadline binding's current value (the C4 work-read precedent). */
+/** Reads one deadline binding's current value (the work-read precedent). */
 async function readDeadlineBinding(
   tx: MutationCtx,
   findingId: Id<"findings">,
@@ -281,7 +281,7 @@ export async function performRecomputeTaskReminders(
   // The dedup identity binds this counter, never the task revision: a
   // title-only edit bumps the revision but leaves the term and recipients
   // alone, so its recompute collapses onto the same rows and never
-  // re-prompts (PR #102 review round 1, finding 3). The epoch moves
+  // re-prompts. The epoch moves
   // exactly when the schedule's meaning does: the term anchor, the bound
   // finding, the effective coordinator, or a return to a scheduled state
   // after closure, suspension or a missing term (which is all the
@@ -579,7 +579,7 @@ interface ReminderBucket {
 /**
  * The evaluator: re-checks and delivers every due task-reminder intent at
  * `nowMs` (the caller-owned target instant - deterministic under scheduler
- * jitter, the F2 evaluator's contract).
+ * jitter, the evaluator's contract).
  */
 export async function performEvaluateDueReminders(
   tx: MutationCtx,
@@ -592,7 +592,7 @@ export async function performEvaluateDueReminders(
   const touched: Id<"notificationIntents">[] = [];
 
   for (const intent of due) {
-    // Only this lane's kind: F2's intents stay for F2's evaluator.
+    // Only this lane's kind: the intents stay for evaluator.
     if (intent.semanticKind !== "task_reminder") {
       continue;
     }
@@ -649,12 +649,12 @@ export async function performEvaluateDueReminders(
   for (const bucket of buckets.values()) {
     // Every bucket member passed the due-time re-check, which resolved this
     // company and validated its timezone in THIS transaction, so no
-    // failed-arm company read exists here (PR #102 review round 1: the
-    // old `company_unresolvable` branch was unreachable and, unlike F2's
+    // failed-arm company read exists here (the
+    // old `company_unresolvable` branch was unreachable and, unlike the
     // failed arm, published no event; it is gone).
     const company = (await tx.db.get(bucket.companyId))!;
 
-    // The personal delivery decision (F1's seam, the shared gate): the
+    // The personal delivery decision (the seam, the shared gate): the
     // task-reminder mute suppresses; quiet hours defer. Read state is
     // deliberately NOT consulted (reading never completes a task).
     const decision = decidePersonalDelivery({
@@ -779,7 +779,7 @@ export async function performSnoozeTaskReminders(
   // The semanticKind predicate keeps the defer inside THIS lane's intents:
   // taskId is an optional column on the shared table, and a future lane
   // writing it would otherwise have its intents silently deferred by a
-  // task snooze (independent review, round 2).
+  // task snooze.
   for (const intent of pending) {
     if (intent.dueAtMs < input.untilMs) {
       await tx.db.patch(intent._id, { dueAtMs: input.untilMs });

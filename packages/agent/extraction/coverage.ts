@@ -1,18 +1,18 @@
 /**
- * Joined segment coverage honesty (E4): the aggregate that names EVERY
+ * Joined segment coverage honesty: the aggregate that names EVERY
  * required input of one mixed source and never marks it fully processed
  * while a required segment or image remains unresolved.
  *
- * This extends E3's text-side snapshot (packages/agent/planning/coverage.ts,
- * `CoverageSnapshot`) with the D5/D6 producer states:
+ * This extends the text-side snapshot (packages/agent/planning/coverage.ts,
+ * `CoverageSnapshot`) with the producer states:
  *
- * - D6 `audioTranscripts` orders: `complete` (extraction version
+ * - `audioTranscripts` orders: `complete` (extraction version
  *   registered), `pending`/`partial` (actively progressing or awaiting a
  *   bounded resume), `planning` with a sanitized `lastErrorKind`
  *   (EXTERNALLY BLOCKED, resumable — e.g. the media executor is not
  *   configured; honest production degradation, never a fake failure), and
  *   terminal `failed`;
- * - D5 image representations: the deterministic retained selection
+ * - normalized image representations: the deterministic retained selection
  *   (`decideRetainedSelection`, convex/processing/images/protocol.ts)
  *   defines the inspectable representation; the NEWEST completed vision
  *   order over THAT exact representationId completes the input (older
@@ -27,7 +27,7 @@
  * never blocks publication by itself.
  */
 
-/** The per-required-input status vocabulary (issue #38). */
+/** The per-required-input status vocabulary. */
 export type RequiredInputStatus =
   /** A completed extraction version exists and is usable by the analysis. */
   | "complete"
@@ -123,7 +123,7 @@ export function inputWorthWaiting(input: RequiredInput): boolean {
 // The DB-shaped view the pure join consumes (built by the Convex loader).
 // ---------------------------------------------------------------------------
 
-/** One audio transcript order as the join sees it (D6 rows). */
+/** One audio transcript order as the join sees it. */
 export interface TranscriptOrderView {
   readonly transcriptId: string;
   readonly attachmentId: string;
@@ -134,7 +134,7 @@ export interface TranscriptOrderView {
   readonly finishedAtMs: number | null;
 }
 
-/** One vision order as the join sees it (E4 rows). */
+/** One vision order as the join sees it. */
 export interface VisionOrderView {
   readonly orderId: string;
   readonly state: "pending" | "complete" | "failed";
@@ -149,7 +149,7 @@ export interface VisionOrderView {
  * newest completion first. The vision and audio coverage decisions derive
  * from it and the loader takes its head per attachment, so the coverage
  * decision and the loader's evidence pin can never disagree on which
- * version won (round-3: the audio side held by two synchronized copies,
+ * version won (the audio side held by two synchronized copies,
  * not by one function).
  */
 export function completedByNewest<
@@ -200,7 +200,7 @@ export interface AttachmentView {
 
 /** The full DB-shaped coverage view of one source. */
 export interface CoverageSourceView {
-  /** The D1 text extraction id (the author's words are their own extraction). */
+  /** The text extraction id (the author's words are their own extraction). */
   readonly textExtractionId: string | null;
   readonly attachments: readonly AttachmentView[];
   readonly transcriptOrders: readonly TranscriptOrderView[];
@@ -340,7 +340,7 @@ export function imageAttachmentStatus(view: ImageInputView): RequiredInput {
  * THE joined coverage decision (pure): names every required input of the
  * source — the author's text plus every accepted audio and image
  * attachment — with its honest status. An empty `textExtractionId` keeps
- * the text input honestly pending (D1 always seeds one; defensive only).
+ * the text input honestly pending (acceptance always seeds one; defensive only).
  */
 export function joinCoverage(view: CoverageSourceView): JoinedCoverageSnapshot {
   const inputs: RequiredInput[] = [

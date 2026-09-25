@@ -1,6 +1,5 @@
 /**
- * The ONE ordered-route runner (E2 structural repair, advisory review
- * round 1; E8 provider-qualified positions): the bounded fallback loop, the
+ * The ONE ordered-route runner: the bounded fallback loop, the
  * per-attempt records, the eligibility short-circuit and the record seal
  * live here exactly once.
  *
@@ -11,7 +10,7 @@
  * shared discipline:
  *
  * - each target in the accepted order gets ONE attempt, in order — the
- *   E8 order crosses supplier boundaries (direct DeepSeek first, the
+ *   route order crosses supplier boundaries (direct DeepSeek first, the
  *   authorized OpenRouter fallback positions next) and the runner treats
  *   them uniformly: eligibility is a property of the FAILURE CLASS, not of
  *   the provider;
@@ -26,7 +25,7 @@
  * - exhausting the order leaves the last observed eligible failure standing
  *   (both providers failing is the recorded degraded outcome).
  *
- * This is the single place later lanes (D6, E3–E5) reuse for classification
+ * This is the single place later lanes reuse for classification
  * and recording; adding a role means writing an attempt function, never a
  * fourth copy of the loop.
  */

@@ -1,7 +1,7 @@
 /**
- * Read-state mutation transaction (F1): `attention.markSourceRead`.
+ * Read-state mutation transaction: `attention.markSourceRead`.
  *
- * ONE Convex mutation performs the whole thing (the D1 dispatch pattern):
+ * ONE Convex mutation performs the whole thing (the dispatch pattern):
  * resolve + tenant-check the LOGICAL source, decide the transition, write
  * the ONE row this person has for that source, and publish the canonical
  * `attention.sourceReadChanged` event — atomically, or nothing commits.

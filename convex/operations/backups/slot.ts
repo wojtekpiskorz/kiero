@@ -1,5 +1,5 @@
 /**
- * The complete-backup decision model (I5).
+ * The complete-backup decision model.
  *
  * PURE MODULE (no Convex imports), mirrored by infra/backups/*.json which
  * tests/i5 asserts cannot drift. Every scheduling, lease, freshness,
@@ -83,7 +83,7 @@ export function slotIsCurrent(slotMs: number, nowMs: number): boolean {
 
 export type BackupTier = "frequent" | "daily";
 
-/** The manifest lifecycle states (the certified A2/A3 union, unchanged). */
+/** The manifest lifecycle states (the certified union, unchanged). */
 export type ManifestState = "building" | "verified" | "failed";
 
 /** The row shape the lease/freshness/retention decisions read. */
@@ -186,7 +186,7 @@ export function freshnessOf(
   };
 }
 
-/** Dedup identity of one staleness episode (anchored like I2 silence). */
+/** Dedup identity of one staleness episode (anchored like telemetry silence). */
 export function staleDedupKey(anchorMs: number): string {
   return `backup_stale:${anchorMs}`;
 }

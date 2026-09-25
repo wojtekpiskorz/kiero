@@ -1,9 +1,9 @@
 /**
- * Sources uploads callable entries (D2).
+ * Sources uploads callable entries.
  *
  * - `prepareUploadCommand` / `resumeUploadCommand` (public mutations): the
  *   client path over the certified operations. Identity is the caller's
- *   verified Convex Auth session (B1's live-session resolution); without a
+ *   verified Convex Auth session (the live-session resolution); without a
  *   verified identity the command fails `unauthenticated`.
  * - `stepTransaction` (internal mutation): the Worker uploads-channel path.
  *   The HTTP boundary (`./http.ts`) forwards the browser's Authorization

@@ -14,7 +14,7 @@
  *   values created through `newX` helpers below. Constructing them always
  *   goes through the schema (never a cast), so an invalid value cannot enter.
  *
- * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
+ * Certified by platform on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";
@@ -28,7 +28,7 @@ export const TABLE_ID_NAMES = [
   // access/identity
   "users",
   "sessions",
-  // access/identity: Convex Auth provider tables (B1 amendment; the library
+  // access/identity: Convex Auth provider tables (the library
   // owns their shape, the identity fragment registers them in the schema)
   "authSessions",
   "authAccounts",
@@ -42,10 +42,10 @@ export const TABLE_ID_NAMES = [
   "invitations",
   // access/gm
   "gmAccessGrants",
-  // access/gm (B4 amendment): the per-company alpha participation authority
+  // access/gm: the per-company alpha participation authority
   // an open grant depends on (activation open = the firm is a testing firm).
   "gmCompanyActivations",
-  // access/linking (B2: verified linking ceremonies, email changes,
+  // access/linking (verified linking ceremonies, email changes,
   // manual-recovery ledger)
   "linkingAttempts",
   "emailChangeRequests",
@@ -64,7 +64,7 @@ export const TABLE_ID_NAMES = [
   "uploads",
   "attachments",
   "mediaRepresentations",
-  // processing/audio (D6 amendment, flagged in the issue report): the
+  // processing/audio: the
   // resumable long-audio STT fragment - transcript orders and per-segment
   // checkpoints over accepted audio attachments.
   "audioTranscripts",
@@ -85,21 +85,20 @@ export const TABLE_ID_NAMES = [
   "tasks",
   "checklistItems",
   "events",
-  // C4 amendment (flagged, I2 precedent): the immutable change history of
+  // The immutable change history of
   // tasks, checklist items and events - actor, time and evidence basis per
-  // change (issue #27 acceptance: "immutable history").
+  // change ("immutable history").
   "workRevisions",
-  // platform (durable execution + outbox)
+  // Platform (durable execution + outbox)
   "processingRuns",
   "processingSteps",
   "processingAttempts",
-  // processing/multimodal (E4 amendment, flagged coordinated change, the
-  // D6 precedent): the vision-extraction order rows over retained image
-  // representations (issue #38).
+  // processing/multimodal: the vision-extraction order rows over retained image
+  // representations.
   "visionOrders",
   "durableJobs",
   "outboxEvents",
-  // A3 certification amendment: observable external-effect ledger used by the
+  // Platform certification amendment: observable external-effect ledger used by the
   // no-duplicate-effect proof (the echo stand-in for external systems).
   "externalEffects",
   // attention/read-state
@@ -110,12 +109,12 @@ export const TABLE_ID_NAMES = [
   "notificationIntents",
   "pushSubscriptions",
   "notificationAttempts",
-  // attention/push (F3 amendment, the G3 closed-inventory precedent): the
+  // attention/push: the
   // per-device delivery rows of the web push transport, plus the guarded
   // proof-only fake push service device store.
   "pushDeliveries",
   "pushProofDevices",
-  // attention/reminders (F4 amendment, flagged): the per-task schedule
+  // attention/reminders: the per-task schedule
   // anchor and the personal per-task snoozes ("Odroczenie przypomnień").
   "reminderSchedules",
   "reminderSnoozes",
@@ -124,7 +123,7 @@ export const TABLE_ID_NAMES = [
   // calendar/projection
   "calendarCopies",
   "calendarSyncState",
-  // calendar/sync (G3 amendment, the G1/G2 closed-inventory precedent):
+  // calendar/sync:
   // the per-leg attempt/outcome ledger, and the proof-only fake-Google
   // event store the guarded fixtures write.
   "calendarSyncAttempts",
@@ -134,8 +133,7 @@ export const TABLE_ID_NAMES = [
   "exportSourceLinks",
   // operations/deletion
   "deletionRecords",
-  // I4 amendment (issue #56, flagged in the issue report; the F3/G3
-  // closed-inventory precedent): the per-stage purge tracking rows of one
+  // The per-stage purge tracking rows of one
   // permanent deletion (media bytes, transcripts, findings marking, search
   // index, notification work, exports) - pending/purged/failed state with
   // the 24-hour deadline the administrator's status screen reports.
@@ -145,7 +143,7 @@ export const TABLE_ID_NAMES = [
   // operations/telemetry
   "auditRecords",
   "diagnosticEvents",
-  // I2 amendments: heartbeat ledger (backend-silence detection) and the
+  // telemetry: heartbeat ledger (backend-silence detection) and the
   // all-in cost accounting behind the 400/500 PLN alerts.
   "healthHeartbeats",
   "costEntries",
@@ -153,9 +151,9 @@ export const TABLE_ID_NAMES = [
   // search
   "searchEntries",
   "searchIndexGenerations",
-  // agent (R25 amendment, issue #230, the F3/G3 closed-inventory precedent):
+  // agent:
   // the answer loop's durable record family — the per-ask run rows and the
-  // per-provider-turn rows the E6 loop records from its checkpoints.
+  // per-provider-turn rows the loop records from its checkpoints.
   "answerRuns",
   "answerTurns",
 ] as const;
@@ -201,7 +199,7 @@ export type TableId<T extends TableIdName> = Schema.Schema.Type<
  * This checks only that the value is a string; it does NOT prove the id
  * exists in the table or that the string is a well-formed Convex id:
  * Convex generates ids and validates them server-side (`ctx.db.normalizeId`),
- * which is part of the A3 runtime proof. The brand ties the reference to one
+ * which is part of the runtime proof. The brand ties the reference to one
  * table so cross-table misuse fails to compile.
  */
 export function parseTableId<T extends TableIdName>(

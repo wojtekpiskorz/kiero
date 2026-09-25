@@ -1,5 +1,5 @@
 /**
- * publishChangeSet (C2): the ONE atomic commit of a logically dependent group.
+ * publishChangeSet: the ONE atomic commit of a logically dependent group.
  *
  * Runs inside ONE Convex mutation. ATOMICITY IS STRUCTURAL, not
  * write-order-dependent: everything that can throw or refuse runs BEFORE
@@ -12,7 +12,7 @@
  * writes none"). Pure decisions (stale-plan guard, plan consistency, cycle
  * checks) come from @kiero/domain/findings, against the then-current graph
  * and counters: precedence is decided by expected revisions, never by
- * arrival or completion time (issue 8).
+ * arrival or completion time.
  */
 
 import { Schema } from "effect";
@@ -134,7 +134,7 @@ export async function performPublishChangeSet(
     if (entry.effectiveFrom !== undefined) {
       decodeTemporalValue(entry.effectiveFrom);
     }
-    // C3 seam (additive, flagged): re-check every extension value against
+    // Re-check every extension value against
     // its exact stored definition version inside THIS transaction — the
     // version may have moved (or been defined) since prepare. A staged value
     // that no longer interprets can never publish as staged: the set fails.
@@ -388,7 +388,7 @@ export async function performPublishChangeSet(
       recordedAtMs: nowMs,
     });
     publishedRevisionIds.push(revisionId);
-    // C3 seam (additive, flagged): the committed-usage counter moves WITH
+    // The committed-usage counter moves WITH
     // the revision it counts, in this transaction — usage statistics are
     // derived from committed records, never estimated.
     await recordExtensionValueUsage(tx.db, companyId, entry.value, nowMs);

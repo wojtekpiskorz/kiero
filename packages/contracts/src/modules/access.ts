@@ -3,7 +3,7 @@
  *
  * Identity/membership separation, one active firm in v1, explicit linking,
  * last-admin constraints, device/session revocation, background and media
- * checks; all owned inside the implementing lane (B1–B4). This file only
+ * checks; all owned inside the implementing lane. This file only
  * names the checked operations and events; until those lanes land, dispatch
  * fails closed with `unsupported`.
  */
@@ -40,7 +40,7 @@ export const accessOperations = {
     result: Schema.NullOr(AccessSnapshot),
     errorKinds: ["unauthenticated"],
   }),
-  // B3 amendment (coordinated addition, named in issue #22): the company
+  // The company
   // bootstrap and invitation-admission seams the bounded solution requires.
   // `access.createCompany` is NOT public self-service signup: a caller with
   // an active firm is refused (one-active-company), and the creator becomes
@@ -120,7 +120,7 @@ export const accessOperations = {
     result: Schema.Struct({ revokedAtMs: Schema.Number }),
     errorKinds: ["forbidden", "not_found", "conflict"],
   }),
-  // B3 amendment: the atomic administrator transfer ("transfer
+  // The atomic administrator transfer ("transfer
   // administration"). One transaction promotes the target member to admin
   // and demotes the actor to member, so the last-admin invariant cannot dip
   // between two separate role changes.
@@ -157,7 +157,7 @@ export const accessOperations = {
     name: "access.enterGmMode",
     input: Schema.Struct({ reason: Schema.NonEmptyString }),
     result: Schema.Struct({ grantId: tableIdSchema("gmAccessGrants") }),
-    // B4 amendment (issue #23): entering twice in one session is an honest
+    // Entering twice in one session is an honest
     // conflict, not a silent grant swap; a whitespace-only reason passes
     // NonEmptyString at decode but dies in the transaction's trim check.
     errorKinds: ["forbidden", "conflict", "validation"],
@@ -169,15 +169,15 @@ export const accessOperations = {
     result: Schema.Struct({ closedAtMs: Schema.Number }),
     errorKinds: ["forbidden", "not_found"],
   }),
-  // B4 amendment (coordinated addition, named in issue #23): the audited GM
+  // The audited GM
   // operations. Every input that targets company data states the target
   // company; every human-triggered action states its basis ("podstawa").
   // GM authority is resolved from an OPEN `gmAccessGrants` row inside the
   // same transaction (never from membership: a member without a GM grant
   // gains nothing, and a GM without membership acts through the grant).
   //
-  // The staged B2 manual-recovery command (issue #21 named prerequisite):
-  // the GM states the verification basis; the B2 core clears sessions,
+  // The staged manual-recovery command:
+  // the GM states the verification basis; the core clears sessions,
   // provider accounts and the Google subject while the users row, membership
   // and authorship survive untouched.
   "access.recoverAccount": operationEntry({
@@ -196,7 +196,7 @@ export const accessOperations = {
     errorKinds: ["forbidden", "not_found", "conflict", "validation"],
   }),
   // The audited GM inspection read (read-side surface over processingRuns /
-  // durableJobs; the retry/reanalysis ACTIONS are H4's). A read is still a
+  // durableJobs; the retry/reanalysis ACTIONS belong to processing inspection). A read is still a
   // GM request: it states the target company and basis, and its audit row
   // lands in the same transaction.
   "access.gmInspectCompany": operationEntry({
@@ -243,7 +243,7 @@ export const accessOperations = {
   // GM company onboarding: creates the firm UNDER GM AUTHORITY (no GM
   // membership is ever created), opens its alpha activation and issues the
   // first-administrator invitation — the operator control path that replaces
-  // direct database edits (issue #23 acceptance criteria).
+  // direct database edits (accepted rule).
   "access.gmOnboardCompany": operationEntry({
     kind: "operation",
     name: "access.gmOnboardCompany",
@@ -327,7 +327,7 @@ export const accessEvents = {
     payload: Schema.Struct({
       membershipId: tableIdSchema("memberships"),
       userId: tableIdSchema("users"),
-      // B3 amendment (issue #22 revocation transaction contract): the event
+      // The event
       // carries the revocation instant and the chosen successor
       // administration policy — the membership that received administration
       // when the revoked boss was the last admin (transfer-before-revoke),

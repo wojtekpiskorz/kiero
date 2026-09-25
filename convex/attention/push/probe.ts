@@ -1,6 +1,6 @@
 /**
- * F3 web-push dev proofs (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable; shared plumbing in convex/attention/probe_shared.ts, the F2
+ * Web-push dev proofs (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable; shared plumbing in convex/attention/probe_shared.ts, the notification-intents
  * probe precedent).
  *
  * - `probeRegisterSubscription` / `probeRevokeSubscription`: the two
@@ -19,7 +19,7 @@
  *   real drain -> job -> executor -> action chain runs end to end.
  * - `probeRevokeFixtureSession`: the session-revocation flip (the
  *   revokeFixtureMembership precedent: a dev fixture flip; production
- *   revocation is B1/B2's audited operation).
+ *   revocation is the identity/linking audited operation).
  */
 
 import { v } from "convex/values";

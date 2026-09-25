@@ -1,16 +1,16 @@
 /**
- * The Convex HTTP client for the Calendar OAuth boundary (G1).
+ * The Convex HTTP client for the Calendar OAuth boundary.
  *
  * Two verified legs, both ending on the canonical Convex checks:
  *
  * - the START forwards the USER's Convex access token (Authorization
  *   header) to the deployment's `/calendar/oauth/start`; Convex verifies
  *   the token and resolves the company scope through the canonical chain
- *   (the A3 checked path), and the response carries only the constructed
+ *   (the checked path), and the response carries only the constructed
  *   Google authorization URL.
  * - the CALLBACK forwards Google's query parameters to
  *   `/calendar/oauth/callback/complete` with the Worker's service
- *   credential (the A3 verified service-bridge identity): the bridge bearer
+ *   credential (the verified service-bridge identity): the bridge bearer
  *   check admits the call, and the callback protocol itself correlates by
  *   the single-use state and re-checks membership.
  *
@@ -31,7 +31,7 @@ export interface CalendarBridgeEnv {
   readonly KIERO_SERVICE_TOKEN?: string;
   /**
    * The configured PWA origin the callback page's "Wróć do Kiero" link
-   * targets (R12; the same deployment variable name the direct Convex
+   * targets (the same deployment variable name the direct Convex
    * callback reads — single-sourced as `CALENDAR_APP_BASE_URL_ENV` in
    * convex/calendar/connection/return.ts, which the route reads through
    * that constant so name drift cannot compile; http.ts only re-exports

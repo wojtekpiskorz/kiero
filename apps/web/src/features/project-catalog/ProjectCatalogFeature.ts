@@ -1,14 +1,14 @@
 /**
- * The barebones project catalog feature (C1): identify projects, assign
+ * The barebones project catalog feature: identify projects, assign
  * firm-unique codenames, change stages, set/clear pauses, and keep the
  * contact catalog with project roles — all through the checked dispatch
  * entry (convex/projects/functions.ts).
  *
  * JSX-free on purpose (createElement only), exactly like the membership
  * feature: the host feature registry chain stays importable by node test
- * programs, and this module is the surface the A4 host entry for
+ * programs, and this module is the surface the host entry for
  * `/projekty` will mount (the entry flip is the host lane's edit, not
- * this lane's). The sign-in leg is B1's shared gate composed with this
+ * this lane's). The sign-in leg is the shared gate composed with this
  * surface as the authenticated continuation. No styling, semantic controls
  * only (the UX/UI track owns presentation).
  */
@@ -105,7 +105,7 @@ function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): Rea
   });
 }
 
-/** Authentication gate: B1's shared sign-in surface; members continue here. */
+/** Authentication gate: the shared sign-in surface; members continue here. */
 function CatalogGate(): ReactNode {
   return createElement(AuthenticatedGate, { continuation: () => createElement(CatalogSurface) });
 }
@@ -122,7 +122,7 @@ function CatalogSurface(): ReactNode {
   const { signOut } = useAuthActions();
   const [signingOut, setSigningOut] = useState(false);
 
-  // The B1/B3 pattern: this query errors exactly when THIS session stopped
+  // The pattern: this query errors exactly when THIS session stopped
   // resolving or the actor has no active company. The honest fallback is the
   // session-ended state with a way back to sign-in, never a spinner.
   if (overview.status === "error") {

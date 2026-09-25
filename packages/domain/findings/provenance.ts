@@ -1,5 +1,5 @@
 /**
- * Pure provenance rules for findings (C2): typed evidence, independent
+ * Pure provenance rules for findings: typed evidence, independent
  * corroboration versus derivation, and the acyclicity of the dependency
  * graph.
  *
@@ -115,12 +115,12 @@ export type RevisionOrigin =
   | "publication"
   | "correction"
   | "withdrawal_marking"
-  // E7 amendment (additive, flagged): the scope re-assessment marking of a
+  // The scope re-assessment marking of a
   // project reassignment; withdrawal treats it by its witness rules below
   // (not as an already-marked state, so a later withdrawal of the sole
   // witness still marks unknown).
   | "reassignment_marking"
-  // I4 amendment (additive, flagged, the E7 precedent): the support-removal
+  // The support-removal
   // marking of a permanent source deletion (issue #56). Like a withdrawal
   // marking it is already an explicit unknown, so replays never re-mark.
   | "purge_marking";
@@ -148,7 +148,7 @@ export function decideWithdrawalMarking(args: {
   currentEvidence: readonly EvidenceSupportRef[];
   withdrawnSourceId: string;
 }): WithdrawalDecision {
-  // I4 append (flagged, minimal): a purge marking is already an explicit
+  // A purge marking is already an explicit
   // unknown for its finding, exactly like a withdrawal marking.
   if (args.currentRevisionOrigin === "withdrawal_marking" || args.currentRevisionOrigin === "purge_marking") {
     return { decision: "retained", basis: "already_marked" };

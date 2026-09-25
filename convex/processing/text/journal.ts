@@ -1,5 +1,5 @@
 /**
- * The run journal (E3): the one helper set every text-processing stage
+ * The run journal: the one helper set every text-processing stage
  * shares — idempotent step recording, failure/outcome markers, fragment
  * ensuring and text-extraction resolution.
  *
@@ -10,7 +10,7 @@
  * - `recordStep` is insert-if-absent on (run, sequence) and only ever
  *   PATCHES a row still `running`/`pending` — journal replay of a
  *   committed stage is a no-op, so restarts cannot duplicate step rows;
- * - the marker bases live OUTSIDE the stage sequences (the A3 crash-proof
+ * - the marker bases live OUTSIDE the stage sequences (the crash-proof
  *   pattern): a THROW marker makes the stage fail as an exception (the
  *   rollback proof), an OUTCOME marker makes it fail as a recorded outcome
  *   (the group-isolation proof);
@@ -19,13 +19,13 @@
  *   instead of minting coordinates twice;
  * - `resolveTextExtraction` validates an explicit extraction reference
  *   in-company (the drain projection may hand `null`) and otherwise
- *   resolves the source's single D1 text extraction.
+ *   resolves the source's single text extraction.
  */
 
 import type { MutationCtx } from "../../_generated/server";
 import type { Id } from "../../_generated/dataModel";
 
-/** Failure markers (the A3 crash-proof pattern) live outside the stages. */
+/** Failure markers (the crash-proof pattern) live outside the stages. */
 export const FAILURE_MARKER_BASE = 100_000;
 /** Outcome markers (recorded group failure, no exception) for the isolation proof. */
 export const OUTCOME_MARKER_BASE = 200_000;
@@ -136,7 +136,7 @@ export async function ensureFragment(
  * Resolves the text extraction of one source, in-company. An explicit
  * reference (the drain projection's named id, or `null` when the payload
  * could not name one) must belong to this source and be a text extraction;
- * without one, the source's single D1-seeded text extraction resolves.
+ * without one, the source's single acceptance-seeded text extraction resolves.
  */
 export async function resolveTextExtraction(
   db: JournalDb,

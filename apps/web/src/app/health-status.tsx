@@ -1,8 +1,8 @@
 /**
- * Connection and platform health status (A4).
+ * Connection and platform health status.
  *
  * The health indicator reads the platform health surface
- * (`platform/health`, the A3 live subscription target) through the Convex
+ * (`platform/health`, the live subscription target) through the Convex
  * React-Query adapter: the canonical `convexQuery` key, hashed and fetched
  * by the QueryClient defaults wired in `connections.ts`. Without a
  * configured backend nothing subscribes and the status stays "nie

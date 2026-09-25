@@ -1,5 +1,5 @@
 /**
- * Work feature state (H2): Polish copy, vocabularies rendered from the
+ * Work feature state: Polish copy, vocabularies rendered from the
  * single domain source, the wire-value renderers for bound dates, and the
  * closed-error hints for the /praca surface.
  *

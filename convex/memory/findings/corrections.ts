@@ -1,5 +1,5 @@
 /**
- * Corrections and clarifications (C2): the explicit change paths that are
+ * Corrections and clarifications: the explicit change paths that are
  * NOT source-backed publications.
  *
  * - `performCorrectFinding`: one explicit correction — a NEW revision
@@ -9,12 +9,12 @@
  *   time never decides ("Korekta ustalenia ... nie przepisuje wcześniejszej
  *   wiadomości źródłowej").
  * - `performRaiseClarification` / `performResolveClarification`: the shared
- *   open question for entitled bosses; resolution keeps its author. R1
- *   (issue #126): resolution additionally persists whether its basis is
+ *   open question for entitled bosses; resolution keeps its author. The
+ *   resolution additionally persists whether its basis is
  *   source-backed (normalized source + optional fragment references,
  *   validated against the current state) or a manual boss decision (a note
  *   alone, no fabricated source); a repeated resolve refuses and never
- *   replaces the stored evidence. R2 (issue #127): raise refuses a
+ *   replaces the stored evidence. R2: raise refuses a
  *   conflicting fragment whose source is not ACTIVE (a retained tombstone
  *   never grounds new work), and a redacted open case refuses resolution
  *   (it is not actionable).
@@ -23,10 +23,10 @@
  *   the purged source are removed, possibly derived text is replaced with
  *   the fixed Polish redaction copy, content-free audit metadata is
  *   recorded, and surviving ACTIVE references, actor and timestamps stay
- *   (bounded by the per-source scope, like every I4 stage).
+ *   (bounded by the per-source scope, like every stage).
  *
  * Every perform* body runs inside ONE Convex mutation; everything that can
- * throw or refuse runs before the first write (the D1 discipline).
+ * throw or refuse runs before the first write (the discipline).
  */
 
 import { Schema } from "effect";
@@ -104,7 +104,7 @@ export async function performCorrectFinding(
     supersedesRevisionId: null,
   });
 
-  // C3 seam (additive, flagged): a correction's value validates against the
+  // A correction's value validates against the
   // exact stored definition version before anything is written, and the
   // committed-usage counter moves with the revision that carries it.
   const encodedCorrectionValue = encodeFindingValue(input.value);
@@ -182,7 +182,7 @@ export async function performRaiseClarification(
         forbiddenError("conflicting_fragment_not_in_company", "sourceFragments"),
       );
     }
-    // R2 (issue #127): the accepted source LIFECYCLE, not row existence,
+    // The accepted source LIFECYCLE, not row existence,
     // decides — a retained tombstone (permanent deletion) or a withdrawn
     // source is not conflicting evidence a new case may rest on, so late
     // work can never publish over a deleted source.
@@ -239,8 +239,8 @@ function resolutionEvidenceError(code: ResolutionEvidenceRefusalCode): ClosedErr
 }
 
 /**
- * R1: validates the cited resolution evidence against the CURRENT state,
- * before any write (the D1 discipline — a refusal leaves the case open and
+ * Validates the cited resolution evidence against the CURRENT state,
+ * before any write (the discipline — a refusal leaves the case open and
  * stores nothing). The per-reference rule lives ONCE in ./references
  * (`checkResolutionEvidenceReference`); this wrapper adds the transaction's
  * error shape and collapses duplicate (source, fragment) pairs, preserving
@@ -304,7 +304,7 @@ export async function performResolveClarification(
       conflictError("clarification_already_resolved", "clarifications", clarificationId),
     );
   }
-  // R2 (issue #127): a redacted open case is not actionable — its question
+  // A redacted open case is not actionable — its question
   // possibly derived from a permanently deleted source, so resolving it
   // would publish a note about content that must stay gone. The refusal
   // leaves the row exactly as it is (the shared rule decides honestly).
@@ -318,7 +318,7 @@ export async function performResolveClarification(
   if (actorUserId === null) {
     return errorResult(validationError("actor_user_unresolved"));
   }
-  // R1: validate the cited evidence against the current state BEFORE any
+  // Validate the cited evidence against the current state BEFORE any
   // write — an unknown, cross-company, inactive or mismatched-fragment
   // reference refuses the WHOLE command (the case stays open). Absent or
   // empty evidence is a manual boss decision, never a fabricated source.
@@ -364,12 +364,12 @@ export async function performResolveClarification(
 }
 
 // ---------------------------------------------------------------------------
-// R2 (issue #127): the durable clarification content purge.
+// The durable clarification content purge.
 // ---------------------------------------------------------------------------
 
 /**
  * Whether one clarification row links to the given source at all — through
- * conflicting fragments or through stored R1 resolution evidence. This is
+ * conflicting fragments or through stored resolution evidence. This is
  * the AFFECTED test; the per-row redaction itself is the shared content
  * rule (./references), never a private copy of it. Redaction removes the
  * very links this function looks for, which is what makes the purge
@@ -390,9 +390,9 @@ async function rowLinksToSource(
 }
 
 /**
- * R2: purges the clarification content of ONE permanently deleted source,
+ * Purges the clarification content of ONE permanently deleted source,
  * inside the deletion executor's single stage transaction. The work is
- * bounded by the per-source scope exactly like every other I4 stage (a
+ * bounded by the per-source scope exactly like every other deletion stage (a
  * row qualifies only through THIS source's fragments or resolution
  * evidence), and idempotent by construction: redaction removes the very
  * links `rowLinksToSource` tests, so a retry of the stage finds nothing
@@ -409,7 +409,7 @@ async function rowLinksToSource(
  * - keeps state, actor and timestamps untouched.
  *
  * The purge publishes no event — the tombstone's own event already told
- * the world, and I6 replays redaction from the stored audit state.
+ * the world, and restore replays redaction from the stored audit state.
  */
 export async function purgeClarificationContentForSource(
   tx: MutationCtx,

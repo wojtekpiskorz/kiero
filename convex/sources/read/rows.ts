@@ -1,5 +1,5 @@
 /**
- * Conversation view rows (D1): the canonical read shape of an accepted
+ * Conversation view rows: the canonical read shape of an accepted
  * source in BOTH scopes.
  *
  * "Rozmowa firmy" is canonical history; "Rozmowa projektowa" is an ordered
@@ -8,9 +8,9 @@
  * ONE schema: the same source id, author, send snapshot and lifecycle
  * resolve identically wherever the entry is read.
  *
- * This module is the D1-produced canonical source/read contract for
- * D2-D6, C2/C5 and E3-E6 (issue 29 "Producer and consumer integration");
- * lifting it into @kiero/contracts is a later coordinated registration (J).
+ * This module is the canonical source/read contract for the
+ * media, memory and processing lanes;
+ * lifting it into @kiero/contracts is a later coordinated registration.
  *
  * The processing state is DERIVED from durable rows, never stored beside the
  * source, so it can never drift from the durable execution state:
@@ -20,7 +20,7 @@
  * - latest run failed  -> `failed`
  * - latest run succeeded or superseded -> `processed`
  * - `partial` is reserved for multi-attachment sources where required
- *   segments are still pending (D5/D6/E3 own producing it; a text-only
+ *   segments are still pending (the processing lanes produce it; a text-only
  *   source can never be partial).
  */
 

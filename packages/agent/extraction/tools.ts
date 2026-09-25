@@ -1,14 +1,14 @@
 /**
- * The joined-analysis tool surface (E4): E3's three tools with the
+ * The joined-analysis tool surface: the three tools with the
  * multimodal evidence extensions.
  *
  * The tool NAMES are unchanged (`memory_upsert_finding`,
  * `projects_identify`, `memory_ask_clarification`) — the model-facing
  * vocabulary is one thing; the DECODE AUTHORITY for the join's arguments is
- * this module's schemas (`JOIN_SCHEMA_VERSION`), which extend E3's with:
+ * this module's schemas (`JOIN_SCHEMA_VERSION`), which extend the with:
  *
  * - `transcriptQuotes`: verbatim quotes from the ASSEMBLED TRANSCRIPT
- *   section of the context (D6's completed segments); the server locates
+ *   section of the context (the completed segments); the server locates
  *   them inside one segment and anchors the original-time interval;
  * - `imageObservationIds`: handles (`obs:<attachmentId>:<index>`) of vision
  *   observations printed in the context's IMAGES section. Observations
@@ -16,7 +16,7 @@
  *   has no handle to claim image inspection with — and a hallucinated
  *   handle is refused by the reducer.
  *
- * `quotes` keeps E3's meaning: verbatim fragments of the author's typed
+ * `quotes` keeps the meaning: verbatim fragments of the author's typed
  * text.
  */
 
@@ -49,7 +49,7 @@ export type JoinUpsertFindingArgs = Schema.Schema.Type<typeof JoinUpsertFindingA
 /** The clarification tool keeps its text shape (transcript quotes ride `quotes`). */
 export const JoinAskClarificationArgs = AskClarificationArgs;
 
-/** One declared tool for E2's `ChatToolSpec` (name + description + codec). */
+/** One declared tool for `ChatToolSpec` (name + description + codec). */
 export interface JoinToolSpec {
   readonly name: string;
   readonly description: string;

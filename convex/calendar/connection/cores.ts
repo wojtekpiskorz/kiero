@@ -1,9 +1,9 @@
 /**
- * Calendar connection domain cores (G1): the pure decision halves of the
+ * Calendar connection domain cores: the pure decision halves of the
  * connection lifecycle, as total functions over small row views.
  *
- * Every rule issue #45 names lives here so tests/g1 prove the boundaries
- * without a deployment (the B3 pattern): the checked start decision, the
+ * Every connection rule lives here so tests/g1 prove the boundaries
+ * without a deployment: the checked start decision, the
  * single-use callback correlation, the disconnect-during-pending race, the
  * uncertainty semantics for token exchange/refresh, and above all the
  * no-blind-duplicate-calendar rule for unknown create/read outcomes.
@@ -275,7 +275,7 @@ export type DisconnectDecision =
  * - from `connected` it stops future publishing structurally (credentials
  *   are cleared) and records UNCONFIRMED cleanup for the user: Kiero
  *   attempts to remove managed copies, but Google-side confirmation is a
- *   G3 reconciliation outcome, never an assumption;
+ *   reconciliation outcome, never an assumption;
  * - from `error`/`disconnected` it is an idempotent no-op keeping the
  *   original timestamps.
  */

@@ -1,11 +1,11 @@
 /**
  * Minimal SigV4 reader for the EU R2 media bucket over its S3-compatible
- * endpoint (D6), scoped to exactly two calls: HeadObject and ranged
+ * endpoint, scoped to exactly two calls: HeadObject and ranged
  * GetObject. Hand-rolled on WebCrypto so the container image needs NO added
- * dependency (the root manifest is a coordinated shared change; D6 does not
+ * dependency (the root manifest is a coordinated shared change; this worker does not
  * make one).
  *
- * SIGNING TWIN: apps/export-worker/src/s3.ts (the I3 writer) carries its
+ * SIGNING TWIN: apps/export-worker/src/s3.ts (the writer) carries its
  * own copy of the same SigV4 derivation chain (hex/hmac/sha256Hex, amzDate,
  * scope, key chain, authorization header). The container boundary keeps it
  * there: each image contains only its own src/ (no node_modules, build
@@ -146,7 +146,7 @@ export function s3ObjectReader(env: {
   return {
     ok: true,
     read: async (objectKey, range) => {
-      // ONE signed request (round-2 finding c): the GET alone answers
+      // ONE signed request: the GET alone answers
       // 404/403 for missing/unreadable objects — a HEAD-first probe would
       // double every segment's signed-request count for no information.
       try {

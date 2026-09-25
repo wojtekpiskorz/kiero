@@ -1,17 +1,17 @@
 /**
- * Version labels and bounds of the multimodal join surface (E4).
+ * Version labels and bounds of the multimodal join surface.
  *
- * The join composes E3's text planning with D5's retained image
- * representations and D6's transcript versions into partial-safe analysis
+ * The join composes the text planning with the retained image
+ * representations and the transcript versions into partial-safe analysis
  * (architecture protocol steps 5-6: "Run versioned STT/vision and prepare
  * bounded source-linked information groups. A missing required segment is
  * pending, not a complete transcript. Text-only fallback cannot claim to
  * have inspected a pending image").
  *
  * Like {@link TEXT_ANALYSIS_PIPELINE_VERSION}, these constants are a
- * deliberate, reviewable single source. E3's text executor copies them
+ * deliberate, reviewable single source. The text executor copies them
  * onto the `processingRuns` row; the join does not (the initial run row is
- * shared with E3) and pins them on its own load-context step row and in
+ * shared with text analysis) and pins them on its own load-context step row and in
  * `checkpoint.join.versions` instead.
  */
 
@@ -24,7 +24,7 @@ export const JOIN_PROMPT_VERSION = "e4.prompt-pl/1" as const;
 /** The tool/input schema version the join's arguments decode against. */
 export const JOIN_SCHEMA_VERSION = "e4.schema/1" as const;
 
-/** The vision-extraction pipeline version (the E4 vision order row). */
+/** The vision-extraction pipeline version (the vision order row). */
 export const VISION_EXTRACTION_PIPELINE_VERSION = "e4.vision/1" as const;
 
 /** Bounded model turns per joined-analysis run. */

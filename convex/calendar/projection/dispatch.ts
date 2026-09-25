@@ -1,16 +1,16 @@
 /**
- * Calendar projection command dispatch wiring (G2, extended by G5): the SAME
- * checked path A3 proved and G1/C4 reuse, with this lane's handler registry
- * and policy.
+ * Calendar projection command dispatch wiring: the SAME
+ * checked path the platform proved and the connection and work lanes reuse,
+ * with this lane's handler registry and policy.
  *
  * The registry implements exactly TWO certified operations today:
  * `calendar.setCopyHidden` (write): the actor's personal hide or explicit
- * restore of one copy, and `calendar.setSelection` (write, G5 issue #107):
- * the actor's personal project selection. `calendar.reconcileCopy` is G3's
+ * restore of one copy, and `calendar.setSelection` (write):
+ * the actor's personal project selection. `calendar.reconcileCopy` is the
  * lane and stays unregistered: it fails closed `unsupported` here, honestly,
- * until G3 implements it.
+ * until reconciliation implements it.
  *
- * Everything resolves through B1's identity source (provision-or-refresh,
+ * Everything resolves through the identity source (provision-or-refresh,
  * then the canonical user -> earliest active membership -> company chain),
  * so a revoked membership fails `unauthenticated` before any handler runs.
  */
@@ -26,7 +26,7 @@ import { performSetCopyHidden, performSetSelection } from "./operations";
 export const setCopyHiddenEntry = calendarOperations["calendar.setCopyHidden"];
 export const setSelectionEntry = calendarOperations["calendar.setSelection"];
 
-/** G2's registered policy: the certified membership semantics, unchanged. */
+/** the registered policy: the certified membership semantics, unchanged. */
 export const calendarProjectionPolicy: AccessPolicy = {
   policyId: "calendar.g2-projection-v1",
   authorize: async (context, request) => {
@@ -64,8 +64,8 @@ export function calendarProjectionHandlers(): HandlerRegistry<MutationCtx> {
 
 /**
  * Dispatches one calendar projection command envelope inside ONE mutation
- * transaction, through the checked path with B1's identity source and the
- * G2 policy. Unimplemented operations (including G3's reconcileCopy) fail
+ * transaction, through the checked path with the identity source and the
+ * projection policy. Unimplemented operations (including reconcileCopy) fail
  * closed `unsupported`.
  */
 export async function dispatchCalendarProjectionCommand(

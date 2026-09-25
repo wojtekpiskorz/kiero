@@ -1,5 +1,5 @@
 /**
- * The barebones account feature (B2): "Konto".
+ * The barebones account feature: "Konto".
  *
  * Semantic controls only — headings, forms, buttons, plain status text
  * (the UX/UI track owns visual design). The screen mounts its own Convex
@@ -53,7 +53,7 @@ function AuthenticatedAccount(): React.ReactNode {
   const { signOut } = useAuthActions();
 
   useEffect(() => {
-    // Idempotent bootstrap (B1): provisions the registry row on first call,
+    // Idempotent bootstrap: provisions the registry row on first call,
     // refreshes trusted activity time afterwards. A denied registry (signed
     // out upstream, revoked elsewhere) surfaces honestly through the
     // panels' own queries.

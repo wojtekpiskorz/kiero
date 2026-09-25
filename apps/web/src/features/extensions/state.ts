@@ -1,5 +1,5 @@
 /**
- * Extensions feature state (H2): Polish copy, the field-kind vocabulary
+ * Extensions feature state: Polish copy, the field-kind vocabulary
  * rendered from the contract's closed sets, the stable-field-id derivation
  * and the closed-error hints for the /dodatkowe surface.
  *

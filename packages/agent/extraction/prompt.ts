@@ -1,7 +1,7 @@
 /**
- * The joined-analysis dialogue builder (E4): the Polish system prompt and
+ * The joined-analysis dialogue builder: the Polish system prompt and
  * context message for a MIXED source (text + audio + images), extending
- * E3's builder with the transcript and image-observation sections and the
+ * the builder with the transcript and image-observation sections and the
  * explicit partial-coverage rules.
  *
  * Everything here is pure and versioned by {@link JOIN_PROMPT_VERSION}:

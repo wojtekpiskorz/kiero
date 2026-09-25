@@ -1,5 +1,5 @@
 /**
- * Calendar connection feature state (G1): Polish copy for the barebones
+ * Calendar connection feature state: Polish copy for the barebones
  * Kalendarz screen. Server results arrive as `ResultEnvelope`s; the copy
  * maps the typed connection status and its machine reasons to honest
  * product text. The screen itself owns no styling (the UX/UI track owns
@@ -82,12 +82,12 @@ export function reasonText(reason: string | null): string {
 }
 
 // ---------------------------------------------------------------------------
-// Settings and sync diagnostics (G4): the copy and honest state mapping for
-// G3's syncOverview and G2's projectionOverview. The views below are the
+// Settings and sync diagnostics: the copy and honest state mapping for
+// syncOverview and projectionOverview. The views below are the
 // structural mirrors of those query returns (the lane owns no backend files).
 // ---------------------------------------------------------------------------
 
-/** The G3 syncOverview rows the settings surface consumes (structural mirror). */
+/** The syncOverview rows the settings surface consumes (structural mirror). */
 export interface SyncOverviewView {
   readonly state: string;
   readonly reconnectNeeded: boolean;
@@ -107,7 +107,7 @@ export interface SyncOverviewView {
   readonly lastConfirmedAtMs: number | null;
 }
 
-/** One G2 projectionOverview copy row the settings surface consumes. */
+/** One projectionOverview copy row the settings surface consumes. */
 export interface CopyRowView {
   readonly copyId: string;
   readonly subjectKind: "task" | "event";
@@ -119,7 +119,7 @@ export interface CopyRowView {
 }
 
 /**
- * The boss's effective project selection (G5): the stored calendarSyncState
+ * The boss's effective project selection: the stored calendarSyncState
  * column when present, the all-projects default otherwise. An explicit
  * selection always carries a (possibly empty) list.
  */
@@ -128,7 +128,7 @@ export interface SelectionView {
   readonly projectIds: readonly string[] | null;
 }
 
-/** The G2 projectionOverview shape the settings surface consumes. */
+/** The projectionOverview shape the settings surface consumes. */
 export interface ProjectionOverviewView {
   readonly state: string;
   /** Null on the lean branches: no own connection means no scope to read. */
@@ -166,9 +166,9 @@ export const settingsCopy = {
   reconnectPointer: "Aby wznowić synchronizację, wróć do sekcji połączenia powyżej i użyj przycisku „Połącz ponownie”.",
   cleanupResidueNote:
     "Po odłączeniu Kiero nie potwierdziło jeszcze usunięcia swoich wpisów z kalendarza Google. Sprawdź kalendarz i usuń wpisy Kiero ręcznie, jeśli zostały.",
-  // Personal project scope (G5: the certified calendar.setSelection write
+  // Personal project scope (the certified calendar.setSelection write
   // exists, so the honest not-yet-available notice is gone and the editor
-  // copy below took its place: the flagged G4-file amendment of issue #107)
+  // copy below took its place)
   scopeHeading: "Wybrane projekty",
   scopeIntro:
     "Wybór projektów jest osobisty: decyduje, które terminy firmy trafiają do Twojego kalendarza, i nie zmienia faktów firmy ani wyciszenia powiadomień innych szefów.",

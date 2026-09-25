@@ -1,8 +1,5 @@
 /**
- * @kiero/gateway: the Cloudflare Worker entry (A3; telemetry wiring by I2;
- * uploads lane routing by D2; images lane routing by D5).
-
- * uploads lane routing by D2; media read routing by D3).
+ * @kiero/gateway: the Cloudflare Worker entry.
  *
  * Routes resolve through the composition registry
  * (`./composition/registry.ts`); the platform lane's routes live in
@@ -22,7 +19,7 @@
  */
 
 import { matchRoute, routeProviders } from "./composition/registry";
-// J2 append (minimal, flagged to the coordinator): the full-flow join's
+// The
 // loud boot gate over the composed core HTTP surface (all five providers,
 // every fixed core route). A provider silently dropped from the registry
 // fails the deploy here instead of answering `unsupported` in production.
@@ -41,9 +38,9 @@ import type { NormalizerEnv } from "./images/normalizer";
 fullCoreGatewayOrThrow({ providers: routeProviders, match: matchRoute });
 
 /**
- * D4 append (minimal, flagged to the coordinator): browser CORS for the
- * upload channel. D4's composer is the FIRST cross-origin consumer of the
- * gateway (D2's proofs drove the Worker from node, where CORS does not
+ * Browser CORS for the
+ * upload channel. The composer is the FIRST cross-origin consumer of the
+ * gateway (the proofs drove the Worker from node, where CORS does not
  * apply): the browser's part/complete/finalize fetches carry Authorization
  * and non-simple content types, so every request preflights.
  *
@@ -117,9 +114,9 @@ export default {
         url.pathname.startsWith("/uploads/") ||
         url.pathname.startsWith("/images/") ||
         url.pathname.startsWith("/media/") ||
-        // I3 append (flagged, the D3 precedent): the export download route.
+        // The export download route.
         url.pathname.startsWith("/exports/") ||
-        // I4 append (flagged, the I3 precedent): the deletion purge route
+        // The deletion purge route
         // (service-credentialed; no browser preflight applies).
         url.pathname.startsWith("/purge/")
       ) {

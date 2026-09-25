@@ -1,22 +1,20 @@
 /**
- * Convex HTTP actions composition entry (A3; telemetry routes appended by
- * I2; sources/uploads routes by D2; Calendar OAuth routes by G1;
- * sources media-access route by D3, under its deployable module path
+ * Convex HTTP actions composition entry. The sources media-access route
+ * lives under the deployable module path
  * `sources/media_access` - Convex rejects hyphenated module path
- * components, so the issue's literal `sources/media-access/**` namespace
- * ships as `sources/media_access/**`; the lane's exclusivity is unchanged;
- * the EU backup Container protocol routes by I5).
+ * components, so the `sources/media-access/**` namespace
+ * ships as `sources/media_access/**`.
  *
  * Convex serves the default export of the `http` module as the deployment's
  * HTTP router. Route handlers live in their owning lane files; this entry
  * only wires them (later lanes append their own route imports here, the
  * same composition pattern as `convex/schema.ts`).
  *
- * B1 addition: the Convex Auth HTTP routes (JWKS discovery, OAuth
+ * The Convex Auth HTTP routes (JWKS discovery, OAuth
  * sign-in/callback) come from the configured auth entry
  * (convex/access/identity/authEntry.ts) via `auth.addHttpRoutes`.
  *
- * G1 addition: the Calendar OAuth boundary (authorization start, callback,
+ * The Calendar OAuth boundary (authorization start, callback,
  * bridge completion) from convex/calendar/connection/http.ts, plus its
  * guarded proof fixtures from convex/calendar/connection/proofHttp.ts.
  */
@@ -33,11 +31,11 @@ import { uploadsBridgeHandler, uploadsStateHandler } from "./sources/uploads/htt
 import { imagesBridgeHandler } from "./processing/images/http";
 
 import { mediaAccessHandler } from "./sources/media_access/http";
-// I3 append (flagged shared-file change, the D3 sanctioned pattern): the
+// The
 // firm-export lane's HTTP boundaries - the per-user download channel and
 // the service-credentialed build channel the export Worker calls.
 import { exportAccessHandler, exportsBridgeHandler } from "./operations/exports/http";
-// I4 append (flagged shared-file change, the I3 sanctioned pattern): the
+// The
 // deletion lane's service-credentialed purge bridge (the gateway Worker's
 // authoritative media-key read).
 import { deletionBridgeHandler } from "./operations/deletion/http";
@@ -53,8 +51,7 @@ import {
   proofRefreshHandler,
   proofStateHandler,
 } from "./calendar/connection/proofHttp";
-// G3 append (flagged shared-file change, the sanctioned per-lane pattern):
-// the fake Google Calendar EVENTS API, its user-action simulator and the
+// The fake Google Calendar EVENTS API, its user-action simulator and the
 // sync-state evidence read.
 import {
   proofFakeEventCreate,
@@ -65,7 +62,7 @@ import {
   proofFakeAdminEvent,
   proofSyncStateHandler,
 } from "./calendar/sync/proofHttp";
-// F3 append (flagged shared-file change, the G1/G3 sanctioned pattern): the
+// The
 // guarded fake WEB PUSH SERVICE (device subscribe, the push endpoint the
 // real transport POSTs to, and the evidence read).
 import {
@@ -73,8 +70,7 @@ import {
   proofPushServiceHandler,
   proofStateHandler as pushProofStateHandler,
 } from "./attention/push/proofService";
-// I5 append (issue #57, flagged shared-file change - the telemetry-boundary
-// precedent): the EU backup Container's verified protocol entry (lease,
+// The EU backup Container's verified protocol entry (lease,
 // complete/fail, retention sweep, state).
 import {
   backupsCompleteHandler,
@@ -100,12 +96,12 @@ http.route({ path: "/processing/images/bridge", method: "POST", handler: imagesB
 
 http.route({ path: "/sources/media/access", method: "POST", handler: mediaAccessHandler });
 
-// I3 append: the export download channel (per-user) and the build channel
+// The export download channel (per-user) and the build channel
 // (service-credentialed) on the same composition seam.
 http.route({ path: "/operations/exports/access", method: "POST", handler: exportAccessHandler });
 http.route({ path: "/operations/exports/bridge", method: "POST", handler: exportsBridgeHandler });
 
-// I4 append: the deletion purge bridge (service-credentialed).
+// The deletion purge bridge (service-credentialed).
 http.route({ path: "/operations/deletion/bridge", method: "POST", handler: deletionBridgeHandler });
 
 http.route({ path: "/calendar/oauth/start", method: "POST", handler: calendarStartHandler });
@@ -133,7 +129,7 @@ http.route({
 http.route({ path: "/calendar/oauth/proof/refresh", method: "POST", handler: proofRefreshHandler });
 http.route({ path: "/calendar/oauth/proof/state", method: "POST", handler: proofStateHandler });
 
-// G3 append: the fake Calendar events surface (guarded, dev proof only).
+// The fake Calendar events surface (guarded, dev proof only).
 http.route({
   path: "/calendar/oauth/proof/fake-google/api/calendars/kiero-proof-calendar/events",
   method: "POST",
@@ -170,7 +166,7 @@ http.route({
   handler: proofSyncStateHandler,
 });
 
-// F3 append: the guarded fake web push service (dev proof only).
+// The guarded fake web push service (dev proof only).
 http.route({ path: "/attention/push/proof/device", method: "POST", handler: proofDeviceHandler });
 http.route({
   pathPrefix: "/attention/push/proof/push-service/",
@@ -179,7 +175,7 @@ http.route({
 });
 http.route({ path: "/attention/push/proof/state", method: "POST", handler: pushProofStateHandler });
 
-// I5 append: the EU backup Container protocol (service-token verified).
+// The EU backup Container protocol (service-token verified).
 http.route({ path: "/operations/backups/run", method: "POST", handler: backupsRunHandler });
 http.route({ path: "/operations/backups/complete", method: "POST", handler: backupsCompleteHandler });
 http.route({ path: "/operations/backups/fail", method: "POST", handler: backupsFailHandler });

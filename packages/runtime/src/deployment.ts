@@ -1,9 +1,9 @@
 /**
- * The single definition of the deployment environment label (R13).
+ * The single definition of the deployment environment label.
  *
  * `KIERO_ENVIRONMENT` is the deployment's closed self-description: exactly
  * one of three labels (dev, staging, alpha-production) read from
- * server-side configuration only. Before R13 the closed-label read existed
+ * server-side configuration only. The closed-label read once existed
  * in five runtime copies (the telemetry cron, the backups HTTP boundary,
  * the redaction format set, the Calendar return resolver and the gateway
  * telemetry tag, which classified the Worker's `ENVIRONMENT` binding); a
@@ -43,7 +43,7 @@ export const DEPLOYMENT_ENVIRONMENT_PATTERN = new RegExp(
 );
 
 /**
- * Classifies a deployment's environment self-description (R13's one
+ * Classifies a deployment's environment self-description (the one
  * canonical read).
  *
  * The accepted rule, unchanged from the five copies this replaces: an

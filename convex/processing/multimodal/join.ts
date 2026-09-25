@@ -1,39 +1,39 @@
 /**
- * The `processing.join_multimodal` executor and durable join workflow
- * (E4): the partial-safe multimodal analysis of ONE mixed source.
+ * The `processing.join_multimodal` executor and durable join workflow:
+ * the partial-safe multimodal analysis of ONE mixed source.
  *
- * Composition (issue #38): E3's text planning (planning surface + journal
- * discipline), D5's retained representations (the deterministic selection
- * defines the anchor coordinate space), D6's transcript versions (per-
- * segment text + original-time interval anchors), E2's chat and vision
+ * Composition: the text planning (planning surface + journal
+ * discipline), the retained representations (the deterministic selection
+ * defines the anchor coordinate space), the transcript versions (per-
+ * segment text + original-time interval anchors), the chat and vision
  * adapters, staged through the ONE canonical workflow engine:
  *
  * 1. `evaluateMediaStage` (one mutation, retried with backoff while media
  *    is ACTIVELY progressing): orders STT for audio attachments that lack
- *    an order (the D6 seam, production channel), auto-orders vision for
+ *    an order (the seam, production channel), auto-orders vision for
  *    retained representations without one, then computes the pure joined
  *    coverage. Actively-pending media waits inside a bounded wall-clock
  *    budget; blocked (planning+lastErrorKind) and terminal inputs never
  *    wait — the join proceeds partial-safe over them.
  * 2. the per-image vision passes (one ACTION + one record MUTATION each,
- *    through E2's vision adapter; both routes failing leaves the image
+ *    through the vision adapter; both routes failing leaves the image
  *    pending with a sanitized reason, resumable), in ./vision.ts.
- * 3. `loadJoinedContextStage`: E3's tenant-filtered context plus the
+ * 3. `loadJoinedContextStage`: the tenant-filtered context plus the
  *    joined coverage, the assembled transcript segments and the vision
  *    observations, with the run's version pins.
- * 4. `modelJoinStage` (one ACTION): the bounded agent loop over E2's chat
+ * 4. `modelJoinStage` (one ACTION): the bounded agent loop over the chat
  *    route with the JOIN tool surface; decoded calls accumulate through
  *    the multimodal reducer (never executed), in ./modelStage.ts.
  * 5. `raiseJoinClarificationStage` (one mutation per question): the
- *    source-backed Sprawa do wyjaśnienia through C2's checked dispatch,
+ *    source-backed Sprawa do wyjaśnienia through the checked dispatch,
  *    with mixed-family fragment anchors.
  * 6. `publishJoinGroupStage` (one mutation per bounded group): the
  *    completeness gate against a FRESH coverage read, the mid-run
- *    staleness guard, per-evidence fragment ensuring, then C2 prepare +
+ *    staleness guard, per-evidence fragment ensuring, then findings prepare +
  *    publish, in ./publish.ts.
  *
  * Text-only sources never reach the workflow (the executor no-ops them —
- * E3's analyze owns those); E3's text analysis of a mixed source runs
+ * the analyze owns those); the text analysis of a mixed source runs
  * independently and publishes its text-grounded groups (independent
  * confirmed text is never blocked), while THIS join carries the
  * media-dependent conclusions with partial-safe semantics.
@@ -130,7 +130,7 @@ export const evaluateMediaStage = internalMutation({
       throw new Error("join: source no longer active");
     }
 
-    // --- order STT for audio attachments without any order (D6 seam) -----
+    // --- order STT for audio attachments without any order -----
     const attachments = await ctx.db
       .query("attachments")
       .withIndex("by_source", (q) => q.eq("sourceId", source._id))
@@ -139,7 +139,7 @@ export const evaluateMediaStage = internalMutation({
       (attachment) => attachment.kind === "audio" || attachment.kind === "image",
     );
     if (mediaAttachments.length === 0) {
-      // Text-only source: E3's analyze owns it; the join has nothing to do.
+      // Text-only source: the analyze owns it; the join has nothing to do.
       await recordJoinStep(ctx.db, args.runId, JOIN_EVALUATE_SEQUENCE, JOIN_EVALUATE_STEP_KIND, {
         state: "succeeded",
         output: { mediaPresent: false },
@@ -301,7 +301,7 @@ export const loadJoinedContextStage = internalMutation({
     // The join's own version pins (MULTIMODAL_JOIN_PIPELINE_VERSION etc.)
     // are recorded on the join's STEP row and the checkpoint's `join` key —
     // NEVER on the run row's version columns: the initial run is SHARED with
-    // E3's text stages (E3 owns the run-level labels it wrote first); a join
+    // the text stages (text analysis owns the run-level labels it wrote first); a join
     // overwriting them would erase which pipeline produced the text plan.
     const base: AnalysisContext = await loadAnalysisContext(ctx.db, {
       source,
@@ -571,8 +571,8 @@ export const completeJoinRun = internalMutation({
       });
     }
     // The honest per-source outcome summary. The checkpoint is MERGED, not
-    // replaced: the initial run's journal is shared with E3's text stages
-    // and D6's segment steps (their summaries keep their keys; mine keeps
+    // replaced: the initial run's journal is shared with the text stages
+    // and the segment steps (their summaries keep their keys; mine keeps
     // `join`). The step rows remain the durable record either way.
     const runRow = await ctx.db.get(args.context.runId);
     let checkpoint: Record<string, unknown> = {};
@@ -595,7 +595,7 @@ export const completeJoinRun = internalMutation({
       .map((row) => ({ sequence: row.sequence, kind: row.stepKind, state: row.state }));
     const groupOutcomes = joinSteps.filter((row) => row.kind === JOIN_PUBLISH_STEP_KIND);
     // The join's version pins, as recorded by the load-context step (the run
-    // row's own labels stay E3's — the initial run is shared).
+    // row's own labels stay the — the initial run is shared).
     const loadStep = steps.find(
       (row) => row.stepKind === "e4_load_joined_context" && row.state === "succeeded",
     );
@@ -609,7 +609,7 @@ export const completeJoinRun = internalMutation({
       }
     }
     await ctx.db.patch(args.context.runId, {
-      // E3's completion owns the shared initial run's terminal state when
+      // the completion owns the shared initial run's terminal state when
       // its analysis already finished; a still-running run gets the join's
       // honest terminal state.
       ...(runRow?.state === "running" ? { state: succeeded ? ("succeeded" as const) : ("failed" as const) } : {}),
@@ -644,7 +644,7 @@ export const joinMultimodalExecutor: JobExecutor = {
     if (source.lifecycle !== "active") {
       return { outcome: "failed", errorKind: "source_not_active", retryable: false };
     }
-    // Text-only sources are E3's analyze alone: the join has nothing to do.
+    // Text-only sources are the analyze alone: the join has nothing to do.
     const attachments = await ctx.db
       .query("attachments")
       .withIndex("by_source", (q) => q.eq("sourceId", sourceId))
@@ -656,7 +656,7 @@ export const joinMultimodalExecutor: JobExecutor = {
       return { outcome: "succeeded" };
     }
     // Resolve the run: the reanalysis kicker's NEW run when handed one,
-    // else the source's initial analysis run (D6's anchoring rule).
+    // else the source's initial analysis run (the anchoring rule).
     let runId = decoded.processingRunId === null
       ? null
       : ctx.db.normalizeId("processingRuns", decoded.processingRunId);
@@ -677,7 +677,7 @@ export const joinMultimodalExecutor: JobExecutor = {
       },
     );
     // MERGE the workflow pointer into the run's checkpoint (never replace:
-    // the shared initial run's checkpoint already carries E3's keys — an
+    // the shared initial run's checkpoint already carries the keys — an
     // overwrite here would erase the text lane's record).
     const current = await ctx.db.get(runId);
     let existingCheckpoint: Record<string, unknown> = {};
@@ -702,7 +702,7 @@ export const joinMultimodalExecutor: JobExecutor = {
 };
 
 /**
- * Restarts a failed join workflow from its journal (the A3 restart
+ * Restarts a failed join workflow from its journal (the restart
  * semantics; the probe exposes it for the live evidence).
  */
 export async function restartJoinWorkflow(

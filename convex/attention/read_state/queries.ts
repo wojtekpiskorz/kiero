@@ -1,9 +1,9 @@
 /**
- * Read-state queries (F1): the unread projection consumers subscribe to.
+ * Read-state queries: the unread projection consumers subscribe to.
  *
- * One projection shape serves every consumer (issue 41: "query functions
+ * One projection shape serves every consumer ("query functions
  * for unread projections"): the caller supplies canonical `sourceId`s —
- * exactly the identity D1's `SourceConversationRow` carries in BOTH the
+ * exactly the identity `SourceConversationRow` carries in BOTH the
  * company and the project view — and receives this person's state per
  * source. Because the stored row has no view or device dimension, the same
  * query answers the company view, any project view and every device of
@@ -16,15 +16,15 @@
  *
  * `gmReadStateOverview` is the audited-GM INSPECTION read: it resolves GM
  * authority over one target company (open grant + open alpha activation,
- * the B4 decision functions) and lists that company's read-state rows
+ * the decision functions) and lists that company's read-state rows
  * WITHOUT writing anything — GM reads never touch boss read state or
- * ordinary activity counters (issue 41 acceptance).
+ * ordinary activity counters.
  *
- * Two callable shapes, one checked resolution (the D1 lane pattern):
+ * Two callable shapes, one checked resolution:
  *
  * - public queries (Convex Auth identity; honestly `unauthenticated` until
- *   B1 ships sign-in),
- * - internal queries + guarded dev-proof actions (the A3 service-bridge
+ *   sign-in exists),
+ * - internal queries + guarded dev-proof actions (the service-bridge
  *   identity; see ./probe.ts).
  */
 
@@ -96,7 +96,7 @@ export const readStateForSources = query({
   },
 });
 
-// --- internal queries (verified service session; the A3 bridge identity) ----
+// --- internal queries (verified service session; the bridge identity) ----
 
 /** The same projection for a verified service session (bridge path). */
 export const readStateForSourcesFor = internalQuery({
@@ -113,11 +113,11 @@ export const readStateForSourcesFor = internalQuery({
 /**
  * The audited-GM inspection read (READ-ONLY): lists one target company's
  * read-state rows under GM authority. It writes nothing — no boss's row,
- * no activity counter, no event. Authority resolution mirrors the B4 GM
+ * no activity counter, no event. Authority resolution mirrors the GM
  * dispatch gate (live session -> user -> OPEN grant; membership is
  * deliberately NOT consulted — GM is separate from company membership,
  * CONTEXT.md "GM"), and BOTH the store reads and the per-company decision
- * come through the B4 surfaces themselves: `gmStore` (the exported
+ * come through the surfaces themselves: `gmStore` (the exported
  * generated-ctx adapter) for grants/company/activation, `openGrantOfUser`
  * and `decideGmCompanyAccess` for the decision. `openActivationOf` keeps
  * the newest OPEN activation even for a company that ended and re-entered

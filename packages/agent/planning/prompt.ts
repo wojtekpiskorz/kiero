@@ -1,9 +1,9 @@
 /**
- * The analysis dialogue builder (E3): the Polish system prompt, the first
+ * The analysis dialogue builder: the Polish system prompt, the first
  * user message from the bounded context, and the deterministic
  * assistant/tool-result turn encodings the bounded agent loop replays.
  *
- * E2's typed single-turn interface carries only user/assistant text parts,
+ * the typed single-turn interface carries only user/assistant text parts,
  * so the loop encodes its own prior turns deterministically here: the
  * assistant's tool calls serialize as one JSON block per call, and each
  * tool result becomes a user turn prefixed `WYNIK NARZĘDZIA <name>:`.

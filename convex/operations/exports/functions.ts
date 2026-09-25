@@ -1,16 +1,16 @@
 /**
- * The export lane's callable entries (I3): the checked boss command surface,
+ * The export lane's callable entries: the checked boss command surface,
  * the boss status query, the per-user download channel query, and the
  * service-credentialed build-channel queries/mutations the export Worker's
  * bridge calls.
  *
- * `dispatchExports` follows the C4/B3 pattern: envelope decode -> B1
+ * `dispatchExports` follows the pattern: envelope decode -> identity
  * identity resolution (with provisioning) -> the lane policy -> contract
  * decode -> `operations.requestExport`, whose intent is `administer`: only
  * a CURRENT administrator can start an export, decided from the resolved
  * membership role on every request.
  *
- * `exportsStatus` is the boss-facing status read (the F3 pushState
+ * `exportsStatus` is the boss-facing status read (the pushState
  * precedent): every export of the caller's company with its lifecycle
  * state and declared snapshot time; never the object key, etag or any
  * storage identity.
@@ -332,7 +332,7 @@ export const buildAttemptFor = internalQuery({
 });
 
 // ---------------------------------------------------------------------------
-// The seam I4 consumes: eager invalidation when a source is purged. I4's
+// The seam deletion consumes: eager invalidation when a source is purged. The
 // purge executor (and the guarded proof) calls this internal mutation; the
 // per-request download check is the immediate guard either way.
 // ---------------------------------------------------------------------------

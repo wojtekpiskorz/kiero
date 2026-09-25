@@ -1,6 +1,6 @@
 /**
  * Shared plumbing and people fixtures for the attention lanes' guarded
- * dev-proof surfaces (F1; F2/F4 reuse the same people — the
+ * dev-proof surfaces (read state; notification intents and reminders reuse the same people — the
  * convex/sources/probe_shared.ts precedent).
  *
  * One place for the attention-level fixtures: the second boss of the
@@ -26,10 +26,10 @@ import {
   serviceIdentityUnavailable,
 } from "../sources/probe_shared";
 
-/** The F1 second-boss fixture (company A = the service company). */
+/** The second-boss fixture (company A = the service company). */
 export const F1_BOSS_EMAIL = "f1-boss-b@kiero.invalid";
 
-/** The F1 GM fixture operator (open grant + open alpha activation). */
+/** The GM fixture operator (open grant + open alpha activation). */
 export const F1_GM_EMAIL = "f1-gm@kiero.invalid";
 
 /** Device labels of the seeded sessions (visible in evidence only). */
@@ -160,7 +160,7 @@ async function ensureDeviceSession(
 
 /**
  * Ensures the GM fixture: a GM user with an OPEN grant and an OPEN alpha
- * activation of the service company, plus a session. Mirrors the B4 row
+ * activation of the service company, plus a session. Mirrors the row
  * shapes; used only to prove GM reads never write boss state.
  */
 export const seedGm = internalMutation({
@@ -227,10 +227,10 @@ export const probeSeedGm = action({
 
 /**
  * Revokes one fixture boss's membership in the service company (guarded).
- * The F1 failure evidence for revoked membership: after this, the same
+ * The failure evidence for revoked membership: after this, the same
  * live session resolves NO active membership and every attention command
- * through it fails closed. A dev fixture flip, exactly like the D1 seed
- * fixtures — production revocation is B3's audited operation.
+ * through it fails closed. A dev fixture flip, exactly like the seed
+ * fixtures — production revocation is the audited operation.
  */
 export const revokeFixtureMembership = internalMutation({
   args: { email: v.string() },

@@ -1,6 +1,6 @@
 /**
- * The capture composer's presentational views (D4): five pure components
- * the feature form composes (split of review round 1). They render props
+ * The capture composer's presentational views: five pure components
+ * the feature form composes. They render props
  * and the copy; every piece of wiring lives in use-capture-composer.ts.
  *
  * JSX-free on purpose (createElement only), like the conversation and
@@ -235,7 +235,7 @@ export function RecoveryPanel({
 }
 
 // ---------------------------------------------------------------------------
-// The sent source's honest processing state (D1's row, same as conversation)
+// The sent source's honest processing state (the row, same as conversation)
 // ---------------------------------------------------------------------------
 
 export function SentStatePanel({ sourceId }: { readonly sourceId: string }): ReactNode {

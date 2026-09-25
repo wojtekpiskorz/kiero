@@ -1,10 +1,10 @@
 /**
  * GM processing feature state: Polish copy and the closed-error
- * classification for the H4 surface.
+ * classification for the surface.
  *
- * The banner and mode copy reuse B4's gmCopy (the GM-mode identification
+ * The banner and mode copy reuse gmCopy (the GM-mode identification
  * contract has one home); this module carries only the processing copy and
- * the failure hints THIS surface adds, falling back to B4's hints so the
+ * the failure hints THIS surface adds, falling back to the hints so the
  * shared authority codes keep one Polish spelling.
  */
 
@@ -130,7 +130,7 @@ export const gmProcessingCopy = {
 
 /**
  * Extra Polish hints for this surface's load-bearing closed-error codes;
- * shared authority codes fall back to B4's hint map.
+ * shared authority codes fall back to the hint map.
  */
 const processingCodeHints: Record<string, string> = {
   processing_run_not_found: "Nie znaleziono takiego przebiegu przetwarzania.",
@@ -153,7 +153,7 @@ const processingCodeHints: Record<string, string> = {
     "Od czasu Twojej inspekcji powstał nowszy przebieg tego źródła. Sprawdź źródło ponownie.",
 };
 
-/** The Polish hint for a closed-error code, this lane's then B4's, or null. */
+/** The Polish hint for a closed-error code, this lane's then the GM access lane's, or null. */
 export function gmProcessingFailureHint(code: string | undefined): string | null {
   if (code === undefined) {
     return null;

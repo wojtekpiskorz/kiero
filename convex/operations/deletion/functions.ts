@@ -1,5 +1,5 @@
 /**
- * The deletion lane's callable entries (I4): the boss-facing status reads
+ * The deletion lane's callable entries: the boss-facing status reads
  * (administrator-checked), the 24-hour tracking tick, and the
  * service-credentialed purge bridge the gateway Worker's route consults.
  *
@@ -10,9 +10,9 @@
  * the status screen is the pending/complete/failed external-cleanup state
  * the issue requires.
  *
- * `purgeTick` (the cron safety net, the I5 backup-tick shape): bounded pass
+ * `purgeTick` (the cron safety net, the backup-tick shape): bounded pass
  * over stages whose 24-hour deadline passed while still un-purged - each
- * emits the deduplicated `ops.deletion.overdue` diagnostic (I2's incident
+ * emits the deduplicated `ops.deletion.overdue` diagnostic (the incident
  * surface) and pushes the stage's deadline one hour so the same episode
  * diagnoses at most once per hour while the underlying durable job's own
  * retry authority stays untouched.
@@ -20,7 +20,7 @@
  * The bridge entry runs under the deployment's service credential
  * (verified by the HTTP boundary before dispatch): the gateway's purge
  * route reads the AUTHORITATIVE media key list here, never from its
- * request body (the D2 uploads-channel discipline).
+ * request body (the uploads-channel discipline).
  */
 
 import { v } from "convex/values";
@@ -59,7 +59,7 @@ function overdueDedupKey(stageId: string, deadlineAtMs: number): string {
 
 /**
  * One bounded overdue pass (the convex mutation the cron calls): un-purged
- * stages past their deadline emit the redacted I2 diagnostic and slide
+ * stages past their deadline emit the redacted diagnostic and slide
  * their tracking deadline one hour forward. Idempotent: purged stages left
  * the pending window, and the dedup key collapses repeats inside an hour.
  */
