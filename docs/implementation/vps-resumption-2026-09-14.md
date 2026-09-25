@@ -105,7 +105,6 @@ Start with the live graph and exact claims. Native blockers are the readiness au
 ```bash
 rtk proxy git worktree list
 rtk proxy gh pr list --state open
-rtk proxy node docs/implementation/audit-map.mjs --remote
 rtk proxy npx --no-install convex env list --names-only --deployment wojtek-piskorz-jr:kiero-dev-core:staging
 rtk proxy gh secret list --repo wojtekpiskorz/kiero --env staging
 ```

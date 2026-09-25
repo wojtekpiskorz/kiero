@@ -243,7 +243,7 @@ function probeWrangler() {
       : `installed wrangler ${major}.${minor} predates containers.constraints.jurisdiction (added by 4.130.0)`,
     supportsContainerJurisdiction
       ? undefined
-      : "Pin wrangler >= 4.130.0 (root manifest; owner A3, see the PENDING table in docs/evidence/environment/preflight-2026-09.md) before relying on container jurisdiction fields."
+      : "Pin wrangler >= 4.130.0 (root manifest; see the PENDING table in docs/evidence/environment/preflight-2026-09.md) before relying on container jurisdiction fields."
   );
 }
 
