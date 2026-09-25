@@ -27,7 +27,7 @@ Start with:
    [#15](https://github.com/wojtekpiskorz/kiero/issues/15); everything
    after the continuation lands on the map
    [#240](https://github.com/wojtekpiskorz/kiero/issues/240).
-5. `rtk proxy node docs/implementation/audit-map.mjs --remote`
+5. The native blockers of the open children of #240 (`gh issue view <n> --json blockedBy`).
 
 Baseline at the 2026-09-16 session-8 handoff (verify, do not assume):
 
@@ -104,13 +104,8 @@ Open positions to watch:
   ~12 min, one re-request on timeout). The durable upgrade is the owned
   Email Worker on a subdomain (owner DNS decision). The B5 lane's
   e2e/access/lib/mail.mjs generalizes this with id-snapshot freshness.
-- The cache-flip pattern: self-carried registration (R17-R24 precedent)
- ; the repair PR carries its own CLOSED entry + mergedPr + native
-  relations before merge; OPEN registrations for unfixed defects ride
-  the discovering lane's PR (R25/R26 precedent); after merge: the map
-  tables, m1 fixtures and the remote audit. **Issue bodies are hashed:
-  hash the raw API JSON, never `gh -q .body` output (it appends a
-  newline; lesson #228).**
+- New issues register under #240 with native `blocked_by` relations only;
+  the repository keeps no cached copy of issue bodies to re-sync.
 - The PWA update handshake CORS-blocked (honest „unavailable"); J4/J6.
 - The shared routeUrl in @kiero/runtime for the four remaining inline
   appends; the descriptor-vs-config overlap check (R20's review); the

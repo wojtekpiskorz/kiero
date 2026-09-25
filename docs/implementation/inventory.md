@@ -120,7 +120,7 @@ Audited application `4aa1cc64b3ecab669c76ffa672832d4c5638ac68`, 2026-09-12. All 
 
 ## Evidence qualifications
 
-The full [manifest](issues.json) retains each historical task's observed evidence and its limits. Current issues link to these observations and give the remaining case owners. No original acceptance criterion was deleted to reconcile status. G5 and E7 are now native map children and manifest entries.
+Each historical task's GitHub issue retains its observed evidence and its limits. Current issues link to these observations and give the remaining case owners. No original acceptance criterion was deleted to reconcile status. G5 and E7 are now native map children and manifest entries.
 
 - I3 had 6 PASS and 15 NOT RUN in its recorded matrix. I4 had 13 PASS and 1 NOT RUN; the actual completed archive download/invalidation case remains I9 work.
 - I5 has an older blocked README and later `9746df9` evidence reporting 13/13 on a dev lease. I10 reconciles exact artifacts and re-proves current scheduled completeness; neither statement replaces I6 restore.

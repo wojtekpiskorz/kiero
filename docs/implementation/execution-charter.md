@@ -18,7 +18,7 @@ The unstyled UI uses semantic forms, buttons, lists and plain status/error text.
 
 ## Advisory review setup
 
-A0 is integrated and proved the Astroix-style thermo-nuclear and unslop workflow before the initial implementation lanes. Review comments are advisory; deterministic required checks remain separate. A0 owns `.github/workflows/ai-review.yml`, vendored review skills and initial Kiero instructions/glossary. It runs without application dependencies. A1 preserved this setup and added `.github/workflows/checks.yml`, the workspace and the remaining handoff contracts. The reference and activation evidence are specified by A0 in the [issue manifest](issues.json).
+A0 is integrated and proved the Astroix-style thermo-nuclear and unslop workflow before the initial implementation lanes. Review comments are advisory; deterministic required checks remain separate. A0 owns `.github/workflows/ai-review.yml`, vendored review skills and initial Kiero instructions/glossary. It runs without application dependencies. A1 preserved this setup and added `.github/workflows/checks.yml`, the workspace and the remaining handoff contracts. The reference and activation evidence live on A0's GitHub issue.
 
 ## Initial module layout and ownership
 
