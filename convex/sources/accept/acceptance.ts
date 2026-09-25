@@ -27,7 +27,7 @@
  * Text analysis owns executing the registered extract/analyze work with real pipeline
  * versions; acceptance only registers it.
  *
- * Notes (attachment-bearing sources, flagged in the issue report):
+ * Attachment-bearing sources:
  * the reference-check phase additionally runs the uploads lane's
  * all-attachments-durable gate (`verifyAttachmentsForAcceptance`) — the
  * upload must be finalized with its declaration fully materialized, every

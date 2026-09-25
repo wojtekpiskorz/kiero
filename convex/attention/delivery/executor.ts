@@ -1,7 +1,7 @@
 /**
  * The `attention.evaluate_due_intents` executor: the durable reaction
- * to the three intent-source events this lane consumes (issue 42:
- * "Consume read-state eligibility and text-analysis source assignment/agent-message events").
+ * to the three intent-source events this lane consumes: read-state eligibility and text-analysis source
+ * assignment/agent-message events.
  *
  * The outbox drain projects each consumed event onto this job kind with a
  * dedup identity derived from the EVENT'S SUBJECT (source, clarification,

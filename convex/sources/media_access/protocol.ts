@@ -4,11 +4,9 @@
  * ranges and conditional requests) of the authorized retained-media stream
  * .
  *
- * PATH NOTE (flagged to the coordinator): the issue's owned namespace
- * `convex/sources/media-access/**` ships as `convex/sources/media_access`
+ * PATH NOTE: the namespace `convex/sources/media-access/**` ships as `convex/sources/media_access`
  * because Convex validates module path components as alphanumeric,
- * underscore or period only — a hyphenated module cannot be pushed. The
- * lane's exclusivity is unchanged.
+ * underscore or period only — a hyphenated module cannot be pushed.
  *
  * Division of labor (the seam, mirrored for reads): the Worker
  * (apps/gateway/src/media) owns the R2 read and the byte stream; Convex

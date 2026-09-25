@@ -1,8 +1,7 @@
 /**
  * Task-reminder scheduling model: the PURE decision core the
- * recompute transaction and the due-time evaluator run (issue 44:
- * "durable reminder evaluation from task state and personal
- * preferences").
+ * recompute transaction and the due-time evaluator run: durable reminder evaluation from task state and
+ * personal preferences.
  *
  * Everything here is deterministic over its inputs - no Convex, no clock,
  * no environment - so the reminder instants, the DST boundaries of the
@@ -11,8 +10,8 @@
  * while ./operations.ts re-runs the SAME functions inside its
  * transactions over live rows (the `delivery/model.ts` precedent).
  *
- * Semantics pinned by the accepted decisions (issue 44's bounded solution,
- * the accepted notification resolution, CONTEXT.md):
+ * Semantics pinned by the accepted decisions (the accepted
+ * notification resolution, CONTEXT.md):
  *
  * - "Przypomnienie o zadaniu" is based on the TASK, never on conversation
  *   read state; its recipient is the task's coordinator ("Koordynator

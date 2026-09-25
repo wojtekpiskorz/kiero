@@ -34,7 +34,7 @@ export type RequiredInputStatus =
   /** In progress or retryable: normalization running, STT pending/partial, vision routes failed. */
   | "pending"
   /**
-   * Externally blocked with a sanitized reason (D6 planning +
+   * Externally blocked with a sanitized reason (transcription planning +
    * lastErrorKind): resumable when the external condition clears; never
    * waited on, never fabricated over.
    */

@@ -1,7 +1,6 @@
 # Runtime bindings inventory (names only)
 
-Owned by issue [I1 #53]; reconciled with the live runtime reads by
-[I8 #133] (2026-09-12). This directory defines which NAME each runtime
+This directory defines which NAME each runtime
 consumes and the documented injection method for it. It never contains
 values. Environment-specific value sources are defined in
 [infra/environments/](../environments/README.md); per-binding presence and
@@ -20,9 +19,9 @@ observed behavior for the staging candidate live in
 
 | Destination | Method | Status |
 | --- | --- | --- |
-| Convex functions env | `npx --yes convex@1.45.0 env set <NAME>` (values typed interactively or passed by CI from a GitHub secret; `env list --names-only` verifies presence without values), or the Convex dashboard Settings > Environment Variables | CLI VERIFIED read-only (`env list --names-only`); `env set` not executed by I1 |
-| Cloudflare Worker secret | `wrangler secret put <NAME> --config apps/<app>/wrangler.jsonc [--env <env>]` from an interactive shell, or `wrangler secret bulk` in CI; presence check: `wrangler secret list` (names only) | wrangler 4.27.0 installed and authenticated; `secret put` not executed by I1 |
-| Cloudflare Worker var (non-secret) | `vars` block in the app's `wrangler.jsonc` (committed, names + non-secret values only) | skeleton files committed by I1 |
+| Convex functions env | `npx --yes convex@1.45.0 env set <NAME>` (values typed interactively or passed by CI from a GitHub secret; `env list --names-only` verifies presence without values), or the Convex dashboard Settings > Environment Variables | CLI VERIFIED read-only (`env list --names-only`); `env set` not executed at bootstrap |
+| Cloudflare Worker secret | `wrangler secret put <NAME> --config apps/<app>/wrangler.jsonc [--env <env>]` from an interactive shell, or `wrangler secret bulk` in CI; presence check: `wrangler secret list` (names only) | wrangler 4.27.0 installed and authenticated; `secret put` not executed at bootstrap |
+| Cloudflare Worker var (non-secret) | `vars` block in the app's `wrangler.jsonc` (committed, names + non-secret values only) | skeleton files committed |
 | R2 API credentials for Containers | dedicated per-bucket R2 API token created in the Cloudflare dashboard (R2 > Manage API Tokens); wrangler cannot create R2 API tokens | documented, PENDING creation by resource-owning tickets |
 | GitHub Actions | repository/environment secrets (`gh secret set <NAME> --repo wojtekpiskorz/kiero`); presence by name via `gh secret list` | `gh secret list` VERIFIED (names only) |
 | Local development | gitignored `.env` / `.env.local` at the repo root; Convex CLI writes `CONVEX_DEPLOYMENT`, `CONVEX_URL`, `CONVEX_SITE_URL` there automatically | name-presence VERIFIED; `.gitignore` already excludes these files |
@@ -41,6 +40,6 @@ observed behavior for the staging candidate live in
    exist today (`OPENROUTER_API_KEY`, `ZAI_API_KEY`); when the set of
    PROVISIONED secrets grows (new names actually present in a store), the
    preflight must derive its name lists from this README instead of
-   extending the hard-coded set. The I8 reconciliation grew the documented
+   extending the hard-coded set. The staging reconciliation grew the documented
    NAME inventory only; the provisioned set is unchanged, so the trigger
    has not fired.

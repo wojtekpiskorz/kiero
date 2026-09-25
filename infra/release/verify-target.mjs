@@ -1,5 +1,5 @@
 /**
- * Release target verification (I7/R6): the wrong-environment guard every
+ * Release target verification: the wrong-environment guard every
  * deploy job runs BEFORE touching anything.
  *
  * Three layers, all deterministic and secret-free (names only, never
@@ -13,7 +13,7 @@
  * - RUNTIME LABEL: the environment label the run carries (KIERO_ENVIRONMENT)
  *   must equal the target; a staging deploy that believes it is "dev" or
  *   "alpha-production" refuses to start.
- * - TARGET DESCRIPTOR (R6): the shared descriptor (target-descriptor.mjs)
+ * - TARGET DESCRIPTOR: the shared descriptor (target-descriptor.mjs)
  *   must be valid, name the same target and GitHub environment, and pin a
  *   checksName that really is a job name in .github/workflows/checks.yml,
  *   so the Checks identity the deploy gate matches cannot drift silently.
@@ -118,7 +118,7 @@ function escapeRegExp(text) {
 
 /**
  * Cross-checks the shared target descriptor against the requested target
- * and the deterministic Checks workflow (R6). Returns violations; empty
+ * and the deterministic Checks workflow. Returns violations; empty
  * means the descriptor agrees with both.
  */
 export function checkDescriptorAgainstWorkflow({ descriptor, target, checksWorkflowText }) {

@@ -18,7 +18,7 @@
  *   purge route, with an explicit URL override (the proof drives the REAL
  *   deployed route without touching deployment env).
  * - `probePurgeTick`: forces the 24-hour tracking pass's decision now.
- * - `probeRetryPurgeStage` (R2): returns one COMPLETED stage
+ * - `probeRetryPurgeStage`: returns one COMPLETED stage
  *   of a fully purged record to the interruption state and replays the
  *   REAL executor, the per-stage idempotency evidence surface (admin
  *   caller only).
@@ -111,7 +111,7 @@ export const probePurgeTick = internalMutation({
   },
 });
 
-// --- R2 per-stage retry evidence surface ------------------------------
+// --- per-stage retry evidence surface ------------------------------
 
 /**
  * The per-stage retry core (unit-tested through the harness): on one
@@ -119,7 +119,7 @@ export const probePurgeTick = internalMutation({
  * state a refused attempt leaves, then re-runs the REAL durable executor.
  * The replayed stage body must converge to the same purged state with no
  * restored content and no duplicate audit, the idempotency contract the
- * R2 purge legs prove live. In-flight records refuse typed: their retry
+ * purge legs prove live. In-flight records refuse typed: their retry
  * belongs to the real durable job, never to a probe. The replay re-marks
  * the stage purged, so its purgedAtMs and attempts reflect the RETRY, not
  * the original completion (the fixture-control precedent of probeAgeUpload).

@@ -36,18 +36,18 @@ created by their owning tickets on first need. Earlier evidence:
 
 | Name | Consumed by | Status |
 | --- | --- | --- |
-| `OPENROUTER_API_KEY` | Convex server actions (AI calls) | name present in local `.env` and as GitHub repo secret; Convex env injection PENDING (E2) |
-| `DEEPSEEK_API_KEY` | Convex server actions (AI chat/vision calls: the e8.0 direct DeepSeek primary route) | name verified in the Convex `staging` deployment and the GitHub `staging` environment (E8 live smoke, 2026-09-14; names only); local `.env` and dev-deployment injection PENDING (I8 owns runtime binding injection) |
-| `RESEND_API_KEY`, `RESEND_FROM` | Convex email integration (`convex/integrations/email/resend.ts`) | PENDING (B5 owner provisioning); replaces the dead `AUTH_RESEND_KEY` name |
-| `AXIOM_API_TOKEN` | gateway/media/export/backup workers + Convex app events | PENDING (I2) |
-| `R2_MEDIA_ACCESS_KEY_ID`, `R2_MEDIA_SECRET_ACCESS_KEY` | media/export containers (S3 API) | PENDING (D5/D6) |
-| `R2_BACKUP_ACCESS_KEY_ID`, `R2_BACKUP_SECRET_ACCESS_KEY` | backup container (S3 API, separate per-bucket token) | PENDING (I5) |
-| `CONVEX_BACKUP_ADMIN_KEY` | backup container export step (candidate name, finalized by I5) | PENDING (I5) |
-| `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`, `WEB_PUSH_VAPID_PUBLIC_KEY`/`_PRIVATE_KEY`/`_SUBJECT` | Convex access + calendar connection; Convex push delivery | PENDING (B1/G4 owner provisioning) |
+| `OPENROUTER_API_KEY` | Convex server actions (AI calls) | name present in local `.env` and as GitHub repo secret; Convex env injection PENDING |
+| `DEEPSEEK_API_KEY` | Convex server actions (AI chat/vision calls: the e8.0 direct DeepSeek primary route) | name verified in the Convex `staging` deployment and the GitHub `staging` environment (live smoke, 2026-09-14; names only); local `.env` and dev-deployment injection PENDING (see infra/environments/provision-runtime.mjs) |
+| `RESEND_API_KEY`, `RESEND_FROM` | Convex email integration (`convex/integrations/email/resend.ts`) | PENDING; replaces the dead `AUTH_RESEND_KEY` name |
+| `AXIOM_API_TOKEN` | gateway/media/export/backup workers + Convex app events | PENDING |
+| `R2_MEDIA_ACCESS_KEY_ID`, `R2_MEDIA_SECRET_ACCESS_KEY` | media/export containers (S3 API) | PENDING |
+| `R2_BACKUP_ACCESS_KEY_ID`, `R2_BACKUP_SECRET_ACCESS_KEY` | backup container (S3 API, separate per-bucket token) | PENDING |
+| `CONVEX_BACKUP_ADMIN_KEY` | backup container export step (candidate name, finalized) | PENDING |
+| `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`, `WEB_PUSH_VAPID_PUBLIC_KEY`/`_PRIVATE_KEY`/`_SUBJECT` | Convex access + calendar connection; Convex push delivery | PENDING |
 
 The per-runtime consumer table for every name (including service tokens and
 executor URLs) is [infra/bindings/](../bindings/README.md), the single
-namespace authority reconciled with the runtime reads by I8; rows here are
+namespace authority reconciled with the runtime reads; rows here are
 the dev-environment subset only.
 
 ## Resource naming convention
@@ -55,7 +55,7 @@ the dev-environment subset only.
 `kiero-dev-<role>`: `kiero-dev-media` (R2, eu jurisdiction, weur location),
 `kiero-dev-backup` (R2, eu jurisdiction, separate token), workers
 `kiero-dev-gateway`, `kiero-dev-media-worker`, `kiero-dev-export-worker`,
-`kiero-dev-backup-worker`, and since R8 the static-assets web Worker
+`kiero-dev-backup-worker`, and the static-assets web Worker
 `kiero-dev-web` (the local PWA host: Vite's `dist/` output with
 single-page-application fallback, no main, no bindings, no Container).
 The Convex project itself is `kiero-dev-core`.
@@ -92,7 +92,7 @@ Default commands in this repository target `dev` ONLY:
   because
   staging is a named deployment created without `--default`
   (`wojtek-piskorz-jr:kiero-dev-core:staging`) inside the same project,
-  reachable only through that explicit reference (I8 reconciliation with the
+  reachable only through that explicit reference (staging reconciliation with the
   owner's no-new-projects instruction). A bare `npx convex deploy` likewise
   resolves to the project's default production deployment if one exists, a
   dev-scope resource, never the `staging` reference and never alpha.
@@ -115,10 +115,10 @@ alias).
 
 ## Prerequisites recorded for downstream tickets
 
-- A3: usable isolated Convex dev access is READY (recreated 2026-09-22:
+- Convex dev access is READY (recreated 2026-09-22:
   project + `dev/main` above with functions pushed; in a fresh clone run
   `npx --yes convex@1.45.0 deployment select glorious-hawk-339` once to
   write `.env.local`, then `npm run convex:dev`).
-- D2/D3: create `kiero-dev-media` (free reversible) before first upload proof:
+- Media: create `kiero-dev-media` (free reversible) before first upload proof:
   `wrangler r2 bucket create kiero-dev-media --jurisdiction eu --location weur`.
-- I5: create `kiero-dev-backup` plus its dedicated R2 API token.
+- Backups: create `kiero-dev-backup` plus its dedicated R2 API token.

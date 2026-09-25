@@ -11,7 +11,6 @@
  *   OAuth providers are imported below. `matchRoute` stays generic: exact
  *   match over all providers' route tables first, then each provider's
  *   optional `match`.
-
  * - `schedulerConsumers`: what this Worker consumes from durable execution
  *   (the Convex-side executors own the work; the gateway currently hosts
  *   none; media/export/backup executors join in later lanes and are the

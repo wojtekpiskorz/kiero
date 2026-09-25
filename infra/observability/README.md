@@ -1,6 +1,6 @@
-# Kiero observability descriptors (I2)
+# Kiero observability descriptors
 
-Owned by issue [I2 #54]. These files define NAMES, schemas and monitor
+These files define NAMES, schemas and monitor
 definitions only - never credential values. What is implemented in code vs
 what requires OWNER action is stated exactly.
 
@@ -23,7 +23,7 @@ what requires OWNER action is stated exactly.
   composed health endpoints, incident scan (attempts-exhausted durable jobs,
   failed outbox rows, stuck runs), cost threshold evaluation with cooldown,
   windowed retention, cron tick (`convex/crons.ts`, which also carries the
-  A3 handoff note's outbox-drain safety net).
+  outbox-drain safety net).
 - Gateway telemetry (`apps/gateway/src/telemetry/`): request-scoped redacted
   events (GW -> OBS), heartbeat prober via the Worker cron trigger, Axiom
   emitter behind an interface with a Convex-ingest dev fallback.
@@ -32,7 +32,7 @@ what requires OWNER action is stated exactly.
 
 ## PENDING owner actions (exact steps)
 
-I11 amendment (2026-09-16): steps 1-2 are DONE by the owner; the Axiom
+Update (2026-09-16): steps 1-2 are DONE by the owner; the Axiom
 account exists, the dataset is `kiero-staging` (EU), and the names
 `AXIOM_API_TOKEN` / `AXIOM_DATASET` are present on the Convex staging
 deployment `wojtek-piskorz-jr:kiero-dev-core:staging` (verified by name
@@ -42,7 +42,7 @@ only). Steps 3-5 remain open and own the actual alert delivery:
    dataset `kiero-staging`, EU).
 2. ~~Set the credentials by name~~ (DONE: names present on the staging
    Convex deployment and injected into the workers by the release flow).
-   LIVE CAVEAT (I11, 2026-09-16): every stored `diagnosticEvents` row on
+   LIVE CAVEAT (2026-09-16): every stored `diagnosticEvents` row on
    staging still carries `forwardedAtMs: 0` (288/288 at the evidence run)
    while the every-minute telemetry tick demonstrably runs, so the
    Convex-to-Axiom ingest leg has never succeeded within the one-hour
@@ -53,7 +53,7 @@ only). Steps 3-5 remain open and own the actual alert delivery:
 3. **Create the three monitors** exactly as defined in [monitors.json](monitors.json)
    against the `kiero-staging` dataset (Axiom Personal permits exactly
    three - all are allocated). The APL dataset filters were corrected from
-   the I2-era `kiero-observability` placeholder to `kiero-staging` on
+   the earlier `kiero-observability` placeholder to `kiero-staging` on
    2026-09-16.
 4. **Configure the email alert destination(s)** for all three monitors,
    replacing `OWNER_PLACEHOLDER` in monitors.json. The owner-decided

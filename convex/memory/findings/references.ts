@@ -15,7 +15,7 @@
  * layer still runs its own end-to-end check; only the rule text lives
  * here, so the two can never drift apart.
  *
- * R2 additions: `requireActiveSource` (GROUNDING: may this
+ * Also: `requireActiveSource` (GROUNDING: may this
  * source ground new work? withdrawn/tombstoned do not) and
  * `requireContentAliveSource` (CONTENT: is this source's content still
  * readable? only `purged` content is gone — withdrawal keeps history),
@@ -230,7 +230,7 @@ export const REDACTED_CLARIFICATION_RESOLUTION_COPY =
 
 /**
  * The effective content state of one clarification row under the CURRENT
- * source lifecycle (R2): which links still point at sources whose CONTENT
+ * source lifecycle: which links still point at sources whose CONTENT
  * is alive, and which text is therefore redacted to the fixed copy. This
  * is the ONE rule every consumer evaluates — the boss-facing read, the
  * agent context loader and the stored purge — so the immediate window

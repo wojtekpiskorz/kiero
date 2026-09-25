@@ -1,5 +1,5 @@
 {
-  "description": "All-in cost tracking configuration (I2): providers tracked, the 400/500 PLN owner thresholds and provider-native caps/limits. Caps are DATED EVIDENCE from docs/research/alpha-services-runtime-facts.md (checked 2026-09-08), not lifetime prices. Provider caps keep their native units; they are never silently converted to PLN - the PLN thresholds apply to the owner-visible all-in budget only.",
+  "description": "All-in cost tracking configuration: providers tracked, the 400/500 PLN owner thresholds and provider-native caps/limits. Caps are DATED EVIDENCE from docs/research/alpha-services-runtime-facts.md (checked 2026-09-08), not lifetime prices. Provider caps keep their native units; they are never silently converted to PLN - the PLN thresholds apply to the owner-visible all-in budget only.",
   "budget": {
     "currency": "PLN",
     "thresholds": { "warning": { "minor": 40000, "label": "400 PLN" }, "alert": { "minor": 50000, "label": "500 PLN" } },

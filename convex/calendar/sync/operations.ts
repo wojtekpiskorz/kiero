@@ -565,8 +565,8 @@ export const completeCopyAttempt = internalMutation({
  * decision (the authorization mode), never an automatic second calendar
  * (docs/research/google-calendar-reconnect-facts.md).
  *
- * FLAGGED cross-lane write: the connection row is the table, and the
- * issue's own scope sanctions exactly this transition ("404-ambiguity ->
+ * Cross-lane write: the connection row belongs to the connection lane,
+ * and reconciliation owns exactly this transition ("404-ambiguity ->
  * calendar_access_lost + the explicit recreate path"). Only the state
  * reason columns are patched; credentials and identity stay untouched (the
  * boss may still hold a working token — the calendar is what went).

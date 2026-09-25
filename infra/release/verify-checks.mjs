@@ -1,5 +1,5 @@
 /**
- * The deterministic Checks gate (R6): deployment must be refused unless the
+ * The deterministic Checks gate: deployment must be refused unless the
  * NAMED Checks job of .github/workflows/checks.yml has concluded SUCCESS
  * for the EXACT release revision (GITHUB_SHA).
  *

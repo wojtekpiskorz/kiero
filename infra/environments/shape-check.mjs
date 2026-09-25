@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Non-secret shape check for I1's environment descriptors (issue #53).
+// Non-secret shape check for the environment descriptors.
 //
 //   node infra/environments/shape-check.mjs
 //
@@ -61,7 +61,7 @@ const expectedApps = {
   "media-worker": ["kiero-dev-media-worker", "kiero-staging-media-worker", "kiero-alpha-media-worker"],
   "export-worker": ["kiero-dev-export-worker", "kiero-staging-export-worker", "kiero-alpha-export-worker"],
   "backup-worker": ["kiero-dev-backup-worker", "kiero-staging-backup-worker", "kiero-alpha-backup-worker"],
-  // R8: the qualification PWA is a Workers Static Assets Worker (owner
+  // The qualification PWA is a Workers Static Assets Worker (owner
   // decision 2026-09-14): static assets + SPA fallback, nothing else.
   web: ["kiero-dev-web", "kiero-staging-web", "kiero-alpha-web"],
 };
@@ -115,7 +115,7 @@ for (const [app, names] of Object.entries(expectedApps)) {
     ...(cfg.containers ?? []),
     ...Object.values(envs).flatMap((e) => e.containers ?? []),
   ];
-  // R8: the web app is STATIC ASSETS ONLY: no main script, and the Vite
+  // The web app is STATIC ASSETS ONLY: no main script, and the Vite
   // dist served with single-page-application fallback in EVERY scope, so
   // direct links to client routes (/zrodlo, /praca, /co-teraz) resolve and
   // /sw.js is served byte-for-byte. (No containers and no R2 bindings are

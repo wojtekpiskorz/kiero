@@ -115,7 +115,7 @@ export type GroupOutcome =
   | "published"
   /** The analysis's input revisions went stale before commit: refused. */
   | "stale_refused"
-  /** A typed C2 refusal (validation/conflict): no partial writes. */
+  /** A typed findings refusal (validation/conflict): no partial writes. */
   | "failed"
   /** Requires segments still pending extraction; nothing claimed. */
   | "pending_segments"

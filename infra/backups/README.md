@@ -1,6 +1,6 @@
-# Complete-backup configuration (I5)
+# Complete-backup configuration
 
-Owned by issue [I5 #57]. Names, configuration and owner actions only - never
+Names, configuration and owner actions only - never
 credential values. The decision model lives once in
 `convex/operations/backups/slot.ts`; the files here are the mirrors that
 `tests/i5` asserts cannot drift.
@@ -22,13 +22,13 @@ credential values. The decision model lives once in
   trigger + Durable Object + container, the pinned documented export
   mechanism (the pre-installed `convex export` binary; see convex-export.ts), pooled media copy with
   sha256 verification, deletion-ledger carriage and manifest-last publish.
-- Health/cost events through the I2 machinery: `backup.job` heartbeats per
+- Health/cost events through the telemetry machinery: `backup.job` heartbeats per
   attempt, measured `backup` provider cost entries (export/storage/egress)
   and the deduplicated `ops.backup.stale` freshness diagnostic.
 
 ## PENDING owner actions (exact steps, by name)
 
-1. **Backup R2 bucket (per environment)** - created for dev by I5's proof
+1. **Backup R2 bucket (per environment)** - created for dev
    (`wrangler r2 bucket create kiero-dev-backup --jurisdiction eu --location weur`,
    free tier); repeat for staging/alpha when those environments are
    provisioned. The alpha-production backup destination
@@ -43,7 +43,7 @@ credential values. The decision model lives once in
    Until injected, every byte operation answers the typed `not_configured`
    refusal - honest pending, never a fabricated copy.
 3. **Convex export credential** - `CONVEX_BACKUP_ADMIN_KEY`: the mechanism
-   I5 finalized is the pinned CLI export (the pre-installed `convex export` binary)
+   The finalized mechanism is the pinned CLI export (the pre-installed `convex export` binary)
    driven headless by injecting a Convex access token; the executor writes
    it to the CLI's config file inside the container at runtime. Until the
    key exists, the export step answers `export_not_configured`.

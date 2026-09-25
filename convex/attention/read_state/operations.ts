@@ -9,7 +9,7 @@
  * What this transaction deliberately does NOT do:
  *
  * - It never infers read state from delivery, dismissal or notification
- *   clicks (issue 41 scope exclusion; only seeing the entry in Kiero or an
+ *   clicks (only seeing the entry in Kiero or an
  *   explicit mark reaches this operation).
  * - It never writes another person's row: the row is keyed on the RESOLVED
  *   actor's user id, which the checked dispatch resolved from a verified

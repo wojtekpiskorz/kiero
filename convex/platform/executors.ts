@@ -30,8 +30,7 @@
  *   `memory.dependentsMarkedStale` and `memory.findingRevised`).
  * - `processing.transcribe_segment` (../processing/audio/executor.ts):
  *   the resumable per-segment STT workflow over one audio transcript order
- *   (the first model-call executor; the contracts amendment provider routing named as
- *   its prerequisite, registered in @kiero/contracts).
+ *   (the first model-call executor, registered in @kiero/contracts).
  * - `processing.normalize_photo` (../processing/images/executor.ts):
  *   the accepted-photo normalization executor (architecture protocol step
  *   4) with the echo-template uncertain-outcome semantics.

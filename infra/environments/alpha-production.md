@@ -3,20 +3,20 @@
 Status: PENDING, NOT PROVISIONED. This descriptor fixes the identity,
 naming and EU contract the future alpha must follow. Nothing here has been
 created; per the issue rules, purchases, OAuth consent screens, domains and
-production services stay explicit pending actions. The R6 release adapter
+production services stay explicit pending actions. The release adapter
 consumes the same names through
 `infra/release/targets/production.json` and records a BLOCKED outcome
 (naming the missing configuration) until they exist; the workflow's
 `environment: alpha-production` key is a NAME and is not evidence that
-GitHub protection is configured (live repository state, owner/I8 action).
+GitHub protection is configured (live repository state, owner action).
 
-OWNER DECISION REQUIRED BEFORE PROVISIONING (I8 note, 2026-09-12): the
+OWNER DECISION REQUIRED BEFORE PROVISIONING (note, 2026-09-12): the
 provisioning commands below still prescribe creating a NEW Convex project
 `kiero-alpha-core`, while the owner's 2026-09 instruction ("no new Convex
 projects, ever") was issued against quota escaping. Whether the real alpha
 environment counts as a sanctioned exception (it is the product target, not
 a quota workaround) or must reuse a deployment under `kiero-dev-core` is an
-explicit owner decision at alpha provisioning time; I8 changed only the
+explicit owner decision at alpha provisioning time; the staging work changed only the
 staging topology and leaves this identity untouched.
 
 ## Identity
@@ -43,7 +43,7 @@ through CI environment variables, never through committed files.
 Identical NAME set to dev/staging (values are production-only and live in
 GitHub Actions `alpha-production` environment secrets); the reconciled
 inventory is [infra/bindings/](../bindings/README.md), the single namespace
-authority (I8): `OPENROUTER_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM`,
+authority: `OPENROUTER_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM`,
 `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`, `WEB_PUSH_VAPID_PUBLIC_KEY`/
 `WEB_PUSH_VAPID_PRIVATE_KEY`/`WEB_PUSH_VAPID_SUBJECT`, `AXIOM_API_TOKEN`,
 `R2_MEDIA_ACCESS_KEY_ID`, `R2_MEDIA_SECRET_ACCESS_KEY`,
@@ -60,7 +60,7 @@ runtime reads `RESEND_API_KEY`/`RESEND_FROM`.)
 `kiero-alpha-export-worker`, `kiero-alpha-backup-worker`,
 `kiero-alpha-web` (the Workers Static Assets Worker serving the built PWA
 bundle; declared by `apps/web/wrangler.jsonc` `--env alpha-production`,
-mirroring R8's staging shape; NOTE: `infra/release/targets/production.json`
+mirroring the staging shape; NOTE: `infra/release/targets/production.json`
 still names a `wrangler-pages` transport for this component and must be
 reconciled by its owning lane before the first alpha release; no Pages
 project may be created meanwhile), Convex project `kiero-alpha-core`.
@@ -72,7 +72,7 @@ project may be created meanwhile), Convex project `kiero-alpha-core`.
   `--jurisdiction eu --location weur`; the backup bucket's token must not
   grant access to the media bucket and vice versa.
 - Media/export and backup Containers with `constraints.jurisdiction: "eu"`
-  (wrangler >= 4.130 required; pin owned by A3, see the PENDING table in
+  (wrangler >= 4.130 required; pin tracked in the PENDING table in
   docs/evidence/environment/preflight-2026-09.md).
 - Alpha data (database, files, backups) stays EU-placed; AI processing outside
   the EU is accepted per the architecture decision; Worker routing is global
@@ -100,7 +100,7 @@ wrangler r2 bucket create kiero-alpha-backup  --jurisdiction eu --location weur
 
 No web-host provisioning command: `kiero-alpha-web` is a Workers Static
 Assets Worker created by its first `wrangler deploy --env alpha-production`
-from `apps/web/wrangler.jsonc` (R8 shape; no Pages project).
+from `apps/web/wrangler.jsonc` (no Pages project).
 
 GitHub-side owner actions: create the `alpha-production` environment,
 configure its protection (required reviewers, an owner action this YAML

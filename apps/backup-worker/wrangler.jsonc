@@ -1,15 +1,12 @@
 // apps/backup-worker/wrangler.jsonc: the EU backup Container executor
-// (I1 skeleton; completed by I5, issue #57).
+// (complete database + media backup sets).
 //
 // The TOP-LEVEL block targets LOCAL DEV names only; staging/alpha are named
 // environments (`--env staging` / `--env alpha-production`) and can never be
 // hit by a bare `wrangler deploy`.
 //
-// EU placement (I5): wrangler 4.130.0 is the pinned root devDependency
-// (A3), so the container EU jurisdiction constraints are SET in every scope
-// (discharging the I5 row of the PENDING table in
-// docs/evidence/environment/preflight-2026-09.md - that table stays the
-// single ownership source; D6 set the same fields for the media container).
+// EU placement: the container jurisdiction constraints are SET in every
+// scope, as for the media worker.
 //
 // Scheduled trigger: daily at 02:00 UTC during the pre-user phase (owner
 // decision 2026-09-25, docs/adr/mvp-cost-envelope-2026-09.md; the alpha
@@ -18,7 +15,7 @@
 // worker's /run when the day's slot has no row. tests/i5 keeps this trigger
 // equal to infra/backups/retention.json.
 //
-// The backup bucket (kiero-dev-backup) was created by the I5 proof with
+// The backup bucket (kiero-dev-backup) was created with
 // `wrangler r2 bucket create kiero-dev-backup --jurisdiction eu --location
 // weur` and is addressed ONLY through its own per-bucket S3 API token
 // (R2_BACKUP_*), never through media credentials
@@ -33,8 +30,7 @@
   // Worker entry wrapping the container's Durable Object (class exported by
   // src/index.ts; proxies /run to the EU container instance).
   "main": "src/index.ts",
-  // Raised together with the wrangler >= 4.130 pin (owner A3, root manifest);
-  // see the PENDING table in docs/evidence/environment/preflight-2026-09.md.
+  // Raised together with the wrangler >= 4.130 pin in the root manifest.
   "compatibility_date": "2026-09-01",
   "observability": {
     "enabled": true
@@ -44,7 +40,7 @@
     "crons": ["0 2 * * *"]
   },
   // The container's Durable Object must be declared as a binding of this
-  // same script (wrangler requirement for Containers; the D6 pattern).
+  // same script (wrangler requirement for Containers).
   "durable_objects": {
     "bindings": [
       {
@@ -62,7 +58,7 @@
   "containers": [
     {
       "name": "kiero-dev-backup-container",
-      // I5: node:22-slim + the pinned Convex CLI, zero-build Node entry
+      // node:22-slim + the pinned Convex CLI, zero-build Node entry
       // (see ./Dockerfile).
       "image": "./Dockerfile",
       // The Dockerfile COPYs repo-level paths (the executor mirrors the two
@@ -115,16 +111,14 @@
         // R2 endpoints stay EMPTY in committed config: the EU S3 endpoint
         // embeds the account id, which the shape-check secret-leak heuristic
         // (rightly) forbids outside evidence docs. The endpoints are
-        // injected at deploy time from the same store as the owner-PENDING
-        // per-bucket R2 credentials (I8 decision, 2026-09-14).
+        // injected at deploy time from the same store as the per-bucket R2
+        // credentials.
         "R2_MEDIA_BUCKET": "kiero-staging-media",
-        // I8 runbook R10 fill (2026-09-14; re-provisioned 2026-09-22): the
-        // staging deployment outgoing-marlin-429 HTTP actions origin (public
-        // URL, not a secret).
+        // The staging deployment's HTTP actions origin (public URL, not a
+        // secret).
         "CONVEX_SITE_URL": "https://outgoing-marlin-429.eu-west-1.convex.site",
-        // I8 runbook R10 fill (2026-09-14): the staging deployment the
-        // pinned `convex export` targets (a reference, not a credential;
-        // the access token itself is the owner-PENDING
+        // The staging deployment the pinned `convex export` targets (a
+        // reference, not a credential; the access token is the
         // CONVEX_BACKUP_ADMIN_KEY secret).
         "CONVEX_EXPORT_DEPLOYMENT": "wojtek-piskorz-jr:kiero-dev-core:staging"
       }

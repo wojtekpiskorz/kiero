@@ -1,7 +1,7 @@
 # Web static-assets worker bindings
 
 Runtime: `apps/web` Cloudflare Worker (the qualification PWA host). Issue
-R8 #167; owner decision 2026-09-14 selected Workers Static Assets over the
+owner decision 2026-09-14 selected Workers Static Assets over the
 former Cloudflare Pages project. Configuration skeleton:
 [apps/web/wrangler.jsonc](../../apps/web/wrangler.jsonc).
 
@@ -35,7 +35,7 @@ former Cloudflare Pages project. Configuration skeleton:
 | Name | Kind | Purpose |
 | --- | --- | --- |
 | `VITE_CONVEX_URL` | build input (Vite env) | Public Convex deployment URL; baked into the bundle by `apps/web/src/app/config.ts`. The release adapter's `requiredConfig` refuses the web component without it |
-| `VITE_GATEWAY_URL` | build input (Vite env) | Public media-gateway Worker base URL; baked into the bundle by the same seam. Required by `requiredConfig` since R8: no transport starts on a half-wired bundle (capture/media surfaces would silently degrade) |
+| `VITE_GATEWAY_URL` | build input (Vite env) | Public media-gateway Worker base URL; baked into the bundle by the same seam. Required by `requiredConfig` : no transport starts on a half-wired bundle (capture/media surfaces would silently degrade) |
 
 In the release workflow these arrive from the `staging` GitHub
 environment as `VITE_CONVEX_URL: vars.STAGING_CONVEX_URL` and

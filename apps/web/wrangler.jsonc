@@ -1,6 +1,6 @@
 // apps/web/wrangler.jsonc: the qualification PWA as a Workers Static
-// Assets Worker (issue R8 #167; owner decision 2026-09-14 selecting static
-// assets over Cloudflare Pages).
+// Assets Worker (owner decision 2026-09-14: static assets over Cloudflare
+// Pages).
 //
 // The TOP-LEVEL block is the default environment and targets the LOCAL DEV
 // name only (kiero-dev-web), the same wrong-environment guardrail every

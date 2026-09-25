@@ -1,10 +1,10 @@
 /**
- * The checked deploy adapter (R6): the ONE executable the release
+ * The checked deploy adapter: the ONE executable the release
  * workflow uses to deploy components. It replaces the former echo
  * placeholders: no deploy step succeeds without deployed bytes, and no
  * refusal happens silently.
  *
- * Contract (issue #131): given an authorized target descriptor, the
+ * Contract: given an authorized target descriptor, the
  * expected revision and a checks report, for every selected component it
  *
  *   1. requires the deterministic Checks success for the EXACT revision
@@ -15,7 +15,7 @@
  *   3. validates configuration NAMES (presence only, never values);
  *   4. for Convex components, resolves the CREDENTIAL-selected deployment
  *      through a read-only probe and requires it to be the identity pinned
- *      in the descriptor before anything else runs (R9; the caller label
+ *      in the descriptor before anything else runs (the caller label
  *      CONVEX_DEPLOYMENT is never trusted as identity);
  *   5. builds the checked-out tree and records the artifact digest;
  *   6. hands REAL artifact paths and the validated descriptor to the
@@ -271,7 +271,7 @@ export async function deployComponents({
       record(blocked(component.id, "missing-configuration", { missingConfigNames: missing }));
       continue;
     }
-    // R9 pre-mutation gate: before any build or transport command runs for
+    // Pre-mutation gate: before any build or transport command runs for
     // a Convex component, resolve the credential-selected deployment
     // (read-only) and require it to be the descriptor's pinned target. A
     // mismatched, missing, unsupported or unresolvable credential blocks

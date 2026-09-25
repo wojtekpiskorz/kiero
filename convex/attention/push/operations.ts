@@ -19,7 +19,7 @@
  * - The stored deliveryJson decodes through the runtime
  *   union in ./model.ts (malformed and unsupported summaries refuse
  *   before any delivery row exists), the three typed adapters re-read
- *   CURRENT lifecycle state (R2's shared clarification content rule
+ *   CURRENT lifecycle state (the shared clarification content rule
  *   included), and every retry re-composes the payload instead of
  *   replaying the stored one. When no live content remains, the pending
  *   rows terminally suppress and no fetch leaves.
@@ -296,7 +296,7 @@ async function activeSubscriptionsOf(
  * - source entries: only ACTIVE sources preview (its own delivery rule,
  *   rechecked here so the race between the sweep and the transport cannot
  *   notify about a withdrawn or purged entry);
- * - clarifications: R2's shared content rule (`clarificationContentRuleOf`)
+ * - clarifications: the shared content rule (`clarificationContentRuleOf`)
  *   decides - a redacted open case left every actionable list, so it never
  *   previews, and possibly deleted-derived text never leaves.
  *
@@ -381,7 +381,7 @@ async function payloadInputsOf(
     if (clarification === null || clarification.companyId !== companyId) {
       continue;
     }
-    // R2's shared lifecycle rule: an open case whose question possibly
+    // The shared lifecycle rule: an open case whose question possibly
     // derived from permanently deleted content is redacted and left every
     // actionable list, so it must not preview either.
     const rule = await clarificationContentRuleOf(tx.db, clarification);

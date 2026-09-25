@@ -1,4 +1,4 @@
-# Dashboard honesty requirements (I2)
+# Dashboard honesty requirements
 
 Every observability dashboard built on the Kiero event stream (Axiom
 dashboards once provisioned, and any in-app operations panel consuming the

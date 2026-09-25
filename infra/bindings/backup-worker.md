@@ -25,13 +25,13 @@ dev proof state. Full configuration and owner actions:
 
 | Name | Purpose | Injected via | Status |
 | --- | --- | --- | --- |
-| `R2_BACKUP_ACCESS_KEY_ID` | Access key id of an R2 API token scoped to the BACKUP bucket only | dedicated per-bucket R2 API token (owner-issued 2026-09-15); release workflow injection (descriptor `runtimeSecrets`) | INJECTED by the staging release (I8) |
-| `R2_BACKUP_SECRET_ACCESS_KEY` | Secret access key paired with the id above | same token, same delivery | INJECTED by the staging release (I8) |
-| `R2_MEDIA_READ_ACCESS_KEY_ID` | Access key id of a READ-ONLY media-bucket token held ONLY by the backup worker (the copy source; distinct from the media worker's token) | dashboard-issued per-bucket token (owner-issued 2026-09-15); release workflow injection (descriptor `runtimeSecrets`) | INJECTED by the staging release (I8) |
-| `R2_MEDIA_READ_SECRET_ACCESS_KEY` | Secret access key paired with the id above | same token, same delivery | INJECTED by the staging release (I8) |
-| `CONVEX_BACKUP_ADMIN_KEY` | Mechanism FINALIZED by I5: a Convex access token driving the pinned documented export (the image's globally pre-installed `convex@1.45.0` binary, invoked directly as `convex export`) headless; the executor writes it to the CLI's runtime config, never to the repo | stored only in the backup runtime environment | PENDING (owner) |
-| `KIERO_SERVICE_TOKEN` | Shared service bearer for the verified Convex protocol routes (`/operations/backups/*`) | release workflow injection (descriptor `runtimeSecrets`); matching value is the Convex deployment variable | set on dev/i5 by the I5 proof; INJECTED on staging by the release (I8) |
-| `AXIOM_API_TOKEN` | Redacted diagnostics ingestion | release workflow injection (descriptor `runtimeSecrets`) | INJECTED by the staging release (I8) |
+| `R2_BACKUP_ACCESS_KEY_ID` | Access key id of an R2 API token scoped to the BACKUP bucket only | dedicated per-bucket R2 API token (owner-issued 2026-09-15); release workflow injection (descriptor `runtimeSecrets`) | INJECTED by the staging release |
+| `R2_BACKUP_SECRET_ACCESS_KEY` | Secret access key paired with the id above | same token, same delivery | INJECTED by the staging release |
+| `R2_MEDIA_READ_ACCESS_KEY_ID` | Access key id of a READ-ONLY media-bucket token held ONLY by the backup worker (the copy source; distinct from the media worker's token) | dashboard-issued per-bucket token (owner-issued 2026-09-15); release workflow injection (descriptor `runtimeSecrets`) | INJECTED by the staging release |
+| `R2_MEDIA_READ_SECRET_ACCESS_KEY` | Secret access key paired with the id above | same token, same delivery | INJECTED by the staging release |
+| `CONVEX_BACKUP_ADMIN_KEY` | Mechanism: a Convex access token driving the pinned documented export (the image's globally pre-installed `convex@1.45.0` binary, invoked directly as `convex export`) headless; the executor writes it to the CLI's runtime config, never to the repo | stored only in the backup runtime environment | PENDING (owner) |
+| `KIERO_SERVICE_TOKEN` | Shared service bearer for the verified Convex protocol routes (`/operations/backups/*`) | release workflow injection (descriptor `runtimeSecrets`); matching value is the Convex deployment variable | set on dev by the backup proof; INJECTED on staging by the release |
+| `AXIOM_API_TOKEN` | Redacted diagnostics ingestion | release workflow injection (descriptor `runtimeSecrets`) | INJECTED by the staging release |
 
 ## Isolation rules
 
@@ -40,7 +40,7 @@ dev proof state. Full configuration and owner actions:
    bucket. This is the feasibility verified in
    [docs/evidence/environment/preflight-2026-09.md](../../docs/evidence/environment/preflight-2026-09.md):
    per-bucket R2 API tokens are the supported mechanism.
-   I5 refinement: the backup WORKER additionally holds a dedicated
+   Refinement: the backup WORKER additionally holds a dedicated
    read-only media token (`R2_MEDIA_READ_*`) because copying retained media
    out is its job; that token can never write media, and no media/export
    worker holds any backup credential, so backups remain unreachable from
@@ -48,4 +48,4 @@ dev proof state. Full configuration and owner actions:
 2. Platform backups and auth secrets are never exported as firm data.
 3. Retention (48h frequent sets, daily through day 14, 30-day expiry of
    deleted content) is configuration of the scheduler/executor, not of these
-   bindings; owned by I5 ([infra/backups/retention.json](../backups/retention.json)).
+   bindings; see [infra/backups/retention.json](../backups/retention.json)).

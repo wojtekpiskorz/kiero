@@ -1,5 +1,5 @@
 /**
- * Type surface for verify-convex-target.mjs (the R9 credential-target
+ * Type surface for verify-convex-target.mjs (the credential-target
  * gate), so tests and any node consumer typecheck against the real API.
  */
 

@@ -1,10 +1,10 @@
 /**
- * The Convex functions transport (R6, re-verified by R9): deploys the
+ * The Convex functions transport deploys the
  * checked-out convex/ functions root through `convex deploy` of the pinned
  * CLI 1.45.0 and records the PROVIDER-OBSERVED identity of the deployment
  * that was actually targeted.
  *
- * R9 contract (issue #168): the target of `convex deploy` is selected by
+ * Contract: the target of `convex deploy` is selected by
  * the credential: a deployment-scoped CONVEX_DEPLOY_KEY resolves to its
  * own deployment and makes the CLI ignore CONVEX_DEPLOYMENT entirely, so
  * the caller-provided CONVEX_DEPLOYMENT label can never serve as remote

@@ -14,11 +14,11 @@
  *   source-backed (normalized source + optional fragment references,
  *   validated against the current state) or a manual boss decision (a note
  *   alone, no fabricated source); a repeated resolve refuses and never
- *   replaces the stored evidence. R2: raise refuses a
+ *   replaces the stored evidence. Raise refuses a
  *   conflicting fragment whose source is not ACTIVE (a retained tombstone
  *   never grounds new work), and a redacted open case refuses resolution
  *   (it is not actionable).
- * - `purgeClarificationContentForSource` (R2): the idempotent content
+ * - `purgeClarificationContentForSource`: the idempotent content
  *   purge the deletion executor runs BEFORE fragments leave — links to
  *   the purged source are removed, possibly derived text is replaced with
  *   the fixed Polish redaction copy, content-free audit metadata is

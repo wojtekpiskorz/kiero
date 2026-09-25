@@ -1,5 +1,5 @@
 /**
- * The stub transport (R6 tests/local rehearsal): records exactly what a
+ * The stub transport (tests/local rehearsal): records exactly what a
  * real transport would receive (the REAL artifact path, the manifest
  * digest and the validated descriptor) into an append-only JSONL file,
  * and returns a synthetic remote identity. It performs no deployment.

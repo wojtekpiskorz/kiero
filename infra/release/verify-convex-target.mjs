@@ -1,10 +1,10 @@
 /**
- * The Convex credential-target gate (R9): resolves the deployment the
+ * The Convex credential-target gate: resolves the deployment the
  * CONVEX_DEPLOY_KEY credential ACTUALLY authorizes and compares it with the
  * identity pinned in the target descriptor, BEFORE any mutating deploy
  * command runs.
  *
- * Why this gate exists (issue #168): `convex deploy` of the pinned CLI
+ * Why this gate exists: `convex deploy` of the pinned CLI
  * 1.45.0 selects its target through the credential, and a deployment-scoped
  * deploy key makes the CLI IGNORE CONVEX_DEPLOYMENT entirely (verified
  * against the CLI's own selection code and read-only probes; see

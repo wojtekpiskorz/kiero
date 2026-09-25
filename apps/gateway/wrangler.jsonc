@@ -1,4 +1,4 @@
-// apps/gateway/wrangler.jsonc: non-secret skeleton (issue I1 #53).
+// apps/gateway/wrangler.jsonc: the gateway Worker's non-secret configuration.
 //
 // The TOP-LEVEL block is the default environment and targets LOCAL DEV names
 // only (kiero-dev-*). Staging and alpha production exist solely as named
@@ -20,11 +20,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kiero-dev-gateway",
-  // Entry point provided by the workspace app skeleton (A1, merged db1d6a5);
-  // `wrangler deploy --dry-run` bundles it.
+  // `wrangler deploy --dry-run` bundles this entry.
   "main": "src/index.ts",
-  // Raise together with the wrangler >= 4.130 pin: owner A3, root manifest;
-  // see the PENDING table in docs/evidence/environment/preflight-2026-09.md.
+  // Raised together with the wrangler >= 4.130 pin in the root manifest.
   "compatibility_date": "2026-09-01",
   "observability": {
     "enabled": true
@@ -43,7 +41,7 @@
     // Fill per environment when that deployment exists (empty = not yet set).
     "CONVEX_SITE_URL": "",
     // Non-secret PWA origin the Calendar callback page's return link
-    // targets (R12; the same variable name the Convex deployment reads).
+    // targets (the same variable name the Convex deployment reads).
     // Local dev fills the origin the kiero-dev-web Worker serves on
     // (empty = not yet set: the callback honestly renders the no-link
     // page until then, never a return to this Worker).
@@ -52,7 +50,7 @@
   "env": {
     "staging": {
       "name": "kiero-staging-gateway",
-      // R21 (owner decision 2026-09-15): Images TRANSFORMATIONS ONLY, no
+      // Images TRANSFORMATIONS ONLY (owner decision 2026-09-15), no
       // storage — the bytes pipeline (input().transform().output()) behind
       // the Images Transformed metric; media bytes stay in the project's own
       // R2 buckets. The binding is NOT inherited into named environments.
@@ -68,16 +66,14 @@
       ],
       "vars": {
         "ENVIRONMENT": "staging",
-        // R8: the staging CORS allow-list pins the one synthetic web origin
-        // (the Workers Static Assets Worker that serves the PWA; owner
-        // decision 2026-09-14, replacing the former Pages project); dev and
+        // The staging CORS allow-list pins the one synthetic web origin
+        // (the Workers Static Assets Worker that serves the PWA); dev and
         // company origins are intentionally absent.
         "ALLOWED_APP_ORIGINS": "https://kiero-staging-web.wojtek-524.workers.dev",
-        // I8 runbook R10 fill (2026-09-14; re-provisioned 2026-09-22): the
-        // staging deployment outgoing-marlin-429 HTTP actions origin (public
-        // URL, not a secret).
+        // The staging deployment's HTTP actions origin (public URL, not a
+        // secret).
         "CONVEX_SITE_URL": "https://outgoing-marlin-429.eu-west-1.convex.site",
-        // R12: the PWA origin the Calendar callback page returns to — the
+        // The PWA origin the Calendar callback page returns to — the
         // same staging web Worker the CORS allow-list above pins.
         "KIERO_CALENDAR_APP_BASE_URL": "https://kiero-staging-web.wojtek-524.workers.dev"
       }

@@ -26,7 +26,7 @@
  *   transition and the marking core.
  * - `probeMemoryState`: the tenant-scoped inspection read the evidence
  *   script asserts on.
- * - `probeClarificationStorage` (R2): the guarded STORED
+ * - `probeClarificationStorage`: the guarded STORED
  *   clarification rows for the caller's company (the storage-freeze half
  *   of the deletion-purge evidence, with the content-free purgeAudit).
  */
@@ -587,11 +587,11 @@ export const probeMemoryState = action({
   },
 });
 
-// --- R2 storage inspection ------------------------------------------
+// --- clarification storage inspection ------------------------------------------
 
 /**
  * The guarded STORED clarification rows for the CALLER's company (the
- * storage-freeze half of the R2 purge evidence): the boss-facing reads
+ * storage-freeze half of the clarification purge evidence): the boss-facing reads
  * already prove redaction from the tombstone on; this surface proves the
  * durable purge actually converged the stored text to the fixed copy and
  * recorded the content-free purge audit. The caller resolves from their own

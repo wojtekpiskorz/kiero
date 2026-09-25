@@ -1,5 +1,5 @@
 /**
- * The Cloudflare Pages transport for the built web bundle (R6). Deploys
+ * The Cloudflare Pages transport for the built web bundle. Deploys
  * the artifact directory produced by the component's build command to
  * the Pages project named by the target descriptor.
  *
