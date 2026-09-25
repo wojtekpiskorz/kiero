@@ -22,13 +22,28 @@ outstanding; real-service qualification (B5/D7/I11 onward) is.
 - [Review record](../evidence/map-review/2026-09-12.md): verified baseline, defects and test results.
 - [Architecture proof cases](../mvp/architecture-proof-matrix.md), [alpha readiness](../mvp/alpha-readiness.md), [contracts](contracts/README.md) and [glossary](../../CONTEXT.md): accepted requirements.
 
-## Next implementation work
+## Current state (2026-09-25)
 
-M2 #166 through M11 #216, R8 #167 through R24 #229 (the 2026-09-16 media repair wave: the media executor's image byte channel, the secure-channel photo render and the real-dimension images drive) are closed with their PRs. **The Google Calendar integration is deferred beyond v1** (M7 #199 ADR): R16 #198 withholds the Calendar entry from the v1 composition, and C6 #197 owns the post-core release behind J5; the nine UX-CAL rows carry both owners as a visible deferral. The full staging stack is live and I8 #133 is CLOSED. D7 #135 (coordinator-claimed) carries the proven vision OCR lane and its remaining media proofs; B5 #134 and I11 #138 stand at their BLOCKED owner rows (the tester Google login; the Axiom monitors and metered costs) with their evidence PRs #233/#238 merged; R29 #237 (behind the merged R28) is the unassigned ready entry; R31 #244 (the account-surface classifier) is closed with its lane PR; R33 #251 (the eventName redaction twin R28 found) waits behind R29 over the shared telemetry paths; R25 #230 (the durable answer-loop rows), R26 #232 (the structured identity refusal codes) and R27 #235 (the durable Axiom forward outcome) are closed with their lane PRs; R30 #242 (the container's FFmpeg conversion for non-WAV recordings, from D7's first live voice walk) is closed with its lane PR — the post-release voice re-run rides D7; J6's open blockers are D7 and B5. Recheck native blockers and active ownership before dispatch.
-
-R1-R3 repair clarification provenance, purge and push delivery; R2 and R3 are closed with their evidence. R4 protects source reassignment against stale editors. R5 fixes old-source links and is closed with its live-leg evidence. R6 replaces the broken/placeholder release path with executable tooling. R7 removes the known Calendar test timing flake while preserving timeout assertions.
-
-I8 completed the isolated qualification environment and the actual release. B5, D7 and I11 now prove actual identity, media and alert delivery. I9 proves export, I10 proves complete scheduled backups, I6 proves quarantined restore, and J6 rechecks the joined repaired application. J3 and J4 qualify AI and physical devices/Google. J5 audits complete core delivery.
+- **Environments.** Convex runs on the Free plan (ADR
+  [mvp-cost-envelope-2026-09](../adr/mvp-cost-envelope-2026-09.md)). `dev/main`
+  is `glorious-hawk-339`, `staging` is `outgoing-marlin-429`; the full
+  staging stack (web, gateway, media/export/backup workers, Convex
+  functions) was released on 2026-09-25 and answers its health checks.
+- **Pre-user cadences.** Background jobs run hourly at most and backups
+  daily until the first real users exist (ADR amendment 2026-09-25;
+  `tests/platform/crons.test.ts` caps the budget).
+- **Runtime configuration.** `infra/environments/provision-runtime.mjs`
+  sets every generated value. Provider credentials (DeepSeek, OpenRouter,
+  Resend, Google, Axiom) and `KIERO_GM_EMAILS` are owner actions on both
+  deployments; until they exist, AI analysis, email and Google sign-in fail
+  honestly.
+- **Tests.** `tests/integration` runs acceptance, the processing pipeline,
+  memory corrections and access on an in-process Convex backend.
+- **Deferred.** Google Calendar stays beyond v1 (ADR
+  [calendar-deferral-2026-09](../adr/calendar-deferral-2026-09.md)).
+- **Open work.** The children of [#240](https://github.com/wojtekpiskorz/kiero/issues/240):
+  the real-service qualification legs (B5, D7, I9-I11, I6, J3-J6) and the
+  telemetry repairs R29/R33. Query their native blockers before starting.
 
 ## Resources and unresolved external work
 
