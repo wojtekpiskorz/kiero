@@ -1,5 +1,5 @@
 {
-  "descriptorId": "infra/release/targets/staging@2026-09-12",
+  "descriptorId": "infra/release/targets/staging@2026-09-22",
   "target": "staging",
   "githubEnvironment": "staging",
   "secretPrefix": "STAGING_",
@@ -35,8 +35,8 @@
           "projectSlug": "kiero-dev-core",
           "reference": "staging",
           "type": "prod",
-          "slug": "fiery-raven-417",
-          "url": "https://fiery-raven-417.eu-west-1.convex.cloud",
+          "slug": "outgoing-marlin-429",
+          "url": "https://outgoing-marlin-429.eu-west-1.convex.cloud",
           "isDefault": false
         }
       },

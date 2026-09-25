@@ -1,8 +1,12 @@
 # Environment: local development (`dev`)
 
 Status: ACTIVE. Convex project provisioned and verified on 2026-09-08
-(free plan, reversible); Cloudflare side is read-verified only, resources are
-created by their owning tickets on first need. Evidence:
+(free plan, reversible); RE-PROVISIONED 2026-09-22 after the owner deleted
+the project during the billing incident (ADR
+docs/adr/mvp-cost-envelope-2026-09.md) — evidence:
+[docs/evidence/staging/reprovision-2026-09-22.md](../../docs/evidence/staging/reprovision-2026-09-22.md).
+Cloudflare side is read-verified only, resources are
+created by their owning tickets on first need. Earlier evidence:
 [docs/evidence/environment/preflight-2026-09.md](../../docs/evidence/environment/preflight-2026-09.md).
 
 ## Identity
@@ -12,7 +16,7 @@ created by their owning tickets on first need. Evidence:
 | Environment name | `dev` (local development) |
 | Convex team | `wojtek-piskorz-jr` |
 | Convex project | `kiero-dev-core` (created, free plan) |
-| Convex default dev deployment | reference `dev/main`, name `steady-basilisk-613`, region Europe (Ireland) / `eu-west-1` |
+| Convex dev deployment | reference `dev/main`, name `glorious-hawk-339`, region Europe (Ireland) / `eu-west-1`, non-default; local `.env.local` selects it via `deployment select` (recreated 2026-09-22) |
 | Cloudflare account | the wrangler-login account (id recorded in the evidence doc, not in code) |
 | Cloudflare resource prefix | `kiero-dev-` |
 
@@ -56,15 +60,17 @@ the dev-environment subset only.
 single-page-application fallback, no main, no bindings, no Container).
 The Convex project itself is `kiero-dev-core`.
 
-Dev leases stay separate from the web Worker: the Convex dev deployments
-under `kiero-dev-core` (`steady-basilisk-613` and the other existing
-leases) are preserved until their ownership is resolved, and the web
+Dev leases stay separate from the web Worker: the single Convex dev
+deployment under `kiero-dev-core` is the recreated `dev/main`
+(`glorious-hawk-339`; the pre-teardown leases `steady-basilisk-613`,
+`flippant-lemur-146`, `nautical-loris-352` and the stray US
+`first-gerbil-326` died with the 2026-09-22 project re-provisioning), and the web
 static-assets Worker owns none of them and no gateway resource; it only
 consumes the public URLs baked into the bundle at build time.
 
 ## EU requirements
 
-- Convex dev deployment in region `eu`: VERIFIED (steady-basilisk-613,
+- Convex dev deployment in region `eu`: VERIFIED (glorious-hawk-339,
   eu-west-1). All future `kiero-dev-core` deployments are created with
   `--region eu`.
 - R2 buckets created with `--jurisdiction eu` and `--location weur`.
@@ -77,8 +83,13 @@ consumes the public URLs baked into the bundle at build time.
 
 Default commands in this repository target `dev` ONLY:
 
-- `npx convex dev` uses root `convex.json` (`kiero-dev-core`) and resolves to
-  the project's default dev deployment; it can never touch staging, because
+- `npx convex dev` uses root `convex.json` (`kiero-dev-core`) and resolves
+  through the local `.env.local` `CONVEX_DEPLOYMENT` selection (written by
+  `npx convex deployment select glorious-hawk-339`; since the 2026-09-22
+  re-provisioning the project has NO default dev/production deployment —
+  the CLI's personal-dev-alias slot is deliberately left vacant because the
+  CLI auto-provisions it in a non-EU region). It can never touch staging,
+  because
   staging is a named deployment created without `--default`
   (`wojtek-piskorz-jr:kiero-dev-core:staging`) inside the same project,
   reachable only through that explicit reference (I8 reconciliation with the
@@ -104,9 +115,10 @@ alias).
 
 ## Prerequisites recorded for downstream tickets
 
-- A3: usable isolated Convex dev access is READY (project + default EU dev
-  deployment above; run `npx --yes convex@1.45.0 dev` once in the repo root to
-  write `.env.local`).
+- A3: usable isolated Convex dev access is READY (recreated 2026-09-22:
+  project + `dev/main` above with functions pushed; in a fresh clone run
+  `npx --yes convex@1.45.0 deployment select glorious-hawk-339` once to
+  write `.env.local`, then `npm run convex:dev`).
 - D2/D3: create `kiero-dev-media` (free reversible) before first upload proof:
   `wrangler r2 bucket create kiero-dev-media --jurisdiction eu --location weur`.
 - I5: create `kiero-dev-backup` plus its dedicated R2 API token.

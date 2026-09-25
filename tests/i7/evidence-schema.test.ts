@@ -240,7 +240,9 @@ describe("the recorder CLI (exact workflow flags)", () => {
       kind: "release-attempt",
       target: "staging",
       revision: REVISION,
-      descriptorId: "infra/release/targets/staging@2026-09-12",
+      // Tracks the real descriptor's versioned id (bumped 2026-09-22 by the
+      // re-provisioning lane, docs/evidence/staging/reprovision-2026-09-22.md).
+      descriptorId: "infra/release/targets/staging@2026-09-22",
       notes: "hotfix: gateway routing repair",
       rehearsal: "9 PASS",
     });

@@ -23,8 +23,10 @@ former Cloudflare Pages project. Configuration skeleton:
   `https://kiero-staging-web.wojtek-524.workers.dev`, which is the one
   origin in the gateway's staging CORS allow-list.
 - Ownership separation: this Worker owns no Convex deployment and no
-  gateway resource. The Convex dev leases under `kiero-dev-core`
-  (`steady-basilisk-613`, `flippant-lemur-146`, `nautical-loris-352`) and
+  gateway resource. The Convex dev lease under `kiero-dev-core` (the
+  recreated `dev/main`, `glorious-hawk-339`; the pre-teardown leases
+  `steady-basilisk-613`, `flippant-lemur-146`, `nautical-loris-352` died
+  with the 2026-09-22 re-provisioning) and
   the gateway Worker (`kiero-*-gateway`) stay exactly where they are; the
   web Worker only reads build-time URLs baked into the bundle.
 

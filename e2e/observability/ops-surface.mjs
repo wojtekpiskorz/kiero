@@ -34,7 +34,7 @@ const value = (flag, fallback) => {
 };
 
 const DEPLOYMENT = value("--deployment", "wojtek-piskorz-jr:kiero-dev-core:staging");
-const SITE = value("--site", "https://fiery-raven-417.eu-west-1.convex.site");
+const SITE = value("--site", "https://outgoing-marlin-429.eu-west-1.convex.site");
 const GATEWAY = value("--gateway", "https://kiero-staging-gateway.wojtek-524.workers.dev");
 const OUT = value("--out", "/tmp/kiero-i11/ops-run");
 const MARKERS = (value("--markers", "") || "").split(",").filter(Boolean);

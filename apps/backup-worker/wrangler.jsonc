@@ -116,9 +116,10 @@
         // injected at deploy time from the same store as the owner-PENDING
         // per-bucket R2 credentials (I8 decision, 2026-09-14).
         "R2_MEDIA_BUCKET": "kiero-staging-media",
-        // I8 runbook R10 fill (2026-09-14): the staging deployment
-        // fiery-raven-417 HTTP actions origin (public URL, not a secret).
-        "CONVEX_SITE_URL": "https://fiery-raven-417.eu-west-1.convex.site",
+        // I8 runbook R10 fill (2026-09-14; re-provisioned 2026-09-22): the
+        // staging deployment outgoing-marlin-429 HTTP actions origin (public
+        // URL, not a secret).
+        "CONVEX_SITE_URL": "https://outgoing-marlin-429.eu-west-1.convex.site",
         // I8 runbook R10 fill (2026-09-14): the staging deployment the
         // pinned `convex export` targets (a reference, not a credential;
         // the access token itself is the owner-PENDING
