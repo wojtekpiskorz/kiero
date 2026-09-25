@@ -34,7 +34,7 @@ export const CHROMIUM =
 export const WEB =
   process.env.KIERO_SMOKE_WEB ?? "https://kiero-staging-web.wojtek-524.workers.dev";
 export const CONVEX_URL =
-  process.env.KIERO_SMOKE_CONVEX ?? "https://fiery-raven-417.eu-west-1.convex.cloud";
+  process.env.KIERO_SMOKE_CONVEX ?? "https://outgoing-marlin-429.eu-west-1.convex.cloud";
 
 // ---------------------------------------------------------------------------
 // Shared driver utilities (single definitions; every leg imports these)

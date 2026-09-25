@@ -41,8 +41,24 @@ const REVISION = "5555555555555555555555555555555555555555";
 
 const fixtureText = (name: string): string => readFileSync(join(fixturesDir, name), "utf8");
 
-/** AC2: the exact identity the staging descriptor pins. */
+/** AC2: the exact identity the staging descriptor pins. Updated by the
+ * 2026-09-22 re-provisioning lane together with the descriptor itself
+ * (docs/evidence/staging/reprovision-2026-09-22.md). */
 const PINNED_STAGING_IDENTITY: ConvexExpectedIdentity = {
+  teamSlug: "wojtek-piskorz-jr",
+  projectSlug: "kiero-dev-core",
+  reference: "staging",
+  type: "prod",
+  slug: "outgoing-marlin-429",
+  url: "https://outgoing-marlin-429.eu-west-1.convex.cloud",
+  isDefault: false,
+};
+
+/** The identity the RECORDED fixture outputs captured (the pre-teardown
+ * `fiery-raven-417` staging deployment, 2026-09-14 releases). Kept in sync
+ * with the recording fixtures, never with the live descriptor: the
+ * recordings are history and are not rewritten. */
+const RECORDED_STAGING_IDENTITY: ConvexExpectedIdentity = {
   teamSlug: "wojtek-piskorz-jr",
   projectSlug: "kiero-dev-core",
   reference: "staging",
@@ -159,8 +175,11 @@ function gateWorkspace() {
 function runGate(
   { directory, record }: ReturnType<typeof gateWorkspace>,
   scenario: FixtureScenario = {},
-  // Pass null explicitly to exercise the unpinned-identity refusal.
-  expectedIdentity: ConvexExpectedIdentity | null = PINNED_STAGING_IDENTITY,
+  // Pass null explicitly to exercise the unpinned-identity refusal. The
+  // default is the RECORDED identity because every recorded scenario below
+  // replays the 2026-09-14 fixtures; the LIVE pairing (descriptor pin) has
+  // its own test further down.
+  expectedIdentity: ConvexExpectedIdentity | null = RECORDED_STAGING_IDENTITY,
 ): Verification {
   return verifyConvexTarget({
     env: shimEnv(directory, record, scenario),
@@ -354,7 +373,7 @@ describe("the recorded provider announcements parse to observed identity", () =>
     }
     // The comparison the live run failed now comes out clean: the
     // spinner's trailing "..." never reaches the url field.
-    expect(compareConvexIdentity(identity, PINNED_STAGING_IDENTITY)).toEqual([]);
+    expect(compareConvexIdentity(identity, RECORDED_STAGING_IDENTITY)).toEqual([]);
   });
 
   it("never prefers a progress line without the dry-run marker (the real-deploy shape)", () => {
@@ -377,7 +396,7 @@ describe("the recorded provider announcements parse to observed identity", () =>
     if (observed === null) {
       throw new Error("the wrong-target fixture must parse");
     }
-    const differences = compareConvexIdentity(observed, PINNED_STAGING_IDENTITY);
+    const differences = compareConvexIdentity(observed, RECORDED_STAGING_IDENTITY);
     expect(differences.join("\n")).toContain('reference: expected "staging"');
     expect(differences.join("\n")).toContain('slug: expected "fiery-raven-417"');
     expect(differences.join("\n")).toContain("url:");
@@ -386,7 +405,7 @@ describe("the recorded provider announcements parse to observed identity", () =>
     if (identity === null) {
       throw new Error("the staging fixture must parse");
     }
-    expect(compareConvexIdentity(identity, PINNED_STAGING_IDENTITY)).toEqual([]);
+    expect(compareConvexIdentity(identity, RECORDED_STAGING_IDENTITY)).toEqual([]);
   });
 });
 
@@ -438,6 +457,36 @@ describe("the gate against the recorded provider responses (recording boundary)"
     // The only command the boundary saw is the read-only probe.
     expect(mutatingDeployInvocations(workspace.record)).toEqual([]);
     expect(recordedInvocations(workspace.record)).toHaveLength(1);
+  });
+
+  it("passes the live pairing: a fabricated announcement of the descriptor-pinned deployment", () => {
+    // The recorded fixtures replay the 2026-09-14 deployment; this test
+    // proves the LIVE descriptor pin (outgoing-marlin-429) pairs end to end
+    // with an announcement of exactly that deployment.
+    const directory = mkdtempSync(join(tmpdir(), "kiero-convex-live-pin-"));
+    const announcement = join(directory, "live-pin-announcement.txt");
+    writeFileSync(
+      announcement,
+      [
+        "▌ Deploying code to deployment:",
+        "▌ [Production] wojtek-piskorz-jr:kiero-dev-core:staging (dashboard: https://dashboard.convex.dev/t/wojtek-piskorz-jr/kiero-dev-core/outgoing-marlin-429)",
+        "▌ └─ https://outgoing-marlin-429.eu-west-1.convex.cloud",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const workspace = gateWorkspace();
+    const verification = runGate(workspace, { probeOut: announcement }, PINNED_STAGING_IDENTITY);
+    expect(verification.decision).toBe("pass");
+    if (verification.decision !== "pass") {
+      throw new Error("unreachable");
+    }
+    expect(verification.identity).toMatchObject({
+      slug: "outgoing-marlin-429",
+      url: "https://outgoing-marlin-429.eu-west-1.convex.cloud",
+      region: "eu-west-1",
+    });
+    expect(mutatingDeployInvocations(workspace.record)).toEqual([]);
   });
 
   it("refuses spinner-only probe output as a failed identity lookup", () => {
@@ -593,7 +642,7 @@ describe("the deploy adapter gates the Convex component before any mutating comm
   it("blocks a wrong key target as target-verification-failed with zero mutating commands", () => {
     const result = runAdapterWithConvexComponent({
       probeOut: join(fixturesDir, "default-production-announcement.txt"),
-    }, PINNED_STAGING_IDENTITY);
+    }, RECORDED_STAGING_IDENTITY);
     expect(result.run.status).toBe(1);
     expect(result.run.stdout).toContain("[blocked] convex-functions: target-verification-failed");
     const rows = readReleaseRecords(result.ledger) as { outcome: string; blockedReason?: string; targetVerification?: { refusalCode: string; observed?: { slug?: string } } }[];
@@ -612,7 +661,7 @@ describe("the deploy adapter gates the Convex component before any mutating comm
         probeOut: join(fixturesDir, "staging-announcement.txt"),
         deployOut: join(fixturesDir, "staging-announcement.txt"),
       },
-      PINNED_STAGING_IDENTITY,
+      RECORDED_STAGING_IDENTITY,
     );
     expect(result.run.status).toBe(0);
     expect(result.run.stdout).toContain("[deployed] convex-functions");
@@ -644,7 +693,7 @@ describe("the deploy adapter gates the Convex component before any mutating comm
     const ciShape = join(fixturesDir, "staging-announcement-ci-spinner.txt");
     const result = runAdapterWithConvexComponent(
       { probeOut: ciShape, deployOut: ciShape },
-      PINNED_STAGING_IDENTITY,
+      RECORDED_STAGING_IDENTITY,
     );
     expect(result.run.status).toBe(0);
     expect(result.run.stdout).toContain("[deployed] convex-functions");
@@ -676,7 +725,7 @@ describe("the deploy adapter gates the Convex component before any mutating comm
         probeOut: join(fixturesDir, "staging-announcement.txt"),
         deployOut: join(fixturesDir, "default-production-announcement.txt"),
       },
-      PINNED_STAGING_IDENTITY,
+      RECORDED_STAGING_IDENTITY,
     );
     expect(result.run.status).toBe(1);
     expect(result.run.stdout).toContain("[blocked] convex-functions: transport-failed");

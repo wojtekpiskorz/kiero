@@ -103,9 +103,10 @@
         // (the descriptor's runtimeSecrets compose the EU S3 URLs from the
         // nonsecret account id at deploy time); a committed empty var would
         // collide with the secret binding (Cloudflare code 10053).
-        // I8 runbook R10 fill (2026-09-14): the staging deployment
-        // fiery-raven-417 HTTP actions origin (public URL, not a secret).
-        "CONVEX_SITE_URL": "https://fiery-raven-417.eu-west-1.convex.site"
+        // I8 runbook R10 fill (2026-09-14; re-provisioned 2026-09-22): the
+        // staging deployment outgoing-marlin-429 HTTP actions origin (public
+        // URL, not a secret).
+        "CONVEX_SITE_URL": "https://outgoing-marlin-429.eu-west-1.convex.site"
       }
     },
     "alpha-production": {

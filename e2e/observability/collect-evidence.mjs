@@ -106,7 +106,7 @@ const result = {
   candidate: revision,
   environment: {
     web: "https://kiero-staging-web.wojtek-524.workers.dev",
-    convex: "wojtek-piskorz-jr:kiero-dev-core:staging (fiery-raven-417)",
+    convex: "wojtek-piskorz-jr:kiero-dev-core:staging (outgoing-marlin-429)",
     gateway: "https://kiero-staging-gateway.wojtek-524.workers.dev",
     axiom: "dataset kiero-staging (EU), names AXIOM_API_TOKEN/AXIOM_DATASET present on the deployment (values never read)",
     note: "KIERO_GM_EMAILS untouched; no GM-panel flow; no staging env var changed; no wrangler deploy",

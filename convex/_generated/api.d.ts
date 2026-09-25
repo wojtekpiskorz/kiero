@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as access_errorCodes from "../access/errorCodes.js";
 import type * as access_gm_cores from "../access/gm/cores.js";
 import type * as access_gm_dispatch from "../access/gm/dispatch.js";
 import type * as access_gm_functions from "../access/gm/functions.js";
@@ -51,6 +52,7 @@ import type * as agent_execute from "../agent/execute.js";
 import type * as agent_loop from "../agent/loop.js";
 import type * as agent_probe from "../agent/probe.js";
 import type * as agent_record from "../agent/record.js";
+import type * as agent_toolExecution from "../agent/toolExecution.js";
 import type * as attention_context from "../attention/context.js";
 import type * as attention_delivery_commands from "../attention/delivery/commands.js";
 import type * as attention_delivery_dispatch from "../attention/delivery/dispatch.js";
@@ -103,6 +105,8 @@ import type * as calendar_connection_operations from "../calendar/connection/ope
 import type * as calendar_connection_proof from "../calendar/connection/proof.js";
 import type * as calendar_connection_proofHttp from "../calendar/connection/proofHttp.js";
 import type * as calendar_connection_protocol from "../calendar/connection/protocol.js";
+import type * as calendar_connection_render from "../calendar/connection/render.js";
+import type * as calendar_connection_return from "../calendar/connection/return.js";
 import type * as calendar_projection_dispatch from "../calendar/projection/dispatch.js";
 import type * as calendar_projection_functions from "../calendar/projection/functions.js";
 import type * as calendar_projection_operations from "../calendar/projection/operations.js";
@@ -181,6 +185,7 @@ import type * as operations_processing_storeAdapter from "../operations/processi
 import type * as operations_telemetry_costs from "../operations/telemetry/costs.js";
 import type * as operations_telemetry_cron from "../operations/telemetry/cron.js";
 import type * as operations_telemetry_emit from "../operations/telemetry/emit.js";
+import type * as operations_telemetry_forward from "../operations/telemetry/forward.js";
 import type * as operations_telemetry_functions from "../operations/telemetry/functions.js";
 import type * as operations_telemetry_heartbeat from "../operations/telemetry/heartbeat.js";
 import type * as operations_telemetry_http from "../operations/telemetry/http.js";
@@ -280,6 +285,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "access/errorCodes": typeof access_errorCodes;
   "access/gm/cores": typeof access_gm_cores;
   "access/gm/dispatch": typeof access_gm_dispatch;
   "access/gm/functions": typeof access_gm_functions;
@@ -323,6 +329,7 @@ declare const fullApi: ApiFromModules<{
   "agent/loop": typeof agent_loop;
   "agent/probe": typeof agent_probe;
   "agent/record": typeof agent_record;
+  "agent/toolExecution": typeof agent_toolExecution;
   "attention/context": typeof attention_context;
   "attention/delivery/commands": typeof attention_delivery_commands;
   "attention/delivery/dispatch": typeof attention_delivery_dispatch;
@@ -375,6 +382,8 @@ declare const fullApi: ApiFromModules<{
   "calendar/connection/proof": typeof calendar_connection_proof;
   "calendar/connection/proofHttp": typeof calendar_connection_proofHttp;
   "calendar/connection/protocol": typeof calendar_connection_protocol;
+  "calendar/connection/render": typeof calendar_connection_render;
+  "calendar/connection/return": typeof calendar_connection_return;
   "calendar/projection/dispatch": typeof calendar_projection_dispatch;
   "calendar/projection/functions": typeof calendar_projection_functions;
   "calendar/projection/operations": typeof calendar_projection_operations;
@@ -453,6 +462,7 @@ declare const fullApi: ApiFromModules<{
   "operations/telemetry/costs": typeof operations_telemetry_costs;
   "operations/telemetry/cron": typeof operations_telemetry_cron;
   "operations/telemetry/emit": typeof operations_telemetry_emit;
+  "operations/telemetry/forward": typeof operations_telemetry_forward;
   "operations/telemetry/functions": typeof operations_telemetry_functions;
   "operations/telemetry/heartbeat": typeof operations_telemetry_heartbeat;
   "operations/telemetry/http": typeof operations_telemetry_http;

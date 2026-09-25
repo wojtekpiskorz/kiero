@@ -105,7 +105,8 @@ jobs:
       # CONVEX_DEPLOYMENT reference (I8 probe P7; runbook R4). R9: the key
       # is also the authoritative IDENTITY: the adapter resolves the
       # credential-selected deployment read-only and refuses unless it is
-      # the identity pinned in the descriptor (fiery-raven-417), so the
+      # the identity pinned in the descriptor (outgoing-marlin-429 since the
+      # 2026-09-22 re-provisioning), so the
       # CONVEX_DEPLOYMENT label above can never be recorded as evidence.
       CONVEX_DEPLOY_KEY: ${{ secrets.STAGING_CONVEX_DEPLOY_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}

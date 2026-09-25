@@ -1,10 +1,11 @@
 # Environment: synthetic staging (`staging`)
 
-Status: PARTIALLY PROVISIONED (2026-09-14). The staging Convex deployment
-exists: `fiery-raven-417` (prod-type, reference `staging`, region
-`eu-west-1`, non-default; observed through the pinned CLI's read-only
-surfaces, see
-[docs/evidence/release/verified-convex-target/README.md](../../docs/evidence/release/verified-convex-target/README.md)).
+Status: PARTIALLY PROVISIONED (re-created 2026-09-22). The staging Convex
+deployment
+exists: `outgoing-marlin-429` (prod-type, reference `staging`, region
+`eu-west-1`, non-default; recreated after the owner deleted the project in
+the billing incident — the previous `fiery-raven-417` is gone; see
+[docs/evidence/staging/reprovision-2026-09-22.md](../../docs/evidence/staging/reprovision-2026-09-22.md)).
 The R2 buckets, workers and the GitHub-side `staging` environment
 variables/secrets remain PENDING owner/I8 actions. The R6 release adapter
 consumes the same names through `infra/release/targets/staging.json` and
@@ -35,7 +36,7 @@ a separate project.
 | Environment name | `staging` (synthetic staging, CI deploy target) |
 | Convex team | `wojtek-piskorz-jr` |
 | Convex project | `kiero-dev-core` (existing; shared with dev by owner instruction, and no new project may be created) |
-| Convex deployment | `fiery-raven-417`: prod-type, reference `staging`, full selector `wojtek-piskorz-jr:kiero-dev-core:staging`, URL `https://fiery-raven-417.eu-west-1.convex.cloud` (region `eu-west-1`), non-default (created without `--default`; R9 pinned it in the staging descriptor) |
+| Convex deployment | `outgoing-marlin-429`: prod-type, reference `staging`, full selector `wojtek-piskorz-jr:kiero-dev-core:staging`, URL `https://outgoing-marlin-429.eu-west-1.convex.cloud` (region `eu-west-1`), non-default (created without `--default`; R9 pinned it in the staging descriptor; recreated 2026-09-22 in the same shape) |
 | Cloudflare account | same account as dev (see evidence doc for the id) |
 | Cloudflare resource prefix | `kiero-staging-` |
 

@@ -27,8 +27,8 @@
     "test": "vitest run",
     "build": "npm run build --workspace @kiero/web",
     "dev": "npm run dev --workspace @kiero/web",
-    "convex:dev": "npx --yes convex@1.45.0 dev --configure=false",
-    "convex:deploy:dev": "npx --yes convex@1.45.0 dev --configure=false --once",
+    "convex:dev": "npx --yes convex@1.45.0 dev",
+    "convex:deploy:dev": "npx --yes convex@1.45.0 dev --once",
     "convex:codegen": "npx --yes convex@1.45.0 codegen",
     "verify:environments": "node infra/environments/shape-check.mjs",
     "verify:corpus": "node evals/corpus/validate/validate.mjs && node evals/expected/scoring/probe/probe.mjs"
