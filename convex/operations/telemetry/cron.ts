@@ -8,8 +8,9 @@
  * the sanctioned pattern - the same reason A3's probe actions live apart
  * from the mutations they drive.
  *
- * `cronTick` runs every minute from convex/crons.ts: incident scan, cost
- * threshold evaluation, windowed retention, then best-effort sink forward.
+ * `cronTick` runs every TELEMETRY_TICK_INTERVAL_MS (./heartbeat.ts) from
+ * convex/crons.ts: incident scan, cost threshold evaluation, windowed
+ * retention, then best-effort sink forward.
  *
  * R27 (issue #235): the sink forward's outcome is recorded durably - the
  * closed status class of every attempt (refused, unreachable, ok) persists
@@ -104,7 +105,7 @@ async function forwardRecentToSink(
   return { ...result, attempted: events.length, status };
 }
 
-/** The every-minute telemetry tick registered in convex/crons.ts. */
+/** The telemetry tick registered in convex/crons.ts. */
 export const cronTick = internalAction({
   args: {},
   handler: async (ctx): Promise<CronTickSummary> => {

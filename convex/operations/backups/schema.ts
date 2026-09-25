@@ -10,7 +10,7 @@
  * I5 completion (the owning lane finishes the fragment; every added column
  * is OPTIONAL so the certified A2/A3 baseline and its fixtures stay valid):
  *
- * - `slotMs` / `leaseExpiresAtMs` / `attempts`: the 15-minute run slot, the
+ * - `slotMs` / `leaseExpiresAtMs` / `attempts`: the run slot, the
  *   single-run lease guarding it against overlapping writers, and the
  *   bounded attempt counter (fresh start + takeovers + retries).
  * - `tier` / `expiresAtMs`: frequent (48h) vs daily (through day 14)

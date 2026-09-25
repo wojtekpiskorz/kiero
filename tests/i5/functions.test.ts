@@ -15,6 +15,7 @@ import {
 } from "../../convex/operations/backups/functions";
 import type { CompleteInput } from "../../convex/operations/backups/functions";
 import {
+  FRESHNESS_LIMIT_MS,
   LEASE_MS,
   SCHEDULE_INTERVAL_MS,
   tierOfSlot,
@@ -414,16 +415,17 @@ describe("the reference-aware retention sweep (server side)", () => {
 });
 
 describe("freshness alerting (the I2 seam)", () => {
-  it("emits the deduplicated stale diagnostic beyond one hour of the newest verified snapshot", async () => {
+  it("emits the deduplicated stale diagnostic past the freshness limit of the newest verified snapshot", async () => {
     const ctx = fakeBackupCtx(BACKUP_TABLES);
     const now = Date.now();
+    const snapshotAt = now - FRESHNESS_LIMIT_MS - HOUR;
     await ctx.db.insert("recoveryManifests", {
-      snapshotAtMs: now - 2 * 60 * MIN,
+      snapshotAtMs: snapshotAt,
       state: "verified",
       databaseManifestHash: "0".repeat(64),
-      slotMs: now - 2 * 60 * MIN,
+      slotMs: snapshotAt,
       attempts: 1,
-      verifiedAtMs: now - 2 * 60 * MIN,
+      verifiedAtMs: snapshotAt,
       expiresAtMs: now + 46 * HOUR,
     });
     const first = await freshnessCheckTx(asTx(ctx), now);
@@ -436,7 +438,7 @@ describe("freshness alerting (the I2 seam)", () => {
     const events = await ctx.db.query("diagnosticEvents").collect();
     expect(events).toHaveLength(1);
     expect(events[0]?.kind).toBe("ops.backup.stale");
-    expect(String(events[0]?.dedupKey)).toBe(`backup_stale:${now - 2 * 60 * MIN}`);
+    expect(String(events[0]?.dedupKey)).toBe(`backup_stale:${snapshotAt}`);
   });
 
   it("never emits when no attempt ever ran (lane not wired, not silently broken)", async () => {

@@ -13,7 +13,10 @@ import {
   isExpired,
   retentionCutoffMs,
 } from "../../convex/operations/telemetry/retention";
-import { HEARTBEATS_KEPT_PER_SERVICE } from "../../convex/operations/telemetry/heartbeat";
+import {
+  HEARTBEATS_KEPT_PER_SERVICE,
+  TELEMETRY_TICK_INTERVAL_MS,
+} from "../../convex/operations/telemetry/heartbeat";
 import retentionConfig from "../../infra/observability/retention.json";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -56,7 +59,7 @@ describe("heartbeat tail and forward window", () => {
     expect(retentionConfig.healthHeartbeats.keptPerService).toBe(20);
   });
 
-  it("events older than one hour are not worth forwarding", () => {
-    expect(FORWARD_WINDOW_MS).toBe(60 * 60 * 1000);
+  it("the forward window spans three telemetry ticks", () => {
+    expect(FORWARD_WINDOW_MS).toBe(3 * TELEMETRY_TICK_INTERVAL_MS);
   });
 });

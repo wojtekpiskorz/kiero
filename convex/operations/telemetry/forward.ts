@@ -5,7 +5,7 @@
  * Convex->Axiom ingest leg, the classification of a `SinkIngestResult` into
  * it, and the health derivation the composed telemetry state exposes.
  *
- * Why this module exists: the every-minute telemetry tick dropped the
+ * Why this module exists: the telemetry tick dropped the
  * `SinkIngestResult` (`cron.ts`'s forwardRecentToSink), so a refused or
  * unreachable forward was indistinguishable from a forward that never ran -
  * every dashboard silence since I11's qualification is explained by that gap.

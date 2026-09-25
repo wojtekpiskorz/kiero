@@ -11,10 +11,12 @@
 // docs/evidence/environment/preflight-2026-09.md - that table stays the
 // single ownership source; D6 set the same fields for the media container).
 //
-// Scheduled trigger: every 15 minutes (the accepted cadence; the Convex-side
-// schedule authority is convex/crons.ts backup-schedule-tick, whose safety
-// net pings this worker's /run when a slot has no row). Frequency is never
-// silently reduced to fit a plan (infra/backups/retention.json).
+// Scheduled trigger: daily at 02:00 UTC during the pre-user phase (owner
+// decision 2026-09-25, docs/adr/mvp-cost-envelope-2026-09.md; the alpha
+// cadence of 15 minutes returns with the first users). The Convex-side
+// backup-schedule-tick in convex/crons.ts runs an hour later and pings this
+// worker's /run when the day's slot has no row. tests/i5 keeps this trigger
+// equal to infra/backups/retention.json.
 //
 // The backup bucket (kiero-dev-backup) was created by the I5 proof with
 // `wrangler r2 bucket create kiero-dev-backup --jurisdiction eu --location
@@ -37,9 +39,9 @@
   "observability": {
     "enabled": true
   },
-  // The every-15-minutes scheduled backup trigger (the accepted cadence).
+  // The daily scheduled backup trigger (pre-user cadence).
   "triggers": {
-    "crons": ["*/15 * * * *"]
+    "crons": ["0 2 * * *"]
   },
   // The container's Durable Object must be declared as a binding of this
   // same script (wrangler requirement for Containers; the D6 pattern).
@@ -86,7 +88,7 @@
     "staging": {
       "name": "kiero-staging-backup-worker",
       "triggers": {
-        "crons": ["*/15 * * * *"]
+        "crons": ["0 2 * * *"]
       },
       "durable_objects": {
         "bindings": [
@@ -130,7 +132,7 @@
     "alpha-production": {
       "name": "kiero-alpha-backup-worker",
       "triggers": {
-        "crons": ["*/15 * * * *"]
+        "crons": ["0 2 * * *"]
       },
       "durable_objects": {
         "bindings": [

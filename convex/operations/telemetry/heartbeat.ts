@@ -15,16 +15,25 @@
  *    delivery succeeding.
  */
 
+import { SCHEDULE_INTERVAL_MS as BACKUP_INTERVAL_MS } from "../backups/slot";
+
+/**
+ * The telemetry tick cadence (convex/crons.ts registers the tick from this
+ * value). Hourly during the pre-user phase: incident scan, silence
+ * detection, cost alerts, pruning and the sink forward all tolerate it.
+ */
+export const TELEMETRY_TICK_INTERVAL_MS = 60 * 60 * 1000;
+
 /** Services whose heartbeats are recorded (closed vocabulary). */
 export const HEARTBEAT_SERVICES = [
   "gateway.worker",
   "backup.job",
   "media.worker",
   "export.worker",
-  // R27 append (issue #235): the telemetry tick's own forward leg. The tick
-  // records one bounded-tail row per run (see ./forward.ts), so the silence
-  // machinery also detects the cron itself stopping - and a degraded row
-  // carries why the Convex->Axiom ingest leg is not delivering.
+  // The telemetry tick's own forward leg. The tick records one bounded-tail
+  // row per run (see ./forward.ts), so the silence machinery also detects
+  // the cron itself stopping, and a degraded row carries why the
+  // Convex->Axiom ingest leg is not delivering.
   "telemetry.sink",
 ] as const;
 
@@ -37,12 +46,10 @@ export type HeartbeatService = (typeof HEARTBEAT_SERVICES)[number];
 export const HEARTBEAT_CADENCE_MS: Record<HeartbeatService, number> = {
   // Gateway cron trigger runs every 5 minutes (the external prober role).
   "gateway.worker": 5 * 60 * 1000,
-  // Backup container runs every 15 minutes (I5's schedule).
-  "backup.job": 15 * 60 * 1000,
+  "backup.job": BACKUP_INTERVAL_MS,
   "media.worker": 15 * 60 * 1000,
   "export.worker": 15 * 60 * 1000,
-  // The telemetry tick is registered every minute (convex/crons.ts).
-  "telemetry.sink": 60 * 1000,
+  "telemetry.sink": TELEMETRY_TICK_INTERVAL_MS,
 };
 
 /** How many missed cadences count as silence. */

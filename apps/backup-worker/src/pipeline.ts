@@ -120,7 +120,7 @@ interface StagedObject {
 }
 
 /**
- * Executes one 15-minute run. NEVER fabricates success: every port failure
+ * Executes one scheduled run. NEVER fabricates success: every port failure
  * becomes a typed server-side failure record (the row goes `failed`, the
  * freshness monitor keeps alerting), and completeness is decided only by
  * the server's closure verification.

@@ -13,6 +13,8 @@
  * the 400/500 PLN budget history survives the diagnostic window.
  */
 
+import { TELEMETRY_TICK_INTERVAL_MS } from "./heartbeat";
+
 /** The accepted diagnostic retention window (30 days). */
 export const DIAGNOSTIC_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -22,8 +24,11 @@ export const COST_RETENTION_MS = 400 * 24 * 60 * 60 * 1000;
 /** Bounded delete batch per pruning pass (keeps mutation size predictable). */
 export const PRUNE_BATCH_SIZE = 100;
 
-/** Events older than this are no longer worth forwarding to the sink. */
-export const FORWARD_WINDOW_MS = 60 * 60 * 1000;
+/**
+ * Events older than this are no longer worth forwarding to the sink. Three
+ * telemetry ticks wide, so one missed tick loses nothing.
+ */
+export const FORWARD_WINDOW_MS = 3 * TELEMETRY_TICK_INTERVAL_MS;
 
 /** The retention cutoff: rows with atMs < cutoff are expired. */
 export function retentionCutoffMs(nowMs: number, windowMs: number = DIAGNOSTIC_RETENTION_MS): number {
