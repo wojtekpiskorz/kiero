@@ -74,6 +74,6 @@ mirrors the release-consumed values and fresh deploy keys into the GitHub
 Owner-held credentials (DeepSeek, OpenRouter, Resend, Google, Axiom, GM
 addresses) are entered with the interactive wizard:
 `bash infra/environments/owner-credentials.sh`. It opens each provider's
-page, takes each value with hidden input, sets it on the chosen Convex
+page, takes secrets with hidden input (IDs and addresses are visible), sets it on the chosen Convex
 deployments over stdin and verifies with the dry run above.
 
