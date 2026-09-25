@@ -1,12 +1,12 @@
 /**
- * Guarded proof fixtures (I5): the dev-deployment seeding the live proofs
+ * Guarded proof fixtures: the dev-deployment seeding the live proofs
  * need, NEVER reachable with the probe guard off (proof.ts is the only
  * caller; these mutations exist as `internalMutation` so no external
  * function reference can ever reach them either).
  *
  * The fixtures seed the real tables through the real schema: a minimal
  * company/user/source/upload/attachment chain for retained representations
- * (the D3 inventory seam) and content-free deletion records (the I4 seam).
+ * (the inventory seam) and content-free deletion records.
  * Past-dated manifest rows let retention sweeps run against real "now"
  * without time travel.
  */
@@ -83,7 +83,7 @@ export const seedRetainedMedia = internalMutation({
   },
 });
 
-/** Seeds one content-free deletion/revocation record (I4 seam). */
+/** Seeds one content-free deletion/revocation record. */
 export const seedDeletion = internalMutation({
   args: {
     kind: v.string(),

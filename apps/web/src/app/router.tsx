@@ -1,5 +1,5 @@
 /**
- * Host router composition (A4).
+ * Host router composition.
  *
  * The route tree is derived from the composed feature registry: one
  * root-level route per entry, the first entry ("/", the company

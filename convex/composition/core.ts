@@ -1,5 +1,5 @@
 /**
- * The final core composition entry, Convex half (J2, issue #61).
+ * The final core composition entry, Convex half.
  *
  * The full-flow join owns this explicit cross-module composition: ONE
  * module that names what "the complete core backend" IS at this join and
@@ -22,11 +22,11 @@
  *    explicitly NOT claimed and stay outside this set.
  * 3. OPERATIONS/EVENTS: the core's producer/consumer seams name entries
  *    that exist in the composed contracts registries (the join's declared
- *    wiring: E4 extraction feeding E5 indexing, E6 tools over C2-C4
- *    operations, C5 recomputation on withdrawal, B3 cleanup on
- *    revocation, F1/F4 attention state over the same membership reads).
+ *    wiring: multimodal extraction feeding search indexing, agent tools over the memory/work
+ *    operations, recomputation on withdrawal, membership cleanup on
+ *    revocation, attention state over the same membership reads).
  *
- * J3 consumes this module as the qualification baseline; J5's audit reads
+ * AI qualification consumes this module as its baseline; the audit reads
  * its evidence.
  */
 

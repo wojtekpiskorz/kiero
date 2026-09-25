@@ -1,7 +1,7 @@
 /**
- * Guarded B2 proof fixtures (dev deployment only).
+ * Guarded linking proof fixtures (dev deployment only).
  *
- * Same pattern as the B1 probe (convex/access/identity/probe.ts):
+ * Same pattern as the probe (convex/access/identity/probe.ts):
  * queries and mutations cannot read deployment variables, so every entry
  * here is an ACTION that checks `KIERO_B2_PROOF_ENABLED === "1"` and then
  * runs an internal mutation reachable only from this module.
@@ -26,7 +26,7 @@
  *   subject a real sign-in would have proven.
  * - `b2ProofRecoverAccount`: runs the REAL recovery core for a
  *   proof-domain account. This is dev evidence tooling, NOT the product
- *   invoker: the checked recovery command stays unregistered until B4
+ *   invoker: the checked recovery command stays unregistered until GM access
  *   supplies explicit GM authority.
  */
 

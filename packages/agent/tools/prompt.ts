@@ -1,9 +1,9 @@
 /**
- * The answer dialogue builder (E6): the Polish system prompt, the first
+ * The answer dialogue builder: the Polish system prompt, the first
  * user message from the bounded answer context, and the deterministic
  * assistant/tool-result turn encodings the bounded answer loop replays.
  *
- * Same convention as E3's planning prompt: E2's typed single-turn interface
+ * Same convention as the planning prompt: the typed single-turn interface
  * carries only user/assistant text parts, so the loop encodes its own prior
  * turns deterministically here. The prompt text below is part of
  * {@link ANSWER_PROMPT_VERSION}: any wording change is a version bump so

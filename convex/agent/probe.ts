@@ -1,17 +1,17 @@
 /**
- * E6 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * Answer-loop dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
  * variable; shared plumbing from convex/sources/probe_shared.ts).
  *
- * No business work happens here; these entries exist so the E6 evidence
+ * No business work happens here; these entries exist so the evidence
  * runs against the REAL dev deployment without a development-auth
- * shortcut, through the same guarded-action pattern E3/C5 use:
+ * shortcut, through the same guarded-action pattern the analysis and withdrawal probes use:
  *
  * - `probeSeedE6Company`: a fresh proof company per nonce with its own
  *   user, admin membership, live bridge session and the Banan project
  *   (deterministic answer context);
  * - `probeSeedE6Source`: one witnessed source (run + text extraction +
  *   whole-source fragment) with a per-run acceptance key — the fixture
- *   findings the script publishes through C2's REAL checked dispatch, and
+ *   findings the script publishes through the REAL checked dispatch, and
  *   the question sources the answer loop consumes;
  * - `probeAskAgent`: runs the REAL bounded answer loop over one question
  *   source (the operation under proof);
@@ -273,7 +273,7 @@ export const probeAskAgent = action({
  * drives; the split exists so a live proof does not need one synchronous
  * action to outlive the transport window (the production shape's honest
  * limit until a durable answer-record family exists — a named prerequisite
- * for J2/J3). The echoed state is untrusted input exactly like a plan: the
+ * for the qualification runs). The echoed state is untrusted input exactly like a plan: the
  * round re-validates every tool call against the context it carries.
  */
 export const probeStartAnswerRun = action({

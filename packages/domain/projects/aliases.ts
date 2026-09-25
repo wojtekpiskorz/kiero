@@ -1,5 +1,5 @@
 /**
- * Project codename (alias) rules (C1 domain half, pure).
+ * Project codename (alias) rules (domain half, pure).
  *
  * Vocabulary ("Alias projektu", CONTEXT.md): a working name that identifies
  * ONE project unambiguously within the firm, e.g. „Banan” or „Kaczmarek”.

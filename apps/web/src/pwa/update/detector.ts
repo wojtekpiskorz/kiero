@@ -1,17 +1,17 @@
 /**
- * Service-worker update detection (I7): watches one registration for a
+ * Service-worker update detection: watches one registration for a
  * NEW WAITING worker, the only honest signal a new client version exists
- * in this architecture (F3's worker installs no fetch handler and no
+ * in this architecture (the worker installs no fetch handler and no
  * cache, so documents always come fresh from the network; the worker's
  * own bytes changing is what an update means).
  *
  * Deliberately NO skipWaiting: the shipped worker (apps/web/public/sw.js,
- * F3-owned) has no message handler and this module never replaces that
+ * push-owned) has no message handler and this module never replaces that
  * file. Activation therefore happens the standard way: the waiting
  * worker takes over when the old clients are gone, which is exactly what
  * the user-approved reload provides.
  *
- * Structural DOM-free types (the A4 pattern): node-side test programs can
+ * Structural DOM-free types: node-side test programs can
  * import this chain without a DOM lib.
  */
 

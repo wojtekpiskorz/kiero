@@ -1,11 +1,11 @@
 /**
- * The barebones web push settings feature (F3): the Polish screen the
+ * The barebones web push settings feature: the Polish screen the
  * bounded solution requires - permission/subscription state, enabling or
  * removing THIS device, and recovery guidance that never blocks normal
  * use of Kiero.
  *
  * JSX-free on purpose (createElement only): the host feature registry
- * chain is imported by the node test programs (the A4/B3/G1 pattern).
+ * chain is imported by the node test programs.
  * The server half comes from the authenticated `pushState` query (own
  * subscriptions, PUBLIC application server key); the browser half
  * (permission, subscribe/unsubscribe) runs through the owned push module

@@ -1,8 +1,8 @@
 /**
  * GM access feature state: Polish copy and the closed-error
- * classification for the B4 surface.
+ * classification for the surface.
  *
- * The sign-in leg lives in B1's shared gate (../sign-in/SignInGate.ts);
+ * The sign-in leg lives in the shared gate (../sign-in/SignInGate.ts);
  * this module carries only the GM copy. GM operation results arrive as
  * `ResultEnvelope`s; every closed error maps to honest Polish copy (the
  * server message) plus hints for the load-bearing machine codes.

@@ -1,22 +1,23 @@
 /**
- * The telemetry function surface (I2).
+ * The telemetry function surface.
  *
  * What lives here:
  *
  * - Writers: `recordEvent` (the sanitized emit path for lanes and HTTP
  *   ingest), `recordHeartbeat` (backend-silence ledger), `recordCostEntry`
  *   (all-in spend accounting).
- * - Monitors: `scanIncidents` (processing/save incidents from the A3
+ * - Monitors: `scanIncidents` (processing/save incidents from the platform
  *   surfaces, incl. attempts-exhausted rows), `evaluateCostAlerts` (400/500
  *   PLN thresholds with per-level cooldown), `pruneExpired` (windowed
  *   retention), `forwardToSink` (best-effort Axiom delivery).
  * - `cronTick`: the orchestrator registered in convex/crons.ts (which also
- *   carries the A3 handoff note's outbox-drain safety net).
+ *   carries the handoff note's outbox-drain safety net).
  * - Reads: `telemetryOverview` (public, redacted-by-construction composed
- *   state for diagnostics/H4/I5/I7) and `telemetryState` (internal full
+ *   state for diagnostics, processing inspection, backups and release) and
+ * `telemetryState` (internal full
  *   read used by the HTTP health surface and proofs).
  *
- * R27 (issue #235): `markForwarded` records the forward attempt's closed
+ * `markForwarded` records the forward attempt's closed
  * status class on the event rows AND the `telemetry.sink` tick ledger row;
  * the composed state's `forwarding` block exposes the leg's durable state.
  */
@@ -57,7 +58,7 @@ import {
 
 // --- explicit handler return types -------------------------------------------------
 // (They break the module -> generated api -> module type cycle, the same reason
-// every A3 probe handler is annotated `Promise<ResultEnvelope>`.)
+// every probe handler is annotated `Promise<ResultEnvelope>`.)
 
 export interface IncidentEmitSummary {
   readonly kind: string;
@@ -111,7 +112,7 @@ export interface RecentDiagnosticEvent {
   readonly serviceName?: string;
   readonly redactionVersion: string;
   readonly forwardedAtMs: number;
-  /** R27: the closed status class of the last forward attempt, if any. */
+  /** The closed status class of the last forward attempt, if any. */
   readonly forwardStatus?: ForwardStatus;
   readonly atMs: number;
 }
@@ -131,9 +132,9 @@ export interface ComposedTelemetryState {
   readonly diagnostics: { readonly recent: readonly RecentDiagnosticEvent[] };
   readonly health: ReturnType<typeof backendSilenceState>;
   /**
-   * R27 (issue #235): the durable forward-leg state derived from the
+   * The durable forward-leg state derived from the
    * `telemetry.sink` tick ledger - the WHY behind a silent sink (wrong
-   * token, wrong dataset, unreachable, not configured) that the pre-R27
+   * token, wrong dataset, unreachable, not configured) that the earlier
    * surfaces could only guess at.
    */
   readonly forwarding: SinkForwardHealth;
@@ -339,7 +340,7 @@ export const recordCostEntry = internalMutation({
 // --- monitors -------------------------------------------------------------------
 
 /**
- * Monitor scan 1 (processing/save incidents): reads the A3 surfaces and
+ * Monitor scan 1 (processing/save incidents): reads the surfaces and
  * emits one deduplicated redacted diagnostic per standing incident
  * (attempts-exhausted durable jobs, failed outbox rows, stuck runs).
  */
@@ -548,14 +549,14 @@ export const unforwardedRecent = internalQuery({
 });
 
 /**
- * Records one forward attempt's outcome (R27, issue #235): the closed
+ * Records one forward attempt's outcome: the closed
  * status class on every attempted event row, and the `telemetry.sink` tick
  * row the health surface derives the leg's state from. The historical name
  * is kept deliberately - `tests/r13/environment-call-sites.test.ts` pins
  * the mutation reference the cron drives; the args grew, not the identity.
  *
  * - `status: "ok"`: rows get `forwardedAtMs` + `forwardStatus: "ok"` (the
- *   I2 marking behavior) and the tick row is a fresh heartbeat.
+ *   marking behavior) and the tick row is a fresh heartbeat.
  * - a refusal/unreachable class: rows carry the class with `forwardedAtMs`
  *   still 0 (retry stays possible) and the tick row is degraded.
  * - `status` absent: the window was empty - only the liveness tick row is
@@ -694,7 +695,7 @@ export const clearCostsByLabel = internalMutation({
 // --- reads -------------------------------------------------------------------------
 
 /**
- * The forward leg's durable state read (R27, issue #235): the composed
+ * The forward leg's durable state read: the composed
  * state's `forwarding` block, derived from the `telemetry.sink` tick
  * ledger's bounded tail (newest first - the index order the pure
  * derivation in `./forward.ts` assumes). Exported so the i2 tests drive
@@ -748,7 +749,7 @@ async function composedState(ctx: QueryCtx): Promise<ComposedTelemetryState> {
     .withIndex("by_period_level", (q) => q.eq("period", period))
     .collect();
   const silence = backendSilenceState(await latestHeartbeats(ctx), nowMs);
-  // R27: the forward leg's durable state, from the tick ledger's bounded tail.
+  // The forward leg's durable state, from the tick ledger's bounded tail.
   const forwarding = await readForwardingState(ctx.db);
   return {
     atMs: nowMs,

@@ -1,34 +1,34 @@
 /**
- * The G3 guarded proof-fixture HTTP surface (dev deployment only): G1's
+ * The guarded proof-fixture HTTP surface (dev deployment only): the
  * clearly-labeled fake Google, extended with the Calendar EVENTS API and
  * a user-action simulator.
  *
  * Everything the evidence script (tests/g3/live-proof.mjs) needs beyond
- * the production routes lives HERE, in G3's owned module, beside its
- * proof vocabulary — G1's fixture files are not edited. The same guard as
- * G1's fake (`KIERO_G1_PROOF_ENABLED === "1"`): these are HTTP actions
+ * the production routes lives HERE, in the owned module, beside its
+ * proof vocabulary — the fixture files are not edited. The same guard as
+ * the fake (`KIERO_G1_PROOF_ENABLED === "1"`): these are HTTP actions
  * that check the deployment variable; on any other deployment every entry
  * fails closed 404. Fixture values are constants, never secrets.
  *
  * The fake RECORDS ITS EFFECTS in `externalEffects` before answering (the
- * A3 echo pattern), so the no-duplicate-effect proofs count rows per
+ * platform echo pattern), so the no-duplicate-effect proofs count rows per
  * dedup key: a create that stalls past the caller deadline EXISTS while
  * the caller can only record `unknown` — exactly the load-bearing
  * uncertainty case. Event state lives in the `calendarProofEvents` table
- * (G3's proof-only store).
+ * (the proof-only store).
  *
- * Behavior selectors ride the ACCESS TOKEN (G1's pattern:
+ * Behavior selectors ride the ACCESS TOKEN (the pattern:
  * `proof-code-<run>-<account>!e-…`): `e-create_timeout`,
  * `e-update_timeout`, `e-delete_timeout`, `e-observe_timeout`,
  * `e-calendar_gone`. The boss acting IN Google (edit/delete/move) is
  * simulated by the guarded admin route.
  *
- * Routes (wired by the sanctioned append in convex/http.ts):
+ * Routes (wired by the append in convex/http.ts):
  * - `POST   /calendar/oauth/proof/fake-google/api/calendars/kiero-proof-calendar/events`
  * - `GET    /calendar/oauth/proof/fake-google/api/calendars/kiero-proof-calendar/events`
  * - `GET|PATCH|DELETE …/kiero-proof-calendar/events/{eventId}` (pathPrefix)
  * - `POST   /calendar/oauth/proof/fake-google/admin/event`
- * - `POST   /calendar/oauth/proof/sync-state` (G3's guarded evidence read)
+ * - `POST /calendar/oauth/proof/sync-state` (the guarded evidence read)
  */
 
 import { v } from "convex/values";
@@ -419,10 +419,10 @@ export const proofFakeAdminEvent = httpAction(async (ctx, request) => {
 });
 
 // ---------------------------------------------------------------------------
-// The guarded G3 evidence read (sanitized; no secrets).
+// The guarded reconciliation evidence read (sanitized; no secrets).
 // ---------------------------------------------------------------------------
 
-/** POST /calendar/oauth/proof/sync-state — G3's sanitized state read. */
+/** POST /calendar/oauth/proof/sync-state — the sanitized state read. */
 export const proofSyncStateHandler = httpAction(async (ctx, request) => {
   const g3Guard = process.env.KIERO_G3_PROOF_ENABLED === "1";
   if (!g3Guard || !proofEnabled(process.env)) {

@@ -1,7 +1,7 @@
 /**
- * @kiero/backup-worker: the EU backup Container executor entry (I5).
+ * @kiero/backup-worker: the EU backup Container executor entry.
  *
- * THIN on purpose (the media-worker D6 pattern): the protocol lives once in
+ * THIN on purpose (the media-worker pattern): the protocol lives once in
  * ./backup-service.ts (`handleBackupProtocol`) and the pipeline in
  * ./pipeline.ts. Three surfaces, one boundary:
  *

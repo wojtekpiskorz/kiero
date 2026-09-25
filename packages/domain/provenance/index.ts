@@ -1,5 +1,5 @@
 /**
- * @kiero/domain provenance surface (C5): the PURE withdrawal-recomputation
+ * @kiero/domain provenance surface: the PURE withdrawal-recomputation
  * rules — the updating-until-revalidated state and its decisions, direct
  * dependent resolution and bounded recomputation grouping. No I/O, no
  * Convex; the durable executor in convex/memory/recompute runs these
@@ -8,9 +8,9 @@
  * marking idempotence, and cycle safety is pinned with the graph invariant
  * in findings/provenance.)
  *
- * Named for later lanes: E6 (agent answers) treats `updating` findings as
- * excluded from authoritative answers; H3 (withdrawal UI) shows them as
- * visibly awaiting reassessment; E5 (search) and I4 (purge) consume
+ * Consumers: agent answers treat `updating` findings as
+ * excluded from authoritative answers; the withdrawal UI shows them as
+ * visibly awaiting reassessment; search and purge consume
  * isUpdatingKnowledgeState the same way.
  */
 

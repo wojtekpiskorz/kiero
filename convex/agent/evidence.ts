@@ -1,5 +1,5 @@
 /**
- * The tenant-scoped evidence search (E6, pre-E5): exact text retrieval over
+ * The tenant-scoped evidence search: exact text retrieval over
  * the company's recent source texts.
  *
  * The question source's company row is the ONLY scope anchor — no client
@@ -12,7 +12,7 @@
  * Similarity never establishes truth: this returns CANDIDATE citations
  * (source + offsets + verbatim quote + an existing fragment when one
  * matches the anchor), and the tool-result encoding the model reads says
- * so explicitly. Semantic/vector retrieval is E5's lane; when it lands,
+ * so explicitly. Semantic/vector retrieval is the lane; when it lands,
  * this query becomes the hydrated structured-source fallback.
  */
 

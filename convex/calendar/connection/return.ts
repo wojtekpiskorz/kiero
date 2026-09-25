@@ -1,6 +1,6 @@
 /**
  * The configured application return origin for the Calendar OAuth
- * callback pages (R10 definition, R12 shared home).
+ * callback pages (one shared definition).
  *
  * A PURE module (no Convex imports), the same shared-home ruling as
  * ./answers.ts: BOTH callback surfaces — the direct Convex page
@@ -57,7 +57,7 @@ export function calendarAppReturnHref(env: CalendarAppReturnEnv): string | null 
     return null;
   }
   // The deployment's environment self-description through the ONE shared
-  // closed-label rule (packages/runtime, R13): the same read the telemetry
+  // closed-label rule (packages/runtime): the same read the telemetry
   // cron and the backups boundary use, where an unknown or absent label
   // honestly means dev. Only dev may return over plain http (a local PWA);
   // every labeled environment requires https for a link the browser will

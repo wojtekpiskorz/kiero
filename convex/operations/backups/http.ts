@@ -1,11 +1,11 @@
 /**
- * The backups HTTP boundary (I5): the EU backup Container's verified entry
+ * The backups HTTP boundary: the EU backup Container's verified entry
  * into Convex. The bearer rule is the ONE shared digest-compare helper
  * (`../telemetry/serviceToken.ts`, the platform-bridge precedent): the
  * worker presents the deployment's `KIERO_SERVICE_TOKEN` and every route
  * below runs the REAL internal functions - no second decision path.
  *
- * Health/cost events around the protocol (I2 seam):
+ * Health/cost events around the protocol:
  * - every begin attempt records a `backup.job` heartbeat (ok when work is
  *   possible, degraded on refusal/failure) so silence detection (3x15m)
  *   fires well before the one-hour freshness limit;
@@ -167,7 +167,7 @@ export const backupsSweepCompleteHandler = httpAction(async (ctx, request) => {
   );
 });
 
-/** GET /operations/backups/state: the composed backups state (I6/J5 seam). */
+/** GET /operations/backups/state: the composed backups state. */
 export const backupsStateHandler = httpAction(async (ctx, request) => {
   if (!(await verifyServiceToken(request.headers.get("authorization")))) {
     return unauthorized();

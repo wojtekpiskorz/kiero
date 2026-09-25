@@ -1,6 +1,6 @@
 /**
- * The typed vision-extraction contract (E4): what the model reads off ONE
- * retained image representation through E2's vision adapter.
+ * The typed vision-extraction contract: what the model reads off ONE
+ * retained image representation through the vision adapter.
  *
  * The output is STRUCTURED, never prose: each observation carries the read
  * text and the image region it was read from, in PIXEL coordinates of the

@@ -1,15 +1,15 @@
 /**
- * The barebones work-list feature (C4): the work half of "Co teraz" —
+ * The barebones work-list feature: the work half of "Co teraz" —
  * tasks with their checklists, derived dueness and effective coordination,
  * and events with derived timing — with explicit state commands through
  * the checked dispatch entry (convex/work/functions.ts).
  *
  * JSX-free on purpose (createElement only), exactly like the project
  * catalog feature: the host feature registry chain stays importable by
- * node test programs, and this module is the surface the A4 host entry
+ * node test programs, and this module is the surface the host entry
  * for `/co-teraz` will mount once the attention (reminders) half joins
  * (the entry flip is the host lane's edit, not this lane's). The sign-in
- * leg is B1's shared gate composed with this surface as the
+ * leg is the shared gate composed with this surface as the
  * authenticated continuation. No styling, semantic controls only (the
  * UX/UI track owns presentation).
  */
@@ -108,7 +108,7 @@ function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): Rea
   });
 }
 
-/** Authentication gate: B1's shared sign-in surface; members continue here. */
+/** Authentication gate: the shared sign-in surface; members continue here. */
 function WorkGate(): ReactNode {
   return createElement(AuthenticatedGate, { continuation: () => createElement(WorkSurface) });
 }
@@ -125,7 +125,7 @@ function WorkSurface(): ReactNode {
   const { signOut } = useAuthActions();
   const [signingOut, setSigningOut] = useState(false);
 
-  // The B1/B3/C1 pattern: this query errors exactly when THIS session
+  // The pattern: this query errors exactly when THIS session
   // stopped resolving or the actor has no active company. The honest
   // fallback is the session-ended state with a way back to sign-in.
   if (overview.status === "error") {
@@ -545,7 +545,7 @@ function EventStateForm({
  * unassigned by construction — the task is born Do zrobienia in the shared
  * queue ("zadanie pozostaje we wspólnej kolejce"); responsibility and a
  * deadline binding are later explicit commands. The project list comes
- * from C1's catalog read (all projects, closed included: a closed project
+ * from the catalog read (all projects, closed included: a closed project
  * may keep administrative obligations).
  */
 function CreateTaskForm({

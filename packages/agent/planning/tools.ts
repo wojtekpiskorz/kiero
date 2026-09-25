@@ -1,9 +1,9 @@
 /**
- * The agent's tool surface for text analysis (E3): typed memory changes,
- * project identification and clarification questions (issue #37).
+ * The agent's tool surface for text analysis: typed memory changes,
+ * project identification and clarification questions.
  *
  * These Effect Schemas are the DECODE authority for tool arguments coming
- * back through E2's chat adapter: the adapter decodes accumulated argument
+ * back through the chat adapter: the adapter decodes accumulated argument
  * JSON against the schema the caller declares (packages/providers/src/chat.ts
  * `ChatToolSpec.input`), so by the time a call reaches the planning reducer
  * its arguments are DECODED typed values, never executed strings. Malformed
@@ -162,7 +162,7 @@ export const AskClarificationArgs = Schema.Struct({
 });
 export type AskClarificationArgs = Schema.Schema.Type<typeof AskClarificationArgs>;
 
-/** One declared tool for E2's `ChatToolSpec` (name + description + codec). */
+/** One declared tool for `ChatToolSpec` (name + description + codec). */
 export interface PlanningToolSpec {
   readonly name:
     | typeof UPSERT_FINDING_TOOL

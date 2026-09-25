@@ -1,6 +1,6 @@
 /**
- * Source-withdrawal marking (C2): the memory-side reaction to
- * "Źródło wycofane" (issue 8), with full recomputation left to C5.
+ * Source-withdrawal marking: the memory-side reaction to
+ * "Źródło wycofane" , with full recomputation in ../recompute.
  *
  * When a source is withdrawn it "przestaje stanowić podstawę aktualnych
  * ustaleń": findings whose CURRENT revision is a publication supported only
@@ -15,23 +15,23 @@
  * - an already-marked revision is not marked twice.
  *
  * Derivation-only findings (no witness links) are located through their
- * dependency edges by C5's recomputation; this marking covers the
+ * dependency edges by the recomputation; this marking covers the
  * witness-backed current state, which is what withdrawal removes.
  *
- * TWO entries over ONE core (review round 2): `markWithdrawnSupport` is
+ * TWO entries over ONE core: `markWithdrawnSupport` is
  * the parameterized core (tenant + recording user as arguments, source id
  * already normalized): the marking walk lives here once, and the commit
  * loop (revision + projection patch + event) is the ONE shared
- * marking-commit core (./marking.ts, extracted in E7 review round 1) this
+ * marking-commit core (./marking.ts) this
  * lane and the reassignment lane both call. `performWithdrawalMarking`
  * stays the RequestContext-backed entry (the guarded probe and any
- * session-holding caller); C5's durable `memory.recompute_dependents`
+ * session-holding caller); the durable `memory.recompute_dependents`
  * executor calls the core directly, because a deferred job cannot depend
  * on a live session existing; its actor is the withdrawal's actor
  * (fallback: the source's author), recorded honestly with the
  * system-driven origin and reason.
  *
- * Each marking revision carries `withdrawnSourceId` (C5 amendment, flagged
+ * Each marking revision carries `withdrawnSourceId` (
  * below in ./schema.ts): the exact withdrawal a marking belongs to, so
  * recomputation adopts only its own roots — identical reason TEXT is not
  * attribution (two withdrawals may share wording).
@@ -64,7 +64,7 @@ export interface WithdrawalMarkingArgs {
  * inside the caller's transaction: every marking (revision + projection
  * patch) and its `memory.findingRevised` event commit together with
  * everything else, or not at all. Everything that can refuse runs before
- * the first write. Returns the typed marking outcome (review round 1: the
+ * the first write. Returns the typed marking outcome (the
  * ok payload is typed, no envelope re-assertions at the callers).
  */
 export async function markWithdrawnSupport(
@@ -139,7 +139,7 @@ export async function markWithdrawnSupport(
 
 /**
  * The RequestContext-backed entry over the same core: resolves the tenant,
- * the recording user and the source reference, then marks. C5's durable
+ * the recording user and the source reference, then marks. The durable
  * executor calls {@link markWithdrawnSupport} directly (identity
  * independence); session-holding callers use this one.
  */

@@ -8,26 +8,17 @@
 export const DOMAIN_NOT_IMPLEMENTED: "bootstrap-placeholder" =
   "bootstrap-placeholder";
 
-// C2 coordinated addition (flagged): the findings domain owns its rules in
-// packages/domain/findings/**; the package surface re-exports them here the
-// same way convex/schema.ts gains an import spread per fragment. Later
-// domains (projects, work, calendar) repeat this one-line pattern.
+// Each domain owns its rules in its own directory; the package surface
+// re-exports them here, the same way convex/schema.ts gains an import
+// spread per fragment.
 export * from "../findings/index";
 
-// C4 coordinated addition (flagged, the same one-line pattern): the work
-// domain owns its rules in packages/domain/work/**.
 export * from "../work/index";
 
-// C3 coordinated addition (flagged): the extensions domain (versioned typed
-// extensions and catalog reuse) follows the same one-line pattern.
 export * from "../extensions/index";
 
-// C5 coordinated addition (flagged, the same one-line pattern): the
-// withdrawal-recomputation domain owns its rules in
-// packages/domain/provenance/** (dependency traversal, updating-until-
-// revalidated state, bounded recomputation grouping).
+// Withdrawal recomputation: dependency traversal, updating-until-
+// revalidated state, bounded recomputation grouping.
 export * from "../provenance/index";
 
-// G2 coordinated addition (flagged, the same one-line pattern): the
-// calendar projection domain owns its rules in packages/domain/calendar/**.
 export * from "../calendar/index";

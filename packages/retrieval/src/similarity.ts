@@ -1,11 +1,11 @@
 /**
- * Cosine similarity and the hybrid result assembly (E5).
+ * Cosine similarity and the hybrid result assembly.
  *
  * The initial candidate's 4096 dimensions exceed what a Convex vector index
  * can hold (2048), so the semantic half is an in-action cosine over the
  * SAME company-and-generation-scoped rows the text half already reads. That
  * is a deliberate barebones decision, not the final search design (explicit
- * scope exclusion in issue #39): tenant filtering happens in our code before
+ * scope exclusion ): tenant filtering happens in our code before
  * any vector is touched, so a vector can never cross company scope.
  */
 

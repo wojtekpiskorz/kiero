@@ -7,7 +7,7 @@
  * before it is written. Delivery is a separate, retryable step; see the
  * architecture's source processing/publication protocol, steps 7–9.
  *
- * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
+ * Certified by platform on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";

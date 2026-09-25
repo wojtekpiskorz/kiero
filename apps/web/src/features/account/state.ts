@@ -1,13 +1,13 @@
 /**
  * Account feature state: the ceremony walkthrough, Polish copy and the
- * failure classification (B2).
+ * failure classification.
  *
  * Every pending label and failure text renders from `accountCopy` keyed by
  * a named state — no ad-hoc strings in components. Our rejections are
  * `ConvexError`s whose DATA carries a closed-vocabulary code
  * (convex/access/errorCodes.ts) that survives production message
- * sanitization — classification reads the decoded data first (R31,
- * mirroring R26's sign-in classifier). The `[kiero:…]` message markers
+ * sanitization — classification reads the decoded data first
+ * (mirroring the sign-in classifier). The `[kiero:…]` message markers
  * remain only as a FALLBACK for responses without data (older deploys,
  * local network errors). The typed union comes from the leaf (one list,
  * client and server); the client cannot import the leaf's RUNTIME module
@@ -37,7 +37,7 @@ export type AccountState =
 
 /**
  * Machine markers OUR server-side errors keep in their message for logs.
- * Classification no longer keys on them (R31: the closed code rides the
+ * Classification no longer keys on them (the closed code rides the
  * ConvexError data); they stay matched only as the no-data fallback. The
  * server literals are pinned equal to these by tests/b2.
  */

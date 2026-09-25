@@ -1,5 +1,5 @@
 /**
- * The conversation feature (H1, joined by J2): the boss-facing surface of
+ * The conversation feature: the boss-facing surface of
  * the one shared conversation history — "Rozmowa firmy" (company) and
  * "Rozmowa projektowa" (project projection of the SAME entries,
  * CONTEXT.md).
@@ -10,7 +10,7 @@
  *
  * One history, one source, one author everywhere:
  *
- * - company view: `sources.read.views.companyConversation` (D1, paginated);
+ * - company view: `sources.read.views.companyConversation` (paginated);
  * - project view: `sources.read.views.projectConversation` — the ordered
  *   projection through source-project links; rows decode through the SAME
  *   `SourceConversationRow`, so source id, author, send snapshot, lifecycle
@@ -18,30 +18,30 @@
  *   exists anywhere: the project filter only narrows which originals show;
  * - one source detail: `sources.read.views.sourceDetail` — the canonical
  *   source route is the dossier `/zrodlo` with its encoded `zrodlo` param
- *   (R5's shared serializer, ../source-detail/source-route); the legacy
+ *   (the shared serializer, ../source-detail/source-route); the legacy
  *   conversation-route deep link carrying the same param redirects there,
  *   because the inline detail renders only inside the feed's loaded rows
  *   and the feed's growth is capped;
- * - unread badges: `attention.read_state.queries.readStateForSources` (F1)
+ * - unread badges: `attention.read_state.queries.readStateForSources`
  *   over the page's canonical source ids — absence of a row means unread;
  *   opening the ORIGINAL (the detail view) marks it read everywhere for
  *   this person through `attention.markSourceRead` (one command per
  *   view-open; the server keeps the marking idempotent);
- * - honest processing states (D1's derived vocabulary, incl. `partial` and
+ * - honest processing states (the derived vocabulary, incl. `partial` and
  *   `failed` — a failed analysis never loses the source);
  * - correction-as-new-source ("Korekta ustalenia", CONTEXT.md): the Korekta
  *   button prefills the composer with a NEW message that references the
  *   old one; the earlier message is never rewritten.
  *
- * The J2 join (issue #61) folds ALL capture modes into this surface: the
- * embedded capture composer (text + one recording + photos, D4's
- * recoverable-draft engine with voice-only sends allowed) replaces J1's
+ * The join folds ALL capture modes into this surface: the
+ * embedded capture composer (text + one recording + photos, the
+ * recoverable-draft engine with voice-only sends allowed) replaces the
  * text-only statement form, and the separate /wpis route retires. The
- * composer's project pill keeps D4's semantics (the DRAFT's stored scope,
+ * composer's project pill keeps the semantics (the DRAFT's stored scope,
  * seeded from this route's ?projekt= param); multi-project messages route
  * through the agent's project identification, not the pill.
  *
- * The agent-answer flow (E6 joined): "Zapytaj agenta" on one message runs
+ * The agent-answer flow: "Zapytaj agenta" on one message runs
  * the real answer loop (`agent/loop:askAgent`, the question source's id)
  * and renders the structured result inline — the answer with per-statement
  * evidence bases, the raised Sprawa do wyjaśnienia, the executed task/event
@@ -107,10 +107,10 @@ type AnswerState =
   | null;
 
 /**
- * R5 (issue #130): the truthful refusal for a legacy source deep link
+ * The truthful refusal for a legacy source deep link
  * whose value cannot denote a source. Local to this file because the
  * shared conversation copy module is outside this issue's owned paths (the
- * R1 label precedent in MemoryFeature); a copy consolidation can move it
+ * same label as MemoryFeature); a copy consolidation can move it
  * unchanged.
  */
 const legacyDeepLinkMalformed =
@@ -141,7 +141,7 @@ function ConversationMain({
 
   // Deep links: ?projekt=<id> selects the project projection. The legacy
   // ?zrodlo=<id> no longer opens the inline detail (it renders only inside
-  // the capped feed): R5 redirects it to the canonical dossier, whose read
+  // the capped feed): the route redirects it to the canonical dossier, whose read
   // is independent of this feed's pagination.
   const [scopeProjectId, setScopeProjectId] = useState<string | null>(() => searchParam(PROJECT_PARAM));
   const [openSourceId, setOpenSourceId] = useState<string | null>(null);
@@ -166,12 +166,12 @@ function ConversationMain({
   }, []);
 
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
-  // The correction prefill for the composer (H1's flow, now writing into
+  // The correction prefill for the composer (the flow, now writing into
   // the draft record through the composer's own seam): one outstanding
   // prefill at a time, dropped once applied.
   const [correctionPrefillText, setCorrectionPrefillText] = useState<string | null>(null);
   const [correcting, setCorrecting] = useState<SourceConversationRowType | null>(null);
-  // The agent-answer flow (J2): one open answer at a time — asking, done
+  // The agent-answer flow: one open answer at a time — asking, done
   // (decoded run) or refused (honest Polish failure).
   const [answer, setAnswer] = useState<AnswerState>(null);
   const askAgent = useAction(api.agent.loop.askAgent);
@@ -193,7 +193,7 @@ function ConversationMain({
   // Two typed subscriptions, one active: the company history or the
   // project projection of the same entries ("skip" unsubscribes the idle
   // one). Both queries return the same wire shape, so the active one
-  // decodes ONCE through D1's own page schema at the untrusted boundary —
+  // decodes ONCE through its own page schema at the untrusted boundary —
   // a drift in the view's shape fails here instead of rendering undefined.
   const scopeBrand = knownProject === null ? null : parseTableId("projects", knownProject);
   const companyConversation = useQueryState({
@@ -225,13 +225,13 @@ function ConversationMain({
   const rows: readonly SourceConversationRowType[] = page?.page ?? [];
   const isDone = page?.isDone ?? true;
 
-  // The unread projection (F1) over this page's canonical source ids:
+  // The unread projection over this page's canonical source ids:
   // absence of a row means unread; one row per person + logical source, so
   // the same query answers every view of that person identically.
   const readState = useQueryState({
     query: api.attention.read_state.queries.readStateForSources,
     args: {
-      // The row ids ARE sources-table ids (decoded from D1's own row
+      // The row ids ARE sources-table ids (decoded from its own row
       // schema); asConvexId converts between the two brandings of one value.
       sourceIds: rows.map((row) => asConvexId("sources", row.sourceId)).slice(0, 256),
     },
@@ -258,7 +258,7 @@ function ConversationMain({
     setCorrectionPrefillText(null);
   }
 
-  /** Runs the real answer loop for one question source (J2's join). */
+  /** Runs the real answer loop for one question source. */
   async function runAnswer(sourceId: string): Promise<void> {
     if (answer !== null && answer.sourceId === sourceId && answer.status === "asking") {
       return;
@@ -323,7 +323,7 @@ function ConversationMain({
           createElement("button", { type: "button", onClick: cancelCorrection }, copy.cancel),
         ),
     // The joined composer: ALL capture modes (text, recording, photos) over
-    // D4's recoverable-draft engine; the correction prefill and the
+    // the recoverable-draft engine; the correction prefill and the
     // accepted callback are this surface's seams into it.
     createElement(ComposerForm, {
       userId: selfMember?.userId ?? "unknown-user",
@@ -552,13 +552,13 @@ function SourceRow({
 }
 
 // ---------------------------------------------------------------------------
-// The agent answer panel: E6's structured result, glossary-exact labels
+// The agent answer panel: the structured result, glossary-exact labels
 // ---------------------------------------------------------------------------
 
 /**
- * The agent-answer panel: E6's structured result, glossary-exact labels.
+ * The agent-answer panel: the structured result, glossary-exact labels.
  * Exported for the deterministic surface tests (renderToString) — it owns
- * no subscriptions, like the memory surface's exported R1 basis view.
+ * no subscriptions, like the memory surface's exported basis view.
  */
 export function AgentAnswerPanel({ answer }: { readonly answer: AnswerState }): ReactNode {
   if (answer === null) {
@@ -616,7 +616,7 @@ export function AgentAnswerPanel({ answer }: { readonly answer: AnswerState }): 
                         createElement(
                           "p",
                           { key: `${handle}-${evidence.sourceId}` },
-                          // R5: the quote itself is the anchor into the
+                          // The quote itself is the anchor into the
                           // canonical dossier route — the answer's basis
                           // stays one click from the original (the wire
                           // pins no fragment, so the whole source serves).
@@ -693,14 +693,14 @@ function SourceDetailPanel({
   const detail = useQueryState({
     query: api.sources.read.views.sourceDetail,
     args: {
-      // The id comes from a decoded D1 row of the same table; asConvexId
+      // The id comes from a decoded source row of the same table; asConvexId
       // converts between the two brandings of one value.
       sourceId: asConvexId("sources", sourceId),
     },
   });
   const markRead = useMutation(api.attention.read_state.commands.markSourceReadCommand);
 
-  // One marking per view-open of the original (F1): seeing the original
+  // One marking per view-open of the original: seeing the original
   // changes this person's state in every view and device. The ref guards
   // re-renders; the server-side transition stays idempotent regardless.
   const markedFor = useRef<string | null>(null);
@@ -725,7 +725,7 @@ function SourceDetailPanel({
       });
   }, [sourceId, markRead]);
 
-  // R5: the canonical link this inline panel can offer is the dossier
+  // The canonical link this inline panel can offer is the dossier
   // route, serialized by the one shared authority.
   const canonicalUrl =
     typeof window === "undefined"

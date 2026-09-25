@@ -1,22 +1,22 @@
 /**
- * The barebones Calendar feature: G1's connection lifecycle plus G4's
+ * The barebones Calendar feature: the connection lifecycle plus the
  * settings and sync diagnostics, the Polish entry point for the optional
  * personal Google calendar ("Kalendarz Kiero w Google").
  *
  * JSX-free on purpose (createElement only): the host feature registry
  * chain is imported by the node test programs, which compile without a
- * JSX flag (the A4/B3 pattern). The screen renders the server's honest
+ * JSX flag. The screen renders the server's honest
  * typed status (convex/calendar/connection/functions.ts `calendarStatus`)
  * and exposes exactly the lifecycle operations that status offers:
  * connect, reconnect, switch account, explicit recreate (Odtwórz) after a
  * confirmed deletion, and disconnect. Nothing here touches Kiero identity:
  * disconnect is a stop of the connection, never of the sign-in.
  *
- * G4 appends ./CalendarSettings.ts under the connection panel: the sync
- * diagnostics and personal copy management over G2/G3's reads and the
+ * ./CalendarSettings.ts renders under the connection panel: the sync
+ * diagnostics and personal copy management over the projection and reconciliation reads and the
  * certified `calendar.setCopyHidden` / `calendar.reconcileCopy` commands.
  * The shared dispatch envelope and the session-ended fallback come from
- * H1's company gate module (the lane-by-lane migration it invites).
+ * the company gate module (the lane-by-lane migration it invites).
  *
  * The authorization start runs server-side (the `startAuthorization`
  * mutation over the same checked decision core as the gateway's route);
@@ -86,7 +86,7 @@ function CalendarSurface(): ReactNode {
   if (status.status === "error") {
     // The session stopped resolving (revocation, upstream sign-out,
     // inactivity): the shared session-ended fallback with the way back
-    // to sign-in (H1's company gate module).
+    // to sign-in (the company gate module).
     return createElement(SessionEnded);
   }
   if (status.status !== "success") {
@@ -95,9 +95,9 @@ function CalendarSurface(): ReactNode {
   return createElement(
     ConnectionPanel,
     { status: status.data },
-    // The G4 settings ride along whenever the actor's connection row
+    // The settings ride along whenever the actor's connection row
     // exists (its own reads decide what to render inside); copy commands
-    // are served only while G1 reports a healthy connected row.
+    // are served only while the connection reports a healthy connected row.
     createElement(CalendarSettings, { actionsEnabled: status.data.state === "connected" }),
   );
 }
@@ -107,7 +107,7 @@ export function ConnectionPanel({
   children,
 }: {
   readonly status: CalendarConnectionStatus;
-  /** The settings continuation (G4), rendered under the lifecycle panel. */
+  /** The settings continuation, rendered under the lifecycle panel. */
   readonly children?: ReactNode;
 }): ReactNode {
   const start = useMutation(api.calendar.connection.functions.startAuthorization);
@@ -187,7 +187,7 @@ export function ConnectionPanel({
       body.push(
         createElement("p", { role: "status" }, calendarCopy.stateConnected(status.googleAccountEmail)),
       );
-      // The dedicated calendar fact (G4): Kiero never writes into the
+      // The dedicated calendar fact: Kiero never writes into the
       // boss's main Google calendar.
       body.push(createElement("p", null, calendarCopy.dedicatedCalendar));
       if (status.connectedAtMs !== null) {

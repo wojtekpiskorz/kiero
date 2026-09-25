@@ -1,5 +1,5 @@
 /**
- * Task-reminder command dispatch wiring (F4): the SAME checked path every
+ * Task-reminder command dispatch wiring: the SAME checked path every
  * lane uses, with this lane's handler registry.
  *
  * `dispatchRemindersCommand` is @kiero/runtime's `dispatchCommand` over

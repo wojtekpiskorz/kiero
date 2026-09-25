@@ -1,5 +1,5 @@
 /**
- * Web Push wire protocol (F3): RFC 8291 "aes128gcm" payload encryption and
+ * Web Push wire protocol: RFC 8291 "aes128gcm" payload encryption and
  * RFC 8292 VAPID server identification, implemented over WebCrypto so the
  * SAME code runs in a Convex action (the transport's home), in Node
  * (tests; Node >= 22 exposes the same WebCrypto globals) and in the
@@ -16,7 +16,7 @@
  * primitives (createECDH + hkdfSync + createDecipheriv), never with this
  * module's code.
  *
- * Uncertainty semantics (the echo/G3 discipline): a POST that produces a
+ * Uncertainty semantics (the echo/Calendar reconciliation discipline): a POST that produces a
  * clean status is definite; a deadline hit is `unknown` with the distinct
  * `timeout` cause (the platform's blind-retry block reads that word); any
  * other non-answer (5xx, dropped connection, unreadable body) is
@@ -24,7 +24,7 @@
  * answer that disables the subscription.
  */
 
-/** Bounded HTTP deadline for one push leg (echo/G3: 2-4s class). */
+/** Bounded HTTP deadline for one push leg (echo/Calendar: 2-4s class). */
 export const PUSH_HTTP_TIMEOUT_MS = 4_000;
 
 /** Push services are not required to accept more than 4096 octets total. */
@@ -345,7 +345,7 @@ export async function vapidAuthorization(
 }
 
 // ---------------------------------------------------------------------------
-// The one bounded POST leg (the echo/G3 fetch discipline).
+// The one bounded POST leg (the echo/Calendar fetch discipline).
 // ---------------------------------------------------------------------------
 
 /** What one push leg definitively reported. */
@@ -370,7 +370,7 @@ export type PushLegReport =
 /** Why a bounded fetch did not produce a clean answer (internal only). */
 type FetchFailure = "unknown_timeout" | "unknown_network";
 
-/** One bounded fetch; never throws (the G3 boundedFetch shape). */
+/** One bounded fetch; never throws (the boundedFetch shape). */
 async function boundedFetch(
   url: string,
   init: RequestInit,

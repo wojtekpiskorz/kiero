@@ -1,7 +1,7 @@
 /**
- * The B2 Convex function surface (generated-call APIs).
+ * The linking Convex function surface (generated-call APIs).
  *
- * B1's doctrine, unchanged: TWO entry ways, ONE core. The typed command
+ * the doctrine, unchanged: TWO entry ways, ONE core. The typed command
  * seam (`access.linkVerifiedMethod` through dispatchAccess) is the
  * read-only confirmation; the identity-layer functions here are the
  * write surface (they run the same cores — ./ceremony.ts,
@@ -12,15 +12,15 @@
  * resolved ONCE per invocation and the snapshot is reused for the
  * company scope and the recent-authentication clock.
  *
- * Code delivery follows B1's honest pattern: the code is staged (hashed)
+ * Code delivery follows the honest pattern: the code is staged (hashed)
  * in an internal mutation, then emailed from the action; on delivery
  * failure the action fails loudly with the machine marker kept in the
- * message and the closed code carried in `ConvexError` data (R26), and a
+ * message and the closed code carried in `ConvexError` data, and a
  * retry stages a FRESH code (the pending hash is replaced, never
  * duplicated). The plain code never crosses to the client.
  *
  * There is deliberately NO recovery entry here: the checked recovery
- * command's invoker stays unavailable until B4 supplies GM authority
+ * command's invoker stays unavailable until GM access supplies the authority
  * (see ./operations.ts); only the guarded dev proof (./probe.ts) runs it.
  */
 
@@ -62,7 +62,7 @@ function denialError(reason: LiveSessionDenial): never {
 }
 
 /**
- * The typed rejection thrown to clients (R26): a `ConvexError` whose DATA
+ * The typed rejection thrown to clients: a `ConvexError` whose DATA
  * carries the closed-vocabulary code plus the marker/copy message for
  * logs — Convex preserves `error.data` through production sanitization,
  * so clients classify on the code, never the prose.
@@ -86,7 +86,7 @@ async function requireLiveSession(
 /**
  * The canonical company scope for revocation events, from the SAME
  * resolved live-session snapshot (live session -> user -> earliest active
- * membership -> company, the A3 chain B1's revokeSession uses); null when
+ * membership -> company, the chain revokeSession uses); null when
  * no membership exists.
  */
 async function companyIdForEvent(
@@ -177,8 +177,8 @@ export const sendProofCode = action({
     });
     const copy = deliveryFailureCopy(outcome);
     if (copy !== null) {
-      // Fail loudly and sanitized; retry stages a fresh code (B1 pattern).
-      // The structured data code survives production sanitization (R26).
+      // Fail loudly and sanitized; retry stages a fresh code.
+      // The structured data code survives production sanitization.
       throw new ConvexError<AccessRefusalData>(
         accessRefusalData("email_delivery_failed", `${EMAIL_DELIVERY_FAILED_MARKER} ${copy}`),
       );
@@ -274,7 +274,7 @@ export const confirmEmailChange = mutation({
   },
 });
 
-/** Authenticated: revoke every OTHER device session through B1's core. */
+/** Authenticated: revoke every OTHER device session through core. */
 export const revokeOtherSessions = mutation({
   args: {},
   handler: async (ctx) => {

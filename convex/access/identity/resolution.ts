@@ -1,7 +1,7 @@
 /**
- * Live-session resolution: the B1 identity source for the A3 seam.
+ * Live-session resolution: the identity source for the seam.
  *
- * This is the swap-in point the platform evidence names ("B1 swaps the
+ * This is the swap-in point the platform evidence names ("identity swaps the
  * identity source into the same canonical resolution seam"): Convex Auth
  * issues a JWT whose `sub` is `<userId>|<authSessions id>`. The platform's
  * generic `identityFromConvexAuth` (convex/platform/context.ts) cannot map
@@ -10,7 +10,7 @@
  *
  *   verified JWT -> strict subject parse -> live authSessions row
  *     -> app session registry row -> VerifiedIdentity(subject = registry
- *     row id) -> A3's resolveRequestContext (user -> earliest active
+ *     row id) -> resolveRequestContext (user -> earliest active
  *     membership -> company -> GM -> ActorContext).
  *
  * Every protected read rejects a session whose authSessions row is gone
@@ -31,12 +31,12 @@ import { resolveRequestContext } from "../../platform/context";
 
 /**
  * The accepted inactivity rule: a session expires after 30 days without
- * authenticated activity (issue #4 grilling; Convex Auth refresh tokens
+ * authenticated activity (product decision; Convex Auth refresh tokens
  * enforce the same window for token refresh — this is the read-side rule).
  */
 export const SESSION_INACTIVITY_LIMIT_MS = 30 * 24 * 60 * 60 * 1000;
 
-/** The auth surface any Convex ctx satisfies (structural, like A3's). */
+/** The auth surface any Convex ctx satisfies (structural). */
 export type AuthReader = {
   getUserIdentity(): Promise<{ readonly subject: string } | null>;
 };
@@ -355,8 +355,8 @@ export async function resolveAccessContextFromConvexAuth(
 
 /**
  * The dispatch resolution (write path): provision-or-refresh first, then
- * the same canonical A3 chain. This is the resolveContext B1 hands to
- * `dispatchCommand` and the surface B2/B3/GM reuse for their boundaries.
+ * the same canonical chain. This is the resolveContext identity hands to
+ * `dispatchCommand` and the surface linking, membership and GM reuse for their boundaries.
  */
 export async function resolveAccessContextWithProvisioning(
   tx: IdentityTx,

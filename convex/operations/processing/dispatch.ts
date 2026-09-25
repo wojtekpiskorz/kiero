@@ -1,13 +1,13 @@
 /**
- * GM processing command dispatch wiring (H4): the checked path for the
- * audited processing operations, composed OVER B4's dispatch machinery
+ * GM processing command dispatch wiring: the checked path for the
+ * audited processing operations, composed OVER the dispatch machinery
  * (envelope decode -> operation allowlist -> GM authority resolution ->
  * contract input decode -> handler) rather than a second copy of it.
  *
  * The allowlist is exactly this lane's three operations. The two-way
- * fail-closed routing stays structural: B4's GM registry
+ * fail-closed routing stays structural: the GM registry
  * (convex/access/gm) contains none of these names, this registry contains
- * none of B4's or any member operation, and the membership dispatches
+ * none of the or any member operation, and the membership dispatches
  * register neither; pinned as such by the focused verification against the
  * REAL registries (tests/h4/dispatch.test.ts).
  */
@@ -44,7 +44,7 @@ export const GM_PROCESSING_OPERATIONS: readonly string[] = [
  * Builds one handler from its contract entry. The dispatch has ALREADY
  * decoded the input against the same entry's schema; this decode is the
  * single typing seam that narrows the validated value to its contract type
- * (B4's gmHandlerOf pattern, one home per lane). Each handler builds this
+ * (gmHandlerOf pattern, one home per lane). Each handler builds this
  * lane's ProcessingTx from the mutation context and re-derives nothing:
  * the transactional core re-derives the authority at commit itself.
  */
@@ -76,7 +76,7 @@ export function gmProcessingHandlers(): Record<string, GmHandler> {
   };
 }
 
-/** The production deps (B4's authority resolution, this lane's registry). */
+/** The production deps (the authority resolution, this lane's registry). */
 export function gmProcessingDeps(): GmDispatchDeps {
   return {
     allowlist: GM_PROCESSING_OPERATIONS,

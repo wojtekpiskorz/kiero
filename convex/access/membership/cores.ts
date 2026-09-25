@@ -1,5 +1,5 @@
 /**
- * Membership domain cores (B3): the pure decision halves of company
+ * Membership domain cores: the pure decision halves of company
  * admission, invitations, roles and administration transfer.
  *
  * Every rule the issue names lives here as a total function over small row
@@ -18,10 +18,10 @@
 
 import type { CompanyId, MembershipId, MembershipRole, UserId } from "@kiero/contracts";
 
-/** An invitation expires after seven days (issue #22 bounded solution). */
+/** An invitation expires after seven days (accepted rule). */
 export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Single-use acceptance code: 8 digits, like the B1 sign-in code. */
+/** Single-use acceptance code: 8 digits, like the sign-in code. */
 export const INVITATION_CODE_LENGTH = 8;
 
 /** Bounded invitation email and company name inputs. */
@@ -40,7 +40,7 @@ export interface InvitationView {
 
 /** The verified-person view the admission decision consumes. */
 export interface InviteeView {
-  /** The actor's normalized account address (B1 user row). */
+  /** The actor's normalized account address (user row). */
   readonly email: string;
   /** A Google-method identity is attached to this person. */
   readonly hasGoogleSubject: boolean;
@@ -141,7 +141,7 @@ export interface MembershipViewWithTime extends MembershipView {
 /**
  * The v1 active-firm rule, identical to the canonical resolution
  * (convex/platform/context.ts): the EARLIEST active membership defines the
- * user's one active firm. B3 keeps this the authoritative rule while the
+ * user's one active firm. Membership keeps this the authoritative rule while the
  * schema admits future multiple memberships.
  */
 export function earliestActiveMembership(
@@ -165,7 +165,7 @@ export function activeAdministrators(
 }
 
 /**
- * The last-admin invariant ("Administrator firmy", issue #22): removing
+ * The last-admin invariant ("Administrator firmy"): removing
  * administration from `target` is allowed only when another CURRENT boss
  * already holds it. Blocking removal, self-revocation and demotion alike.
  */
@@ -228,7 +228,7 @@ export function normalizeInvitationCode(input: string): string {
 
 /**
  * Cryptographically secure invitation digits with rejection sampling
- * (identical shape to B1's OTP): bytes >= 250 are rejected so the modulo
+ * (identical shape to the OTP): bytes >= 250 are rejected so the modulo
  * mapping onto 0..9 stays uniform. Web Crypto only.
  */
 export function generateInvitationCode(): string {

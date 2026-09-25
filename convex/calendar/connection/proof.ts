@@ -1,18 +1,18 @@
 /**
- * Guarded G1 proof fixtures (dev deployment only).
+ * Guarded Calendar connection proof fixtures (dev deployment only).
  *
- * Same pattern as B1's probe (convex/access/identity/probe.ts): queries and
+ * Same pattern as the probe (convex/access/identity/probe.ts): queries and
  * mutations cannot read deployment variables, so every fixture entry is an
  * HTTP action guarded by `KIERO_G1_PROOF_ENABLED === "1"`; on any other
  * deployment the variable is absent and every fixture fails closed.
  *
  * Why these exist (honest scope): the owner has not supplied Google OAuth
- * client credentials (the same owner action B1 recorded), so no proof can
+ * client credentials (the same owner action sign-in recorded), so no proof can
  * walk the real accounts.google.com consent. The fixtures let the evidence
  * script exercise the REAL protocol halves — authorization URL
  * construction, single-use state consumption, PKCE exchange, scope
  * enforcement, calendar find-or-create with uncertain outcomes — against a
- * clearly-labeled fake Google served by the deployment itself (the A3 echo
+ * clearly-labeled fake Google served by the deployment itself (the echo
  * pattern: the stand-in records its effects in `externalEffects` BEFORE
  * answering, so no-duplicate proofs count rows). The live Google legs stay
  * explicitly BLOCKED-owner-action.

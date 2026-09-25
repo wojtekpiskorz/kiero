@@ -1,13 +1,13 @@
 /**
- * The media access resolution (D3): the tenant-scoped, per-request
+ * The media access resolution: the tenant-scoped, per-request
  * authorization record the gateway consults BEFORE any R2 read.
  *
- * This is the read-side counterpart of the D2 uploads channel, with the
+ * This is the read-side counterpart of the uploads channel, with the
  * same division of authority: Convex owns WHAT may be read and WHICH
  * representation serves the bytes; the Worker owns the byte stream. The
  * resolution walks the exact chain the issue names, in order:
  *
- *   caller (already resolved: live B1 session -> active membership ->
+ *   caller (already resolved: live session -> active membership ->
  *   company) -> attachment (or representation -> its attachment) ->
  *   accepted source (tenant scope + lifecycle) -> verified representation
  *   -> the recorded grant (object key, etag, byte length, media type).
@@ -29,24 +29,24 @@
  *
  * REPRESENTATION SELECTION (the retained-or-received rule): photo reads
  * target the verified `retained` normalized version; audio's `received`
- * representation IS the alpha streaming target (D1/D2 semantics — the
- * received representation is the streaming target until D5 replaces the
+ * representation IS the alpha streaming target (acceptance/upload semantics — the
+ * received representation is the streaming target until normalization replaces the
  * transform). The newest verified retained representation wins; without
  * one, the verified `received` record serves; without either, the uniform
  * not-found refusal. Historical evidence never silently moves to new
  * bytes: an EXACT representation id (the `representationId` input) serves
- * exactly that version when it is itself verified, which is what E4's
- * media anchors and I3/I5's export/backup readers address.
+ * exactly that version when it is itself verified, which is what the
+ * media anchors and the export/backup readers address.
  *
  * LEDGER CONSISTENCY: the grant's `etag`, `bytes` and `contentType`
  * describe the CHOSEN representation — its own records when they exist
- * (D5's verified rows carry bytes/mimeType), with the D2 attachment
+ * (the verified rows carry bytes/mimeType), with the attachment
  * receipt (receivedBytes/r2ObjectEtag, and the kind-derived media type)
  * as the received-role fallback. The gateway additionally verifies etag
  * and size against the live R2 object before serving a byte, failing
  * closed on mismatch, so a retained representation of a different length
  * than the received one serves ITS OWN length, never a stale receipt.
- * D5's `removedAtMs` (received bytes cleaned up after a verified retained
+ * `removedAtMs` (received bytes cleaned up after a verified retained
  * representation) removes a row from selection entirely: its object is
  * deliberately gone, and an exact-representation read of a removed row
  * refuses like any missing one.
@@ -78,7 +78,7 @@ export interface RepresentationRow {
   readonly verifiedAtMs?: number | undefined;
   readonly createdAtMs: number;
   /**
-   * D5's verified-row records (optional until its rows land): the
+   * the verified-row records (optional until its rows land): the
    * representation's OWN byte length, media type and received-byte cleanup
    * marker. `removedAtMs` present means the object is deliberately gone
    * from R2 (the received bytes a retained representation replaced).
@@ -108,7 +108,7 @@ export interface SourceRow {
 /**
  * The slim reader surface the resolution walks. The real Convex db adapts
  * to it below; tests/d3 drive the SAME resolution through an in-memory
- * implementation (the D2 harness pattern — no deployment needed for the
+ * implementation (the harness pattern — no deployment needed for the
  * decision matrix).
  */
 export interface MediaAccessDb {
@@ -149,8 +149,8 @@ function etagOf(representation: RepresentationRow, attachment: AttachmentRow): s
 
 /**
  * The CHOSEN representation's own ledger-recorded byte length, with the
- * received-role fallback: D5's verified rows carry `bytes` themselves;
- * the received representation's D2 record is the attachment receipt
+ * received-role fallback: the verified rows carry `bytes` themselves;
+ * the received representation's upload record is the attachment receipt
  * (`receivedBytes`, the manifest byte sum completed at acceptance). A
  * representation without either record fails closed (the gateway's
  * size/etag cross-check must never be fed a guess).
@@ -250,7 +250,7 @@ export async function resolveMediaAccess(
   if (
     chosen === null ||
     chosen.verifiedAtMs === undefined ||
-    // D5's received-byte cleanup: the object is deliberately gone.
+    // the received-byte cleanup: the object is deliberately gone.
     chosen.removedAtMs !== undefined
   ) {
     return errorResult(mediaReferenceNotFound());

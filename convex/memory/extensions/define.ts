@@ -1,9 +1,9 @@
 /**
- * defineExtension (C3): create a FIRM-scoped definition with its immutable
+ * defineExtension: create a FIRM-scoped definition with its immutable
  * version 1 — or idempotently reuse the equivalent one that already exists.
  *
  * Runs inside ONE Convex mutation through the checked dispatch. The reuse
- * decision runs BEFORE any insert (issue #26: "Reuse and similarity checks
+ * decision runs BEFORE any insert ("Reuse and similarity checks
  * precede creating near-duplicates"):
  *
  * - same normalized name + compatible structure (own firm definition or a

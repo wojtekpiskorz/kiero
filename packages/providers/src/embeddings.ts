@@ -1,5 +1,5 @@
 /**
- * The embeddings adapter (E2) over OpenRouter's `/api/v1/embeddings`.
+ * The embeddings adapter over OpenRouter's `/api/v1/embeddings`.
  *
  * The accepted candidate is `qwen/qwen3-embedding-8b` with native 4096
  * dimensions as the versioned initial proof baseline (architecture
@@ -11,10 +11,10 @@
  * finite floats and its OBSERVED dimension must equal the baseline — a
  * different dimension (or a non-float/base64 body we did not request) is
  * incompatible output and fails closed, because mixing vector generations in
- * one index would silently corrupt retrieval (E5 owns the index lifecycle).
+ * one index would silently corrupt retrieval (search indexing owns the index lifecycle).
  *
  * Query-side vs document-side text preparation differs for this model family;
- * the caller (E5) versions its preparation and passes the prepared string.
+ * the caller versions its preparation and passes the prepared string.
  */
 
 import { Schema } from "effect";
@@ -36,7 +36,7 @@ export type EmbeddingInputKind = Schema.Schema.Type<typeof EmbeddingInputKind>;
 
 /** The typed embedding request (no model/dimensions fields: versioned). */
 export interface EmbeddingRequest {
-  /** Prepared text; preparation versioning belongs to the caller (E5). */
+  /** Prepared text; preparation versioning belongs to the caller. */
   readonly text: string;
   readonly inputKind: EmbeddingInputKind;
 }
@@ -114,7 +114,7 @@ export function decodeEmbedding(
 
 /**
  * Runs ONE embedding attempt against one target (no fallback decisions).
- * The retained E8 owner decision keeps embeddings on OpenRouter
+ * The retained owner decision keeps embeddings on OpenRouter
  * exclusively: no supported direct DeepSeek embeddings endpoint exists, so
  * the attempt is an OpenRouter client call whatever qualifier the frozen
  * route carries (the embedding order only ever says `openrouter`).

@@ -1,5 +1,5 @@
 /**
- * R2 multipart media for the uploads lane (D2): the ONLY place the gateway
+ * R2 multipart media for the uploads lane: the ONLY place the gateway
  * touches the private EU media bucket.
  *
  * The Worker owns object keys and R2 part identities (architecture protocol
@@ -10,7 +10,7 @@
  * anywhere on this path (no `arrayBuffer()`/`bytes()` on upload bodies).
  *
  * Browser chunks are the client's slicing concern and media segments are
- * D6's processing units; what crosses THIS seam are R2 multipart parts.
+ * the processing units; what crosses THIS seam are R2 multipart parts.
  */
 
 import type { BridgeEnv } from "../platform/bridge";

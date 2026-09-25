@@ -1,9 +1,9 @@
 /**
- * The cross-feature route-params contract (H1 review round 1): the
+ * The cross-feature route-params contract: the
  * query-param keys of the conversation route, owned in ONE module instead
  * of one private definition per feature.
  *
- * Since R5 (issue #130) the canonical source deep link is the dossier
+ * The canonical source deep link is the dossier
  * route `/zrodlo?zrodlo=<id>` serialized by the source-detail feature's
  * own contract module (../source-detail/source-route) — the ONLY sanctioned
  * builder of source links. The legacy `/?zrodlo=<id>` form on this route

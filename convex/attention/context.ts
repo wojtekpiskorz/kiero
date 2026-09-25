@@ -1,28 +1,28 @@
 /**
- * Attention-lane dispatch context resolution (F1, review round 1).
+ * Attention-lane dispatch context resolution.
  *
  * The identity-to-context closure every attention dispatch needs, spelled
  * ONCE for this lane: without a service session id, Convex Auth is the
- * only identity source; with one, the A3 service-bridge identity (verified
+ * only identity source; with one, the service-bridge identity (verified
  * before this point) substitutes the bearer-verified identity. Both feed
  * the SAME canonical resolution (session -> user -> one active membership
  * -> company). There is no development-auth shortcut.
  *
- * Scope ruling (PR #94 review round 1): this helper is LANE-LOCAL: the
+ * Scope ruling: this helper is LANE-LOCAL: the
  * same closure currently sits verbatim in five dispatch files across
  * lanes, and promoting it to `convex/platform/context.ts` (and migrating
  * the other lanes' copies) is a recorded follow-up for the platform owner,
  * deliberately NOT done in this PR.
  *
- * J2 identity repair (the gap H2 recorded on its public reads): the user
+ * Identity resolution: the user
  * path no longer resolves through the platform-generic
  * `identityFromConvexAuth`, because a real Convex Auth token's subject is
  * `<userId>|<authSessions id>` (not a sessions-registry id), which made
  * every ordinary user token fail `unauthenticated` here. The user path
- * now maps the auth-session subject through B1's live-session chain
+ * now maps the auth-session subject through the live-session chain
  * (`resolveAccessContextFromConvexAuth` on reads,
  * `resolveAccessContextWithProvisioning` on dispatch: the same fold-in
- * J1 applied to C2's and D1's public entries), which is what makes the
+ * the first text loop applied to the public entries), which is what makes the
  * notification-click -> /co-teraz flows work end to end.
  */
 

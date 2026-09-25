@@ -1,5 +1,5 @@
 /**
- * The Calendar OAuth callback answer vocabulary (G1): the Polish page and
+ * The Calendar OAuth callback answer vocabulary: the Polish page and
  * HTTP status for every terminal outcome the callback surfaces.
  *
  * A PURE module (no Convex imports): the Convex HTTP boundary

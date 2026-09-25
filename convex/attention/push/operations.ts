@@ -1,8 +1,8 @@
 /**
- * Web Push delivery transactions (F3): device registration, the per-device
+ * Web Push delivery transactions: device registration, the per-device
  * delivery prepare/settle pair, and the revocation hygiene sweep.
  *
- * Every entry runs inside ONE Convex mutation transaction (the F2
+ * Every entry runs inside ONE Convex mutation transaction (the notification-intents
  * operations precedent) and re-reads live state at the moment it decides:
  *
  * - registration binds the subscription to the RESOLVED actor's user,
@@ -16,7 +16,7 @@
  *   solution demands); it also re-reads the preview material and the
  *   hide-preview preference at that same instant, so the payload can
  *   never carry content the recipient may no longer see.
- * - R3 (issue #128): the stored deliveryJson decodes through the runtime
+ * - The stored deliveryJson decodes through the runtime
  *   union in ./model.ts (malformed and unsupported summaries refuse
  *   before any delivery row exists), the three typed adapters re-read
  *   CURRENT lifecycle state (R2's shared clarification content rule
@@ -288,13 +288,13 @@ async function activeSubscriptionsOf(
 
 /**
  * Reads one summary's live preview material (re-read at delivery time).
- * The three typed adapters (R3):
+ * The three typed adapters:
  *
- * - task reminders (the narrow F4 adapter): re-read the CURRENT task rows
+ * - task reminders (the narrow reminders adapter): re-read the CURRENT task rows
  *   of the collapsed batch; completed, cancelled, deleted and cross-company
  *   tasks suppress (ids are routing hints, never access);
- * - source entries: only ACTIVE sources preview (F2's own delivery rule,
- *   rechecked here so the race between F2's sweep and the transport cannot
+ * - source entries: only ACTIVE sources preview (its own delivery rule,
+ *   rechecked here so the race between the sweep and the transport cannot
  *   notify about a withdrawn or purged entry);
  * - clarifications: R2's shared content rule (`clarificationContentRuleOf`)
  *   decides - a redacted open case left every actionable list, so it never
@@ -408,8 +408,8 @@ async function payloadInputsOf(
 }
 
 /**
- * Terminally suppresses every still-pending per-device row of one intent
- * (R3): the work is invalid (its content died), so no later sweep or
+ * Terminally suppresses every still-pending per-device row of one intent::
+ * the work is invalid (its content died), so no later sweep or
  * replayed event may transport the stored payload. The stored payload is
  * replaced with non-content data; delivered/failed/unknown rows keep
  * their settled truth.
@@ -448,7 +448,7 @@ export async function suppressPendingDeliveriesOfIntent(
  * Prepares one delivered intent's per-device legs. Idempotent by
  * (intent, subscription): devices with an existing row are skipped, so
  * concurrent jobs/sweeps collapse onto one row set. The payload is
- * composed from live reads on EVERY prepare (R3): a retried pending row
+ * composed from live reads on EVERY prepare: a retried pending row
  * carries the re-composed payload, never the stored snapshot, so routing
  * identities and preview material are current immediately before each
  * transport attempt. When the re-read finds no live content left (the
@@ -464,18 +464,18 @@ export async function performPreparePushDelivery(
     return { kind: "denied", reason: "intent_not_found" };
   }
   if (intent.state !== "delivered" || intent.deliveryJson === undefined) {
-    // Only F2's delivered intents reach the transport: suppressed and
+    // Only the delivered intents reach the transport: suppressed and
     // failed intents notify nobody, pending ones are not this lane's.
     return { kind: "denied", reason: `intent_${intent.state}` };
   }
   const decoded = decodeDeliverySummary(intent.deliveryJson);
   if (decoded.kind === "invalid") {
     // Malformed or unsupported summaries refuse BEFORE any delivery row
-    // exists (R3: the runtime decode replaces the cast after JSON.parse).
+    // exists (the runtime decode replaces the cast after JSON.parse).
     return { kind: "denied", reason: "summary_invalid" };
   }
   if (decoded.kind === "confirmation") {
-    // Defensive: the kind exists in the union but F2 never creates it.
+    // Defensive: the kind exists in the union but notification intents never create it.
     return { kind: "denied", reason: "confirmation_never_pushed" };
   }
   const summary = decoded.summary;
@@ -502,7 +502,7 @@ export async function performPreparePushDelivery(
   if (payload === null) {
     // The content died between delivery and transport: terminally
     // suppress whatever was already prepared, so the stored preview can
-    // never leave on a retry (the prepare-delete-retry race, R3-P1).
+    // never leave on a retry (the prepare-delete-retry race).
     await suppressPendingDeliveriesOfIntent(
       tx,
       intent._id,
@@ -598,7 +598,7 @@ export async function performCompletePushLegs(
       updatedAtMs: nowMs,
       ...(settled.state === "pending" ? {} : { finishedAtMs: nowMs }),
     });
-    // The shared external-attempt ledger (F2's notificationAttempts; this
+    // The shared external-attempt ledger (notificationAttempts; this
     // lane's export read per the fragment's schema comment).
     await tx.db.insert("notificationAttempts", {
       intentId: row.intentId,
@@ -635,7 +635,7 @@ const HYGIENE_LIMIT = 200;
  * prepare re-check); this pass persists the honest disabled state so a
  * settings screen never shows a dead device as enabled.
  *
- * The sweep drains (the F2 by_due precedent): it queries the
+ * The sweep drains (the by_due precedent): it queries the
  * NOT-yet-revoked range through `by_revoked`, and patching revokedAtMs
  * moves a row OUT of that range, so each bounded pass inspects the next
  * window instead of re-reading the same oldest rows forever.

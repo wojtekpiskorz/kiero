@@ -1,13 +1,13 @@
 /**
- * Stage 6 of the `processing.join_multimodal` workflow (E4): one bounded
- * joined publication group through C1 + C2.
+ * Stage 6 of the `processing.join_multimodal` workflow: one bounded
+ * joined publication group through project identification and findings publication.
  *
  * The completeness gate runs against a FRESH coverage read (a mid-run
  * re-normalization refuses the group — coordinates never move beneath a
  * published finding), then the mid-run staleness guard, per-evidence
  * fragment ensuring (text ranges, audio intervals, image regions — the
  * evidence carries the anchor coordinates in the fragment-anchor shape,
- * flat for image regions), then C2 prepare + publish with the analysis
+ * flat for image regions), then findings prepare + publish with the analysis
  * revisions as caller expectations.
  */
 
@@ -92,7 +92,7 @@ export async function publishJoinGroupTransaction(
     return okResult({ outcome: output });
   };
 
-  // The deterministic group-isolation proof hook (E3's pattern).
+  // The deterministic group-isolation proof hook.
   if (await joinOutcomeMarkerArmed(ctx.db, params.runId, sequence)) {
     return finish("failed", { outcome: "failed", error: "probe_injected_group_failure" });
   }
@@ -114,7 +114,7 @@ export async function publishJoinGroupTransaction(
     return finish("succeeded", { outcome: "pending_segments", key: group.key, fresh: true });
   }
 
-  // --- resolve the group's scope (C1 identification for `new:N`) -------
+  // --- resolve the group's scope (project identification for `new:N`) -------
   let scopeProjectId: Id<"projects"> | null = null;
   if (group.key.kind === "project") {
     const handle = group.key.projectId ?? "";
@@ -162,7 +162,7 @@ export async function publishJoinGroupTransaction(
     }
   }
 
-  // --- the mid-run staleness guard (E3's rule, joined) ------------------
+  // --- the mid-run staleness guard (the rule, joined) ------------------
   const currentRevisions: Record<string, number> = {};
   for (const expectation of group.analysisRevisions) {
     const findingId = ctx.db.normalizeId("findings", expectation.findingId);
@@ -253,7 +253,7 @@ export async function publishJoinGroupTransaction(
     });
   }
 
-  // --- C2 prepare + publish through the checked dispatch ---------------
+  // --- findings prepare + publish through the checked dispatch ---------------
   const session = await authorSessionId(ctx.db, source.authorUserId);
   if (session === null) {
     return finish("failed", { outcome: "failed", error: "actor_session_unavailable" });

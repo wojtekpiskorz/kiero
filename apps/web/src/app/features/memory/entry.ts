@@ -1,16 +1,16 @@
 /**
- * Memory feature entry (A4 host wiring point, H1's sanctioned addition).
+ * Memory feature entry.
  *
  * "Pamięć" is the boss-facing memory route: current findings with their
  * honest knowledge states, per-finding revision history and provenance
- * (links back to the canonical source deep link), E3's sourced
- * clarifications with the answering flow, and C2's audited direct
+ * (links back to the canonical source deep link), the sourced
+ * clarifications with the answering flow, and the audited direct
  * correction command. The project scope is selectable (?projekt=<id>, the
  * same deep-link key the conversation route uses).
  *
- * Consumed operations are the commands the surface issues: C2's separate
- * audited correction command and the clarification resolution. Reads (C2
- * current findings, the H1-flagged history/clarifications reads) ride the
+ * Consumed operations are the commands the surface issues: the separate
+ * audited correction command and the clarification resolution. Reads (the
+ * current findings, the history/clarifications reads) ride the
  * lane-owned public queries.
  */
 

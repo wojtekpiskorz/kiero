@@ -1,5 +1,5 @@
 /**
- * Index generation lifecycle transactions (E5): start and verified cutover.
+ * Index generation lifecycle transactions: start and verified cutover.
  *
  * `search.startIndexGeneration` refuses anything but the pinned initial
  * candidate (model, dimensions, preparation; @kiero/retrieval candidate

@@ -1,10 +1,10 @@
 /**
- * The external-delivery proof executor (A3): `platform.echo_delivery`.
+ * The external-delivery proof executor: `platform.echo_delivery`.
  *
  * This executor demonstrates the architecture's external-call protocol
  * (source-processing/publication protocol, steps 7-9, at platform level)
  * with an HTTP echo stand-in instead of a live provider (OpenRouter belongs
- * to E2):
+ * to provider routing):
  *
  * 1. the transactional half (execute) hands the effect to the delivery
  *    ACTION; external calls never run inside the transaction that commits

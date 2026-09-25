@@ -1,14 +1,13 @@
 /**
- * Recovery manifest table (A2 candidate, certified by A3; completed by I5).
+ * Recovery manifest table.
  *
- * Owning implementers: I5 (scheduled complete backups), I6 (quarantine
- * restore drill). A backup is complete only after the database snapshot and
+ * A backup is complete only after the database snapshot and
  * every referenced retained media object are verified against the manifest.
  * Restore happens in quarantine; current deletions/revocations are replayed
  * before access is permitted.
  *
- * I5 completion (the owning lane finishes the fragment; every added column
- * is OPTIONAL so the certified A2/A3 baseline and its fixtures stay valid):
+ * Additions to the certified fragment (every added column is OPTIONAL so
+ * the certified baseline and its fixtures stay valid):
  *
  * - `slotMs` / `leaseExpiresAtMs` / `attempts`: the run slot, the
  *   single-run lease guarding it against overlapping writers, and the
@@ -22,9 +21,9 @@
  *   the retention sweep uses (objects are pooled and shared across sets).
  * - `ledgerCount` / `purgedDroppedJson`: the content-free deletion/revocation
  *   ledger snapshot size carried in the set, and the media keys dropped at
- *   build time because their sources have purge records (I4 seam).
+ *   build time because their sources have purge records.
  * - byte/usage columns and `manifestHash` for cost measurement (P12) and
- *   I6's immutable-manifest contract. `databaseManifestHash` is the sha256
+ *   the immutable-manifest contract. `databaseManifestHash` is the sha256
  *   of the export zip and is "" while the set is still building (the
  *   baseline column is required; empty means not yet known).
  *
@@ -50,7 +49,7 @@ export const backupsTables = {
     verifiedAtMs: v.optional(shared.tsMs),
     expiresAtMs: v.optional(shared.tsMs),
     failureReason: v.optional(v.string()),
-    // I5 completion (all optional; see the module doc).
+    // Additions to the certified fragment (all optional; see the module doc).
     slotMs: v.optional(shared.tsMs),
     leaseExpiresAtMs: v.optional(shared.tsMs),
     attempts: v.optional(shared.counter),

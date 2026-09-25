@@ -1,5 +1,5 @@
 /**
- * The Calendar OAuth callback status page (G1, shared renderer).
+ * The Calendar OAuth callback status page (shared renderer).
  *
  * A PURE module (no Convex imports), the same shared-home ruling as
  * ./answers.ts and ./return.ts: BOTH callback surfaces — the direct

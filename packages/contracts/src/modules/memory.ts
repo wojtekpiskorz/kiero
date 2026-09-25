@@ -1,18 +1,18 @@
 /**
  * Memory/findings module surface (architecture "Deep modules": Memory).
- * Implements lanes: C2 (findings/revisions/provenance), C3 (extensions),
- * C5 (withdrawal/recomputation), E3/E4 (change plans), E6 (answers).
+ * Covers findings/revisions/provenance, extensions,
+ * withdrawal/recomputation, change plans and answers.
  *
  * Typed states, immutable revisions, support/derivation/supersession,
  * stale-plan checks, extension definitions, independent corroboration,
  * current versus historical retrieval. Revisions are immutable: a correction
  * or a knowledge-state change writes a new revision with its own actor and
  * recorded time; reprocessing an older source cannot overwrite a newer
- * explicit correction (issue 8).
+ * explicit correction.
  *
- * C3 completed the extension operations this surface declared as candidates
- * (define, version, catalog search, validate-value) and added the definition
- * version reference to the extension finding value (all additive, flagged).
+ * The extension operations (define, version, catalog search,
+ * validate-value) and the definition version reference on the extension
+ * finding value live here too.
  */
 
 import { Schema } from "effect";
@@ -33,7 +33,7 @@ import { operationEntry, eventEntry } from "./registration";
 /**
  * The value of one finding: exactly one payload shape plus its knowledge state.
  *
- * C3 amendment (additive, flagged on the B3/C2 precedent): the extension
+ * The extension
  * branch carries the `extensionVersions` row the value validates against.
  * The version reference is atomic with the payload, so every historic
  * revision stays interpretable under its original definition version after
@@ -72,11 +72,11 @@ export const PlannedEvidence = Schema.Struct({
 export type PlannedEvidence = Schema.Schema.Type<typeof PlannedEvidence>;
 
 /**
- * One planned revision in a change set (C2 amendment: the certified A2 entry
+ * One planned revision in a change set (the original entry
  * carried only findingId/semanticKey/value/knowledgeState, which cannot
  * express scope for new findings, evidence witnesses or a derivation basis —
- * the provenance and acyclicity criteria of issue #25 are inexpressible
- * without them). Additive, flagged coordinated edit on the B3 precedent.
+ * the provenance and acyclicity criteria are inexpressible
+ * without them).
  */
 export const PlannedRevision = Schema.Struct({
   findingId: Schema.NullOr(tableIdSchema("findings")),
@@ -93,8 +93,8 @@ export const PlannedRevision = Schema.Struct({
 export type PlannedRevision = Schema.Schema.Type<typeof PlannedRevision>;
 
 /**
- * The recorded basis of one clarification resolution (R1 amendment,
- * additive, flagged on the B3 precedent): a source-backed resolution cites
+ * The recorded basis of one clarification resolution:
+ * a source-backed resolution cites
  * the NEW evidence that grounds it; a manual resolution is the boss's own
  * decision stated in the note. `legacy_unknown` is the READ-side default
  * for pre-repair rows whose basis was never stored — an unknown historical
@@ -110,7 +110,7 @@ export type ClarificationResolutionBasis = Schema.Schema.Type<
 >;
 
 /**
- * One normalized evidence reference of a clarification resolution (R1): the
+ * One normalized evidence reference of a clarification resolution: the
  * source plus the optional fragment — whole-source evidence when
  * `fragmentId` is null, per the fragment contract.
  */
@@ -166,8 +166,8 @@ export const memoryOperations = {
     errorKinds: ["forbidden", "validation", "conflict"],
   }),
   /**
-   * H1 amendment (issue #49, additive, flagged on the B3 precedent): the
-   * boss-facing revision-history read. C2 proved the immutable
+   * The
+   * boss-facing revision-history read. the platform proved the immutable
    * findings/findingRevisions/evidenceLinks rows, but no public read exposed
    * them; the conversation/memory surface must let a boss "inspect
    * old/current revisions and provenance" without replaying the
@@ -194,7 +194,7 @@ export const memoryOperations = {
             "publication",
             "correction",
             "withdrawal_marking",
-            // E7 amendment (additive, flagged): a project reassignment's
+            // A project reassignment's
             // scope re-assessment marking.
             "reassignment_marking",
           ]),
@@ -222,11 +222,11 @@ export const memoryOperations = {
     errorKinds: ["forbidden", "not_found"],
   }),
   /**
-   * H1 amendment (issue #49, additive, flagged on the B3 precedent): the
-   * boss-facing clarifications read. C2/E3 proved raising and resolving
+   * The
+   * boss-facing clarifications read. the platform proved raising and resolving
    * ("Sprawa do wyjaśnienia"), and `memory.resolveClarification` is a
    * declared command, but no public read listed the open questions; the
-   * surface must display E3's sourced clarification and let a boss answer
+   * surface must display the sourced clarification and let a boss answer
    * it. Read-only; each conflicting-evidence pointer dereferences to its
    * canonical source so provenance stays inspectable.
    */
@@ -244,18 +244,18 @@ export const memoryOperations = {
         resolutionNote: Schema.NullOr(Schema.String),
         resolvedAtMs: Schema.NullOr(Schema.Number),
         /**
-         * R1 amendment (additive, flagged): the recorded basis of the
+         * The recorded basis of the
          * resolution — null while open; `legacy_unknown` for pre-repair
          * resolved rows whose basis was never stored.
          */
         resolutionBasis: Schema.NullOr(ClarificationResolutionBasis),
         /**
-         * R1 amendment (additive, flagged): the persisted evidence
+         * The persisted evidence
          * references of a source-backed resolution (empty for open rows,
          * manual resolutions and pre-repair rows).
          */
         resolutionEvidence: Schema.Array(ResolutionEvidenceReference),
-        /** The sourced contradiction the question is about (E3's evidence). */
+        /** The sourced contradiction the question is about. */
         conflictingEvidence: Schema.Array(
           Schema.Struct({
             fragmentId: tableIdSchema("sourceFragments"),
@@ -297,7 +297,7 @@ export const memoryOperations = {
       clarificationId: tableIdSchema("clarifications"),
       resolutionNote: Schema.NonEmptyString,
       /**
-       * R1 amendment (additive, flagged on the B3 precedent): the normalized
+       * The normalized
        * NEW evidence grounding the resolution (company-owned active source,
        * matching fragment, validated by the transaction). Absent or empty =
        * a manual boss decision (note only) — the pre-repair note-only
@@ -310,7 +310,7 @@ export const memoryOperations = {
     errorKinds: ["forbidden", "not_found", "validation", "conflict"],
   }),
   /**
-   * C3 completion (the owning lane finishes the A2 candidate). Creates a
+   * Creates a
    * FIRM-scoped definition with its immutable version 1, or idempotently
    * reuses the existing definition when an equivalent one (same normalized
    * name, compatible structure) already exists in the firm catalog or the
@@ -335,7 +335,7 @@ export const memoryOperations = {
     errorKinds: ["forbidden", "validation", "conflict"],
   }),
   /**
-   * C3 completion (the owning lane finishes the A2 candidate). Appends the
+   * Appends the
    * NEXT immutable version of a definition: additions and label changes are
    * compatible; removals, kind/unit/itemKind changes and enum-option removals
    * refuse `conflict` — those need a new definition or an explicit migration.
@@ -357,7 +357,7 @@ export const memoryOperations = {
     errorKinds: ["forbidden", "not_found", "validation", "conflict"],
   }),
   /**
-   * C3: catalog lookup with similarity candidates. Called BEFORE creating a
+   * Catalog lookup with similarity candidates. Called BEFORE creating a
    * definition; each candidate carries a typed verdict — `reuse_candidate`
    * (near name AND compatible structure), `name_conflict` (near name,
    * incompatible meaning/type: create a distinct definition, never a silent
@@ -395,7 +395,7 @@ export const memoryOperations = {
     errorKinds: ["forbidden"],
   }),
   /**
-   * C3: the validate-value operation for E6 tools and the publish seam. One
+   * The validate-value operation for agent tools and the publish seam. One
    * extension value against ONE stored definition version: shape derivation,
    * kind/unit/option membership, bounded sizes, required-versus-optional
    * fields. The transaction layer adds the tenant checks for entity refs.
@@ -450,7 +450,7 @@ export const memoryEvents = {
       rootFindingId: tableIdSchema("findings"),
       dependentFindingIds: Schema.Array(tableIdSchema("findings")),
       /**
-       * C5 amendment (additive, flagged on the B3 precedent): the actor the
+       * The actor the
        * recomputation cascade records its markings for (the withdrawal's
        * actor). Nullable so external publishers without an actor still
        * decode; the executor then resolves identity itself.

@@ -1,5 +1,5 @@
 /**
- * The derived-search durable executor (E5): `search.index_generation`.
+ * The derived-search durable executor: `search.index_generation`.
  *
  * Modes (the one closed input the registry owns):
  * - `build`: the full generation pass `search.startIndexGeneration` registers.
@@ -7,7 +7,7 @@
  *   the external ACTION (the echo external-outcome protocol): the embedding
  *   pass is a provider call and never runs inside the committing
  *   transaction. The action collects the work, embeds what it can through
- *   E2's adapter, and records the batch through the write authority
+ *   the adapter, and records the batch through the write authority
  *   (./records.ts), which re-validates dimensions and tenant linkage and
  *   FAILS THE INDEX WRITE on wrong-dimension or malformed vectors.
  * - `refresh_source` (withdrawal/purge drain): drops the source's derived
@@ -16,7 +16,7 @@
  *   CURRENT revision through the same external pass; a finding with no
  *   current projection keeps only the delete.
  *
- * Embedding outage discipline (issue #39): a provider failure classified as
+ * Embedding outage discipline: a provider failure classified as
  * an outage (deadline, connection, rate limit, unavailability, or no key at
  * all) does NOT fail the build; the affected rows commit text-only and the
  * query-side coverage literal discloses the semantic gap. Only incompatible

@@ -1,5 +1,5 @@
 /**
- * The linking-ceremony core (B2): begin, staged proof codes, leg
+ * The linking-ceremony core: begin, staged proof codes, leg
  * verification, the two auth-callback resolutions and cancellation.
  *
  * The product rules live in ./policy.ts (pure); these db-halves run over
@@ -219,7 +219,7 @@ export async function recordGoogleProofCore(
 }
 
 /**
- * The auth-callback hook for B1's `method_conflict` rejection (a Google
+ * The auth-callback hook for `method_conflict` rejection (a Google
  * sign-in whose address collides with an email-code account): replaces the
  * rejection with the explicit link commit when — and only when — an active
  * ceremony proves both methods. Returns the committed user id, or the

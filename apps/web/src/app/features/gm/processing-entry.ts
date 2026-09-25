@@ -1,15 +1,15 @@
 /**
- * GM processing feature entry (H4): the audited processing inspector and
+ * GM processing feature entry: the audited processing inspector and
  * the GM retry controls; inspection of one processing run (canonical
  * stages, attempts with the approved model route, versions, derived
- * changes, I2 redacted diagnostics, derived blockers), failed-stage retry
+ * changes, redacted diagnostics, derived blockers), failed-stage retry
  * that preserves run identity, and deliberate reanalysis as a linked new
  * run; through the checked dispatch entries in
- * convex/operations/processing/functions.ts under B4's explicit GM mode.
+ * convex/operations/processing/functions.ts under the explicit GM mode.
  *
- * Like B4's GM tab, this surface is visible to every signed-in person and
+ * Like the GM tab, this surface is visible to every signed-in person and
  * fails closed honestly for anyone without an open GM grant; it consumes
- * B4's gmOverview read for the mode state and issues no source-read
+ * gmOverview read for the mode state and issues no source-read
  * marking and no usage mutation.
  */
 

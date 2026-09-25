@@ -1,24 +1,24 @@
 /**
- * The B3 Convex function surface (generated-call APIs).
+ * The membership Convex function surface (generated-call APIs).
  *
  * One core set, three callable entries (no drift by construction):
  *
  * - `dispatchMembership` (public mutation): the typed command dispatch for
  *   company-scoped membership operations (revokeInvitation,
  *   changeMembershipRole, revokeMembership, transferAdministration), with
- *   B1 identity resolution and the B3 policy.
+ *   identity resolution and the policy.
  * - `admitCommand` (public mutation): the checked admission dispatch for a
  *   verified person without an active firm (createCompany,
  *   acceptInvitation, rejectInvitation) — the same envelope, contract
  *   decodes and closed errors as the dispatch, entered one seam earlier
- *   because the runtime dispatch requires a company scope (B1's own
+ *   because the runtime dispatch requires a company scope (its own
  *   membership-less pattern).
  * - `createInvitationCommand` (public action): the issuance leg whose
  *   email delivery must run outside the transaction; the code crosses the
  *   internal boundary exactly once and never appears in results.
  *
  * `membershipOverview` (public query) is the barebones UI read: it resolves
- * the actor through the SAME canonical read-only chain B1's protected reads
+ * the actor through the SAME canonical read-only chain the protected reads
  * use, and everything it returns is derived from the RESOLVED company
  * scope — no company or user id is ever accepted from client input.
  */

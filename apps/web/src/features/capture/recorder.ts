@@ -1,5 +1,5 @@
 /**
- * The voice recording engine (D4): tap-to-start / tap-to-stop recording
+ * The voice recording engine: tap-to-start / tap-to-stop recording
  * whose EVERY chunk is persisted as MediaRecorder emits it.
  *
  * The media boundary (getUserMedia, MediaRecorder, the clock) is an

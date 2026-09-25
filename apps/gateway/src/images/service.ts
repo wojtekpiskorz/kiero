@@ -1,5 +1,5 @@
 /**
- * The images executor service (D5): drives ONE durable normalization job
+ * The images executor service: drives ONE durable normalization job
  * from its current retention state to a terminal state, idempotently and
  * resumably.
  *
@@ -161,7 +161,7 @@ async function writeAndProve(
 type NormalizationResult =
   | {
       readonly kind: "exception";
-      // The record step's own outcome shape, verbatim (R24: no parallel
+      // The record step's own outcome shape, verbatim (no parallel
       // copies to hand-sync; the optional originalSpace/failureStatus live
       // exactly where the ledger transaction reads them).
       readonly outcome: RecordOutcome & { readonly _tag: "exception" };
@@ -245,7 +245,7 @@ async function normalizeAttachment(
     thumbnailOutput = await encode(normalizer, "thumbnail", input.bytes);
   } catch (cause) {
     // The executor failed to decode or encode: a typed conversion failure
-    // keeps the received original as the inspectable exception. R24: the
+    // keeps the received original as the inspectable exception. The
     // typed refusal's status field (never its prose) and the original's
     // pixel space ride along on the durable record.
     const status = cause instanceof NormalizerFailure ? cause.status : undefined;

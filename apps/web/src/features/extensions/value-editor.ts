@@ -1,5 +1,5 @@
 /**
- * The extension value editor (H2): the pure input-to-wire builders and the
+ * The extension value editor: the pure input-to-wire builders and the
  * matching barebones controls for one definition version's value.
  *
  * The builders are I/O-free and decode their OWN output through the

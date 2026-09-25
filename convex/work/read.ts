@@ -1,5 +1,5 @@
 /**
- * The work read (C4): tasks with their checklists, events, and the DERIVED
+ * The work read: tasks with their checklists, events, and the DERIVED
  * facts consumers need — effective coordination and dueness.
  *
  * Nothing derived here is ever stored. "Zadanie po terminie" is computed

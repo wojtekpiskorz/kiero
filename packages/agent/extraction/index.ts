@@ -1,8 +1,8 @@
 /**
- * @kiero/agent/extraction: the pure multimodal-join surface (E4).
+ * @kiero/agent/extraction: the pure multimodal-join surface.
  *
  * Small public interface, Convex-free and model-free by construction,
- * composed over E3's planning surface (../planning) rather than forked
+ * composed over the planning surface (../planning) rather than forked
  * from it:
  *
  * - the joined coverage snapshot (`joinCoverage`, `decideJoinedCompleteness`):
@@ -18,14 +18,14 @@
  *   intervals, image evidence anchors regions of the EXACT retained
  *   representation;
  * - the joined tool schemas and reducer (`JOIN_TOOLS`,
- *   `applyMultimodalCall`): decoded-not-executed accumulation with E3's
+ *   `applyMultimodalCall`): decoded-not-executed accumulation with the
  *   validation discipline carried over every modality;
  * - completeness-based bounding (`boundMultimodalGroups`) and the
  *   inspection-honesty invariant (`mediaClaimsBackedByCompleteInputs`);
  * - the versioned Polish joined-dialogue builder.
  *
  * The Convex-coupled halves (the join workflow, vision orders, provider
- * calls, C2 publication) live in convex/processing/multimodal.
+ * calls, findings publication) live in convex/processing/multimodal.
  */
 
 export * from "./versions";

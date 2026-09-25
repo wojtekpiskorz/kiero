@@ -1,5 +1,5 @@
 /**
- * @kiero/domain work surface (C4): the PURE semantic rules for the work
+ * @kiero/domain work surface: the PURE semantic rules for the work
  * half of the "Projects and work" deep module — task states (Czeka with a
  * saved reason), the one-level checklist whose completion is independent
  * of the parent task, event states (a passed date proves nothing), the

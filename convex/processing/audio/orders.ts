@@ -1,8 +1,8 @@
 /**
- * The STT order transaction (D6): one resumable transcript order over one
+ * The STT order transaction: one resumable transcript order over one
  * accepted audio attachment, registered through the checked durable path.
  *
- * What this transaction proves structurally (same pattern as D1's
+ * What this transaction proves structurally (same pattern as the
  * acceptance): every step that can throw resolves BEFORE the first insert —
  * executor lookup and input decode templates first, then validation reads,
  * then the atomic commit of the order row plus the durable
@@ -13,7 +13,7 @@
  * - One order = one future immutable extraction VERSION over the
  *   attachment. Ordering again with the SAME segmentation config replays
  *   the SAME order (idempotent, and for a definite-failed job the
- *   registration re-queues it — the sanctioned resume). A DIFFERENT config
+ *   registration re-queues it — the resume). A DIFFERENT config
  *   creates a NEW order; completed versions are never touched.
  * - No new source message is ever created (CONTEXT.md "Wiadomość
  *   źródłowa"): the order references the accepted attachment and its
@@ -44,7 +44,7 @@ import {
   type SegmentationConfig,
 } from "./segmentation";
 
-/** D6 pipeline version of this order shape (bump = new orders, new version). */
+/** Transcription pipeline version of this order shape (bump = new orders, new version). */
 export const D6_PIPELINE_VERSION = "d6.stt/1";
 
 /** Bounded retry policy of one transcript order across resumes. */
@@ -53,13 +53,13 @@ export const TRANSCRIPT_RETRY_POLICY = { maxAttempts: 3, backoffBaseMs: 2_000 } 
 /** The guarded proof stash stays far below the Convex document bound. */
 export const MAX_PROOF_STASH_BYTES = 600_000;
 
-/** The input of the order entry (E3 passes it; the probe forwards it). */
+/** The input of the order entry (text analysis passes it; the probe forwards it). */
 export interface OrderTranscriptInput {
   readonly attachmentId: string;
   /** Overrides the segmentation target (ms); dev proofs segment tiny clips. */
   readonly targetSegmentMs?: number | undefined;
   readonly bytesChannel: "media_worker" | "proof_inline";
-  /** proof_inline only: the SAME bytes the caller uploaded through D2. */
+  /** proof_inline only: the SAME bytes the caller uploaded through the uploads lane. */
   readonly proofAudioBase64?: string | undefined;
 }
 

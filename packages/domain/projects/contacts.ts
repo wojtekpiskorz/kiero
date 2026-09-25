@@ -1,5 +1,5 @@
 /**
- * Contact and contact-role rules (C1 domain half, pure).
+ * Contact and contact-role rules (domain half, pure).
  *
  * Vocabulary ("Kontakt", "Klient", CONTEXT.md): a person or organization
  * described in the firm's catalog, able to appear in projects as a client,

@@ -1,14 +1,14 @@
 /**
- * Retrieval coverage disclosure (E5).
+ * Retrieval coverage disclosure.
  *
  * "Absence of a semantic hit is reported as retrieval coverage, not proof
- * that the fact does not exist" (issue #39). The coverage literal is the
+ * that the fact does not exist". The coverage literal is the
  * honest disclosure the result carries; this module is its single decision
  * table:
  *
  * - `degraded`: no ACTIVE index generation exists. Full-text search over the
  *   derived index is unavailable too; typed/current structured reads (the
- *   D1 conversation views, C2 current findings) remain available through
+ *   conversation views, current findings) remain available through
  *   their own operations, unaffected by the index.
  * - `text_only`: an active generation exists, but the semantic half is not
  *   fully in play: either the query could not be embedded (embedding outage)

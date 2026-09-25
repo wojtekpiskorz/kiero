@@ -1,5 +1,5 @@
 /**
- * The `memory.recompute_dependents` executor (C5): the durable, idempotent
+ * The `memory.recompute_dependents` executor: the durable, idempotent
  * reaction to source withdrawal and to every finding revision — the
  * dependency-aware recomputation half of "Źródło wycofane".
  *
@@ -8,7 +8,7 @@
  *
  * - `sources.sourceWithdrawn` → cause `source_withdrawn`: recheck the
  *   source's CURRENT lifecycle (marking follows withdrawal, never ahead of
- *   it — C2's rule), mark the findings that lost their sole witness
+ *   it — the rule), mark the findings that lost their sole witness
  *   (`markWithdrawnSupport` below), then hand EVERY removed root to the
  *   cascade by publishing one `memory.dependentsMarkedStale` carrier per
  *   root — the cascade jobs own level 1 exactly like every deeper level
@@ -28,13 +28,13 @@
  *   When a basis became known again (a re-analysis publication, a later
  *   independent confirmation, an explicit correction), every DIRECT
  *   dependent still in `updating` gets its linked re-analysis registered
- *   through E3's seam: a NEW `reanalysis` processing run of the dependent's
+ *   through the seam: a NEW `reanalysis` processing run of the dependent's
  *   own provenance source (withdrawn/purged provenance sources support no
  *   new run — their dependents stay honestly `updating` until NEW
  *   evidence). A non-known root is a no-op: the stale cascade above owns
  *   that direction.
  *
- * - `sources.sourceReassigned` → cause `source_reassigned` (E7 amendment,
+ * - `sources.sourceReassigned` → cause `source_reassigned` (
  *   flagged): a project reassignment re-assesses DEPENDENT SCOPE. The
  *   moved source stays active (its evidence still witnesses), so nothing
  *   is marked unknown here; the findings whose project placement lost the
@@ -43,16 +43,16 @@
  *   linked witness, become `updating`-until-revalidated through the memory
  *   findings lane's reassignment marking core
  *   (../findings/reassignment.ts), cascade to derivation dependents
- *   through the same carrier, and re-analyze through E3's seam (the new
+ *   through the same carrier, and re-analyze through the seam (the new
  *   run reads the CURRENT project links).
  *
- * AMPLIFICATION NOTE (for H3's incident scanning): the findingRevised edge
+ * AMPLIFICATION NOTE (for the incident scanning): the findingRevised edge
  * fires one durable walk per revision — including the cascade's own
  * markings, most of which no-op. Accepted for alpha volume; per-reaction
  * outcomes live on the durableJobs rows and each walk is one bounded
  * indexed query.
  *
- * IDENTITY (review round 1, MAJOR 2): a deferred durable job must not die
+ * IDENTITY: a deferred durable job must not die
  * on live-session availability — the withdrawer's session can be revoked
  * between the withdrawal transaction and this reaction, and an
  * `actor_session_unavailable` retry exhausts in seconds, leaving a
@@ -62,13 +62,13 @@
  * with the tenant and the recording user as arguments — the withdrawal's
  * actor (fallback: the source's author), both real user rows recorded
  * honestly as the marking's author, with the system-driven nature explicit
- * in the revision's reason and origin. C2's `performWithdrawalMarking` is
+ * in the revision's reason and origin. `performWithdrawalMarking` is
  * the same core behind the RequestContext-backed entry; the revision row,
  * projection patch and event payload exist exactly once.
  *
  * Recompute = linked re-analysis that cannot overwrite a newer correction:
- *   E3's publish re-checks the analysis's input revisions against CURRENT
- *   counters (C2's stale-plan guard), and this executor never writes a
+ *   the publish re-checks the analysis's input revisions against CURRENT
+ *   counters (the stale-plan guard), and this executor never writes a
  *   revision except a marking that preserves the value verbatim.
  *
  * Durable checkpoints / resumability: every level is one transaction whose
@@ -95,8 +95,8 @@ import type { JobExecutor } from "../../platform/executors";
 import type { MutationCtx } from "../../_generated/server";
 import type { Id, Doc } from "../../_generated/dataModel";
 import { markWithdrawnSupport } from "../findings/withdrawal";
-// E7 amendment (flagged): the reassignment scope-marking core lives in the
-// memory findings lane it writes (review round 1 moved it there from the
+// The reassignment scope-marking core lives in the
+// memory findings lane it writes (moved it there from the
 // sources lane; its commit loop is the shared marking core,
 // ../findings/marking.ts).
 import { markReassignedScope } from "../findings/reassignment";
@@ -116,14 +116,14 @@ interface RecomputeInput {
   readonly reason: string | null;
   readonly withdrawnByUserId: string | null;
   /**
-   * E7 amendment (flagged): the reassigning user of the
+   * The reassigning user of the
    * `source_reassigned` cause (optional like the registry key; absent on
    * every other cause).
    */
   readonly reassignedByUserId?: string | null;
 }
 
-/** Retry policy of the linked re-analysis registrations (E3's bound). */
+/** Retry policy of the linked re-analysis registrations (bound). */
 const ANALYSIS_RETRY_POLICY = { maxAttempts: 3, backoffBaseMs: 2_000 } as const;
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ async function withdrawnRootFindings(
 }
 
 // ---------------------------------------------------------------------------
-// Linked re-analysis registration (the E3 seam).
+// Linked re-analysis registration.
 // ---------------------------------------------------------------------------
 
 /** Registers one bounded re-analysis group: a NEW linked run + durable job. */
@@ -191,7 +191,7 @@ async function registerReanalysis(
 ): Promise<boolean> {
   // Bounded per (provenance source, trigger): the same source hit at two
   // cascade levels of one storm may re-analyze once more; both runs read
-  // fresh context and C2's guard keeps them from overwriting each other's
+  // fresh context and the guard keeps them from overwriting each other's
   // newer corrections.
   const dedupKey = `processing.analyze:memory.recompute:${sourceId}:${triggerKey}`;
   // Dedup BEFORE the run insert: an already-registered (active or
@@ -501,7 +501,7 @@ type SourceCauseResolution =
  * the row, recheck its CURRENT lifecycle (marking follows the explicit
  * transition, never ahead of it) and resolve the identity-independent
  * recording user (the cause's actor, fallback: the source's author).
- * Extracted in E7 review round 1, when the second cause transcribed the
+ * Extracted when the second cause transcribed the
  * first guard for guard.
  */
 async function resolveSourceCause(
@@ -637,7 +637,7 @@ export const recomputeDependentsExecutor: JobExecutor = {
       return { outcome: "succeeded" };
     }
 
-    // E7 amendment (flagged, issue #115): the scope re-assessment reaction
+    // The scope re-assessment reaction
     // of one project reassignment. The shared source-cause preamble covers
     // the identity-independent resolution (the reassigning user, fallback
     // the source's author, recorded honestly as the marking's author) and

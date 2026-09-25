@@ -1,5 +1,5 @@
 /**
- * Shared tenant-scoped reference checks for the findings lane (C2).
+ * Shared tenant-scoped reference checks for the findings lane.
  *
  * The resolved company is the only company any row may belong to: every
  * require* helper normalizes the id, reads the row and refuses (returns
@@ -8,14 +8,14 @@
  * tenant boundary. Imported by the changeset transactions, corrections,
  * the current read and the withdrawal marking.
  *
- * R1 (issue #126) addition: `checkResolutionEvidenceReference` is the ONE
+ * `checkResolutionEvidenceReference` is the ONE
  * per-reference rule for evidence cited by a clarification resolution
  * (existence, company, active lifecycle, fragment ownership). Both the
  * agent executor and the resolution transaction validate through it — each
  * layer still runs its own end-to-end check; only the rule text lives
  * here, so the two can never drift apart.
  *
- * R2 (issue #127) additions: `requireActiveSource` (GROUNDING: may this
+ * R2 additions: `requireActiveSource` (GROUNDING: may this
  * source ground new work? withdrawn/tombstoned do not) and
  * `requireContentAliveSource` (CONTENT: is this source's content still
  * readable? only `purged` content is gone — withdrawal keeps history),
@@ -68,12 +68,12 @@ export async function requireSource(
 }
 
 /**
- * R2 (issue #127): the GROUNDING predicate — "may this source ground NEW
+ * The GROUNDING predicate — "may this source ground NEW
  * work?" (raising a case, resolving on new evidence, anchoring a citation).
  * It must exist, belong to the resolved company and be `active`: a
  * withdrawn source "przestała stanowić podstawę aktualnych ustaleń"
  * (CONTEXT.md, Źródło wycofane) and a retained tombstone grounds nothing.
- * R1's `checkResolutionEvidenceReference` and the agent write paths
+ * `checkResolutionEvidenceReference` and the agent write paths
  * evaluate this stance; every grounding call site uses this predicate,
  * never a private copy.
  */
@@ -87,7 +87,7 @@ export async function requireActiveSource(
 }
 
 /**
- * R2 round 3 (issue #127): the CONTENT predicate — "is this source's
+ * The CONTENT predicate — "is this source's
  * CONTENT still readable?" Withdrawal deletes nothing ("Jej wcześniejsza
  * rola i przyczyna korekty pozostają częścią historii", CONTEXT.md): the
  * row, text and fragments stay, so a withdrawn source is content-alive.
@@ -173,7 +173,7 @@ export async function companyDependencyEdges(
   }));
 }
 
-/** The typed refusal code of one resolution-evidence reference check (R1). */
+/** The typed refusal code of one resolution-evidence reference check. */
 export type ResolutionEvidenceRefusalCode =
   | "resolution_source_not_found"
   | "resolution_source_not_in_company"
@@ -181,7 +181,7 @@ export type ResolutionEvidenceRefusalCode =
   | "resolution_fragment_mismatch";
 
 /**
- * R1 (issue #126): the per-reference rule for evidence cited by a
+ * The per-reference rule for evidence cited by a
  * clarification resolution — the cited source must EXIST, belong to the
  * resolved company and be ACTIVE ("Źródło wycofane" no longer grounds a
  * resolution), and a cited fragment must belong to that source. Returns
@@ -215,7 +215,7 @@ export async function checkResolutionEvidenceReference(
 }
 
 // ---------------------------------------------------------------------------
-// R2 (issue #127): the shared clarification purge-redaction rule.
+// The shared clarification purge-redaction rule.
 // ---------------------------------------------------------------------------
 
 /**
@@ -267,7 +267,7 @@ export interface ClarificationContentRule {
 }
 
 /**
- * R2: evaluates one clarification row against the current state. A dead
+ * Evaluates one clarification row against the current state. A dead
  * link is a conflicting fragment (or resolution-evidence reference) whose
  * source is missing, cross-company or `purged`
  * (`requireContentAliveSource` — permanent deletion is the one lifecycle
@@ -326,7 +326,7 @@ export async function clarificationContentRuleOf(
     });
   }
   // The stored basis decides the note: a source-backed basis redacts when
-  // any cited source was purged; a legacy basis (never stored, pre-R1) redacts
+  // any cited source was purged; a legacy basis (never stored, older rows) redacts
   // with a redacted question — its basis is unknown and never guessed safe;
   // a manual boss decision rested on no source and keeps its note.
   const noteRedactedByBasis =

@@ -1,17 +1,15 @@
 /**
- * Typed extension definition tables (A2 candidate, certified by A3;
- * completed by C3 for the versioned typed extensions and catalog reuse
- * lane).
+ * Typed extension definition tables.
  *
- * Owning implementer: C3. Definitions are bounded data, never executable
+ * Definitions are bounded data, never executable
  * schema code. Field IDs are stable across label changes; a change of
  * meaning or kind creates a new immutable version, preserving the
  * interpretation of historic values. Reuse and similarity checks precede
  * creating near-duplicates; usage counts come from stored data (committed
  * finding revisions), not model estimates.
  *
- * C3 completion of the candidate fragment:
- * - `extensionVersions.fields` pins to the C3-amended contracts field shape
+ * Additions to the certified fragment:
+ * - `extensionVersions.fields` pins to the amended contracts field shape
  *   (scalar kinds plus scalar-item lists; `unit` on quantity fields and
  *   `itemKind` on list fields). The value-vocabulary kind `object` is NOT a
  *   legal field kind here, so the Convex validator itself refuses recursive

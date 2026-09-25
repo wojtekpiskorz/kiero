@@ -1,12 +1,12 @@
 /**
- * Google Calendar Events API protocol (G3): pure request construction and
+ * Google Calendar Events API protocol: pure request construction and
  * bounded executors for the per-copy create / read / update / delete legs.
  *
  * The executors return the DECISION CORES' vocabulary directly
  * (`MutationReport`, `ObservationResult` — ./cores.ts): this module and
  * the cores are both pure (no Convex imports), so there is no adapter
  * layer and no second type family between the wire and the decision
- * table. The uncertainty semantics are G1's (../connection/protocol.ts):
+ * table. The uncertainty semantics are (../connection/protocol.ts):
  *
  * - a 2xx answer with a readable body is a CONFIRMATION;
  * - 401/403 (revoked or inaccessible token) and a 404 at the CALENDAR
@@ -22,7 +22,7 @@
  *   only reconciliation by observation may resolve it.
  *
  * Testable without Google: the focused tests run it against a
- * clearly-labeled local fake (the G1 tests/g1/exchange.test.ts pattern).
+ * clearly-labeled local fake (the tests/g1/exchange.test.ts pattern).
  */
 
 import type { ManagedFields, MutationReport, ObservationResult } from "./cores";

@@ -1,23 +1,23 @@
 /**
- * Shared plumbing for the sources lanes' guarded probe surfaces (D1; D2/D3
+ * Shared plumbing for the sources lanes' guarded probe surfaces (sources; uploads/media access
  * and later lanes reuse it instead of growing copies).
  *
- * One place for: the deployment-variable guard (the A3 probe pattern —
+ * One place for: the deployment-variable guard (the probe pattern —
  * platform's own copy stays in convex/platform/probe.ts, which the sources
- * lanes do not own), the service-session resolution through the A3-proved
+ * lanes do not own), the service-session resolution through the platform-proved
  * bridge identity, and the seeded-identity email → user → live session →
  * canonical request-context chain. Sessions are created server-side by the
  * seeding mutations; no identity is ever accepted from client input, and a
  * missing/revoked/incomplete chain resolves to null, which callers surface
  * as the sanitized `forbidden` service-identity error.
  *
- * E7 append (flagged, review round 1, issue #115): the fixture and
+ * The fixture and
  * inspection BODIES the later lanes' probes share: one witnessed
  * (optionally project-linked) source, the service-company project seeder,
  * the second-company identity chain, and the bounded tenant-scoped walks
  * (sources with links, findings with revisions, recompute jobs, reanalysis
- * runs, outbox events). Grown here because E7's probe transcribed
- * ~200 lines of C5's probe verbatim; each lane keeps only its deltas
+ * runs, outbox events). Grown here because the probe transcribed
+ * ~200 lines of the probe verbatim; each lane keeps only its deltas
  * (its proof stamp, its fixture set, its wire-row mapping).
  */
 
@@ -29,16 +29,16 @@ import type { Id, Doc } from "../_generated/dataModel";
 import { bridgeIdentity, resolveRequestContext, type ResolutionDb } from "../platform/context";
 import { resolveAccessContextFromConvexAuth } from "../access/identity/resolution";
 
-/** The A3 platform proof service account (seeded by platform/probe:probeSeed). */
+/** The platform proof service account (seeded by platform/probe:probeSeed). */
 export const SERVICE_EMAIL = "platform-service@kiero.invalid";
 
-/** The D1 tenant-isolation fixture account (seeded by ./probe seedIsolation). */
+/** The tenant-isolation fixture account (seeded by ./probe seedIsolation). */
 export const ISOLATION_EMAIL = "d1-isolation@kiero.invalid";
 
-/** The D1 tenant-isolation fixture company name. */
+/** The tenant-isolation fixture company name. */
 export const ISOLATION_COMPANY = "Kiero Dev Proof B (D1 isolation)";
 
-/** The deployment guard, identical to the A3 platform probes. */
+/** The deployment guard, identical to the platform probes. */
 export function probeGuardEnabled(): boolean {
   return process.env.KIERO_PROBE_ENABLED === "1";
 }
@@ -55,7 +55,7 @@ export function serviceIdentityUnavailable(): ResultEnvelope {
 
 /**
  * Resolves the CALLER's context for the guarded caller-pattern probes (the
- * D2 uploads precedent): the caller's own verified Convex Auth credential
+ * uploads precedent): the caller's own verified Convex Auth credential
  * through the canonical chain, or the sanitized unauthenticated refusal.
  * Shared so each lane's probe stops hand-rolling the same four lines.
  */
@@ -73,7 +73,7 @@ export async function resolveCallerContext(
   return { ok: true, context };
 }
 
-/** Resolves the service account's session id (the A3 fixture identity). */
+/** Resolves the service account's session id (the fixture identity). */
 export async function serviceSessionId(ctx: ActionCtx): Promise<string | null> {
   const session = await ctx.runQuery(api.platform.probe.serviceSession, {});
   return session === null ? null : session.sessionId;
@@ -120,7 +120,7 @@ export async function bridgeContextForEmail(
 }
 
 // ---------------------------------------------------------------------------
-// E7 append (flagged): the shared fixture bodies.
+// The shared fixture bodies.
 // ---------------------------------------------------------------------------
 
 /** The lane-specific stamp every seeded fixture row carries. */
@@ -142,7 +142,7 @@ export interface SeededSource {
 /**
  * Ensures one witnessed source (run + text extraction + whole-source
  * fragment), optionally linked to the given projects; idempotent by
- * acceptance key within one proof run. The C5/E7 probe bodies unified.
+ * acceptance key within one proof run. The probe bodies unified.
  */
 export async function ensureWitnessedSource(
   db: MutationCtx["db"],
@@ -260,7 +260,7 @@ export interface IsolationIdentity {
 /**
  * Ensures the second-company fixture chain (the tenant-isolation prover):
  * user → company → active admin membership → live session, idempotent per
- * identity. The C5/E7 isolation seeders unified.
+ * identity. The isolation seeders unified.
  */
 export async function ensureIsolationIdentity(
   db: MutationCtx["db"],
@@ -298,7 +298,7 @@ export async function ensureIsolationIdentity(
     .withIndex("by_company_user", (q) => q.eq("companyId", companyId).eq("userId", userId))
     .first();
   // `.first()` yields null (not undefined) when absent: the null check is
-  // load-bearing (the C2 probe comment documents the same trap).
+  // load-bearing (the probe comment documents the same trap).
   if (existingMembership === null) {
     await db.insert("memberships", {
       companyId,
@@ -326,7 +326,7 @@ export async function ensureIsolationIdentity(
 }
 
 // ---------------------------------------------------------------------------
-// E7 append (flagged): the shared tenant-scoped inspection walks. Each lane
+// The shared tenant-scoped inspection walks. Each lane
 // maps its own wire rows; the bounded walks themselves exist once.
 // ---------------------------------------------------------------------------
 
@@ -394,7 +394,7 @@ export async function companyMemoryJobs(
     .collect();
 }
 
-/** The company's `reanalysis` processing runs (the E3 revalidation seam). */
+/** The company's `reanalysis` processing runs (the revalidation seam). */
 export async function companyReanalysisRuns(
   db: InspectionDb,
   companyId: Id<"companies">,

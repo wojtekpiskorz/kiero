@@ -1,5 +1,5 @@
 /**
- * The platform HTTP boundary (A3): the Worker bridge, the external echo
+ * The platform HTTP boundary: the Worker bridge, the external echo
  * stand-in and the health endpoint.
  *
  * `/platform/bridge` (POST): Worker service calls. The bearer credential in
@@ -40,7 +40,7 @@ import { dispatchBridgeCommand } from "./dispatch";
 import { verifyServiceBearerToken } from "../operations/telemetry/serviceToken";
 
 // --- credential verification ---------------------------------------------------
-// Round-1 repair: the digest-compare bearer check lives ONCE in
+// The digest-compare bearer check lives ONCE in
 // operations/telemetry/serviceToken.ts (no convex/server imports) and is
 // shared with the telemetry HTTP boundary. A mirror of credential-
 // comparison code is a hazard; there is exactly one definition now.

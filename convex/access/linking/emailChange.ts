@@ -1,5 +1,5 @@
 /**
- * The email-change core (B2): stage (recent-authentication gate + hashed
+ * The email-change core: stage (recent-authentication gate + hashed
  * code for the NEW address) and confirm (atomic address move + credential
  * repoint + pending-ceremony rejection). A failed confirmation writes
  * nothing; the identity-layer action delivers the code (./functions.ts).

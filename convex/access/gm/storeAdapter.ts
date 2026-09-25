@@ -1,8 +1,8 @@
 /**
- * The generated-ctx adapter (B4): maps the Convex mutation/query context
+ * The generated-ctx adapter: maps the Convex mutation/query context
  * onto the GM store surfaces from ./store.ts.
  *
- * `normalizeId` is the proved id bridge (A3): the cores speak plain-string
+ * `normalizeId` is the proved id bridge: the cores speak plain-string
  * ids, typed index chains live only here. Projections stay bounded and
  * payload-free — inspection reads carry ids, states and timestamps only,
  * never source content or job inputs.

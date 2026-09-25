@@ -1,12 +1,12 @@
 /**
  * Minimal SigV4 client for the EU R2 media bucket over its S3-compatible
- * endpoint (I3), the D6 reader pattern extended to exactly the calls the
+ * endpoint, the reader pattern extended to exactly the calls the
  * bounded archive assembly needs: GetObject (streaming), CreateMultipart-
  * Upload, UploadPart, CompleteMultipartUpload, AbortMultipartUpload and
  * DeleteObject. Hand-rolled on WebCrypto so neither the Worker nor the
  * container image needs an added dependency.
  *
- * SIGNING TWIN: apps/media-worker/src/s3r2.ts (the D6 reader) carries its
+ * SIGNING TWIN: apps/media-worker/src/s3r2.ts (the reader) carries its
  * own copy of the same SigV4 derivation chain (hex/hmac/sha256Hex, amzDate,
  * scope, key chain, authorization header). The container boundary keeps it
  * there: the image carries only its own src/ plus the one mirrored
@@ -18,7 +18,7 @@
  * body hashes and a sorted canonical query (writes need both); the reader
  * signs the empty hash with no query (ranged reads only).
  *
- * Credential rules (the D6 ruling, unchanged): ONLY the media bucket token
+ * Credential rules (the ruling, unchanged): ONLY the media bucket token
  * reaches this process (R2_MEDIA_ENDPOINT / R2_MEDIA_BUCKET /
  * R2_MEDIA_ACCESS_KEY_ID / R2_MEDIA_SECRET_ACCESS_KEY); backup credentials
  * are never present. Values arrive as runtime env/secrets; they are never

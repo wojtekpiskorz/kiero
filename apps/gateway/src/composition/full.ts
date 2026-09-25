@@ -1,5 +1,5 @@
 /**
- * The final core composition entry, gateway half (J2, issue #61).
+ * The final core composition entry, gateway half.
  *
  * The full-flow join owns this explicit cross-module composition: ONE
  * module that names the complete core HTTP surface the gateway Worker
@@ -14,9 +14,9 @@
  * environment (the root test program imports it) while the Worker entry
  * passes the REAL registry (`./composition/registry.ts`). The five core
  * providers: platform (health + the checked command bridge), uploads
- * (D2's resumable channel the joined composer drives), images (D5's
- * retained-representation channel), media (D3's authorized range reads
- * the source dossier streams) and Calendar OAuth (G1's lifecycle).
+ * (the resumable channel the joined composer drives), images (the
+ * retained-representation channel), media (the authorized range reads
+ * the source dossier streams) and Calendar OAuth (lifecycle).
  */
 
 /** The registry slice the validation consumes (structural on purpose). */
@@ -31,8 +31,8 @@ export const FULL_CORE_PROVIDER_IDS: readonly string[] = [
   "uploads",
   "images",
   "media",
-  // I4 append (issue #56, flagged): (a) the REPAIR of a pre-existing
-  // main-branch drift - I3's exports provider was appended to the registry
+  // (a) the REPAIR of a pre-existing
+  // main-branch drift - the exports provider was appended to the registry
   // between media and calendar-oauth but never named here, so the boot
   // gate threw on every load of the Worker entry; (b) the deletion purge
   // provider (the service-credentialed media-byte deletion route).

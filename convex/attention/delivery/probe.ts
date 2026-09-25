@@ -1,5 +1,5 @@
 /**
- * F2 notification-delivery dev proofs (guarded by the deployment's
+ * Notification-delivery dev proofs (guarded by the deployment's
  * KIERO_PROBE_ENABLED variable; shared plumbing in
  * convex/attention/probe_shared.ts).
  *
@@ -19,7 +19,7 @@
  *   one extra evaluator hop directly.
  * - `probeForceRunFailed`: the terminal-analysis-failure fixture flip (the
  *   revokeFixtureMembership precedent: a dev fixture flip, production
- *   failure is E3's honest state).
+ *   failure is the honest state).
  */
 
 import { v } from "convex/values";

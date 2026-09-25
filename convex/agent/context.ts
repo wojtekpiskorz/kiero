@@ -1,5 +1,5 @@
 /**
- * The tenant-filtered answer-context loader (E6): protocol step 6 for the
+ * The tenant-filtered answer-context loader: protocol step 6 for the
  * answer flow — "Read relevant current structured state, discover evidence
  * with tenant-filtered retrieval ... Similarity does not establish truth."
  *
@@ -9,12 +9,12 @@
  * honest processing state (a source whose analysis is still running is
  * disclosure material, never a blocker for independent confirmed facts).
  *
- * The C5 updating gate is applied HERE: `isUpdatingKnowledgeState` decides
+ * The updating gate is applied HERE: `isUpdatingKnowledgeState` decides
  * the `updating` flag and the `groundsUpdating` evidence flag, so the pure
  * reducer never has to re-derive it and the model sees updating findings
  * marked from the first message.
  *
- * R2 (issue #127): the same loader drops dead references — an evidence
+ * The same loader drops dead references — an evidence
  * WITNESS must pass the GROUNDING predicate (`requireActiveSource`: a
  * withdrawn source "przestała stanowić podstawę aktualnych ustaleń" and a
  * tombstone grounds nothing, so neither may enter the ledger the model
@@ -23,7 +23,7 @@
  * deletion removes content): a redacted case is not actionable and stays
  * out of the model's list, a withdrawn-anchored case stays answerable.
  *
- * No vector search yet (E5 owns it): retrieval stays bounded tenant-filtered
+ * No vector search yet: retrieval stays bounded tenant-filtered
  * text work, and similarity would anyway never establish truth.
  */
 
@@ -153,7 +153,7 @@ async function loadFindingsAndEvidence(
       if (evidence.length >= MAX_ANSWER_CONTEXT_FINDINGS * 2) {
         break;
       }
-      // R2 (issue #127): the GROUNDING predicate decides here, not the
+      // The GROUNDING predicate decides here, not the
       // content one — the ledger's handles are what the model cites to
       // ground statements and resolves, and neither a withdrawn source
       // (no longer a basis of current agreements) nor a tombstone may
@@ -278,7 +278,7 @@ async function loadClarifications(
     .query("clarifications")
     .withIndex("by_company_state", (q) => q.eq("companyId", companyId).eq("state", "open"))
     .take(MAX_ANSWER_CONTEXT_WORK);
-  // R2 (issue #127): a redacted open case is not actionable — the model
+  // A redacted open case is not actionable — the model
   // must not see (let alone answer) a question whose content derived from
   // a permanently deleted source. The ONE shared content rule decides
   // (content question: a withdrawn source's case stays visible here).

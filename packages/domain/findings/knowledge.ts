@@ -1,5 +1,5 @@
 /**
- * Knowledge-state explicitness rules (C2, "Value contracts").
+ * Knowledge-state explicitness rules ("Value contracts").
  *
  * Knowledge is `known`, `unknown` with a reason, `conflicted` or
  * `not_applicable` — an EPISTEMIC vocabulary, deliberately separate from

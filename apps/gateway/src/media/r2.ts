@@ -1,5 +1,5 @@
 /**
- * R2 media reads for the media lane (D3): the read half of the private EU
+ * R2 media reads for the media lane: the read half of the private EU
  * media bucket this Worker already owns (the write half is the uploads
  * lane's `../uploads/r2.ts`; the binding is the same `MEDIA_BUCKET`).
  *

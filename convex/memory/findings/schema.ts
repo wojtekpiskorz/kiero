@@ -1,10 +1,5 @@
 /**
- * Memory findings, revisions, provenance and publication tables
- * (A2 candidate, certified by A3; completed by C2 for the atomic
- * findings/revisions/provenance/corrections lane).
- *
- * Owning implementers: C2 (this lane), C5 (withdrawal recomputation over
- * these rows), E3 (change-plan preparation feeding these transactions).
+ * Memory findings, revisions, provenance and publication tables.
  *
  * Revisions are immutable; the findings row is the CURRENT projection and is
  * only ever patched inside the same transaction that writes the revision it
@@ -15,7 +10,7 @@
  * publish) and inference is never another witness; withdrawal/correction
  * locates affected findings without discarding independent evidence.
  *
- * C2 amendments (the owning lane completes the candidate fragment):
+ * Notes (the owning lane completes the candidate fragment):
  * - `findingRevisions.origin` + optional `provenance`/`reason` +
  *   `recordedByUserId`/`recordedAtMs`: a revision names WHERE it came from —
  *   a source-backed publication (provenance: source, fragments, actor),
@@ -24,7 +19,7 @@
  * - `evidenceLinks.sourceId` required with optional fragment: whole-source
  *   evidence is first-class ("Gdy nie da się wiarygodnie wskazać fragmentu,
  *   podstawą pozostaje cały materiał") and tenant checks key on the source;
- *   fragment-typed links arrive with E3's extractions.
+ *   fragment-typed links arrive with extractions.
  * - `publicationGroups.plannedChanges`: the staged, decoded plan with the
  *   expectations captured at prepare time — the stale-plan guard's base.
  *
@@ -58,12 +53,12 @@ const revisionOrigin = v.union(
   v.literal("publication"),
   v.literal("correction"),
   v.literal("withdrawal_marking"),
-  // E7 amendment (additive, flagged): the scope re-assessment marking of a
+  // The scope re-assessment marking of a
   // project reassignment: value preserved verbatim, knowledge state
   // updating-until-revalidated, never a withdrawal.
   v.literal("reassignment_marking"),
-  // I4 amendment (additive, flagged, the E7 precedent): the support-removal
-  // marking of a permanent source deletion (issue #56): a purged source can
+  // The support-removal
+  // marking of a permanent source deletion: a purged source can
   // witness nothing, so findings it alone supported become unknown with a
   // machine reason, attributed by SOURCE ID.
   v.literal("purge_marking"),
@@ -131,21 +126,21 @@ export const findingsTables = {
     /** Why an explicit correction or withdrawal marking happened. */
     reason: v.optional(v.string()),
     /**
-     * C5 amendment (additive, flagged): the source whose withdrawal a
+     * The source whose withdrawal a
      * marking revision belongs to. Attribution is by SOURCE ID, never by
      * reason text (two withdrawals may share wording); recomputation
      * adopts only the roots of its own withdrawal.
      */
     withdrawnSourceId: v.optional(shared.sourceId),
     /**
-     * E7 amendment (additive, flagged): the source whose project
+     * The source whose project
      * reassignment a `reassignment_marking` revision belongs to (the same
      * by-SOURCE-ID attribution rule; a withdrawal marking never carries
      * one).
      */
     reassignedSourceId: v.optional(shared.sourceId),
     /**
-     * I4 amendment (additive, flagged, the E7 attribution precedent): the
+     * The
      * source whose permanent deletion a `purge_marking` revision belongs
      * to (by SOURCE ID, never by reason text).
      */
@@ -239,7 +234,7 @@ export const findingsTables = {
     resolutionNote: v.optional(v.string()),
     resolvedAtMs: v.optional(shared.tsMs),
     /**
-     * R1 amendment (additive, flagged on the E7 precedent): whether the
+     * Whether the
      * resolution's basis is source-backed or a manual boss decision.
      * Absent on open rows and on PRE-REPAIR resolved rows — the read side
      * then reports `legacy_unknown`, never a guessed manual decision.
@@ -251,7 +246,7 @@ export const findingsTables = {
       ),
     ),
     /**
-     * R1 amendment (additive, flagged): the normalized evidence references a
+     * The normalized evidence references a
      * source-backed resolution rests on (validated company-owned active
      * source + matching fragment). `sourceFragmentId` absent = whole-source
      * evidence, the fragment contract's rule.
@@ -265,8 +260,8 @@ export const findingsTables = {
       ),
     ),
     /**
-     * R2 amendment (additive, flagged on the R1 precedent): the content-free
-     * audit trail of one row's purge redaction (issue #127) — WHICH source
+     * The content-free
+     * audit trail of one row's purge redaction — WHICH source
      * deletions contributed and WHEN each text was replaced. Never carries
      * any text of the removed content. Absent on rows no purge touched;
      * pre-existing rows read as un-redacted until a purge reaches them.

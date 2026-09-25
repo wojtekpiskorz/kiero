@@ -1,5 +1,5 @@
 /**
- * Versioned text preparation (E5): the one folding both the indexed document
+ * Versioned text preparation: the one folding both the indexed document
  * text and the query text go through before matching or embedding.
  *
  * Preparation is versioned because it changes every embedding: a different
@@ -56,7 +56,7 @@ export function prepareDocumentText(text: string): string {
 }
 
 /**
- * Prepares the query text. E2's model family distinguishes query-side from
+ * Prepares the query text. The model family distinguishes query-side from
  * document-side input; the same fold keeps text matching symmetric with the
  * embedded comparison.
  */

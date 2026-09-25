@@ -1,8 +1,8 @@
 /**
- * Exports feature entry (I3): the Polish barebones status/download screen
- * issue #55 requires, mounted through the A4 host registry. The entry file
- * owns the shape; mounting it is I3's sanctioned one-line host-composition
- * edit in ../app-features.ts (the F3/D4 precedent).
+ * Exports feature entry: the Polish barebones status/download screen
+ * mounted through the host registry. The entry file
+ * owns the shape; mounting it is the one-line host-composition
+ * edit in ../app-features.ts.
  */
 
 import { createElement } from "react";

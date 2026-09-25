@@ -1,9 +1,9 @@
 /**
- * Task-reminder scheduling tables (F4, issue 44).
+ * Task-reminder scheduling tables.
  *
- * Owning implementer: F4 (convex/attention/reminders/**). The durable
- * reminder INTENTS themselves live in F2's `notificationIntents` under the
- * certified `task_reminder` kind (F2's evaluator explicitly leaves that
+ * The durable
+ * reminder INTENTS themselves live in `notificationIntents` under the
+ * certified `task_reminder` kind (the evaluator explicitly leaves that
  * kind to this lane); the two tables here are this lane's own state:
  *
  * - `reminderSchedules`: ONE row per task, the schedule anchor the

@@ -1,8 +1,5 @@
 /**
- * Gateway composition registry (A3; uploads provider appended by D2;
- * Calendar OAuth provider by G1; images provider by D5).
-
- * Calendar OAuth provider by G1; media provider by D3).
+ * Gateway composition registry.
  *
  * The single place route providers and executor registrations compose, so
  * parallel lanes add their own provider files here (imports only) without
@@ -10,12 +7,12 @@
  *
  * - `routeProviders`: each provider owns its routes and, when it has
  *   parameterized paths, its own `match` for them; the platform lane's
- *   provider, the D2 uploads lane's provider and the D5 images lane's
+ *   provider, the uploads lane's provider and the images lane's
  *   provider are imported below. `matchRoute` stays generic: exact match
  *   over all providers' route tables first, then each provider's optional
- *   `match`. D3's range reads become the next provider using this seam.
+ *   `match`. The range reads become the next provider using this seam.
 
- *   provider, the D2 uploads lane's provider and the D3 media lane's
+ *   provider, the uploads lane's provider and the media lane's
  *   provider are imported below. `matchRoute` stays generic: exact match
  *   over all providers' route tables first, then each provider's optional
  *   `match`.
@@ -32,13 +29,13 @@ import { imagesRouteProvider } from "../images/routes";
 
 import { mediaRouteProvider } from "../media/routes";
 
-// I3 append (flagged shared-file change, the D3 sanctioned pattern): the
+// The
 // firm-export download provider (parameterized GET reads only).
 import { exportsRouteProvider } from "../exports/routes";
 
 import { calendarOAuthProvider } from "../calendar-oauth/routes";
 
-// I4 append (flagged shared-file change, the D3/I3 sanctioned pattern): the
+// The
 // permanent-deletion purge provider (the service-credentialed media-byte
 // deletion route).
 import { purgeRouteProvider } from "../purge/routes";
@@ -68,13 +65,13 @@ export const routeProviders: readonly RouteProvider[] = [
 
   calendarOAuthProvider,
 
-  // I4 append (flagged shared-file change): the deletion purge provider.
+  // The deletion purge provider.
   purgeRouteProvider,
 ];
 
 /**
  * Durable executors and scheduler consumers this Worker hosts, exposed for
- * health/diagnostics. Names come from the A2/A3 registry vocabulary; the
+ * health/diagnostics. Names come from the registry vocabulary; the
  * Convex-side executor table (`convex/platform/executors.ts`) is the
  * authority; this list only reports what runs HERE.
  */

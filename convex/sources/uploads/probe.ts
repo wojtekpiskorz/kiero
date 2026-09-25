@@ -1,13 +1,13 @@
 /**
- * D2 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, exactly like the D1 probes; shared plumbing in
+ * Uploads dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable, exactly like the probes; shared plumbing in
  * ../probe_shared.ts).
  *
- * No business work happens here; these entries exist so the D2 evidence can
+ * No business work happens here; these entries exist so the evidence can
  * run against the REAL dev deployment and the REAL Worker/R2 path. Every
  * entry resolves the CALLER's identity from that caller's own verified
  * Convex Auth credential (the proof script signs in real fixture persons,
- * B1's email-code flow with fixture codes — the same pattern as the B3
+ * the email-code flow with fixture codes — the same pattern as the membership
  * evidence): the credential propagates from the authenticated action into
  * the internal mutation/query, and the SAME canonical resolution and
  * authorization seam decides. No identity is ever accepted from client
@@ -16,25 +16,25 @@
  * - `probeRunStep`: dispatches one uploads-channel step envelope through
  *   the checked step path AS THE CALLER — used for typed-rejection and
  *   cross-identity proofs that need the raw step envelope.
- * - `probeAcceptSourceAsCaller`: runs D1's UNCHANGED acceptance transaction
+ * - `probeAcceptSourceAsCaller`: runs the UNCHANGED acceptance transaction
  *   with the caller's honestly re-resolved context. This exists because
- *   D1's public accept entry predates B1's identity source (its dispatch
- *   still reads the pre-B1 `identityFromConvexAuth` seam, which cannot
+ *   the public accept entry predates the identity source (its dispatch
+ *   still reads the older `identityFromConvexAuth` seam, which cannot
  *   resolve Convex Auth subjects) — the acting principal here is the real
  *   signed-in user, never the service account. Flagged to the coordinator:
- *   D1's dispatch adopting `resolveAccessContextWithProvisioning` retires
+ *   the dispatch adopting `resolveAccessContextWithProvisioning` retires
  *   this probe in favor of the certified client command.
  * - `probeAgeUpload`: fixture control for the reconciliation grace proofs —
  *   moves one of the caller's company's uploads into the past by an exact
  *   offset.
  * - `probeUploadsState`: the caller's tenant-scoped ledger inspection the
  *   evidence script asserts on (uploads, attachments, representations,
- *   accepted sources and their durable jobs — D1's own inspection probe
+ *   accepted sources and their durable jobs — its own inspection probe
  *   still resolves the service session, which is NOT the acting user
  *   here).
  *
  * Revocation and tenant-isolation fixtures live in their OWNING lanes'
- * certified surfaces (B1's `access.revokeSession`, B3's
+ * certified surfaces (`access.revokeSession`, the
  * `access.revokeMembership`, real invitations): the evidence drives them
  * as real commands, not through server-side state edits here.
  */
@@ -91,7 +91,7 @@ export const probeRunStep = action({
 // --- acceptance as the caller ------------------------------------------------------
 
 /**
- * D1's acceptance transaction with the caller's honestly re-resolved
+ * the acceptance transaction with the caller's honestly re-resolved
  * context (see the module docstring for why this exists).
  */
 export const acceptSourceAsCaller = internalMutation({

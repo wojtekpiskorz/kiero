@@ -1,26 +1,26 @@
 /**
- * The purge support-removal marking (I4): the memory-side reaction to a
- * committed source tombstone, over the C5 marking machinery.
+ * The purge support-removal marking: the memory-side reaction to a
+ * committed source tombstone, over the marking machinery.
  *
  * A permanently deleted source can witness nothing ("baza" gone, not merely
  * withdrawn): findings whose CURRENT revision was a publication supported
  * only by that source are marked unknown with the machine purge reason, as
  * a NEW revision (origin `purge_marking`) through the ONE shared marking
- * commit core (../../memory/findings/marking.ts - the C2/E7 discipline), so
+ * commit core (../../memory/findings/marking.ts - the discipline), so
  * the value's history stays inspectable while the current projection is the
  * explicit unknown. Current revisions that stand on their own keep standing:
  * a later explicit correction is its own resolution, and a remaining witness
  * on another source (independent corroboration) keeps the finding alive.
  *
- * Every marked root then hands its derivation dependents to the C5 cascade
+ * Every marked root then hands its derivation dependents to the cascade
  * by publishing one `memory.dependentsMarkedStale` carrier per root (the
  * same revision-unique carrier discipline the withdrawal recompute uses):
  * dependents become visibly `updating`-until-revalidated, and any Calendar
- * copies follow their subjects' term revisions through G2's own drift pass.
+ * copies follow their subjects' term revisions through its own drift pass.
  * A purged provenance source supports no new run, so such dependents stay
  * honestly `updating` until NEW evidence.
  *
- * IDENTITY-INDEPENDENT (the C5 review rule): the durable purge executor
+ * IDENTITY-INDEPENDENT (the review rule): the durable purge executor
  * calls this core with the tenant and the deleting administrator as
  * arguments; a deferred job never depends on a live session.
  */
@@ -129,7 +129,7 @@ export async function markPurgedSupport(
 /**
  * Publishes the cascade carrier for one marked root (the recompute
  * executor's carrier shape, re-declared here so the dependency stays on
- * the shared EVENT, not on C5's private helper).
+ * the shared EVENT, not on the private helper).
  */
 async function publishCascadeCarrier(
   tx: MutationCtx,

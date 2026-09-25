@@ -1,5 +1,5 @@
 /**
- * GM decision cores (B4): the pure, timestamp-injected decisions behind
+ * GM decision cores: the pure, timestamp-injected decisions behind
  * explicit audited GM access.
  *
  * Everything here is pure over plain views (no Convex types, no db): the

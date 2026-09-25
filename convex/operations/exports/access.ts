@@ -1,10 +1,10 @@
 /**
- * The export download access resolution (I3): the per-request authorization
- * record the gateway consults BEFORE any R2 read (the D3 seam, applied to
+ * The export download access resolution: the per-request authorization
+ * record the gateway consults BEFORE any R2 read (the seam, applied to
  * archives).
  *
- * The chain, in order: the caller's live B1 session -> active membership ->
- * company (resolved by the HTTP boundary, never client input) -> the B3
+ * The chain, in order: the caller's live session -> active membership ->
+ * company (resolved by the HTTP boundary, never client input) -> the membership
  * `administer` policy (a CURRENT administrator; a member or a revoked admin
  * refuses `forbidden` here) -> the export row (must belong to the caller's
  * company, else the uniform `not_found`) -> the lifecycle gate
@@ -18,7 +18,7 @@
  *
  * IMMEDIACY: every request re-reads the linked sources. A purge that landed
  * after the archive was published refuses the next request with zero
- * bucket calls, whether or not I4's eager invalidation has run yet; the
+ * bucket calls, whether or not the eager invalidation has run yet; the
  * boundary then marks the row so the status list says why.
  */
 

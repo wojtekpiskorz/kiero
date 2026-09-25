@@ -1,14 +1,14 @@
 /**
- * Read-state command entries (F1).
+ * Read-state command entries.
  *
- * Two callable entries, one checked dispatch (the D1 pattern):
+ * Two callable entries, one checked dispatch:
  *
  * - `markSourceReadCommand` (public mutation): the client path. Identity
  *   comes from Convex Auth only; without a verified identity the command
- *   fails `unauthenticated` (B1 owns the sign-in product that issues real
+ *   fails `unauthenticated` (sign-in issues real
  *   identities).
  * - `markSourceReadTransaction` (internal mutation): the service-bridge
- *   path A3 proved — the caller supplies a service session id whose
+ *   path the platform proved — the caller supplies a service session id whose
  *   credential was verified BEFORE this point (the HTTP bridge boundary,
  *   or the guarded dev-proof actions).
  *
@@ -28,7 +28,7 @@ export const markSourceReadCommand = mutation({
 
 /**
  * The service path's transactional entry: the verified service session id
- * substitutes the bearer-verified identity (the A3 bridge pattern).
+ * substitutes the bearer-verified identity (the bridge pattern).
  */
 export const markSourceReadTransaction = internalMutation({
   args: { envelope: v.any(), serviceSessionId: v.string() },

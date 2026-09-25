@@ -1,11 +1,11 @@
 /**
- * The export lane's HTTP boundaries (I3), registered by convex/http.ts
+ * The export lane's HTTP boundaries, registered by convex/http.ts
  * through the composition append pattern (imports only).
  *
  * `/operations/exports/access` (POST): the per-user download channel,
- * exactly the D3 media-access shape — the browser sends its Convex Auth
+ * exactly the media-access shape — the browser sends its Convex Auth
  * credential, the gateway forwards it verbatim, Convex resolves the acting
- * person through B1's live-session chain, and the CURRENT-administrator
+ * person through the live-session chain, and the CURRENT-administrator
  * check plus the lifecycle gate decide BEFORE any R2 byte. A missing
  * credential fails sanitized 401 before any dispatch.
  *

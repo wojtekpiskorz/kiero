@@ -1,8 +1,8 @@
 /**
- * Project stage rules (C1 domain half, pure).
+ * Project stage rules (domain half, pure).
  *
  * Vocabulary ("Etap projektu", CONTEXT.md): the fixed stage set from the
- * accepted lifecycle decision (issue 9) — Zapytanie, Przygotowanie oferty,
+ * accepted lifecycle decision  — Zapytanie, Przygotowanie oferty,
  * Oczekiwanie na decyzję, Uzgodnione, W realizacji, Zakończone, Anulowane.
  * The machine tokens come from the certified contract surface
  * (`ProjectStage` in @kiero/contracts); this module owns their Polish

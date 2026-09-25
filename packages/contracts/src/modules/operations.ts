@@ -1,7 +1,7 @@
 /**
  * Operations module surface (architecture "Deep modules": Operations).
- * Implements lanes: H4 (inspection/retry), I2 (telemetry), I3 (exports),
- * I4 (deletion), I5/I6 (backups/recovery).
+ * Covers inspection/retry, telemetry, exports,
+ * deletion and backups/recovery.
  *
  * Audited GM actions, pipeline versions, backup completeness, external
  * deletion/revocation ledger, retention, health and cost alerts. GM does not
@@ -25,8 +25,7 @@ export const ProcessingRunState = Schema.Literals([
 export type ProcessingRunState = Schema.Schema.Type<typeof ProcessingRunState>;
 
 export const operationsOperations = {
-  // H4 amendment (issue #52, coordinated addition on the B3/B4 precedent):
-  // the audited GM processing inspector. Every input that targets company
+  // The audited GM processing inspector. Every input that targets company
   // data states its basis ("podstawa"); GM authority is resolved from an
   // OPEN gmAccessGrants row inside the same transaction, and the protected
   // audit row (actor, grant, basis, outcome, target revision, run) lands in
@@ -127,7 +126,7 @@ export const operationsOperations = {
     // validation: whitespace-only basis (decode passes, trim check rejects).
     errorKinds: ["forbidden", "not_found", "validation"],
   }),
-  // H4 amendment (issue #52): retry resumes APPROVED compatible work and
+  // Retry resumes APPROVED compatible work and
   // preserves semantic run identity (same run row, same versions, journal
   // replay of committed stages). The operator states the run state they
   // inspected (`expectedRunState`, the stale-revision guard: a run that
@@ -150,8 +149,8 @@ export const operationsOperations = {
     }),
     errorKinds: ["forbidden", "not_found", "conflict", "validation", "unsupported"],
   }),
-  // H4 amendment (issue #52): deliberate reanalysis is a linked NEW run over
-  // the same immutable source, through the server-approved E3/E2
+  // Deliberate reanalysis is a linked NEW run over
+  // the same immutable source, through the server-approved analysis/routing
   // configuration (no model selection anywhere in the input). The operator
   // states the source's latest run they inspected (`expectedLatestRunId`,
   // null when the source has none): a newer run landing meanwhile refuses as

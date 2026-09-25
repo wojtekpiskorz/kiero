@@ -1,5 +1,5 @@
 /**
- * @kiero/retrieval (E5): evidence lookup over the derived search index.
+ * @kiero/retrieval: evidence lookup over the derived search index.
  *
  * Pure cores for tenant-safe versioned retrieval:
  * - versioned text preparation (./preparation);
@@ -8,7 +8,7 @@
  * - cosine similarity and hybrid result assembly with cursor pagination
  *   (./similarity);
  * - retrieval coverage disclosure (./coverage);
- * - hydration keep-or-drop rules against canonical D1/C2 records
+ * - hydration keep-or-drop rules against canonical source/finding records
  *   (./hydration).
  *
  * The Convex-side wiring (index generations, the durable index executor and

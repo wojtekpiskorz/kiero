@@ -1,5 +1,5 @@
 /**
- * The D2 acceptance gate: the all-attachments-durable verification D1's
+ * The acceptance gate: the all-attachments-durable verification the
  * acceptance transaction runs BEFORE its first insert.
  *
  * `acceptSource` checks ALL attachment references (architecture protocol
@@ -9,8 +9,8 @@
  * only after this gate passes — a source can never appear saved while any
  * required attachment is missing or unverified.
  *
- * This module lives in the D2 uploads fragment; D1's acceptance.ts calls it
- * from its reference-check phase so the gate keeps D1's structural
+ * This module lives in the uploads fragment; acceptance.ts calls it
+ * from its reference-check phase so the gate keeps the structural
  * pre-flight pattern (a failing gate returns a typed error envelope with
  * nothing written).
  */
@@ -42,7 +42,7 @@ export async function verifyAttachmentsForAcceptance(
     .withIndex("by_upload", (q) => q.eq("uploadId", upload._id))
     .collect();
   if (attachments.length === 0) {
-    // Text-only source: no attachment references to verify (D1's semantics).
+    // Text-only source: no attachment references to verify (semantics).
     return { ok: true, binding: { attachmentIds: [], bindLedger: false } };
   }
   const representations = [];

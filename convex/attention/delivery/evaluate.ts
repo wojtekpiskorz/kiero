@@ -1,7 +1,7 @@
 /**
- * The evaluator's scheduled/cron entries (F2): the durable execution side
+ * The evaluator's scheduled/cron entries: the durable execution side
  * of `attention.evaluateDueIntents` (the platform pattern — native Convex
- * scheduler plus a cron safety net, the A3/I2 outbox-drain precedent).
+ * scheduler plus a cron safety net, the outbox-drain precedent).
  *
  * - `evaluateDueIntents` is the SCHEDULED hop: intent creation schedules it
  *   atomically at the batching window close (60 s from durable

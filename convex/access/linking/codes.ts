@@ -1,13 +1,13 @@
 /**
- * One-time proof-code helpers (B2): generation and hashing for the codes
+ * One-time proof-code helpers: generation and hashing for the codes
  * the linking ceremony and the email change stage (same shape and the
- * same unbiased sampling as B1's sign-in OTP — one code discipline).
+ * same unbiased sampling as the sign-in OTP — one code discipline).
  */
 
-/** One-time proof code: 8 digits, same shape as B1's sign-in OTP. */
+/** One-time proof code: 8 digits, same shape as the sign-in OTP. */
 export const PROOF_CODE_LENGTH = 8;
 
-/** Rejects sampled bytes for uniform digits (no modulo bias), like B1. */
+/** Rejects sampled bytes for uniform digits (no modulo bias), like sign-in codes. */
 export function generateProofCode(): string {
   const digits = "0123456789";
   const maxUsableByte = Math.floor(256 / digits.length) * digits.length; // 250

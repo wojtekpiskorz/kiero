@@ -1,5 +1,5 @@
 /**
- * Gateway uploads routes (D2): the Worker-mediated resumable upload surface.
+ * Gateway uploads routes: the Worker-mediated resumable upload surface.
  *
  * Protocol (architecture steps 2-3; the Convex ledger in
  * convex/sources/uploads is the state authority, this Worker owns R2):
@@ -23,24 +23,24 @@
  *   (never for accepted or active uploads), the Worker aborts/deletes the
  *   decided objects only.
  *
- * Acceptance itself (`sources.acceptSource`) stays a Convex operation (D1's
- * atomic transaction extended by D2's attachment gate); the saved receipt is
+ * Acceptance itself (`sources.acceptSource`) stays a Convex operation (the
+ * atomic transaction extended by the attachment gate); the saved receipt is
  * issued there, never here.
  *
- * IDENTITY (round-2 review): every route carries the END USER's credential.
+ * IDENTITY: every route carries the END USER's credential.
  * The browser sends its Convex Auth `Authorization` header; the Worker
- * forwards it verbatim and Convex resolves the acting user (B1 live session
+ * forwards it verbatim and Convex resolves the acting user (live session
  * -> active membership -> company). No route on this lane acts as the
  * service account — a user-owned ledger must never be touched as the
  * platform — and because every R2-touching route resolves the user through
  * Convex FIRST, a dead session or membership refuses the request before any
- * byte reaches R2 (what D4's revocation-mid-upload tests exercise).
+ * byte reaches R2 (what the revocation-mid-upload tests exercise).
  *
  * Registration rides the composition contract: this lane supplies a
  * `RouteProvider` whose optional `match` owns the parameterized paths (the
  * captured groups close over structurally-GatewayRoute handlers), so the
  * registry composes providers by imports only. Parts travel over POST
- * because the shared route vocabulary (platform/routes.ts, A3-owned)
+ * because the shared route vocabulary (platform/routes.ts)
  * admits GET|POST only; widening it is a named cross-lane prerequisite,
  * not an independent edit.
  *
@@ -195,13 +195,13 @@ async function prepareRoute(request: Request, env: UploadsEnv): Promise<Response
   if (session.state.stage !== "draft" && session.state.stage !== "uploading") {
     return jsonResponse(200, okResult({ uploadId, stage: session.state.stage, attachments: [] }));
   }
-  // J2 join repair (flagged minimal amendment): a TEXT-ONLY declaration
+  // A TEXT-ONLY declaration
   // (mediaKinds: []) has no attachment to begin — the fused route used to
   // call the begin step with an empty attachments array, which the begin
   // contract honestly refuses (isMinLength(1)). The text-only upload row
-  // is already durable in draft stage, exactly what D1's text-only
+  // is already durable in draft stage, exactly what the text-only
   // acceptance semantics consume; no R2 session and no begin step exist
-  // for it. (D2's proofs only drove media-bearing declarations; the
+  // for it. (the proofs only drove media-bearing declarations; the
   // joined composer is the first text-only consumer of THIS route.)
   if (mediaKinds.length === 0) {
     return jsonResponse(200, okResult({ uploadId, stage: session.state.stage, attachments: [] }));

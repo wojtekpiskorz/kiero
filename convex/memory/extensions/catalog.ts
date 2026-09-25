@@ -1,5 +1,5 @@
 /**
- * searchExtensionCatalog (C3): the catalog lookup with similarity
+ * searchExtensionCatalog: the catalog lookup with similarity
  * candidates the agent consults BEFORE creating a definition.
  *
  * Read-only; runs inside ONE Convex mutation through the checked dispatch

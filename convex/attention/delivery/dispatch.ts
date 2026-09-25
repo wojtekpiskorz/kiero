@@ -1,5 +1,5 @@
 /**
- * Notification-delivery command dispatch wiring (F2): the SAME checked
+ * Notification-delivery command dispatch wiring: the SAME checked
  * path every lane uses, with this lane's handler registry.
  *
  * `dispatchDeliveryCommand` is @kiero/runtime's `dispatchCommand` over

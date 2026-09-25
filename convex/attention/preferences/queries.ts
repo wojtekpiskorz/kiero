@@ -1,5 +1,5 @@
 /**
- * Notification-preference queries (F1): the personal-settings read F2/F4/H
+ * Notification-preference queries: the personal-settings read the delivery lanes and UI
  * consume, plus the live evaluation seam hook.
  *
  * `myNotificationPreferences` returns the EFFECTIVE settings: the stored
@@ -11,12 +11,12 @@
  * `evaluatePersonalDeliveryFor` runs the PURE evaluation
  * (`./evaluation.ts`) over the actor's REAL stored row and the REAL
  * company timezone, at a caller-supplied instant: the dev-proof surface
- * for quiet-hour boundary and DST evidence, and the exact seam F2's
+ * for quiet-hour boundary and DST evidence, and the exact seam the
  * evaluator calls at due time.
  *
  * Two callable shapes, one checked resolution (the lane pattern): public
- * queries (Convex Auth; honestly `unauthenticated` until B1) and internal
- * queries behind the verified service session (the A3 bridge identity).
+ * queries (Convex Auth; honestly `unauthenticated` without a session) and internal
+ * queries behind the verified service session (the bridge identity).
  * The identity-to-scope resolution lives once in ../context.ts (the
  * round-1 lane-local ruling).
  */
@@ -169,7 +169,7 @@ export const myNotificationPreferences = query({
   },
 });
 
-// --- internal queries (verified service session; the A3 bridge identity) ----
+// --- internal queries (verified service session; the bridge identity) ----
 
 /** The effective settings for a verified service session (bridge path). */
 export const myNotificationPreferencesFor = internalQuery({
@@ -186,7 +186,7 @@ export const myNotificationPreferencesFor = internalQuery({
 /**
  * The live evaluation seam: the actor's REAL stored preferences and REAL
  * company timezone decide one hypothetical delivery at `nowMs` (bridge
- * path; the dev-proof surface and F2's exact seam).
+ * path; the dev-proof surface and the exact seam).
  */
 export const evaluatePersonalDeliveryFor = internalQuery({
   args: { serviceSessionId: v.string(), request: deliveryRequestValidator },

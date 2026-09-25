@@ -1,13 +1,13 @@
 /**
- * GM command dispatch wiring (B4): the checked path for audited GM
+ * GM command dispatch wiring: the checked path for audited GM
  * operations, with this lane's authority resolution.
  *
  * Why a dedicated dispatch (not the runtime's `dispatchCommand`): the
  * runtime seam requires a company-scoped RequestContext (ActorContext
  * carries companyId + membershipRole), which a GM WITHOUT membership can
- * never honestly have. Exactly like B3's admission surface, GM operations
+ * never honestly have. Exactly like the admission surface, GM operations
  * enter one seam earlier: envelope decode -> operation allowlist (this
- * lane's) -> B1 identity resolution (provision-or-refresh) -> the policy
+ * lane's) -> identity resolution (provision-or-refresh) -> the policy
  * gate `decideGmRequest` over an OPEN GRANT (./policy.ts) -> contract
  * input decode -> handler. The check order mirrors `dispatchCommand`
  * (packages/runtime/src/command.ts) so the closed-error discipline is
@@ -17,7 +17,7 @@
  *
  * The GM authority NEVER confers membership: member operations are absent
  * from this registry by construction, and the membership dispatches
- * (B1/B3) register none of these names — fail-closed both ways.
+ *  register none of these names — fail-closed both ways.
  */
 
 import { Schema } from "effect";
@@ -122,7 +122,7 @@ export function gmHandlers(onboardCapture?: {
       performExitGmMode(tx, { userId: authority.userId, grantId: input.grantId }),
     ),
     "access.recoverAccount": gmHandlerOf(recoverAccountEntry, (ctx, tx, authority, input) =>
-      // The production recovery runner: B2's checked command with the
+      // The production recovery runner: the checked command with the
       // RESOLVED GM actor as the performer, in this transaction.
       performGmRecoverAccount(tx, authority, input, (recoveryInput, performedBy) =>
         recoverAccountCommand.run(ctx, recoveryInput, performedBy),
@@ -147,7 +147,7 @@ export function gmHandlers(onboardCapture?: {
       });
       // The action wrapper composes the honest delivery state into the
       // client envelope; this transport value never leaves the server
-      // (same shape as B3's issuance leg).
+      // (same shape as the issuance leg).
       return okResult({ pendingDelivery: true });
     }),
     "access.gmActivateCompany": gmHandlerOf(gmActivateCompanyEntry, (_ctx, tx, authority, input) =>
@@ -177,7 +177,7 @@ export interface GmDispatchDeps {
 
 /**
  * The production authority resolution: live session -> the policy gate.
- * Session liveness is decided by the composed B1 resolution (upstream of
+ * Session liveness is decided by the composed identity resolution (upstream of
  * the policy — see ./policy.ts); with a live session, `decideGmRequest`
  * decides over resolved facts: an open grant, membership deliberately not
  * consulted. The open-grant predicate is the cores' one spelling
@@ -278,7 +278,7 @@ export async function dispatchGmCommand(
  * The onboarding dispatch leg: the FULL checked path inside the
  * transaction, with the single-use invitation code captured for the action
  * wrapper (email delivery happens OUTSIDE the transaction, exactly like
- * B3's issuance leg; the code never crosses a client boundary).
+ * the issuance leg; the code never crosses a client boundary).
  */
 export async function dispatchGmOnboard(
   ctx: MutationCtx,

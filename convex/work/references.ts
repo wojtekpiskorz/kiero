@@ -1,12 +1,12 @@
 /**
  * Shared tenant-scoped reference checks, history recording and event
- * publication for the work lane (C4).
+ * publication for the work lane.
  *
  * The resolved company is the only company any row may belong to: every
  * load* helper normalizes the id, reads the row and returns null when the
  * row is missing OR belongs to another company — without saying which, so
  * the refusal leaks no existence information across the tenant boundary
- * (the C1/C2 discipline). `recordCommittedChange` is the ONE commit
+ * (the discipline). `recordCommittedChange` is the ONE commit
  * pattern the transaction halves record through (history row + canonical
  * event with the uniform dedup key, never apart); `recordWorkRevision`
  * remains the only writer of `workRevisions` underneath it.

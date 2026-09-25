@@ -1,15 +1,15 @@
 /**
- * The C1 Convex function surface (generated-call APIs).
+ * The projects Convex function surface (generated-call APIs).
  *
  * One core set, two callable entries (no drift by construction):
  *
  * - `dispatchProjects` (public mutation): the typed command dispatch for
  *   the company-scoped projects operations (identifyProject, assignCodename,
- *   changeStage, setPause, upsertContact, assignContactRole), with B1
- *   identity resolution and the C1 policy. Each command and its canonical
+ *   changeStage, setPause, upsertContact, assignContactRole), with
+ *   identity resolution and the policy. Each command and its canonical
  *   event commit atomically inside the mutation.
  * - `projectsOverview` (public query): the barebones catalog read. It
- *   resolves the actor through the SAME canonical read-only chain B1/B3
+ *   resolves the actor through the SAME canonical read-only chain identity and membership
  *   protected reads use, and everything it returns is derived from the
  *   RESOLVED company scope — no company, project or contact id is ever
  *   accepted from client input, so no other tenant's row can appear.
@@ -90,7 +90,7 @@ export interface ProjectView {
   readonly activeCodename: string | null;
   /** Retained alias history, oldest first; still denoting this project. */
   readonly aliases: readonly ProjectAliasView[];
-  /** Linked source count (D1 rows); closure preserves the links. */
+  /** Linked source count; closure preserves the links. */
   readonly sourceLinkCount: number;
 }
 

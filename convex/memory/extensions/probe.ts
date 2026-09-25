@@ -1,9 +1,9 @@
 /**
- * C3 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, exactly like the C2 findings probes; shared plumbing from
+ * Extensions dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable, exactly like the findings probes; shared plumbing from
  * convex/sources/probe_shared.ts).
  *
- * No business work happens here; these entries exist so the C3 evidence can
+ * No business work happens here; these entries exist so the evidence can
  * run against the REAL dev deployment without a development-auth shortcut:
  * every command goes through the SAME checked dispatch with a server-seeded
  * session, and no identity is ever accepted from client input.

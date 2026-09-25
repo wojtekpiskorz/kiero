@@ -1,14 +1,14 @@
 /**
- * Guarded B4 proof fixtures (dev deployment only).
+ * Guarded GM access proof fixtures (dev deployment only).
  *
- * Same pattern as the B1/B2/B3 probes: an ACTION checks the deployment
+ * Same pattern as the probes: an ACTION checks the deployment
  * guard variable (`KIERO_B4_PROOF_ENABLED === "1"`) and runs internal
  * mutations reachable only from this module. Nothing here is a product
  * surface: the entries exist so the evidence script can (1) read the
  * sanitized GM state (grants, activations, audit tail) the live proofs
  * assert on, and (2) seed the one processingRuns row the inspection proof
  * needs (no processing lane ships on this window yet; durableJobs rows
- * already appear through B3's revocation cleanup). On a production
+ * already appear through the revocation cleanup). On a production
  * deployment the guard variable is absent and every entry fails closed.
  */
 

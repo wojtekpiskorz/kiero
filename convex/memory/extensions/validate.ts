@@ -1,6 +1,6 @@
 /**
- * Extension value validation (C3): the validate-value operation for E6
- * tools, and the seam helpers the C2 publish/prepare/correction cores call
+ * Extension value validation: the validate-value operation for the agent
+ * tools, and the seam helpers the publish/prepare/correction cores call
  * so every extension finding value validates against the exact stored
  * definition version.
  *
@@ -16,7 +16,7 @@
  *
  * `checkExtensionValue` is the ONE resolution sequence both callers share;
  * `checkExtensionFindingValue` adapts it to the encoded finding-value shape
- * the C2 seam checks, and `performValidateExtensionValue` surfaces it as the
+ * the seam checks, and `performValidateExtensionValue` surfaces it as the
  * validate-value operation. `recordExtensionValueUsage` moves the
  * committed-usage counter for an extension value, atomically with the
  * revision that carries it.
@@ -114,7 +114,7 @@ interface EncodedFindingValueView {
 }
 
 /**
- * The C2 seam check: one ENCODED finding value. Returns null when the value
+ * The seam check: one ENCODED finding value. Returns null when the value
  * is not an extension value (nothing to check); otherwise the outcome of
  * validating it against its exact stored definition version, including the
  * entity-reference tenant checks.
@@ -167,7 +167,7 @@ export async function recordExtensionValueUsage(
   await bumpExtensionUsage(db, companyId, version.definitionId, versionId, nowMs);
 }
 
-/** The validate-value operation (E6 tools and the agent tool surface). */
+/** The validate-value operation (the agent tool surface). */
 export async function performValidateExtensionValue(
   tx: MutationCtx,
   context: RequestContext,

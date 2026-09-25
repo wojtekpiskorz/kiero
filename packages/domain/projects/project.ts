@@ -1,5 +1,5 @@
 /**
- * Project identity rules (C1 domain half, pure).
+ * Project identity rules (domain half, pure).
  *
  * Vocabulary ("Projekt", CONTEXT.md): one concrete matter about a potential
  * or accepted assignment, existing from the first client inquiry. Later

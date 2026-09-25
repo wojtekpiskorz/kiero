@@ -1,5 +1,5 @@
 /**
- * The backend-silence model (I2).
+ * The backend-silence model.
  *
  * PURE MODULE. Two independent detection layers, per the accepted
  * architecture ("External missing-health detection must still find total

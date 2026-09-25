@@ -1,5 +1,5 @@
 /**
- * The DIRECT DeepSeek transport (E8): one bounded streaming request against
+ * The DIRECT DeepSeek transport: one bounded streaming request against
  * `POST https://api.deepseek.com/responses`, mapped onto the same AG-UI event
  * vocabulary `@tanstack/ai-openrouter` emits, so the existing harvest
  * (`harvestStream`), typed decode and ordered-route recording serve the
@@ -59,7 +59,7 @@ export interface DeepSeekCredentials {
 
 /**
  * The server-held direct DeepSeek key from the environment; presence only,
- * never its value. Canonical reader (E8): the chat/vision entry points call
+ * never its value. Canonical reader: the chat/vision entry points call
  * it when a caller did not inject `deepseekApiKey` explicitly, matching the
  * `openRouterCredentialsFromEnv` precedent.
  */
@@ -164,7 +164,7 @@ function toRequestBody(call: DeepSeekResponsesCall): Record<string, unknown> {
     ...(call.systemPrompt === undefined ? {} : { instructions: call.systemPrompt }),
     input: toInputItems(call.messages),
     // EXPLICIT non-thinking selection (ADR): reasoning replay for thinking
-    // tool loops is an unproven continuation contract, so E8 pins effort
+    // tool loops is an unproven continuation contract, so the routing pins effort
     // "none" — the documented Responses non-thinking switch.
     reasoning: { effort: "none" },
     max_output_tokens: call.maxOutputTokens,

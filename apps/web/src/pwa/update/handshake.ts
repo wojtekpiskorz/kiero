@@ -1,9 +1,9 @@
 /**
- * The backend version handshake (I7): how a running client learns whether
+ * The backend version handshake: how a running client learns whether
  * the deployment it talks to still supports it.
  *
  * The source is the deployment's PUBLIC health endpoint
- * (GET /platform/health, A3/I2 surface): it answers the envelope
+ * (GET /platform/health): it answers the envelope
  * { value: { runtimeVersion, ... } }. The client compares that against
  * the runtime version THIS build was certified with.
  *

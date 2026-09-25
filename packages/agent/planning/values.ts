@@ -1,11 +1,11 @@
 /**
- * Server-side value construction for planned findings (E3): temporal and
+ * Server-side value construction for planned findings: temporal and
  * financial values from decoded model proposals.
  *
  * The rules that make this the SERVER's job, never the model's:
  *
  * - relative language resolves against the SOURCE's `sentAt` and timezone
- *   snapshot through the C2 pure resolver — a retry days later yields the
+ *   snapshot through the pure resolver — a retry days later yields the
  *   same day, and the model never does date arithmetic;
  * - an explicit day proposed alongside a bounded relative expression is
  *   VERIFIED against the server's own resolution: a mismatch is refused
@@ -26,7 +26,7 @@ import { quoteStatesTaxBasis } from "./quotes";
 
 /**
  * Polish weekday inflection map (accusative/locative back to nominative):
- * the C2 resolver's bounded vocabulary lists weekday names in the
+ * the resolver's bounded vocabulary lists weekday names in the
  * nominative ("środa"), while spoken Polish says "w środę". Mapping the
  * common inflected forms here keeps the RESOLUTION rule in @kiero/domain
  * (one authority) while this lane's proposals still resolve.

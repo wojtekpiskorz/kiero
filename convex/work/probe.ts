@@ -1,7 +1,7 @@
 /**
- * Guarded C4 proof fixtures (dev deployment only).
+ * Guarded work proof fixtures (dev deployment only).
  *
- * Same pattern as the A3/B1/B3/C1 probes: an ACTION checks the deployment
+ * Same pattern as the probes: an ACTION checks the deployment
  * guard variable (`KIERO_C4_PROOF_ENABLED === "1"`) and runs internal
  * functions reachable only from this module. On a production deployment
  * the guard variable is absent and every entry fails closed.
@@ -9,24 +9,24 @@
  * - `c4ProofCompanyWork`: the tenant-scoped inspection read the live
  *   evidence asserts on — raw tasks, points, events, the immutable
  *   `workRevisions` history, the company's `work.*` outbox events, its
- *   membership lifecycle rows and B3's registered revocation cleanup jobs,
+ *   membership lifecycle rows and the registered revocation cleanup jobs,
  *   plus the DERIVED overview (dueness, effective coordination, timing)
  *   computed exactly as the public read computes it. It reads only; the
  *   proof writes exclusively through the checked dispatch.
  * - `c4ProofRecordEventWithTask` / `c4ProofCrashEventWithTask`: the atomic
  *   event + linked task pair under the proof person's live session, and its
- *   crash twin (FULL pair, then a deliberate throw: the D1/C2 no-orphan
+ *   crash twin (FULL pair, then a deliberate throw: the no-orphan
  *   pattern proving both records roll back together).
  * - `c4ProofDeriveDueness`: runs the DEPLOYED pure dueness/timing
  *   derivation for explicit instants around company-timezone day
  *   boundaries (no state is touched).
  * - `c4ProofSetSignInCode` / `c4ProofSetInvitationCode` /
  *   `c4ProofSeedWitnessedSource`: the lease-workaround fixtures this lane's
- *   live evidence needs from OTHER lanes' modules (B1's code fixture, B3's
- *   invitation-code fixture, C2's witnessed-source seeding). The dev lease
+ *   live evidence needs from OTHER lanes' modules (the code fixture, the
+ *   invitation-code fixture, the witnessed-source seeding). The dev lease
  *   snapshots guard variables into module bundles at push time, so an
  *   UNCHANGED sibling module keeps answering `proof_guard_disabled` after
- *   the variables land (the C1 precedent: the same fixture runs from this
+ *   the variables land (the precedent: the same fixture runs from this
  *   lane's freshly-pushed module). Proof domains only; the REAL issuance,
  *   verification, acceptance and publication still run through their owning
  *   lanes' checked paths.
@@ -316,7 +316,7 @@ export const c4ProofDeriveDueness = action({
   },
 });
 
-// --- lease-workaround fixtures (C1 precedent; guarded like their owners) ------
+// --- lease-workaround fixtures (projects precedent; guarded like their owners) ------
 
 const OTP_MAX_AGE_SECONDS = 15 * 60;
 
@@ -326,7 +326,7 @@ export const setSignInCodeInternal = internalMutation({
     if (!isProofFixtureEmail(args.email)) {
       return errorResult(unsupportedError("work.c4Proof", "proof_domain_required"));
     }
-    // The account lookup matches B1's own fixture exactly: the library
+    // The account lookup matches its own fixture exactly: the library
     // stores providerAccountId as the address was passed, so the lookup
     // uses the exact string (no case folding).
     const account = await ctx.db
@@ -403,10 +403,10 @@ const WITNESS_PIPELINE_VERSION = "c4.proof/1";
 
 /**
  * Ensures one ACTIVE witnessed source (run + text extraction + whole-source
- * fragment) owned by whoever the live session resolves to — the C2 seeding
- * pattern, session-scoped like C1's draft-upload fixture. The row is the
- * evidence basis for work changes and the evidence source for C2 change
- * sets; it never impersonates D1's acceptance transaction.
+ * fragment) owned by whoever the live session resolves to — the seeding
+ * pattern, session-scoped like the draft-upload fixture. The row is the
+ * evidence basis for work changes and the evidence source for findings change
+ * sets; it never impersonates the acceptance transaction.
  */
 export const seedWitnessedSourceInternal = internalMutation({
   args: { sessionId: v.string(), acceptanceKey: v.string(), authorText: v.string() },

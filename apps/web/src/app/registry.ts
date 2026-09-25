@@ -1,7 +1,7 @@
 /**
- * The host feature-entry registry (A4).
+ * The host feature-entry registry.
  *
- * This is the UI-side half of the registration contract from A2/A3: lanes
+ * This is the UI-side half of the registration contract: lanes
  * B/D/F/G/H each fill one feature entry (their own module entry file under
  * `./features/<name>/`) instead of rewriting a shared App/router file, and
  * `./app-features` composes the list. The shape stays aligned with

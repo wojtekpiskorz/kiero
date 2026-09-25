@@ -1,5 +1,5 @@
 /**
- * Service-credential verification (shared, I2 round-1 repair).
+ * Service-credential verification (shared).
  *
  * ONE definition of the bearer check used by BOTH HTTP boundaries (the
  * platform bridge and the telemetry ingest/heartbeat endpoints). A mirror

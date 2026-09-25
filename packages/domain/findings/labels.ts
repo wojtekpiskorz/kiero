@@ -1,6 +1,6 @@
 /**
- * Polish rendering of the contract's closed finding-value vocabularies
- * (H2 review round 1): the ONE source of the temporal-role, tax-basis,
+ * Polish rendering of the contract's closed finding-value vocabularies:
+ * the ONE source of the temporal-role, tax-basis,
  * money-role and certainty labels, following the TASK_STATE_LABELS
  * pattern (packages/domain/work/taskState.ts). The machine tokens come
  * from the certified contract surface (`TemporalRole`, `TaxBasis`,

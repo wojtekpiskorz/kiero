@@ -1,7 +1,7 @@
 /**
- * The firm-export durable executor (I3): `exports.build_archive`.
+ * The firm-export durable executor: `exports.build_archive`.
  *
- * The architecture's external-call protocol (the D5 echo template) applied
+ * The architecture's external-call protocol (the echo template) applied
  * to archive assembly:
  *
  * 1. the transactional half (`execute`) moves the export row to
@@ -72,7 +72,7 @@ export const EXPORT_CLEANUP_ROUTE = "/exports/cleanup";
 
 /**
  * Derives one executor route URL from the deployment's bare-origin
- * `KIERO_EXPORT_EXECUTOR_URL` (R17): every consumer appends its route in
+ * `KIERO_EXPORT_EXECUTOR_URL`: every consumer appends its route in
  * code, so one origin value serves both the build drive and the cleanup
  * drive. Trailing-slash tolerant.
  */

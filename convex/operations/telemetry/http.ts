@@ -1,5 +1,5 @@
 /**
- * The telemetry HTTP boundary (I2).
+ * The telemetry HTTP boundary.
  *
  * - `POST /platform/telemetry/ingest`: batch ingest of redacted events from
  *   gateway/worker lanes (service-token verified, like the bridge; every

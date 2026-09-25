@@ -1,7 +1,7 @@
 /**
- * The barebones GM access feature (B4): enter/exit GM mode with basis, the
+ * The barebones GM access feature: enter/exit GM mode with basis, the
  * audited GM surfaces this issue names — company inspection, account
- * recovery (B2's checked command under the GM actor), company onboarding
+ * recovery (the checked command under the GM actor), company onboarding
  * with first-admin invitation, activation, administrator restoration and
  * ending alpha participation — all through the checked dispatch entries
  * (convex/access/gm/functions.ts).
@@ -121,7 +121,7 @@ function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): Rea
   });
 }
 
-/** Authentication gate: B1's shared sign-in surface; the operator continues here. */
+/** Authentication gate: the shared sign-in surface; the operator continues here. */
 function GmGate(): ReactNode {
   return createElement(AuthenticatedGate, { continuation: () => createElement(GmSurface) });
 }

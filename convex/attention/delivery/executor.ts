@@ -1,7 +1,7 @@
 /**
- * The `attention.evaluate_due_intents` executor (F2): the durable reaction
+ * The `attention.evaluate_due_intents` executor: the durable reaction
  * to the three intent-source events this lane consumes (issue 42:
- * "Consume F1 eligibility and E3 source assignment/agent-message events").
+ * "Consume read-state eligibility and text-analysis source assignment/agent-message events").
  *
  * The outbox drain projects each consumed event onto this job kind with a
  * dedup identity derived from the EVENT'S SUBJECT (source, clarification,
@@ -12,7 +12,7 @@
  * row and the SAME semantic intents: duplicate suppression is structural.
  *
  * The trigger vocabulary is the generic assignment/agent-message state
- * contract (E4 later emits the same terminal states through these edges):
+ * contract (multimodal extraction emits the same terminal states through these edges):
  *
  * - `source_accepted`: create the per-recipient `source_entry` intents
  *   (author excluded) anchored at durable all-attachment acceptance.

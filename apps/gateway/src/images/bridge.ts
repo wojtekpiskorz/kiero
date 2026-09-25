@@ -1,5 +1,5 @@
 /**
- * The Convex images-channel bridge client (D5): how the Worker's images
+ * The Convex images-channel bridge client: how the Worker's images
  * executor routes reach the normalization ledger.
  *
  * No transport of its own: every call goes through the ONE gateway bridge

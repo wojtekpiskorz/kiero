@@ -1,10 +1,10 @@
 /**
- * Route/model/version recording per provider call (E2).
+ * Route/model/version recording per provider call.
  *
  * Every provider call produces one immutable record of its attempts: which
  * supplier and model was requested (the accepted order position actually
  * tried — `provider` distinguishes direct DeepSeek from the retained
- * OpenRouter positions since E8), which model actually served the request
+ * OpenRouter positions), which model actually served the request
  * as observed in the provider's response (never assumed from the request),
  * the routing configuration version the decision was made under, latency,
  * observed usage and the sanitized failure classification when an attempt
@@ -12,9 +12,9 @@
  *
  * Consumers:
  * - `processingAttempts` rows (platform pipeline tables) carry the
- *   provider/model/outcome columns; E3+ stages copy these values when a
+ *   provider/model/outcome columns; analysis stages copy these values when a
  *   durable step owns the call.
- * - the corpus runner (J3, `evals/expected/scoring/run-report.schema.json`)
+ * - the corpus runner (`evals/expected/scoring/run-report.schema.json`)
  *   needs per-component `provider`/`model`/`route`, `latencyMs` and `cost`
  *   from exactly these fields.
  *
@@ -27,7 +27,7 @@ import { Schema } from "effect";
 import { ProviderFailureKind } from "./failures";
 import { ROUTING_CONFIG_VERSION } from "./routing";
 
-/** Route ids reuse the A2 integrations contract vocabulary. */
+/** Route ids reuse the integrations contract vocabulary. */
 export const ProviderCallRouteId = Schema.Literals([
   "chat_analysis",
   "vision_extraction",
@@ -54,7 +54,7 @@ export const ProviderCallAttempt = Schema.Struct({
   /** Frozen routing configuration version the attempt ran under. */
   routingConfigVersion: Schema.NonEmptyString,
   /**
-   * The supplier that served the attempt (E8 split: direct `deepseek` vs
+   * The supplier that served the attempt (direct `deepseek` vs
    * retained/fallback `openrouter`). Optional so records recorded before
    * the split still decode; new attempts always carry it, keeping usage and
    * cost accounting distinguishable per provider.

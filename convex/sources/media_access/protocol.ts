@@ -2,7 +2,7 @@
  * The gateway media-read protocol: the access-channel input schema, the
  * served-content vocabulary and the PURE HTTP read decisions (RFC 9110
  * ranges and conditional requests) of the authorized retained-media stream
- * (D3).
+ * .
  *
  * PATH NOTE (flagged to the coordinator): the issue's owned namespace
  * `convex/sources/media-access/**` ships as `convex/sources/media_access`
@@ -10,7 +10,7 @@
  * underscore or period only — a hyphenated module cannot be pushed. The
  * lane's exclusivity is unchanged.
  *
- * Division of labor (the D2 seam, mirrored for reads): the Worker
+ * Division of labor (the seam, mirrored for reads): the Worker
  * (apps/gateway/src/media) owns the R2 read and the byte stream; Convex
  * (this lane's access.ts) owns the CURRENT authorization decision and the
  * representation resolution. EVERY request — full or ranged — resolves the
@@ -44,7 +44,7 @@
  *   this lane serves no Last-Modified) makes the Range be ignored (200
  *   full), never a partial answer for changed bytes.
  *
- * SHARED-HOME DECISION (D2's ruling, applied identically): this file is
+ * SHARED-HOME DECISION (the ruling, applied identically): this file is
  * the ONE definition of the media-read channel's vocabulary on BOTH sides
  * of the deployment boundary — the Convex boundary and the gateway Worker
  * import it directly. It stays out of @kiero/contracts because the channel
@@ -73,8 +73,8 @@ const Forbidden = () => Schema.optional(Schema.Never);
 /**
  * What the Worker asks access for: exactly one of the attachment id (the
  * canonical read: the SERVER resolves which representation serves the
- * bytes) or a specific representation id (the exact-version read E4's
- * media anchors and I3/I5's export/backup readers address). Object keys are
+ * bytes) or a specific representation id (the exact-version read the
+ * media anchors and the export/backup readers address). Object keys are
  * never accepted from the caller — keys travel ONLY inside the grant, the
  * authorized answer. The UNION is the exactly-one-id invariant: both,
  * neither or malformed references fail the decode itself, in this ONE
@@ -103,8 +103,8 @@ export type ServableRole = Schema.Schema.Type<typeof ServableRole>;
  * constructs and decodes its grant against this definition before
  * answering, and the gateway route decodes the answer through the same
  * one. The object key, etag and byte length are the LEDGER's recorded
- * values — the CHOSEN representation's own records (D5's rows carry
- * bytes/mimeType when verified), with the D2 attachment receipt
+ * values — the CHOSEN representation's own records (the rows carry
+ * bytes/mimeType when verified), with the attachment receipt
  * (receivedBytes/r2ObjectEtag) as the received-role fallback — never
  * caller-supplied and never probed from R2 to decide authorization.
  */
@@ -124,7 +124,7 @@ export const MediaAccessGrant = Schema.Struct({
   bytes: Schema.Number.pipe(Schema.check(Schema.isGreaterThan(0))),
   contentType: Schema.NonEmptyString,
   transformVersion: Schema.NonEmptyString,
-  /** Representation metadata E4's anchors and H3's UI will address. */
+  /** Representation metadata the anchors and the UI will address. */
   width: Schema.optional(Schema.Number),
   height: Schema.optional(Schema.Number),
   durationMs: Schema.optional(Schema.Number),
@@ -137,11 +137,11 @@ export type MediaAccessGrant = Schema.Schema.Type<typeof MediaAccessGrant>;
 
 /**
  * The FALLBACK media-type mapping, pinned to the ONE place it is recorded
- * today: D2's `createMultipartSessions` writes exactly these as the R2
+ * today: `createMultipartSessions` writes exactly these as the R2
  * objects' httpMetadata content types (audio/webm, image/jpeg — the alpha
  * browser recording and the received image format). The chosen
  * representation's OWN recorded mimeType takes precedence when present
- * (D5's rows carry it); the kind column is the fallback authority.
+ * (the rows carry it); the kind column is the fallback authority.
  */
 export function contentTypeForKind(kind: MediaKind): string {
   return kind === "audio" ? "audio/webm" : "image/jpeg";

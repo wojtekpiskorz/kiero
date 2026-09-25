@@ -8,7 +8,7 @@
  * Publication of checked memory changes is likewise staged and atomic per
  * dependent group.
  *
- * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
+ * Certified by platform on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";
@@ -51,7 +51,7 @@ export type PublicationState = Schema.Schema.Type<typeof PublicationState>;
 /**
  * Lifecycle of a firm export archive.
  *
- * I3 amendment (issue #55, additive, flagged; the C5 `updating` precedent):
+ * Notes:
  * `failed` names a build that could not produce an archive (bound
  * exceeded, media drift, executor failure). A placeholder cannot claim
  * business work, and a build that did not finish must say so instead of

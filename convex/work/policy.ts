@@ -1,5 +1,5 @@
 /**
- * The C4 work policy: the lane's registration over the platform
+ * The work policy: the lane's registration over the platform
  * authorization seam.
  *
  * Every work operation is ordinary collaborative boss work — any active
@@ -11,15 +11,15 @@
  * actor's resolved company.
  *
  * The company scope itself never comes from client input: the dispatch
- * resolves it from the B1 live-session identity through the canonical chain
- * (user -> earliest active membership -> company), exactly as C1's projects
+ * resolves it from the live-session identity through the canonical chain
+ * (user -> earliest active membership -> company), exactly as the projects
  * dispatch does. Cross-company references are then row-level checks inside
  * each transaction (indistinguishable from missing rows).
  */
 
 import { membershipPolicy, type AccessPolicy } from "@kiero/runtime";
 
-/** C4's registered work policy (the authoritative rule set for this lane). */
+/** the registered work policy (the authoritative rule set for this lane). */
 export const workLanePolicy: AccessPolicy = {
   policyId: "work.c4-work-v1",
   authorize: async (context, request) => {

@@ -1,5 +1,5 @@
 /**
- * GM access feature entry (B4): the audited operator surface — enter/exit
+ * GM access feature entry: the audited operator surface — enter/exit
  * GM mode with basis, company inspection, account recovery, onboarding,
  * activation, administrator restoration and alpha ending, all through the
  * checked dispatch entries in convex/access/gm/functions.ts.

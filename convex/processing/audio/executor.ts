@@ -1,10 +1,10 @@
 /**
- * The durable STT segment workflow (D6): resumable, checkpointed per
+ * The durable STT segment workflow: resumable, checkpointed per
  * segment, one bounded provider pass per segment per run.
  *
  * The registered executor (`processing.transcribe_segment`, the coordinated
- * contracts amendment E2 named as its prerequisite) delegates to a
- * @convex-dev/workflow workflow — the ONE canonical engine (A3 precedent in
+ * contracts amendment provider routing needed) delegates to a
+ * @convex-dev/workflow workflow — the ONE canonical engine (the platform precedent in
  * convex/platform/pipeline.ts). Crash/restart semantics:
  *
  * - The manifest is planned ONCE (insert-if-absent): the immutable
@@ -12,10 +12,10 @@
  * - Each segment step re-reads its checkpoint: an already-succeeded segment
  *   replays as a no-op (no second provider call for it); a failed/pending
  *   segment gets ONE bounded provider pass (the accepted STT route order
- *   inside E2's adapter already covers mai -> whisper fallback per call).
+ *   inside the adapter already covers mai -> whisper fallback per call).
  * - Segment attempts are bounded per segment (SEGMENT_MAX_ATTEMPTS) across
  *   resumes; the resume path is re-registration of the definitely-failed
- *   job (the A3 outbox rule), never an unbounded loop.
+ *   job (the outbox rule), never an unbounded loop.
  * - A segment failure does not abort the run: remaining segments still
  *   process (maximum honest progress), and the transcript is left
  *   `partial`/`pending` with a sanitized error kind — never fake-complete.
@@ -64,27 +64,27 @@ import {
 export const SEGMENT_MAX_ATTEMPTS = 3;
 
 /**
- * Step-sequence keyspace (review round 1, the E3 collision fix).
+ * Step-sequence keyspace.
  *
- * D6 orders anchor to the source's INITIAL analysis run — the same run
- * whose step journal E3's text stages own (`convex/processing/text`:
+ * Transcript orders anchor to the source's INITIAL analysis run — the same run
+ * whose step journal the text stages own (`convex/processing/text`:
  * extract step 10, stages 20/30, clarifications 500+, groups 1000+, and
- * the failure/outcome marker bases 100_000/200_000). D6's segment steps
+ * the failure/outcome marker bases 100_000/200_000). The segment steps
  * and probe markers therefore live at dedicated bases far OUTSIDE every
- * E3 range, and every (run, sequence) lookup additionally checks
+ * text-analysis range, and every (run, sequence) lookup additionally checks
  * `stepKind`, so a text+audio source can never cross-wire the two lanes'
- * journals (a D6 step attaching attempts to an E3 stage, or a disarm
- * deleting an E3 marker). Pinned against E3's exported constants by
+ * journals (a step attaching attempts to an stage, or a disarm
+ * deleting an marker). Pinned against the exported constants by
  * tests/d6/keyspace.test.ts.
  */
 export const SEGMENT_STEP_BASE = 1_000_000;
 export const SEGMENT_MARKER_BASE = 5_000_000;
 
-/** The step kinds D6 writes on `processingSteps` (lookup guards). */
+/** The step kinds transcription writes on `processingSteps` (lookup guards). */
 export const SEGMENT_STEP_KIND = "stt_segment";
 export const PROBE_FAILURE_MARKER_KIND = "d6_probe_fail_segment";
 
-/** Provider failures classified uncertain by E2's event mapping. */
+/** Provider failures classified uncertain by the event mapping. */
 export const UNCERTAIN_FAILURE_KINDS = new Set(["deadline_exceeded", "connection_failed"]);
 
 /** The db read surface the marker helpers need (any Convex ctx fits). */
@@ -94,7 +94,7 @@ type StepsDb = Pick<MutationCtx["db"], "query">;
  * The probe-armed failure marker row for one segment (stepKind-guarded).
  * Rows are COLLECTED and filtered by kind, not `.first()`-checked: at a
  * shared (run, sequence) key the first row is arbitrary, and the guard must
- * find D6's marker regardless of a foreign lane's row at the same sequence.
+ * find the marker regardless of a foreign lane's row at the same sequence.
  */
 export async function segmentFailureMarkerRow(
   db: StepsDb,
@@ -151,13 +151,13 @@ export async function removeSegmentFailureMarker(
 export type ManifestOutcome = { ok: true; segmentCount: number } | { ok: false; code: string };
 
 /**
- * The byte-channel resolution the manifest needs (R34, issue #254): the
+ * The byte-channel resolution the manifest needs: the
  * duration of the retained audio. The LOAD is a query (`manifestTarget`);
  * the RESOLUTION is I/O-BEARING — the `media_worker` channel probes the
  * media executor over HTTP — so it runs in an ACTION
  * (`resolveManifestInput`); Convex mutations cannot fetch, and the probe
  * silently died as `media_worker_unreachable` on every real recording
- * while the D6 proof fixtures (the fetch-free `proof_inline` channel)
+ * while the proof fixtures (the fetch-free `proof_inline` channel)
  * never noticed.
  */
 export type ManifestDuration =
@@ -226,7 +226,7 @@ export async function resolveManifestDuration(loaded: ManifestTarget): Promise<M
     if (!measured.ok) {
       return { ok: false, code: measured.code };
     }
-    // The order-time pin is COMPARED, not just stored (review finding 3):
+    // The order-time pin is COMPARED, not just stored:
     // a stash mutated after ordering refuses planning.
     if (
       loaded.proofBytesSha256 !== undefined &&
@@ -317,7 +317,7 @@ export const manifestTarget = internalQuery({
 });
 
 /**
- * The fetch-bearing half of manifest planning (R34): Convex mutations
+ * The fetch-bearing half of manifest planning: Convex mutations
  * cannot perform I/O, so the action loads the target through the query and
  * resolves the duration HERE, handing it to the transactional mutation.
  */
@@ -381,7 +381,7 @@ export interface SegmentAttemptOutcome {
   }[];
 }
 
-/** Reads the OpenRouter key like E2's dispatch (presence only, never value). */
+/** Reads the OpenRouter key like the dispatch (presence only, never value). */
 function openRouterCredentials(): OpenRouterCredentials | null {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (apiKey === undefined || apiKey === "") {
@@ -419,7 +419,7 @@ export const segmentWork = internalQuery({
 });
 
 /**
- * Maps one E2 adapter call record onto the journal outcome (round-2
+ * Maps one adapter call record onto the journal outcome (round-2
  * finding b: `servedModels` lists ONLY the models whose attempts actually
  * served; requested-but-failed fallback positions stay on the per-attempt
  * history rows). Pure: unit-tested directly over runner-record shapes.
@@ -528,7 +528,7 @@ export const attemptSegment = internalAction({
     if (credentials === null) {
       return { kind: "failed", errorKind: "provider_key_not_configured" };
     }
-    // The accepted STT route order (mai -> whisper) lives INSIDE E2's
+    // The accepted STT route order (mai -> whisper) lives INSIDE the
     // adapter; this call is one segment's bounded pass over that route, and
     // the pure mapping owns every recorded field.
     return providerCallOutcome(
@@ -675,7 +675,7 @@ export const recordSegmentOutcome = internalMutation({
 });
 
 /**
- * The per-segment platform step row: insert-if-absent at the D6-only
+ * The per-segment platform step row: insert-if-absent at the transcription-only
  * `SEGMENT_STEP_BASE + segmentIndex` keyspace, with the `stepKind` guard on
  * the lookup so a foreign lane's row at the same sequence can never be
  * adopted (or clobbered) as a segment step.
@@ -695,9 +695,9 @@ async function ensureStepRow(
   const ours = existing.find((row) => row.stepKind === SEGMENT_STEP_KIND);
   if (ours !== undefined) {
     // The step row must reflect the LATEST pass, not freeze at the first
-    // outcome (round-2 finding 1: the fail-then-succeed resume — the
+    // outcome (the fail-then-succeed resume — the
     // interrupt fixture's exact case — left a failed STT step under a
-    // completed transcript forever). Like E3's recordStep, a non-terminal
+    // completed transcript forever). Like recordStep, a non-terminal
     // or superseded row is patched; a succeeded row never regresses (the
     // segment checkpoint makes later failures on it unreachable).
     if (outcome.kind === "succeeded" && ours.state !== "succeeded") {
@@ -773,7 +773,7 @@ export async function assembleTranscriptTransaction(
     // Idempotent assembly: the version exists; never a second one.
     return { complete: true, succeeded: segments.length, total: transcript.segmentCount, uncertain: false };
   }
-  // Immutability check (review finding 3): the stored planning-time
+  // Immutability check: the stored planning-time
   // fingerprint must equal the fingerprint of the rows being assembled —
   // coordinates that moved since planning refuse publication, loudly.
   if (transcript.manifestSha256 !== undefined) {
@@ -868,7 +868,7 @@ export const transcribeAudioWorkflow = workflow
     }),
   })
   .handler(async (step, args) => {
-    // R34: the byte-channel probe FETCHES, and mutations cannot — the
+    // The byte-channel probe FETCHES, and mutations cannot — the
     // resolver runs as an action first, the transaction commits second.
     const resolved = await step.runAction(
       internal.processing.audio.executor.resolveManifestInput,
@@ -960,7 +960,7 @@ export const completeTranscription = internalMutation({
     const transcript = await ctx.db.get(args.context.transcriptId);
     if (transcript !== null && transcript.state !== "complete" && value !== null) {
       await ctx.db.patch(args.context.transcriptId, {
-        // Keep the honest partial/pending state visible (E3/E4 seam); the
+        // Keep the honest partial/pending state visible; the
         // sanitized planning error rides along when planning refused.
         ...(value.lastErrorKind === undefined ? {} : { lastErrorKind: value.lastErrorKind }),
         updatedAtMs: nowMs,

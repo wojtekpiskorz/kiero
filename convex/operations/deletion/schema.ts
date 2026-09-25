@@ -1,26 +1,24 @@
 /**
- * Permanent deletion ledger and purge tracking (A2 candidate, certified by
- * A3; completed by I4).
+ * Permanent deletion ledger and purge tracking.
  *
- * Owning implementer: I4 (purge and derived-access invalidation).
  * Permanently deleted sources become inaccessible immediately; active or
  * reconstructing derivatives are purged within 24 hours; isolated backup
  * content expires within 30 days. The ledger row is content-free and
  * survives application database rollback, so a restore cannot resurrect
  * deleted data.
  *
- * I4 completion (the owning lane finishes the fragment):
+ * Additions to the certified fragment:
  *
  * - `deletionRecords.purgeDeadlineAtMs`: the 24-hour window's anchor set by
  *   the initiating transaction (stages inherit it). The row itself stays
- *   CONTENT-FREE (counts and opaque identities only, never text): I5's
+ *   CONTENT-FREE (counts and opaque identities only, never text): the
  *   backup inventory reads it verbatim into the separately-hashed ledger
- *   file, and I6's quarantine restore replays it before access opens.
+ *   file, and the quarantine restore replays it before access opens.
  * - `deletionPurgeStages`: one row per derivative family of one deletion
  *   record (media bytes, transcripts, findings marking, search index,
  *   notification work, exports). Stage state is the administrator's
  *   pending/complete/failed view; the durable `deletion.purge_source` job
- *   owns retries, and I2's incident scan sees the exhausted job. The
+ *   owns retries, and the incident scan sees the exhausted job. The
  *   media stage carries the R2 object keys it must delete (server-owned
  *   opaque identities, not content).
  *
@@ -56,9 +54,9 @@ export const deletionTables = {
     scopeSummary: v.string(),
     createdAtMs: shared.tsMs,
     /**
-     * I4 completion: when the 24-hour purge window of this record closes.
-     * Optional only so pre-I4 fixtures stay valid; every source_purge row
-     * I4 writes carries it.
+     * When the 24-hour purge window of this record closes.
+     * Optional only so older fixtures stay valid; every source_purge row
+     * the purge writes carries it.
      */
     purgeDeadlineAtMs: v.optional(shared.tsMs),
   })
@@ -68,7 +66,7 @@ export const deletionTables = {
     .index("by_target_source", ["targetSourceId"]),
 
   /**
-   * One derivative family's purge state inside one deletion record (I4).
+   * One derivative family's purge state inside one deletion record.
    * The rows are the administrator's cleanup status and the 24-hour
    * tracking surface; the durable job's own row remains the retry
    * authority. No user content ever lands here: the media stage lists

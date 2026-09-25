@@ -1,30 +1,27 @@
 /**
- * Calendar projection and sync tables (A2 candidate, certified by A3).
+ * Calendar projection and sync tables.
  *
- * Owning implementers: G2 (deterministic projection, personal scope),
- * G3 (reconciliation of writes, unknown outcomes, reconnects).
  * A copy mirrors one task deadline or event time into a personal calendar
  * and links back to the Kiero record. Hiding a copy is personal and never
  * cancels the underlying work. Unknown remote outcomes require
  * reconciliation; another POST is not automatically safe.
  *
- * G2 amendments (the owning lane completes the candidate fragment; the
- * table NAME stays in the closed inventory, G1 precedent):
+ * Notes:
  * - `calendarCopies` carries the full DESIRED state: the deterministic
  *   semantic id (stable per user/company/Google account/subject), the
  *   desired outcome (`projected` with its managed Google payload vs
  *   `withdrawn` with a machine reason), the finding revision the desire
  *   derives from, and the personal-hide bookkeeping. `googleEventId` and
- *   `remoteOutcome` remain G3's remote ledger: G2 only ever sets the
+ *   `remoteOutcome` remain the remote ledger: projection only ever sets the
  *   initial `unknown` and resets it when the account binding changes
  *   (the old calendar's linkage honestly stops being knowable).
  * - `calendarSyncState` additionally records the boss's personal project
  *   selection (default: all projects, independent of notification
  *   preferences) and the honest suspension reason of the last projection
  *   pass (a lost or refresh-unknown connection suspends publishing).
- * - G3 amendment (round-2 concurrency fix): `calendarCopies.syncAttemptSeq`
- *   is G3's attempt-claim counter, like the remote-ledger columns below —
- *   G2's projection pass never writes it.
+ * - `calendarCopies.syncAttemptSeq`
+ *   is the attempt-claim counter, like the remote-ledger columns below —
+ *   the projection pass never writes it.
  *
  * Tables: calendarCopies, calendarSyncState.
  */
@@ -117,7 +114,7 @@ export const calendarProjectionTables = {
     hiddenAtMs: v.optional(shared.tsMs),
     remoteOutcome: calendarRemoteOutcome,
     /**
-     * G3's attempt-claim counter: bumped in the SAME transaction that
+     * the attempt-claim counter: bumped in the SAME transaction that
      * inserts an attempt row, so the attempt dedup key is minted from a
      * PERSISTED sequence instead of a read-then-used row count. Two racing
      * prepares for one copy conflict on THIS document; Convex retries the

@@ -1,17 +1,18 @@
 /**
- * Work command dispatch wiring (C4): the SAME checked path A3 proved and
- * B1/B3/C1/C2/D1 reuse, with this lane's handler registry and policy.
+ * Work command dispatch wiring: the SAME checked path the platform proved and
+ * identity, membership, projects, findings and sources reuse, with this lane's
+ * handler registry and policy.
  *
  * `dispatchWorkCommand` is @kiero/runtime's `dispatchCommand` over the
- * B3-preceded identity resolution: provision-or-refresh the B1 live session,
+ * Identity resolution (as in membership): provision-or-refresh the live session,
  * then the canonical chain (user -> earliest active membership -> company)
- * whose rows B3 owns. The resolved context is the ONLY company scope — no
+ * whose rows membership owns. The resolved context is the ONLY company scope — no
  * client input names a company. The handlers run inside ONE Convex mutation,
  * so each state change, its history row and its canonical `work.*` event
  * commit atomically.
  *
  * The dispatch decodes the envelope input ONCE and hands the handler the
- * DECODED value; the handlers re-decode (the B3/C1 pattern), which is
+ * DECODED value; the handlers re-decode, which is
  * sound here because every work input field is an untransformed wire shape
  * (ids, literals, strings, integers) — no schema-transformed values.
  *
@@ -98,8 +99,8 @@ export function workHandlers(): HandlerRegistry<MutationCtx> {
 
 /**
  * Dispatches one company-scoped work command envelope inside ONE Convex
- * mutation transaction, through the checked path with B1's identity source
- * and the C4 policy. Unimplemented operations fail closed `unsupported`.
+ * mutation transaction, through the checked path with the identity source
+ * and the policy. Unimplemented operations fail closed `unsupported`.
  */
 export async function dispatchWorkCommand(
   ctx: MutationCtx,

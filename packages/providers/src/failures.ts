@@ -1,5 +1,5 @@
 /**
- * Provider failure classification (E2).
+ * Provider failure classification.
  *
  * A provider failure is classified into a closed vocabulary BEFORE any
  * fallback decision, and only the classification survives: provider error
@@ -12,7 +12,7 @@
  * problem with the route that was actually tried. Incompatible output
  * (malformed JSON, schema mismatch, unknown tool name, wrong vector
  * dimensions) fails closed: trying another model would mask a capability
- * incompatibility the corpus runner (J3) must observe, and provider output
+ * incompatibility the corpus runner must observe, and provider output
  * must never be normalized into acceptance.
  */
 

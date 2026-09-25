@@ -1,10 +1,10 @@
 /**
- * Health and observability reads (A3; re-scoped for production honesty by I2
- * per the A3 handoff note: the dev-proof framing of the metadata became the
+ * Health and observability reads (re-scoped for production honesty
+ * per the handoff note: the dev-proof framing of the metadata became the
  * real statement of what this surface does and does not cover).
  *
  * `snapshot` is the live subscription target: it exposes runtime version,
- * the registered executors (from the A2/A3 composed registry), outbox counts
+ * the registered executors (from the composed registry), outbox counts
  * and a monotone revision (total outbox rows), plus the observability
  * honesty block: native Convex platform log history is UNAVAILABLE on the
  * Free plan and is never simulated; diagnostics are explicit redacted

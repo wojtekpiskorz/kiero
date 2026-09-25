@@ -1,8 +1,8 @@
 /**
- * The durable local draft store (D4): ONE stable, recoverable composer
+ * The durable local draft store: ONE stable, recoverable composer
  * draft per signed-in person, persisted in the browser's own storage.
  *
- * Honesty rules this module exists to enforce (issue #32):
+ * Honesty rules this module exists to enforce:
  *
  * - a draft that was never confirmed by the server is LOCAL, and says so:
  *   the record's `phase` is the one authority the UI renders ("composing"
@@ -60,7 +60,7 @@ export interface DraftPhoto {
  * Crash recovery of an interrupted SEND reads nothing but the stable
  * `draftId`: the resume path re-prepares with it and trusts the server's
  * own session answer, so the record deliberately carries NO mirrored
- * upload session (round 2: a mirror with no production reader).
+ * upload session (a mirror with no production reader).
  */
 export interface DraftRecord {
   readonly userId: string;
@@ -73,7 +73,7 @@ export interface DraftRecord {
   readonly scopeProjectId: string | null;
   /**
    * Captured at the FIRST send attempt; an interrupted/offline draft keeps
-   * its original intention on every retry (D1: past values stay acceptable).
+   * its original intention on every retry (past values stay acceptable).
    */
   readonly intendedSentAtIso: string | null;
   readonly recording: DraftRecording | null;

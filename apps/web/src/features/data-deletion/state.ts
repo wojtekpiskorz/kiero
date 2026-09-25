@@ -1,5 +1,5 @@
 /**
- * Polish product copy of the data-deletion feature (I4). Barebones scope:
+ * Polish product copy of the data-deletion feature. Barebones scope:
  * plain semantic controls and status text only, no styling (AGENTS.md).
  * The confirmation phrase is the server's exact contract (imported, not
  * duplicated), so the UI's "wpisz: ..." can never drift from the check.

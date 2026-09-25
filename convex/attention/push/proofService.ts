@@ -1,11 +1,11 @@
 /**
- * The F3 guarded proof-fixture WEB PUSH SERVICE (dev deployment only): the
+ * The guarded proof-fixture WEB PUSH SERVICE (dev deployment only): the
  * clearly-labeled fake push service the evidence script
- * (tests/f3/live-proof.mjs) controls - G1/G3's fake-Google pattern, applied
+ * (tests/f3/live-proof.mjs) controls - the Calendar fake-Google pattern, applied
  * to RFC 8030/8291/8292.
  *
  * Everything the live proof needs beyond the production lanes lives HERE,
- * in F3's owned module, beside its protocol vocabulary. The guard is
+ * in the owned module, beside its protocol vocabulary. The guard is
  * `KIERO_F3_PROOF_ENABLED === "1"`; on any other deployment every entry
  * fails closed 404. Fixture values are constants, never secrets; the
  * VAPID keypair the deployment signs with stays in environment variables
@@ -28,7 +28,7 @@
  *   exactly the load-bearing timeout-after-acceptance case).
  * - `POST /attention/push/proof/state` - the guarded evidence read.
  *
- * Wired by the sanctioned append in convex/http.ts.
+ * Wired by the append in convex/http.ts.
  */
 
 import { v } from "convex/values";
@@ -36,7 +36,7 @@ import { httpAction, internalAction, internalMutation, internalQuery } from "../
 import { internal } from "../../_generated/api";
 import { base64UrlDecode, base64UrlEncode } from "./protocol";
 
-/** The guard (G1's shape). */
+/** The guard. */
 export function pushProofEnabled(env: { KIERO_F3_PROOF_ENABLED?: string }): boolean {
   return env.KIERO_F3_PROOF_ENABLED === "1";
 }

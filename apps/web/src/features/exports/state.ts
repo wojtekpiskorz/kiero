@@ -1,5 +1,5 @@
 /**
- * Polish product copy of the exports feature (I3). Barebones scope: plain
+ * Polish product copy of the exports feature. Barebones scope: plain
  * semantic controls and status text only, no styling (AGENTS.md).
  */
 

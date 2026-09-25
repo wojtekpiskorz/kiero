@@ -1,7 +1,6 @@
 /**
- * Projects and contacts tables (A2 candidate, certified by A3).
+ * Projects and contacts tables.
  *
- * Owning implementer: C1 (projects, contacts, aliases, lifecycle).
  * A project exists from the first client inquiry; ordinary names may collide
  * while assigned codenames are firm-unique across retained history and stay
  * reserved through rename/closure. Pause is a separate mark, not a stage.

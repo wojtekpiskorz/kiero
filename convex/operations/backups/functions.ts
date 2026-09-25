@@ -1,12 +1,12 @@
 /**
- * The complete-backup function surface (I5).
+ * The complete-backup function surface.
  *
  * The Convex side is the coordination authority; the EU backup Container
  * (apps/backup-worker) is the executor. One scheduled run:
  *
  * 1. `beginRun` (single-run lease): decides start/takeover/retry/refuse for
- *    the current slot, reads the retained-media inventory (D3 seam) and the
- *    content-free deletion ledger (I4 seam) atomically, and stores the
+ *    the current slot, reads the retained-media inventory and the
+ *    content-free deletion ledger atomically, and stores the
  *    inventory on the building row as the closure authority.
  * 2. The executor exports the database snapshot with the pinned documented
  *    mechanism (the pre-installed `convex export` binary), copies every inventory object
@@ -18,13 +18,13 @@
  *    ledger count must match; tier and retention deadline are recomputed,
  *    never trusted from the client) before a row may become `verified`.
  *    A partial set can therefore never be labelled complete.
- * 4. `failRun` records a typed failure; freshness alerting (I2 seam) and the
+ * 4. `failRun` records a typed failure; freshness alerting and the
  *    next slot's retry take it from there.
  * 5. `sweepPlan`/`sweepComplete` run the reference-aware retention pass:
  *    expired sets are collected, pooled objects are deleted only when no
  *    SURVIVING manifest references them, and stale failed rows are pruned.
  *
- * Health/cost events (I2 seam) are emitted by the HTTP boundary and the
+ * Health/cost events are emitted by the HTTP boundary and the
  * cron tick around these functions: every attempt records a `backup.job`
  * heartbeat, completed runs record measured cost entries, and the
  * freshness check emits the deduplicated `ops.backup.stale` diagnostic.
@@ -77,7 +77,7 @@ export interface BeginAcquired {
   readonly leaseExpiresAtMs: number;
   /** The media objects this run must copy and verify (purge drops removed). */
   readonly media: readonly InventoryEntry[];
-  /** Purge-recorded drops already excluded from `media` (I4 seam). */
+  /** Purge-recorded drops already excluded from `media`. */
   readonly purgedDrops: readonly { objectKey: string; sourceId: string }[];
   /** The content-free deletion/revocation ledger to carry separately. */
   readonly ledger: readonly LedgerEntry[];
@@ -523,7 +523,7 @@ export const FAILED_ROW_RETENTION_MS = 48 * 60 * 60 * 1000;
 /**
  * Applies a finished sweep: collected expired sets' rows go, stale failed
  * rows are pruned, and one audited retention-evidence record is written
- * (J5 reads this trail). Idempotent: rows already gone count as replayed.
+ * (core qualification reads this trail). Idempotent: rows already gone count as replayed.
  */
 export async function sweepCompleteTx(
   ctx: MutationCtx,
@@ -581,7 +581,7 @@ export const sweepComplete = internalMutation({
     sweepCompleteTx(ctx, args),
 });
 
-// --- freshness (I2 seam) -------------------------------------------------------------
+// --- freshness -------------------------------------------------------------
 
 /** The rows the freshness check reads. */
 async function freshnessInputs(db: QueryCtx["db"]) {
@@ -699,7 +699,7 @@ export const backupTick = internalAction({
   },
 });
 
-// --- the composed state read (proofs, I6, J5) --------------------------------------------
+// --- the composed state read --------------------------------------------
 
 export const backupsState = internalQuery({
   args: {},

@@ -1,5 +1,5 @@
 /**
- * The archive's readable HTML index (I3): a single self-contained, unstyled
+ * The archive's readable HTML index: a single self-contained, unstyled
  * HTML document rendered from the company snapshot. It is written for a
  * boss who opens the ZIP on any computer: plain headings, lists and links
  * to the media files next to it — no scripts, no styles, no network.

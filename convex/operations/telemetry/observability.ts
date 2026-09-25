@@ -1,8 +1,8 @@
 /**
- * The observability honesty block (I2).
+ * The observability honesty block.
  *
  * PURE MODULE, single definition: consumed by `convex/platform/health.ts`
- * (the A3 re-scope) and the telemetry state reads, and mirrored in
+ * (the re-scope) and the telemetry state reads, and mirrored in
  * infra/observability/dashboards.md. Dashboards and health surfaces must
  * state retention and blind spots accurately; application events never claim
  * full native Convex logging (unavailable on the Free plan, and not simulated).

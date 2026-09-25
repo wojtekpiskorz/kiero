@@ -1,12 +1,12 @@
 /**
- * The uploads channel HTTP boundary (D2): the browser's verified entry to
+ * The uploads channel HTTP boundary: the browser's verified entry to
  * the upload ledger.
  *
  * `/sources/uploads/bridge` (POST) and `/sources/uploads/state` (POST)
  * carry the END USER's Convex Auth credential: the browser sends
  * `Authorization: Bearer <id token>`, the gateway Worker forwards that
  * header verbatim, and Convex propagates it into the invoked mutation's /
- * query's `ctx.auth` — where B1's live-session resolution and A3's
+ * query's `ctx.auth` — where the live-session resolution and the
  * canonical chain resolve the acting user (live session, active
  * membership, company). The service-bridge identity is NOT used here: a
  * user-owned ledger row must never be created or touched as the service

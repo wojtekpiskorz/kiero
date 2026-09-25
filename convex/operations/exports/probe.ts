@@ -1,6 +1,6 @@
 /**
- * I3 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, the D1/D3 probe pattern). No business work happens here; the
+ * Exports dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable, the probe pattern). No business work happens here; the
  * entries let the live evidence run against the REAL dev deployment, the
  * REAL gateway Worker, the REAL export Worker and the REAL EU bucket.
  *
@@ -13,7 +13,7 @@
  * - `probeRequestExportAsCaller`: runs the SAME checked dispatch the web
  *   feature uses (`dispatchExports`) as the caller, so the admin/member
  *   refusal matrix lives on the real deployment.
- * - `probeInvalidateForPurgedSource`: the eager invalidation seam I4 will
+ * - `probeInvalidateForPurgedSource`: the eager invalidation seam deletion will
  *   call, as a guarded internal action for the immediacy evidence; the
  *   wrapper first checks the source against the caller's own company
  *   (`probeSourceOfCallerInternal`, the sibling membership pattern).
@@ -57,7 +57,7 @@ export const probeRequestExportAsCaller = action({
   },
 });
 
-/** The eager invalidation seam (I4's consumer edge), as an internal mutation. */
+/** The eager invalidation seam (the consumer edge), as an internal mutation. */
 export const probeInvalidateForPurgedSource = internalMutation({
   args: { sourceId: v.id("sources"), reason: v.optional(v.string()) },
   handler: async (ctx, args) => {

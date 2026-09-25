@@ -1,11 +1,11 @@
 /**
- * C2 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, exactly like the A3 platform probes and the D1 sources probes;
+ * Findings dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable, exactly like the platform probes and the sources probes;
  * shared plumbing imported from convex/sources/probe_shared.ts).
  *
- * No business work happens here; these entries exist so the C2 evidence can
+ * No business work happens here; these entries exist so the evidence can
  * run against the REAL dev deployment without a development-auth shortcut:
- * the actor is always the service account's own session (the A3
+ * the actor is always the service account's own session (the platform
  * service-bridge identity) or an explicitly seeded second-company session,
  * resolved through the SAME canonical resolution and authorization seam as
  * production calls. Sessions are created server-side here; no identity is
@@ -16,7 +16,7 @@
  * - `probeReadCurrentFindings`: the tenant-scoped current read.
  * - `probeResolveRelativeDay`: runs the deployed pure temporal resolver.
  * - `probeCrashPublish`: performs the FULL publish transaction and then
- *   THROWS before commit (the D1 no-orphan pattern), proving rollback of
+ *   THROWS before commit (the no-orphan pattern), proving rollback of
  *   revisions, provenance, projection, group state and events together.
  * - `probeSeedMemoryFixtures` / `probeSeedMemoryIsolation`: idempotent
  *   fixtures (two witnessed sources with text extractions and fragments in
@@ -26,7 +26,7 @@
  *   transition and the marking core.
  * - `probeMemoryState`: the tenant-scoped inspection read the evidence
  *   script asserts on.
- * - `probeClarificationStorage` (R2, issue #127): the guarded STORED
+ * - `probeClarificationStorage` (R2): the guarded STORED
  *   clarification rows for the caller's company (the storage-freeze half
  *   of the deletion-purge evidence, with the content-free purgeAudit).
  */
@@ -322,7 +322,7 @@ export const probeReadCurrentFindings = action({
   },
 });
 
-// H1 exposition-read probes (guarded): the same internal twins the public
+// Exposition-read probes (guarded): the same internal twins the public
 // queries ride, so the boss-facing history/clarification reads are provable
 // live against the real authorization path without a development-auth
 // shortcut.
@@ -587,7 +587,7 @@ export const probeMemoryState = action({
   },
 });
 
-// --- R2 storage inspection (issue #127) ------------------------------------------
+// --- R2 storage inspection ------------------------------------------
 
 /**
  * The guarded STORED clarification rows for the CALLER's company (the

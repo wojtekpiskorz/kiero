@@ -1,5 +1,5 @@
 /**
- * The photo-normalizer port and its adapters (D5).
+ * The photo-normalizer port and its adapters.
  *
  * Q210 selected the Cloudflare Images binding as the normalization
  * executor ("Images binding" in the architecture's provider table): the
@@ -72,7 +72,7 @@ interface ImagesBindingLike {
 }
 
 /**
- * The executor's typed refusal (R24): the HTTP status rides the error TYPE,
+ * The executor's typed refusal: the HTTP status rides the error TYPE,
  * not its prose — the drive's conversion-failure record reads the field, so
  * no message wording is ever load-bearing.
  */
@@ -114,14 +114,14 @@ export function imagesBindingNormalizer(binding: ImagesBindingLike): PhotoNormal
         .output({ format: "image/webp", quality: request.quality })
         .response();
       if (!response.ok) {
-        // The status rides the typed refusal (R24): the drive's conversion
+        // The status rides the typed refusal: the drive's conversion
         // failure record names WHY the executor refused — entitlement and
         // decode failures stop being indistinguishable.
         throw new NormalizerFailure(`images binding transform failed: ${response.status}`, response.status);
       }
       const output = new Uint8Array(await response.arrayBuffer());
       // The binding's response does not report output dimensions, so the
-      // adapter decodes its own WebP output (R24: the drive's recorded
+      // adapter decodes its own WebP output (the drive's recorded
       // evidence needs the real pixel space; an undecodable own output is
       // a conversion failure, never a 0x0 stand-in).
       const dimensions = decodeImageDimensions(output);

@@ -1,15 +1,15 @@
 /**
- * @kiero/agent/tools: the pure answer-tools surface (E6).
+ * @kiero/agent/tools: the pure answer-tools surface.
  *
  * Small public interface, Convex-free and model-free by construction:
  *
  * - `AnswerContext` + derivations: the tenant-filtered snapshot one answer
- *   run reads, with the C5 updating gate applied at load;
+ *   run reads, with the updating gate applied at load;
  * - the seven tool input schemas (`agent_search_evidence`,
  *   `agent_submit_answer`, `agent_ask_clarification`,
  *   `agent_resolve_clarification`, `agent_change_task`,
  *   `agent_change_event`, `agent_validate_extension_value`): the decode
- *   authority for tool arguments coming back through E2's chat adapter;
+ *   authority for tool arguments coming back through the chat adapter;
  * - `applyAnswerToolCall`: the decoded-not-executed answer-contract
  *   reducer (grounded vs ungrounded, corroboration is a second witness,
  *   the updating gate, ambiguity → clarification);
@@ -25,11 +25,11 @@
  * - the versioned Polish dialogue builders (system prompt, question
  *   message, evidence-result encoding). The former prose tool-round
  *   renderings were deleted when the answer loop switched to replaying
- *   NATIVE tool rounds (E8 coordinated lane); the planning copies in
- *   @kiero/agent stay live for E3/E4.
+ *   NATIVE tool rounds; the planning copies in
+ *   @kiero/agent stay live for text and multimodal analysis.
  *
  * The Convex-coupled half (context loading, tenant-scoped evidence search,
- * checked executions through the C2-C4 dispatches, the bounded answer
+ * checked executions through the memory and work dispatches, the bounded answer
  * loop) lives in convex/agent.
  */
 

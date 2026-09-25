@@ -1,13 +1,13 @@
 /**
  * The canonical relative target of one source record: the Convex half of
- * R5's wire contract (issue #130).
+ * the wire contract.
  *
  * The app-side authority is the source-detail feature's serializer/parser
  * (`apps/web/src/features/source-detail/source-route`). The Convex backend
  * must not import browser feature code, so this module is the ONE
  * runtime-neutral half every server-side consumer addresses a source
- * through — attention push summaries (R3) and export archive records
- * (I3) re-export or call `sourceTargetOf` instead of keeping private
+ * through — attention push summaries and export archive records
+ *  re-export or call `sourceTargetOf` instead of keeping private
  * twins. tests/i3 pin the wire form equal to the app serializer against
  * one corpus and pin both consumers' exports to THIS function.
  *

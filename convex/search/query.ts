@@ -1,7 +1,7 @@
 /**
- * Tenant-safe versioned retrieval (E5): the `search.queryEvidence` core.
+ * Tenant-safe versioned retrieval: the `search.queryEvidence` core.
  *
- * The operation runs in an ACTION (the E2 checked-dispatch pattern over an
+ * The operation runs in an ACTION (the checked-dispatch pattern over an
  * action context): the query-side embedding is a provider call and never
  * happens inside a transaction. The retrieval pipeline, in order:
  *
@@ -12,17 +12,17 @@
  *    nor a semantic result can cross company scope, whatever a stale derived
  *    row claims.
  * 2. The ACTIVE generation resolves; without one the result is the honest
- *    `degraded` coverage (typed/current structured reads, the D1 views and
- *    C2 current findings, remain available through their own operations).
+ *    `degraded` coverage (typed/current structured reads, the views and
+ *    current findings, remain available through their own operations).
  * 3. Text matching runs over the versioned prepared texts (the same fold
  *    that prepared the index); the semantic half embeds the QUERY through
- *    E2's adapter (inputKind `search_query`) and ranks same-generation rows
+ *    the adapter (inputKind `search_query`) and ranks same-generation rows
  *    by cosine in-action (the 4096-dimension baseline exceeds the platform
  *    vector-index limit; the final vector design is the excluded search
  *    track). An embedding outage leaves text retrieval standing and the
  *    coverage literal discloses `text_only`: absence of a semantic hit is
  *    retrieval coverage, never proof that the fact does not exist.
- * 4. HYDRATION: every candidate re-reads its canonical D1/C2 record
+ * 4. HYDRATION: every candidate re-reads its canonical source/finding record
  *    (source lifecycle, tenant scope, project links, author, send time;
  *    finding current revision) and the keep-or-drop rules from
  *    @kiero/retrieval filter before anything is returned. Withdrawn or

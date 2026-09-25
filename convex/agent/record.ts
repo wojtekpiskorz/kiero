@@ -1,6 +1,6 @@
 /**
- * The answer loop's recording half (R25, issue #230): the durable
- * answerRuns/answerTurns rows the E6 loop writes from its existing
+ * The answer loop's recording half: the durable
+ * answerRuns/answerTurns rows the loop writes from its existing
  * checkpoints — run start, each provider turn, run finish. Pure
  * instrumentation: NO loop behavior changes; the fix the recorded evidence
  * decides is a separate repair.
@@ -19,7 +19,7 @@
  *   are BEST-EFFORT: a recording failure (transient storage, id validation)
  *   is swallowed — instrumentation must never fail an ask that would
  *   otherwise succeed.
- * - sanitization by shape (the I2 diagnosticEvents discipline): names,
+ * - sanitization by shape (the diagnosticEvents discipline): names,
  *   closed codes/classes, counts, latencies and ONE bounded excerpt enter
  *   these rows; raw payloads, arguments, prompts and transcripts have no
  *   field to land in, and the helpers bound every untrusted string before

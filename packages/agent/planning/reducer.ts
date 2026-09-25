@@ -1,8 +1,8 @@
 /**
- * The decoded-tool-call reducer (E3): validation and accumulation of an
+ * The decoded-tool-call reducer: validation and accumulation of an
  * agent plan — decoded, never executed.
  *
- * E2's chat adapter hands each tool call back with its arguments DECODED
+ * the chat adapter hands each tool call back with its arguments DECODED
  * against the declared schema; this reducer then validates the decoded
  * arguments against the analysis context (the tenant-filtered truth) and
  * accumulates them into a serializable plan state. Nothing here writes, and
@@ -10,7 +10,7 @@
  * unstated tax basis, a self-derivation or a retargeted correction is
  * refused with a Polish tool-result message the model can act on. The
  * EXECUTION of what survives happens later, in one checked transaction per
- * publication group, through C2's `prepareChangeSet`/`publishChangeSet`.
+ * publication group, through `prepareChangeSet`/`publishChangeSet`.
  *
  * The accumulated state is WIRE-shaped on purpose (encoded FindingValue,
  * plain strings/numbers): it crosses the workflow journal between the model
@@ -432,10 +432,10 @@ function applyClarification(
 
 /**
  * Applies one decoded tool call to the plan state. Arguments must already
- * be DECODED (E2's adapter guarantees this); a call whose arguments fail
+ * be DECODED (the adapter guarantees this); a call whose arguments fail
  * the deeper context validation is refused with a Polish tool result the
  * model can correct in a later turn. Unknown tool names are refused —
- * though E2's adapter already fails those closed.
+ * though the adapter already fails those closed.
  */
 export function applyDecodedCall(
   state: PlanningState,

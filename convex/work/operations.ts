@@ -1,15 +1,15 @@
 /**
- * Work transactions (C4): the write halves of the pure domain rules in
+ * Work transactions: the write halves of the pure domain rules in
  * `packages/domain/work`, each inside ONE Convex mutation.
  *
  * Every entry runs through the typed command dispatch (./dispatch.ts):
- * envelope decode -> registry -> B1 identity resolution -> the C4 policy ->
+ * envelope decode -> registry -> identity resolution -> the policy ->
  * contract input decode -> handler. The company scope always comes from the
  * RESOLVED context; a cross-company task/event/project/contact/membership/
  * finding/source reference is indistinguishable from a missing one
  * (`not_found`, no existence leak).
  *
- * ATOMICITY (the B3/C2 discipline): every step that can refuse (validation,
+ * ATOMICITY (the discipline): every step that can refuse (validation,
  * row loads, domain decisions) runs BEFORE the first insert/patch. Task and
  * event changes are split into a PREPARE half (reads, decisions, a plan)
  * and a COMMIT half (only pre-validated writes), so a delivery event and
@@ -968,7 +968,7 @@ export interface EventWithTaskInput {
  * versa. The two records share whatever dated finding the caller binds to
  * both (`timeFindingId` / `deadlineFindingId`) by reference — one
  * agreement, no divergent copies. Composable inside a publication
- * transaction (E3): call it from the same MutationCtx.
+ * transaction: call it from the same MutationCtx.
  */
 export async function performRecordEventWithTask(
   tx: MutationCtx,

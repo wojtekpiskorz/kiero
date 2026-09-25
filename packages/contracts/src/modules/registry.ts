@@ -103,21 +103,20 @@ export const revokedAccessCleanupInput = Schema.Struct({
   kind: Schema.Literals(["membership", "session"]),
   membershipId: Schema.NullOr(tableIdSchema("memberships")),
   sessionId: Schema.NullOr(tableIdSchema("sessions")),
-  // B3 amendment (issue #22): the drain projects the event payload onto this
+  // The drain projects the event payload onto this
   // input; `access.sessionRevoked` payloads carry no timestamp, so the
   // instant is optional and the executor stamps its own completion time.
   revokedAtMs: Schema.optionalKey(Schema.Number),
 });
 
 /**
- * The recomputation input (issue #28 owns this executor's edge). C5
- * amendment on the B3 input-shape precedent (additive, flagged): `reason`
- * and `withdrawnByUserId` join the certified shape as NULLABLE fields so
- * the drain can project event payloads that do not carry them, while the
+ * The recomputation input. `reason` and `withdrawnByUserId` join the certified
+ * shape as NULLABLE fields so the drain can project event payloads that do not
+ * carry them, while the
  * withdrawal transaction registers the job with the real values - the
  * marking revisions record the withdrawal's reason and actor.
  *
- * E7 amendment (issue #115, flagged on the same precedent): the
+ * The
  * `source_reassigned` cause carries the scope re-assessment reaction of a
  * project reassignment, and its optional nullable actor
  * `reassignedByUserId` rides alongside `withdrawnByUserId` (one actor
@@ -138,8 +137,7 @@ export const recomputeDependentsInput = Schema.Struct({
 });
 
 /**
- * I4 amendment (issue #56, the E3 `extractFragmentsInput` precedent for
- * input-shape amendments made by the edge-owning lane): the drain projects
+ * Notes: the drain projects
  * `sources.sourcePurged` onto this input, but the certified payload carries
  * only the source id (the purge transaction registers the job itself with
  * the real record id, under the SAME dedup key, so the projection collapses
@@ -158,13 +156,13 @@ export const reconcileOutcomeInput = Schema.Struct({
 });
 
 /**
- * E3 amendment (issue #37): the drain projects `sources.sourceAccepted`
- * onto this input, but the certified D1 payload carries no `extractionId`
+ * The drain projects `sources.sourceAccepted`
+ * onto this input, but the certified payload carries no `extractionId`
  * (the acceptance transaction registers the extract job itself with the
  * real id). The id is therefore nullable: `null` means "resolve the
- * source's text extraction in-company" (exactly one exists per D1 source),
+ * source's text extraction in-company" (exactly one exists per text source),
  * and the drain's registration collapses onto the publisher's row anyway
- * through the shared dedup key. The B3 precedent for input-shape
+ * through the shared dedup key. The precedent for input-shape
  * amendments made by the edge-owning lane.
  */
 export const extractFragmentsInput = Schema.Struct({
@@ -178,7 +176,7 @@ export const analyzeChangePlanInput = Schema.Struct({
   reanalysisOfRunId: Schema.NullOr(tableIdSchema("processingRuns")),
 });
 
-// D5 amendment (issue #33): the photo-normalization executor input. The
+// The photo-normalization executor input. The
 // accepted source's attachment ids ride the `sources.sourceAccepted` payload
 // verbatim (audio attachments are skipped by the executor); the source id
 // anchors tenancy and the deterministic job dedup key.
@@ -187,37 +185,36 @@ export const normalizePhotoInput = Schema.Struct({
   attachmentIds: Schema.Array(tableIdSchema("attachments")),
 });
 
-// A3 certification amendment: the platform's external-delivery proof executor.
+// Platform certification amendment: the platform's external-delivery proof executor.
 export const echoDeliveryInput = Schema.Struct({
   dedupKey: Schema.NonEmptyString,
   message: Schema.NonEmptyString,
 });
 
-// D6 amendment (flagged coordinated change, the B3 precedent): the first
-// model-call job kind gets its executor registration - the prerequisite E2's
+// The first
+// model-call job kind gets its executor registration - the prerequisite the
 // dispatch named. Per-segment STT executes through the durable path; the
 // transcript row is the order the workflow owns.
 export const transcribeSegmentInput = Schema.Struct({
   transcriptId: tableIdSchema("audioTranscripts"),
 });
 
-// E4 amendment (flagged coordinated change, the D6 precedent): the
+// The
 // multimodal-join executor input. `processingRunId` is the run the join
 // anchors its steps to (the drain hands the reanalysis kicker's NEW run;
 // null means "resolve the source's initial analysis run", exactly the way
-// D6's orders anchor). The join composes E3 text planning with D5 vision
-// representations and D6 transcript versions (issue #38).
+// the orders anchor). The join composes text planning with normalized-photo vision
+// representations and transcript versions.
 export const joinMultimodalInput = Schema.Struct({
   sourceId: tableIdSchema("sources"),
   processingRunId: Schema.NullOr(tableIdSchema("processingRuns")),
   reanalysisOfRunId: Schema.NullOr(tableIdSchema("processingRuns")),
 });
-// F2 amendment (issue #42, flagged coordinated change on the B3/D5
-// precedent): the notification-intent executor input. The drain projects
+// The notification-intent executor input. The drain projects
 // the three consumed events onto this shape; the nullable ids let every
-// trigger share one closed input (the B3 optional-field precedent), and
+// trigger share one closed input (the optional-field precedent), and
 // the trigger vocabulary IS the generic assignment/agent-message state
-// contract (E4 later emits the same terminal states through these edges).
+// contract (multimodal extraction emits the same terminal states through these edges).
 export const attentionIntentsInput = Schema.Struct({
   trigger: Schema.Literals([
     "source_accepted",
@@ -229,8 +226,7 @@ export const attentionIntentsInput = Schema.Struct({
   changeSetId: Schema.NullOr(tableIdSchema("changeSets")),
 });
 
-// E5 amendment (issue #39, flagged coordinated change on the B3/F2
-// precedent): the derived-search index executor input. `build` is the full
+// The derived-search index executor input. `build` is the full
 // generation pass `search.startIndexGeneration` registers; the two refresh
 // modes are the drain's projections of the consumed lifecycle events
 // (withdrawal/purge drop a source's derived rows; a revised finding's rows
@@ -244,8 +240,7 @@ export const searchIndexInput = Schema.Struct({
   findingId: Schema.NullOr(tableIdSchema("findings")),
 });
 
-// F3 amendment (issue #43, flagged coordinated change - the F2 precedent):
-// the web-push delivery executor input. The drain projects the delivered
+// The web-push delivery executor input. The drain projects the delivered
 // intent's own event onto this shape; the executor's prepare re-reads the
 // intent (state, rights, subscriptions, preview) at delivery time instead
 // of trusting the event payload.
@@ -253,8 +248,7 @@ export const deliverPushInput = Schema.Struct({
   notificationIntentId: tableIdSchema("notificationIntents"),
 });
 
-// F4 amendment (issue #44, flagged coordinated change on the F2 precedent):
-// the task-reminder scheduling executor input. The drain projects the three
+// The task-reminder scheduling executor input. The drain projects the three
 // consumed events onto this shape; the nullable ids let every trigger
 // share one closed input. Both work events (`work.taskChanged` and
 // `work.taskStateChanged`) project onto the ONE `task_changed` trigger:
@@ -270,8 +264,7 @@ export const attentionRemindersInput = Schema.Struct({
   findingId: Schema.NullOr(tableIdSchema("findings")),
 });
 
-// I3 amendment (issue #55, flagged coordinated change, the D5/F3
-// precedent): the firm-export archive build executor's input. One job per
+// The firm-export archive build executor's input. One job per
 // export row; the export id is the whole identity (the snapshot itself is
 // read by the executor inside ONE transaction, never carried in the input).
 export const buildArchiveInput = Schema.Struct({
@@ -312,7 +305,7 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "calendar.reconcile_outcome",
     input: reconcileOutcomeInput,
   }),
-  // The durable publication pipeline seams (E3 and later lanes implement).
+  // The durable publication pipeline seams (text analysis and later lanes implement).
   executorEntry({
     kind: "executor",
     executorId: decodeFeatureId("processing.extract"),
@@ -325,17 +318,17 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "processing.analyze_change_plan",
     input: analyzeChangePlanInput,
   }),
-  // D5 amendment (issue #33): the accepted-photo normalization executor
+  // The accepted-photo normalization executor
   // (architecture protocol step 4 - normalize before ordinary vision). It
   // consumes `sources.sourceAccepted` through its own edge; the extraction
-  // job the acceptance transaction registers stays E3's.
+  // job the acceptance transaction registers stays with text analysis.
   executorEntry({
     kind: "executor",
     executorId: decodeFeatureId("processing.normalize"),
     jobKind: "processing.normalize_photo",
     input: normalizePhotoInput,
   }),
-  // A3 certification amendment: the platform's external-delivery proof
+  // Platform certification amendment: the platform's external-delivery proof
   // executor (echo stand-in; business lanes keep their own kinds).
   executorEntry({
     kind: "executor",
@@ -343,7 +336,7 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "platform.echo_delivery",
     input: echoDeliveryInput,
   }),
-  // D6 amendment (flagged coordinated change): the durable per-segment STT
+  // The durable per-segment STT
   // executor over one transcript order (resumable, checkpointed per
   // segment; `convex/processing/audio/executor.ts` implements it).
   executorEntry({
@@ -352,9 +345,9 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "processing.transcribe_segment",
     input: transcribeSegmentInput,
   }),
-  // E4 amendment (flagged coordinated change): the multimodal-join executor
+  // The multimodal-join executor
   // (`convex/processing/multimodal/join.ts` implements it). It no-ops
-  // text-only sources (E3's analyze owns those) and joins extraction
+  // text-only sources (the analyze owns those) and joins extraction
   // outcomes into partial-safe analysis groups for mixed ones.
   executorEntry({
     kind: "executor",
@@ -362,7 +355,7 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "processing.join_multimodal",
     input: joinMultimodalInput,
   }),
-  // F2 amendment (issue #42, flagged coordinated change): the durable
+  // The durable
   // notification-intent executor - intent creation from the consumed
   // events plus the due-time evaluator kick
   // (`convex/attention/delivery/executor.ts` implements it).
@@ -372,7 +365,7 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "attention.evaluate_due_intents",
     input: attentionIntentsInput,
   }),
-  // E5 amendment (issue #39, flagged coordinated change): the derived-search
+  // The derived-search
   // index executor (`convex/search/executor.ts` implements it). The
   // versioned generation builds and the scoped lifecycle refreshes of the
   // disposable index rows.
@@ -382,7 +375,7 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "search.index_generation",
     input: searchIndexInput,
   }),
-  // F3 amendment (issue #43, flagged coordinated change): the web-push
+  // The web-push
   // transport executor - the per-device delivery of one delivered intent
   // (`convex/attention/push/executor.ts` implements it).
   executorEntry({
@@ -391,7 +384,7 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "attention.deliver_push",
     input: deliverPushInput,
   }),
-  // F4 amendment (issue #44, flagged coordinated change): the durable
+  // The durable
   // task-reminder scheduling executor - the semantic slot recompute from
   // the consumed work events and bound-deadline revisions
   // (`convex/attention/reminders/executor.ts` implements it).
@@ -401,7 +394,7 @@ export const executors: readonly ExecutorEntry[] = [
     jobKind: "attention.schedule_task_reminders",
     input: attentionRemindersInput,
   }),
-  // I3 amendment (issue #55, flagged coordinated change): the firm-export
+  // The firm-export
   // archive build executor (`convex/operations/exports/executor.ts`
   // implements it). Registered by the admin-only requestExport transaction;
   // it consumes no event edge.
@@ -433,14 +426,14 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("access.sessionRevoked", "access.cleanup_revocation"),
   // Withdrawal/purge re-evaluates dependent findings; history retained.
   consumer("sources.sourceWithdrawn", "memory.recompute_dependents"),
-  // E7 amendment (issue #115, flagged): a project reassignment re-assesses
+  // A project reassignment re-assesses
   // the dependent scope of findings resting on the moved source (findings
   // keep history; the link change narrows what is marked). The reassignment
   // transaction registers this job itself under the event's dedup identity,
   // so the drain projection collapses onto the publisher's row.
   consumer("sources.sourceReassigned", "memory.recompute_dependents"),
   consumer("memory.dependentsMarkedStale", "memory.recompute_dependents"),
-  // C5 registration (issue #28 owns the revalidation half of this edge):
+  // Revalidation:
   // every revised finding drains into one bounded dependent walk - a basis
   // that became non-known propagates updating markings through the
   // dependentsMarkedStale cascade; a basis that became known again
@@ -458,22 +451,22 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   // processing.analyze was the inconsistency; the executor table is the
   // authority and its input shape is extraction, not change-plan analysis).
   consumer("sources.sourceAccepted", "processing.extract_fragments"),
-  // D5 amendment (issue #33): acceptance also fans out photo normalization
+  // Acceptance also fans out photo normalization
   // (protocol step 4) through its own consumer edge; the drain projects the
   // event payload onto both edges and each job carries a distinct dedup key.
   consumer("sources.sourceAccepted", "processing.normalize_photo"),
   // Requested reanalysis runs as a linked new analysis run.
   consumer("operations.reanalysisRequested", "processing.analyze_change_plan"),
-  // E4 amendment (flagged coordinated change): acceptance also fans out the
+  // Acceptance also fans out the
   // multimodal join (STT ordering + the joined partial-safe analysis), and
   // a requested reanalysis of a MIXED source re-joins it through the same
   // edge (text-only sources no-op inside the executor).
   consumer("sources.sourceAccepted", "processing.join_multimodal"),
   consumer("operations.reanalysisRequested", "processing.join_multimodal"),
-  // A3 certification amendment: the platform's echo publication drains into
+  // Platform certification amendment: the platform's echo publication drains into
   // its own durable delivery job through the same edge mechanism.
   consumer("platform.echoRequested", "platform.echo_delivery"),
-  // F2 amendment (issue #42, flagged coordinated change): the three
+  // The three
   // intent-source events drain into the notification-intent executor.
   // Acceptance creates the per-recipient source intents; a raised
   // clarification creates the addressed agent-question intent; a published
@@ -485,7 +478,7 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceAccepted", "attention.evaluate_due_intents"),
   consumer("memory.clarificationRaised", "attention.evaluate_due_intents"),
   consumer("memory.changeSetPublished", "attention.evaluate_due_intents"),
-  // E5 amendment (issue #39, flagged coordinated change): derived search
+  // Derived search
   // rows are refreshed through the same durable edges as every other
   // derivative. Withdrawal and purge drop a source's index rows; a revised
   // finding rebuilds its rows from the CURRENT revision. Hydration remains
@@ -494,13 +487,13 @@ export const eventConsumers: readonly EventConsumerEntry[] = [
   consumer("sources.sourceWithdrawn", "search.index_generation"),
   consumer("sources.sourcePurged", "search.index_generation"),
   consumer("memory.findingRevised", "search.index_generation"),
-  // F3 amendment (issue #43, flagged coordinated change): every delivered
+  // Every delivered
   // notification intent drains into the web-push transport. The projection
   // derives its dedup identity from the intent, so a replayed or
   // differently-keyed duplicate event collapses onto the same per-device
-  // delivery rows (issue 43: semantic intent plus subscription).
+  // delivery rows (semantic intent plus subscription).
   consumer("attention.intentDelivered", "attention.deliver_push"),
-  // F4 amendment (issue #44, flagged coordinated change): the task-reminder
+  // The task-reminder
   // scheduling edges. Every task change (creation, deadline binding,
   // coordinator, reopen) recomputes the semantic slots; a revision of a
   // bound deadline finding recomputes every task bound to it (a date

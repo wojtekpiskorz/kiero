@@ -1,7 +1,7 @@
 /**
  * Attention module surface (architecture "Deep modules": Notifications).
- * Implements lanes: F1 (read state/preferences), F2 (intents/batching),
- * F3 (push), F4 (reminders/snooze).
+ * Covers read state/preferences, intents/batching, push and
+ * reminders/snooze.
  *
  * Read state belongs to the logical source and the user: seeing the original
  * in any view marks it everywhere for that person. Reminders are based on
@@ -25,19 +25,19 @@ export const attentionOperations = {
     result: Schema.Struct({ sourceId: tableIdSchema("sources") }),
     errorKinds: ["forbidden", "not_found"],
   }),
-  // F1 amendment (issue #41, flagged in the issue report): the A2 candidate
+  // The candidate
   // input expressed the mute vocabulary as per-source ids, but the accepted
-  // product decision (issue 7 resolution: "Nowe wpisy, odbiorcy i
+  // product decision ("Nowe wpisy, odbiorcy i
   // grupowanie" / "Przypomnienia o zadaniach" / "Podgląd, otwarcie i
   // urządzenia") defines PERSONAL mutes per project conversation, a separate
   // personal mute of company entries, a separate personal task-reminder
   // mute, a personal preview-content preference and personal quiet hours in
   // the company timezone. The input is therefore the decision's vocabulary
   // as independent PATCH keys: an omitted key leaves that control unchanged
-  // (issue 41 acceptance: the controls "can be changed independently"), and
+  // (the controls "can be changed independently"), and
   // `quietHours: null` reverts to the company default window. No operation
   // or event name changed; nothing implemented or consumed the candidate
-  // shape (dispatch failed closed `unsupported` until F1).
+  // shape (dispatch failed closed `unsupported` before read state existed).
   "attention.changeNotificationPreferences": operationEntry({
     kind: "operation",
     name: "attention.changeNotificationPreferences",
@@ -74,8 +74,7 @@ export const attentionOperations = {
     result: Schema.Struct({ taskId: tableIdSchema("tasks") }),
     errorKinds: ["forbidden", "not_found", "validation"],
   }),
-  // F3 amendment (issue #43, flagged in the sibling pattern - the F1
-  // input-shape precedent): the candidate input lacked the device label
+  // The candidate input lacked the device label
   // the settings screen shows ("To urządzenie" of each browser), so the
   // optional `deviceLabel` joins additively; the subscription still binds
   // to the RESOLVED actor (user, company, session), never to client
@@ -93,7 +92,7 @@ export const attentionOperations = {
     result: Schema.Struct({ pushSubscriptionId: tableIdSchema("pushSubscriptions") }),
     errorKinds: ["forbidden", "validation"],
   }),
-  // F3 amendment (issue #43): removing this device's subscription. The
+  // Removing this device's subscription. The
   // screen offers enabling/removing THIS device; removal is idempotent and
   // only ever touches the actor's OWN subscription row.
   "attention.revokePushSubscription": operationEntry({
@@ -112,8 +111,8 @@ export const attentionOperations = {
     result: Schema.Struct({ evaluatedIntentIds: Schema.Array(tableIdSchema("notificationIntents")) }),
     errorKinds: ["forbidden"],
   }),
-  // F4 amendment (issue #44, flagged in the issue report): the task-reminder
-  // evaluator's checked entry. F2's evaluator deliberately leaves the
+  // The task-reminder
+  // evaluator's checked entry. The evaluator deliberately leaves the
   // `task_reminder` kind to this lane, so the reminder sweep is its own
   // operation with the same shape as `attention.evaluateDueIntents`.
   "attention.evaluateDueReminders": operationEntry({

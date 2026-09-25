@@ -1,8 +1,8 @@
 /**
- * Version labels of the text-analysis planning surface (E3).
+ * Version labels of the text-analysis planning surface.
  *
  * Every processing run records its workflow, prompt, schema and
- * model/route configuration version (issue #37: "Every run records
+ * model/route configuration version ("Every run records
  * workflow, prompt, schema, model/route and input-revision versions with
  * resumable stage status"). These constants are the single source the
  * Convex-side executor copies onto the `processingRuns` row; bumping any

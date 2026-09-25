@@ -1,5 +1,5 @@
 /**
- * Segment coverage honesty (E3; architecture protocol step 5-6: "A missing
+ * Segment coverage honesty (architecture protocol step 5-6: "A missing
  * required segment is pending, not a complete transcript. Text-only
  * fallback cannot claim to have inspected a pending image").
  *
@@ -24,7 +24,7 @@ export type PendingSegmentKind = "audio" | "image";
 
 /**
  * The inspectable-parts snapshot of one source at analysis time.
- * `extractedKinds` always contains `"text"` for D1 sources (the author's
+ * `extractedKinds` always contains `"text"` for text sources (the author's
  * words are their own extraction); `pendingSegments` lists attachments
  * without a completed extraction version.
  */

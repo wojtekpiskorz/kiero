@@ -1,5 +1,5 @@
 /**
- * The reserved proof-fixture domain (B1 dev evidence).
+ * The reserved proof-fixture domain (identity dev evidence).
  *
  * The guarded proof actions (convex/access/identity/probe.ts) can install
  * fixture verification codes. To make "guard enabled" a NECESSARY but not

@@ -1,6 +1,6 @@
 /**
- * Notification-intent transactions (F2): durable intent creation and the
- * idempotent due-time evaluator (issue 42's bounded solution).
+ * Notification-intent transactions: durable intent creation and the
+ * idempotent due-time evaluator.
  *
  * Everything runs inside ONE Convex mutation transaction per call:
  *
@@ -22,7 +22,7 @@
  *   evaluator because the assignment classification may have gone
  *   terminal. After analysis no new 60-second window starts.
  * - `performEvaluateDueIntents` — the evaluator: at due time it re-reads
- *   F1 read/preferences (the `decidePersonalDelivery` seam), current B3
+ *   read state/preferences (the `decidePersonalDelivery` seam), current membership
  *   membership rights (a revoked member's intent dies), source business
  *   validity and the terminal assignment classification, then applies
  *   quiet hours through the same seam. A firing bucket carries every
@@ -209,7 +209,7 @@ export async function performEnsureClarificationIntents(
     return errorResult(forbiddenError("clarification_not_found"));
   }
   // The source the question is about, two durable paths: the raising run's
-  // source (the row's optional linkage, E4's later direct emissions), and
+  // source (the row's optional linkage, the later direct emissions), and
   // — the path today's checked dispatch produces — the first conflicting
   // EVIDENCE fragment, whose source is the analyzed entry.
   let authorUserId: Id<"users"> | null = null;
@@ -427,7 +427,7 @@ type Recheck =
 /**
  * THE shared re-check list, called by the due loop AND the sibling
  * absorption — one definition, so the two paths can never drift apart
- * again (round-1 review: a clarification resolved inside the window was
+ * again (a clarification resolved inside the window was
  * still absorbed because only the due path checked it). Callers filter to
  * the two notifiable kinds first.
  */
@@ -500,7 +500,7 @@ function addToBucket(
  * The evaluator: re-checks and delivers every due pending intent. The
  * caller owns `nowMs` (the scheduled entry passes the wall clock; the
  * guarded probe may pass a chosen instant), and every decision inside is
- * computed AT that instant through F1's seam, so quiet-hour and DST
+ * computed AT that instant through the seam, so quiet-hour and DST
  * boundaries behave identically in proofs and production.
  */
 export async function performEvaluateDueIntents(
@@ -520,7 +520,7 @@ export async function performEvaluateDueIntents(
   for (const intent of due) {
     touched.push(intent._id);
 
-    // task_reminder is F4's kind; confirmation is never created (ordinary
+    // task_reminder is the kind; confirmation is never created (ordinary
     // agent confirmations produce no push intent). Neither is pending here
     // today; if one ever is, it stays for its owning lane's evaluator.
     const kind: "source_entry" | "clarification" | null =
@@ -569,7 +569,7 @@ export async function performEvaluateDueIntents(
     }
 
     // --- read state: the read due entries die here (after rights, before
-    // the personal decision — F1's seam order), leaving the live batch.
+    // the personal decision — the seam order), leaving the live batch.
     const live: PendingIntent[] = [];
     for (const member of bucket.intents) {
       if (member.read) {
@@ -639,12 +639,12 @@ export async function performEvaluateDueIntents(
       continue;
     }
 
-    // --- the personal delivery decision (F1's seam, suppression first) ------
+    // --- the personal delivery decision (the seam, suppression first) ------
     const decision = decidePersonalDelivery({
       kind: bucket.semanticKind,
       scope: bucket.scope.kind,
       projectIds: [...bucket.scope.projectIds],
-      // The seam reads isAuthor only for source entries (the own-entry
+      // The seam reads isAuthor only for source entries (its own-entry
       // suppression), and a source_entry intent never exists for the author
       // (creation excludes them): false is the honest value for both kinds.
       isAuthor: false,

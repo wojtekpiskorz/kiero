@@ -1,11 +1,11 @@
 /**
- * The B1 Convex function surface (generated-call APIs).
+ * The identity Convex function surface (generated-call APIs).
  *
  * Two entry ways, one core each (no drift by construction):
  *
  * - `dispatchAccessCommand` (./operations.ts) is the typed command seam
- *   for B2/B3/GM — it needs the full actor chain (membership), which no
- *   B1 user has yet;
+ *   for linking/membership/GM — it needs the full actor chain (membership), which no
+ *   freshly signed-in user has yet;
  * - the functions here are the identity-layer surface the barebones app
  *   uses BEFORE any company exists: provider availability, session
  *   provisioning, current access resolution, the device session registry
@@ -196,9 +196,9 @@ export const listMySessions = query({
 });
 
 /**
- * The typed command dispatch entry (the A3 seam with B1's identity source
+ * The typed command dispatch entry (the seam with the identity source
  * and policy): the same checked path for UI and future agent commands.
- * Envelope validation is delegated to the contract schemas (A3 ruling),
+ * Envelope validation is delegated to the contract schemas,
  * so the Convex-level argument stays `unknown` by design.
  */
 export const dispatchAccess = mutation({
@@ -207,7 +207,7 @@ export const dispatchAccess = mutation({
     dispatchAccessCommand(ctx, args.envelope),
 });
 
-/** The barebones identity-layer full-chain resolution (A3 canonical path). */
+/** The barebones identity-layer full-chain resolution (the canonical path). */
 export const accessContextProbe = query({
   args: {},
   handler: async (ctx) => {
@@ -220,7 +220,7 @@ export const accessContextProbe = query({
  * Authenticated: self-service revocation of one of the actor's own
  * sessions (the current device's "Wyloguj to urządzenie", or a remote
  * device's row). The company scope for the canonical revocation event
- * comes from the SAME canonical chain (A3's resolveRequestContext: user
+ * comes from the SAME canonical chain (resolveRequestContext: user
  * -> earliest active membership -> company), not a hand-rolled lookup.
  * Result envelope matches the typed dispatch entry.
  */

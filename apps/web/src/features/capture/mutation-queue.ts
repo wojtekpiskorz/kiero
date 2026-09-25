@@ -1,5 +1,5 @@
 /**
- * One serialized queue over the draft record's mutations (D4, review
+ * One serialized queue over the draft record's mutations (review
  * round 2).
  *
  * The class it closes: `appendRecordingChunk` (and every other record

@@ -1,5 +1,5 @@
 /**
- * Bounded image-dimension decoding (R24): the ONE pure source of pixel
+ * Bounded image-dimension decoding: the ONE pure source of pixel
  * width/height for the images drive, decoded from a bounded byte window —
  * never a served guess and never a 0×0 stand-in.
  *

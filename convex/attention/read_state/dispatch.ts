@@ -1,6 +1,6 @@
 /**
- * Read-state command dispatch wiring (F1): the SAME checked path A3 proved
- * and D1 lifted, with this lane's handler registry.
+ * Read-state command dispatch wiring: the SAME checked path the platform proved
+ * and text sources lifted, with this lane's handler registry.
  *
  * `dispatchReadStateCommand` is @kiero/runtime's `dispatchCommand` over the
  * canonical context resolution (verified identity -> session -> user -> one

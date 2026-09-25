@@ -1,5 +1,5 @@
 /**
- * The extensions feature (H2): the /dodatkowe surface for C3's typed
+ * The extensions feature: the /dodatkowe surface for the typed
  * extension definitions and the extension values bosses record.
  *
  * JSX-free on purpose (createElement only), like the sibling surfaces.
@@ -12,7 +12,7 @@
  *   dispatch; the define form derives a stable field id from the Polish
  *   label, and the boss may adjust it;
  * - values: recording an extension value is an evidence-backed finding:
- *   the boss's statement becomes a real source (D1's prepare/accept pair),
+ *   the boss's statement becomes a real source (the prepare/accept pair),
  *   then one staged change set (`memory.prepareChangeSet` +
  *   `memory.publishChangeSet`) writes the typed value with that source as
  *   its basis; `memory.validateExtensionValue` pre-flights the value

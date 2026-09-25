@@ -1,5 +1,5 @@
 /**
- * Per-identifier issuance throttle for sign-in code emails (B1).
+ * Per-identifier issuance throttle for sign-in code emails.
  *
  * @convex-dev/auth 0.0.95 rate-limits VERIFICATION failures
  * (`authRateLimits` via `isSignInRateLimited`) but not code ISSUANCE:
@@ -16,7 +16,7 @@
  * recovery window and starve the honest user forever).
  *
  * The decision core is pure and unit-tested; the row read/write is the
- * shared `commitIssuanceAttempt` below (B1 amendment for B2: the linking
+ * shared `commitIssuanceAttempt` below (shared with linking: the linking
  * module's ceremony/email-change codes send through the SAME budget core —
  * one throttle semantics, two callers, no duplicated row plumbing). The
  * auth entry runs it at issuance time, BEFORE any user/code row is created

@@ -1,11 +1,11 @@
 /**
- * Work feature entry (A4 host wiring point, H2's sanctioned addition).
+ * Work feature entry.
  *
  * "Praca" is the record surface for project work: tasks with one-level
  * checklists, coordinator/executor responsibility, bound term findings and
  * explicit states (Do zrobienia, W toku, Czeka z powodem, Wykonane,
  * Anulowane), plus events whose occurrence is only ever an explicit
- * command. Every change rides C4's checked dispatch; the route accepts
+ * command. Every change rides the checked dispatch; the route accepts
  * the same ?zadanie/?zdarzenie record-focus keys the /co-teraz screen
  * links in with.
  */

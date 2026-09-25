@@ -1,6 +1,6 @@
 /**
- * Web Push command entries (F3): the client mutation path and the
- * service-bridge transactional entry (the F2 commands precedent).
+ * Web Push command entries: the client mutation path and the
+ * service-bridge transactional entry (the commands precedent).
  *
  * - `dispatchPushCommand` (public mutation): the settings screen's path;
  *   Convex Auth identity only.
@@ -21,7 +21,7 @@ export const dispatchPush = mutation({
 
 /**
  * The service path's transactional entry: the verified service session id
- * substitutes the bearer-verified identity (the A3 bridge pattern).
+ * substitutes the bearer-verified identity (the bridge pattern).
  */
 export const dispatchPushTransaction = internalMutation({
   args: { envelope: v.any(), serviceSessionId: v.string() },

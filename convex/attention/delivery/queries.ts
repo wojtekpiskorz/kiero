@@ -1,13 +1,12 @@
 /**
- * Notification-delivery queries (F2): the due-delivery-intent export F3
- * consumes and the diagnostic status H4/I2 read (issue 42: "export due
- * delivery intents for F3 and diagnostic status for H4/I2").
+ * Notification-delivery queries: the due-delivery-intent export web push
+ * consumes and the diagnostic status processing inspection and telemetry read.
  *
  * `dueDeliveryIntentsFor` lists the actor's company's intents with their
  * current lifecycle state, semantic identity, suppressed reason and the
- * collapsed delivery summary — the exact rows F3's push transport picks
+ * collapsed delivery summary — the exact rows the push transport picks
  * up (state `delivered` = the due delivery decision handed the summary to
- * the adapter seam; F3 owns what happens after, including known/unknown
+ * the adapter seam; web push owns what happens after, including known/unknown
  * attempt outcomes on `notificationAttempts`).
  *
  * `deliveryStateForSource` narrows to one logical source (tenant-checked),
@@ -15,7 +14,7 @@
  * only; no other person's row is ever visible).
  *
  * Two callable shapes, one checked resolution (the lane pattern): internal
- * queries behind the verified service session (the A3 bridge identity)
+ * queries behind the verified service session (the bridge identity)
  * and public Convex-Auth queries. Nothing here writes boss state.
  */
 

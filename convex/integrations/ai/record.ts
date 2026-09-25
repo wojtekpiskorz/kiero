@@ -1,5 +1,5 @@
 /**
- * The provider-call completion record (E2).
+ * The provider-call completion record.
  *
  * One outbox event per dispatched model call, carrying only the sanitized
  * route/model/outcome vocabulary of the declared

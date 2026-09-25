@@ -1,5 +1,5 @@
 /**
- * The answer-context shape (E6): the tenant-filtered, bounded snapshot one
+ * The answer-context shape: the tenant-filtered, bounded snapshot one
  * answer run reads, plus the evidence ledger the answer's citations must
  * resolve against.
  *
@@ -11,7 +11,7 @@
  * answer; unrelated backlog does not block independent confirmed
  * information", protocol step 6).
  *
- * The UPDATING GATE (C5) is applied at load: a finding whose knowledge
+ * The UPDATING GATE is applied at load: a finding whose knowledge
  * state is `updating` is carried with `updating: true`, and every evidence
  * entry grounding it is flagged `groundsUpdating`. The reducer refuses to
  * ground an established statement on such evidence — an answer never
@@ -53,7 +53,7 @@ export interface AnswerFinding {
   readonly value: unknown;
   readonly knowledgeTag: AnswerKnowledgeTag;
   /**
-   * THE updating gate (C5): true when the current revision is the
+   * THE updating gate: true when the current revision is the
    * updating-until-revalidated marking — value preserved, excluded from
    * established statements and automation until revalidated.
    */
@@ -133,7 +133,7 @@ export interface AnswerEvidenceEntry {
   readonly endOffset: number | null;
   /** The finding whose witnesses introduced this entry; null for search. */
   readonly groundsFindingId: string | null;
-  /** C5 gate: the grounded finding is updating — citable only as disclosure. */
+  /** Recompute gate: the grounded finding is updating — citable only as disclosure. */
   readonly groundsUpdating: boolean;
 }
 
@@ -263,7 +263,7 @@ export function owedDisclosures(context: AnswerContext): {
 
 /**
  * The load-time revision snapshot the staleness recheck compares against
- * (the answer-flow twin of E3's `revisionSnapshotOf`).
+ * (the answer-flow twin of `revisionSnapshotOf`).
  */
 export function answerRevisionSnapshotOf(
   context: AnswerContext,

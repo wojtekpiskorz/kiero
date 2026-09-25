@@ -1,5 +1,5 @@
 /**
- * The consistent company snapshot reader (I3).
+ * The consistent company snapshot reader.
  *
  * ONE Convex transaction reads every business collection of ONE company
  * and returns a single `CompanySnapshot` stamped with the transaction's
@@ -15,7 +15,7 @@
  * -> revision -> evidence). No table is scanned without a company-scoped
  * anchor, so a foreign tenant's row cannot enter the result by id.
  *
- * WHAT IS EXCLUDED (issue #55): personal read/notification state, Calendar
+ * WHAT IS EXCLUDED: personal read/notification state, Calendar
  * connection/hide/cursor state, sessions, auth rows, provider tokens,
  * platform jobs/outbox, backups, diagnostics; purged sources (their content
  * is gone and they are never linked to an archive); the acceptance
@@ -25,17 +25,17 @@
  * message's earlier role and correction reason as history.
  *
  * MEDIA: for every attachment of an included source the SAME
- * retained-or-received rule as the D3 read seam decides which verified,
+ * retained-or-received rule as the read seam decides which verified,
  * not-removed representation the archive copies; the snapshot records the
  * ledger's object key, etag and byte length so the Worker verifies the
- * live object before copying a byte (tests/i3 pin the rule against D3's
+ * live object before copying a byte (tests/i3 pin the rule against the
  * resolver on shared fixtures).
  *
  * BOUNDS: counts and the encoded JSON size are checked here; exceeding any
  * declared bound refuses the whole snapshot with a typed kind and no
  * partial result.
  *
- * The reader is written over a slim `SnapshotDb` surface (the D2/D3
+ * The reader is written over a slim `SnapshotDb` surface (the uploads/media
  * harness pattern) so tests/i3 drive the exact same code over an
  * in-memory store; `snapshotDb(db)` adapts the real Convex reader.
  */
@@ -165,7 +165,7 @@ function project(row: Record<string, unknown>, drop: readonly string[] = []): Sn
   return out;
 }
 
-/** The newest verified, not-removed representation of one servable role (D3's rule). */
+/** The newest verified, not-removed representation of one servable role (rule). */
 function newestVerified(
   rows: readonly Doc<"mediaRepresentations">[],
   role: "received" | "retained",
@@ -179,7 +179,7 @@ function newestVerified(
   return candidates.reduce((newest, row) => (row.createdAtMs > newest.createdAtMs ? row : newest));
 }
 
-/** The ledger etag of the chosen representation (D3's `etagOf`, same fallback). */
+/** The ledger etag of the chosen representation (`etagOf`, same fallback). */
 function etagOf(
   representation: Doc<"mediaRepresentations">,
   attachment: Doc<"attachments">,
@@ -194,7 +194,7 @@ function etagOf(
   return null;
 }
 
-/** The ledger byte length of the chosen representation (D3's `bytesOf`). */
+/** The ledger byte length of the chosen representation (`bytesOf`). */
 function bytesOf(
   representation: Doc<"mediaRepresentations">,
   attachment: Doc<"attachments">,
@@ -249,13 +249,13 @@ const bounded = (rows: readonly unknown[]): boolean =>
   rows.length <= EXPORT_BOUNDS.maxRecordsPerCollection;
 
 // ---------------------------------------------------------------------------
-// R5 (issue #130): the canonical relative source target of the archive
+// The canonical relative source target of the archive
 // ---------------------------------------------------------------------------
 
 /**
  * The canonical relative target of one archived source record: the dossier
  * route with the encoded source id, openable in the app regardless of
- * conversation pagination (R5-P1's export half).
+ * conversation pagination (the export half).
  *
  * Served by the ONE shared runtime-neutral helper
  * (`convex/sources/target.ts`) — the same wire form the app's serializer
@@ -384,7 +384,7 @@ export async function readCompanySnapshot(
     }
     const definition = await db.extensionDefinitionById(version.definitionId);
     // A definition owned by ANOTHER company can never be referenced by this
-    // company's findings (C3's write paths refuse it); fail closed anyway.
+    // company's findings (the write paths refuse it); fail closed anyway.
     if (definition === null || (definition.companyId !== undefined && definition.companyId !== companyId)) {
       continue;
     }
@@ -407,9 +407,9 @@ export async function readCompanySnapshot(
     contacts: (await db.contactsOfCompany(companyId)).map((row) => project(row)),
     contactRoles: (await db.contactRolesOfCompany(companyId)).map((row) => project(row)),
     sources: sources.map((row) =>
-      // R5: every archived source record carries its canonical relative
+      // Every archived source record carries its canonical relative
       // target (no host); the field is additive under the current archive
-      // format, whose version constant the I3 lane owns.
+      // format, whose version constant the lane owns.
       withSourceTarget(project(row, ["acceptanceKey", "acceptanceFingerprint"]), row._id),
     ),
     sourceProjectLinks,

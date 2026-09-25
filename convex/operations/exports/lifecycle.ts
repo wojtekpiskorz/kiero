@@ -1,12 +1,12 @@
 /**
- * The firm-export lifecycle (I3): the pure decisions and the ONE-transaction
+ * The firm-export lifecycle: the pure decisions and the ONE-transaction
  * cores behind request, build, publish, expiry, invalidation and cleanup.
  *
  * STATES (contracts `ExportState`): requested -> building -> available ->
  * expired | invalidated; building -> failed; any pre-terminal state ->
  * invalidated (a linked source was purged, or an administrator asked).
  * Every transition that can refuse decides BEFORE the first write; every
- * write lands in the caller's transaction (the B3/C2 discipline).
+ * write lands in the caller's transaction (the discipline).
  *
  * WHY A BUILD TOKEN: the durable executor may run more than once (retry
  * after a crash, an uncertain outcome resolved by reconciliation). Each
@@ -17,7 +17,7 @@
  * create divergent published snapshots" is structural.
  *
  * WHY LINKS: `exportSourceLinks` names every source whose records or media
- * an archive carries. I4's purge executor and this lane's per-request
+ * an archive carries. The purge executor and this lane's per-request
  * download check both key on it: a purge of any linked source refuses the
  * download immediately (the check re-reads the sources) and marks the row
  * `invalidated` (the eager path below). The object bytes are then removed
@@ -369,7 +369,7 @@ export async function invalidateExportCore(
 }
 
 /**
- * The eager invalidation path (I4's purge executor and this lane's proof
+ * The eager invalidation path (the purge executor and this lane's proof
  * call it): every pre-terminal export linked to the source runs through
  * the one-row core above. Returns the invalidated export ids (the
  * per-request download check is the immediate guard even before this

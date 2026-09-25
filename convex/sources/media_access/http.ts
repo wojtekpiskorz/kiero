@@ -1,12 +1,12 @@
 /**
- * The media-access channel HTTP boundary (D3): the Worker's verified entry
+ * The media-access channel HTTP boundary: the Worker's verified entry
  * to the per-request read authorization.
  *
  * `/sources/media/access` (POST) carries the END USER's Convex Auth
- * credential, exactly like the D2 uploads boundary: the browser sends
+ * credential, exactly like the uploads boundary: the browser sends
  * `Authorization: Bearer <id token>`, the gateway Worker forwards that
  * header verbatim, and Convex propagates it into the invoked query's
- * `ctx.auth` — B1's live-session resolution and the canonical chain decide
+ * `ctx.auth` — the live-session resolution and the canonical chain decide
  * the acting user, the service identity is never substituted, and the
  * uniform `not_found` refusal never discloses existence, tenancy or
  * storage layout. A missing credential fails sanitized 401 before any

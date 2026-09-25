@@ -1,5 +1,5 @@
 /**
- * Google OAuth / Calendar API protocol (G1): pure URL construction, PKCE
+ * Google OAuth / Calendar API protocol: pure URL construction, PKCE
  * material, token-exchange request/response classification and calendar
  * find-or-create requests for the REAL Google endpoints' protocol.
  *
@@ -17,7 +17,7 @@
  *   `calendarList.list` is NOT granted by this scope, so recovery uses the
  *   stored calendar id (docs/research/google-calendar-reconnect-facts.md).
  *
- * Uncertainty semantics (the A3 echo template): a 2xx answer is a
+ * Uncertainty semantics (the echo template): a 2xx answer is a
  * confirmation; a 4xx answer from the token endpoint is a DEFINITE failure;
  * a 5xx answer, a deadline hit or an ambiguous body is UNCERTAIN — the
  * external system may have performed its effect (a consumed authorization
@@ -80,7 +80,7 @@ function base64UrlToBytes(value: string): Uint8Array {
   return bytes;
 }
 
-/** SHA-256 hex digest (the correlation-hash path, like B3 code hashes). */
+/** SHA-256 hex digest (the correlation-hash path, like invitation code hashes). */
 export async function sha256Hex(input: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
   return Array.from(new Uint8Array(digest))
@@ -121,7 +121,7 @@ export async function deriveCodeChallenge(verifier: string): Promise<string> {
 
 /**
  * Generates the single-use state and the PKCE verifier/challenge with Web
- * Crypto only (32 bytes each: 43 base64url characters, like B1/B3 codes).
+ * Crypto only (32 bytes each: 43 base64url characters, like sign-in/invitation codes).
  */
 export async function generateAuthorizationChallenge(): Promise<AuthorizationChallenge> {
   const state = randomBase64Url(32);

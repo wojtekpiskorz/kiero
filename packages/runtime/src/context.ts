@@ -6,7 +6,7 @@
  * the actor and firm). Two identity sources exist and only two:
  *
  * - `convex-auth`: the authenticated user identity from `ctx.auth` (Convex
- *   Auth; B1 owns the sign-in product that produces it).
+ *   Auth; the sign-in product produces it).
  * - `service-bridge`: the Worker service identity, verified server-side by a
  *   bearer credential check at the bridge HTTP boundary.
  *
@@ -15,7 +15,7 @@
  * development-auth shortcut: no code path constructs an ActorContext from
  * unverified input, and absent identities fail `unauthenticated`.
  *
- * B1/B3 supply the authoritative access rules by registering a policy through
+ * Identity and membership supply the authoritative access rules by registering a policy through
  * this seam; until then the platform default policy (`membershipPolicy`)
  * decides from the resolved membership role and GM flag alone.
  */
@@ -72,7 +72,7 @@ export type AuthorizationDecision =
   | { readonly allowed: false; readonly error: ClosedError };
 
 /**
- * The authorization seam. B1/B3 register the authoritative implementation;
+ * The authorization seam. Identity and membership register the authoritative implementation;
  * the platform always consults exactly one policy per command.
  */
 export interface AccessPolicy {
@@ -88,7 +88,7 @@ export interface AccessPolicy {
  * context. `null` context (no verified identity) always denies. A requested
  * company scope must equal the resolved tenant scope. This is a real check
  * over real session/membership rows; it is not, and cannot be, faked from
- * client input. B1/B3 replace it with the authoritative rule set.
+ * client input. Identity and membership replace it with the authoritative rule set.
  */
 export const membershipPolicy: AccessPolicy = {
   policyId: "platform.membership-default",

@@ -1,6 +1,6 @@
 /**
  * The gateway upload protocol: step schemas and the PURE decisions of the
- * resumable-upload ledger (D2).
+ * resumable-upload ledger.
  *
  * The Worker (apps/gateway/src/uploads) mediates R2 and owns object keys and
  * R2 part identities; Convex owns this ledger. The two systems cannot share
@@ -15,7 +15,7 @@
  *   verified `received` representation;
  * - finalize requires EVERY declared attachment complete and verified, then
  *   publishes `sources.uploadFinalized` (idempotent);
- * - accept reuses D1's atomic acceptance, which verifies all attachment
+ * - accept reuses the atomic acceptance, which verifies all attachment
  *   references BEFORE any write and binds source+attachments+ledger together;
  * - reconcile decides orphan collection only for expired, unaccepted,
  *   inactive uploads (never accepted, never mid-retry).
@@ -24,7 +24,7 @@
  * without a deployment; the live proofs run the same functions through the
  * real Worker, R2 and Convex deployment.
  *
- * SHARED-HOME DECISION (D2 review round 1): this file is the ONE definition
+ * SHARED-HOME DECISION: this file is the ONE definition
  * of the uploads protocol on BOTH sides of the deployment boundary — the
  * Convex functions import it directly, and the gateway Worker imports it
  * exactly like the existing pure Convex-directory module it already ships
@@ -61,7 +61,7 @@ export const ACTIVE_GRACE_MS = 24 * 60 * 60 * 1_000;
  * this window before orphan collection may claim it.
  */
 export const FINALIZED_GRACE_MS = 7 * 24 * 60 * 60 * 1_000;
-/** The version label of the D2 received representation (D5 replaces it). */
+/** The version label of the received representation (normalization replaces it). */
 export const RECEIVED_TRANSFORM_VERSION = "d2.received/1";
 
 /** Lower-case hex SHA-256 (64 chars), the only accepted part digest form. */
@@ -104,8 +104,8 @@ export const PrepareInput = Schema.Struct({
     Schema.check(Schema.isGreaterThan(0)),
     Schema.check(Schema.isLessThanOrEqualTo(MAX_PARTS)),
   ),
-  // J1 prerequisite repair: a TEXT-ONLY source prepares with mediaKinds: []
-  // (attachmentCount 0, no attachment references — D1's documented text-only
+  // A TEXT-ONLY source prepares with mediaKinds: []
+  // (attachmentCount 0, no attachment references — the documented text-only
   // acceptance semantics; the certified contract's array has no minimum).
   // The previous isMinLength(1) made the PUBLIC prepare command unusable
   // for the one capture mode the first text checkpoint proves; media
@@ -363,7 +363,7 @@ export type AttachmentGateDecision =
  * only when the upload is finalized, the declaration is fully materialized,
  * EVERY attachment is durably completed in R2 and EVERY attachment has a
  * verified received representation. This gate runs BEFORE the first insert
- * of the acceptance transaction (D1's structural pre-flight pattern), so a
+ * of the acceptance transaction (the structural pre-flight pattern), so a
  * failing gate leaves nothing written.
  */
 export function decideAttachmentGate(

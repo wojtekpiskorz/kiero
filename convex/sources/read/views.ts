@@ -1,5 +1,5 @@
 /**
- * Company and project conversation views (D1).
+ * Company and project conversation views.
  *
  * "Rozmowa firmy" (company conversation) is the canonical history:
  * `companyConversation` paginates `sources.by_company_order` — company plus
@@ -19,8 +19,8 @@
  * resolution (mirroring the accept lane):
  *
  * - public queries (Convex Auth identity; honestly `unauthenticated` until
- *   B1 ships sign-in),
- * - internal queries + guarded dev-proof actions (the A3 service-bridge
+ *   sign-in exists),
+ * - internal queries + guarded dev-proof actions (the service-bridge
  *   identity; see ./probe.ts).
  */
 
@@ -44,7 +44,7 @@ import {
   deriveProcessingState,
   type ConversationPage as ConversationPageType,
 } from "./rows";
-// H3 exposition cores (additive, flagged): the dossier + evidence reads.
+// Exposition cores: the dossier + evidence reads.
 import { readSourceExpositionRows, readSourceEvidenceRows } from "./exposition";
 
 type PaginationOpts = { cursor: string | null; numItems: number };
@@ -90,7 +90,7 @@ async function companyConversationPage(
     .withIndex("by_company_order", (q) => q.eq("companyId", companyId))
     .order("desc")
     .paginate(pagination);
-  // I4 append (flagged, the D3 lifecycle rule): a permanently deleted
+  // A permanently deleted
   // source never appears in the conversation. The page-level filter keeps
   // the index read unchanged; a page after a purge may run shorter than
   // the cursor's page size (accepted for alpha volume - the alternative
@@ -134,7 +134,7 @@ async function projectConversationPage(
     if (source === null || source.companyId !== companyId) {
       continue;
     }
-    // I4 append (flagged, the same lifecycle rule as the company page): a
+    // A
     // purged source leaves the project conversation too (its content is
     // gone; the ledger keeps only the content-free record).
     if (source.lifecycle === "purged") {
@@ -170,8 +170,7 @@ async function sourceDetailRow(
 // --- public queries (Convex Auth identity) ---------------------------------
 
 async function contextOrFail(ctx: QueryCtx) {
-  // J1 prerequisite repair (same defect C4 flagged on C2's public entries):
-  // B1's live-session read chain (no provisioning — queries never write).
+  // The live-session read chain (no provisioning — queries never write).
   // The platform-generic subject is not a sessions-registry id, so ordinary
   // user tokens failed the resolution and the conversation views were
   // unreachable from the app.
@@ -186,7 +185,7 @@ async function contextOrFail(ctx: QueryCtx) {
   return { companyId };
 }
 
-/** Company conversation view (client path; unauthenticated until B1). */
+/** Company conversation view (client path; unauthenticated without sign-in). */
 export const companyConversation = query({
   args: { paginationOpts: paginationOptsValidator },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
@@ -198,7 +197,7 @@ export const companyConversation = query({
   },
 });
 
-/** Project conversation view (client path; unauthenticated until B1). */
+/** Project conversation view (client path; unauthenticated without sign-in). */
 export const projectConversation = query({
   args: { projectId: v.id("projects"), paginationOpts: paginationOptsValidator },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
@@ -214,7 +213,7 @@ export const projectConversation = query({
   },
 });
 
-/** One source detail (client path; unauthenticated until B1). */
+/** One source detail (client path; unauthenticated without sign-in). */
 export const sourceDetail = query({
   args: { sourceId: v.id("sources") },
   handler: async (ctx, args): Promise<ResultEnvelope> => {
@@ -230,7 +229,7 @@ export const sourceDetail = query({
   },
 });
 
-// --- internal queries (verified service session; the A3 bridge identity) ----
+// --- internal queries (verified service session; the bridge identity) ----
 
 async function serviceContextOrFail(ctx: QueryCtx, serviceSessionId: string) {
   const context = await resolveRequestContext(ctx.db, bridgeIdentity(serviceSessionId, Date.now()));
@@ -294,19 +293,18 @@ export const sourceDetailFor = internalQuery({
   },
 });
 
-// --- H3 exposition reads (additive, flagged on the H1 memory-exposition
-// precedent): the source dossier and the paginated evidence chain. Cores
-// live in ./exposition.ts; rows carry their wire shapes and decode through
+// --- exposition reads: the source dossier and the paginated evidence chain.
+// Cores live in ./exposition.ts; rows carry their wire shapes and decode through
 // the Effect schemas defined there. Unlike the helpers above (which narrow
 // to the company id), these two keep the full RequestContext the cores'
 // tenant checks read.
 
-/** The client-path context (full) for the H3 exposition cores. */
+/** The client-path context (full) for the exposition cores. */
 async function expositionContextOrFail(ctx: QueryCtx): Promise<RequestContext | null> {
   return resolveAccessContextFromConvexAuth(ctx.db, ctx.auth, Date.now());
 }
 
-/** The bridge-path context (full) for the H3 exposition cores. */
+/** The bridge-path context (full) for the exposition cores. */
 async function expositionServiceContextOrFail(
   ctx: QueryCtx,
   serviceSessionId: string,

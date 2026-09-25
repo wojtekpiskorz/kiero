@@ -1,6 +1,6 @@
 /**
- * The statement-to-source send loop (J1's proved path, one shared home;
- * H2 review round 1): the ONLY way a boss's spoken statement becomes a
+ * The statement-to-source send loop (the proved path, one shared home):
+ * the ONLY way a boss's spoken statement becomes a
  * durable accepted source on the client.
  *
  * `sources.prepareUpload` (the text-only source's durable upload row) then
@@ -12,7 +12,7 @@
  * may already exist; a resubmit can never accept the same statement as a
  * second source.
  *
- * The conversation surface (H1) and the extension value recording (H2)
+ * The conversation surface and the extension value recording
  * both ride this module; the pure `sendStatementAsSource` half is the
  * deterministic test surface for the convergence property.
  */

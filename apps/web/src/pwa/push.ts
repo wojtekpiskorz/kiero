@@ -1,5 +1,5 @@
 /**
- * The web push module (F3 owns this file; the composition slot in
+ * The web push module (the composition slot in
  * apps/web/src/app/pwa/composition.ts names it).
  *
  * Two halves:
@@ -20,7 +20,7 @@
  *
  * DOM globals are touched only inside functions and only behind
  * existence guards, so the node-side test programs can import the entry
- * chain without a DOM lib (the A4 pattern).
+ * chain without a DOM lib.
  */
 
 import type { PushEntryModule, ServiceWorkerRegistrationHandle } from "../app/pwa/composition";

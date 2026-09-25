@@ -1,11 +1,11 @@
 /**
- * Pure definition-shape rules (C3): bounded-data validation of definition
+ * Pure definition-shape rules: bounded-data validation of definition
  * versions, the version-succession compatibility rule and value-versus-
  * version validation.
  *
  * Everything here is I/O-free and deterministic; the Convex transaction
  * cores (convex/memory/extensions) re-run every one of these decisions
- * inside their own transaction against stored rows, exactly like the C2
+ * inside their own transaction against stored rows, exactly like the findings
  * pattern (packages/domain/findings).
  *
  * The semantic model (one sentence each):
@@ -29,7 +29,7 @@
  *   migration. Historic values keep the version they were written against.
  * - A field is REQUIRED in the values of version V when it was already
  *   present in version 1; fields added by later versions are optional
- *   ("Adding an optional firm field creates a new version", issue #26).
+ *   ("Adding an optional firm field creates a new version").
  *
  * The field/value views below are deliberately structural: the decoded
  * (Effect) and encoded (Convex wire) forms both satisfy them, so the same

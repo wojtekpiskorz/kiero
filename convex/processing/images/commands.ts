@@ -1,12 +1,13 @@
 /**
- * Images channel callable entries (D5): the internal mutations behind the
+ * Images channel callable entries: the internal mutations behind the
  * service-credential HTTP boundary (`./http.ts`) and the probe surface
  * (`./probe.ts`).
  *
  * There is deliberately NO public mutation here: the images channel is the
  * executor's own recording path, and user-facing reads live in the guarded
- * probe until D3/E4 build the certified surfaces. Every entry is scoped by
- * `jobKey` and re-derives tenancy from the job row inside its transaction
+ * probe until media access and multimodal extraction build the certified
+ * surfaces. Every entry is scoped by `jobKey` and re-derives tenancy from the
+ * job row inside its transaction
  * (see ./ledger.ts for the authority model).
  */
 

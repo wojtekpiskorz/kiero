@@ -1,5 +1,5 @@
 /**
- * Task identity, executor and coordinator rules (C4 domain half, pure).
+ * Task identity, executor and coordinator rules (domain half, pure).
  *
  * Vocabulary (CONTEXT.md): "Wykonawca zadania" — the person doing the work,
  * also a subcontractor WITHOUT a Kiero account (a catalog contact);
@@ -7,7 +7,7 @@
  * in Kiero (a company membership). They may be the same person; they are
  * different records.
  *
- * Rules encoded here (issue 9, "Wykonawca, koordynator i zmiana dostępu"):
+ * Rules encoded here ("Wykonawca, koordynator i zmiana dostępu"):
  *
  * - The executor is a CONTACT reference and the coordinator a MEMBERSHIP
  *   reference. Naming an external executor grants nothing: no access, no

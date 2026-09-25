@@ -1,10 +1,10 @@
 /**
- * Guarded B3 proof fixtures (dev deployment only).
+ * Guarded membership proof fixtures (dev deployment only).
  *
- * Same pattern as the A3 platform probes and B1's identity probes: an
+ * Same pattern as the platform probes and the identity probes: an
  * ACTION checks the deployment guard variable and runs an internal
  * mutation reachable only from this module. The invitation-code leg needs
- * the same honest-scoped treatment B1's OTP got: invitation emails go
+ * the same honest-scoped treatment the OTP got: invitation emails go
  * through the Resend adapter, whose key this deployment does not carry, so
  * the evidence script installs a KNOWN code for a proof-domain invitation
  * and exercises the REAL admission path end to end. The code fixture can

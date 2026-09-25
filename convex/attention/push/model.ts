@@ -1,14 +1,14 @@
 /**
- * Web Push delivery decision core (F3): the PURE model the push
- * transactions and the delivery action run (the F2 `model.ts` precedent
+ * Web Push delivery decision core: the PURE model the push
+ * transactions and the delivery action run (the `model.ts` precedent
  * - deterministic over its inputs, no Convex, no clock, no environment,
  * so every rule is unit-testable without a deployment while
  * ./operations.ts re-runs the SAME functions inside transactions).
  *
  * Semantics pinned by issue 43's bounded solution and the accepted
- * notification decision (issue 7 resolution):
+ * notification decision:
  *
- * - The unit of delivery is F2's COLLAPSED summary on one delivered
+ * - The unit of delivery is the COLLAPSED summary on one delivered
  *   intent: ONE notification per recipient, bucket and fire instant -
  *   never one per underlying entry. The idempotency key is the semantic
  *   intent PLUS the subscription ("Do urządzenia" once), so a retried
@@ -22,10 +22,10 @@
  *   the app, which resolves current data through live authentication).
  * - Terminal provider responses (404/410) disable the subscription;
  *   uncertain outcomes (timeout/unknown) block blind re-sends - the
- *   echo/G3 uncertainty discipline.
+ *   echo/Calendar reconciliation uncertainty discipline.
  *
- * R3 (issue #128) additions: the runtime-decoded summary union
- * (`decodeDeliverySummary`: F2's entry summaries and F4's taskIds-only
+ * Also: the runtime-decoded summary union
+ * (`decodeDeliverySummary`: the entry summaries and taskIds-only
  * reminder summaries, never a cast after JSON.parse), the bounded
  * Polish task-reminder copy ("Przypomnienie o zadaniu"), the validated
  * RELATIVE same-origin click targets (source dossier, task record, Co
@@ -35,7 +35,7 @@
 import type { PushLegReport } from "./protocol";
 import { sourceTargetOf } from "../../sources/target";
 
-/** The F2-shaped summary of one source-entry or clarification batch. */
+/** The intent-shaped summary of one source-entry or clarification batch. */
 export interface EntrySummary {
   readonly semanticKind: "source_entry" | "clarification";
   readonly bucket: string;
@@ -48,7 +48,7 @@ export interface EntrySummary {
   readonly deliveredAtMs: number;
 }
 
-/** The F4-shaped summary of one collapsed task-reminder batch (no scope). */
+/** The reminder-shaped summary of one collapsed task-reminder batch (no scope). */
 export interface TaskSummary {
   readonly semanticKind: "task_reminder";
   readonly bucket: string;
@@ -56,10 +56,10 @@ export interface TaskSummary {
   readonly deliveredAtMs: number;
 }
 
-/** The runtime-decoded union of every summary the transport accepts (R3). */
+/** The runtime-decoded union of every summary the transport accepts. */
 export type DecodedSummary = EntrySummary | TaskSummary;
 
-/** What decoding one stored deliveryJson concluded (R3: no cast after parse). */
+/** What decoding one stored deliveryJson concluded (no cast after parse). */
 export type SummaryDecode =
   | { readonly kind: "decoded"; readonly summary: DecodedSummary }
   | { readonly kind: "confirmation" }
@@ -89,8 +89,8 @@ function isStringArray(value: unknown): value is string[] {
 /**
  * Decodes one stored deliveryJson into the typed union, or refuses. The
  * push prepare runs this BEFORE any delivery row exists, so a malformed or
- * unsupported summary can never reach the transport (issue 128: the cast
- * after JSON.parse hid F4's taskIds-and-no-scope shape). Id VALUES are
+ * unsupported summary can never reach the transport (the cast
+ * after JSON.parse hid taskIds-and-no-scope shape). Id VALUES are
  * shape-checked only: ownership stays the adapter's live read, because a
  * foreign id is a routing hint, never access.
  */
@@ -114,7 +114,7 @@ export function decodeDeliverySummary(json: string): SummaryDecode {
     return { kind: "invalid" };
   }
   if (semanticKind === "confirmation") {
-    // The kind exists in the union but F2 never creates it.
+    // The kind exists in the union but notification intents never create it.
     return { kind: "confirmation" };
   }
   const sourceIds =
@@ -191,7 +191,7 @@ export interface ClarificationPreview {
   readonly stillOpen: boolean;
 }
 
-/** One open task's preview material as the F4 adapter re-reads it (R3). */
+/** One open task's preview material as the adapter re-reads it. */
 export interface TaskPreview {
   readonly taskId: string;
   readonly title: string;
@@ -207,7 +207,7 @@ export interface PayloadInputs {
   readonly scope?: ScopeView;
   readonly sources?: readonly SourcePreview[];
   readonly clarifications?: readonly ClarificationPreview[];
-  /** The F4 adapter's re-read task rows (absent for entry summaries). */
+  /** The adapter's re-read task rows (absent for entry summaries). */
   readonly tasks?: readonly TaskPreview[];
   readonly hidePreview: boolean;
 }
@@ -238,8 +238,8 @@ export interface PushNotificationPayload {
 const FRAGMENT_LIMIT = 120;
 
 // ---------------------------------------------------------------------------
-// The validated relative targets (R3). The SAME literal wire forms the app
-// registers: the source dossier route (R5's serializer contract, served by
+// The validated relative targets. The SAME literal wire forms the app
+// registers: the source dossier route (the serializer contract, served by
 // the ONE shared runtime-neutral helper convex/sources/target.ts — never a
 // local twin), the task record screen's param key
 // (apps/web/src/features/now/state.ts) and the Co teraz route whose live
@@ -248,7 +248,7 @@ const FRAGMENT_LIMIT = 120;
 // re-validates against its own scope before navigating.
 // ---------------------------------------------------------------------------
 
-/** The dossier route and target of one "Wiadomość źródłowa" (R5's wire contract). */
+/** The dossier route and target of one "Wiadomość źródłowa" (the wire contract). */
 export { SOURCE_ROUTE_PATH, sourceTargetOf } from "../../sources/target";
 /** The task record screen's deep-link key (the accepted record route). */
 export const TASK_ROUTE_PATH = "/praca";
@@ -397,7 +397,7 @@ export function composePushPayload(
     };
   }
   if (summary.semanticKind === "task_reminder") {
-    // The F4 adapter's rendering (R3): the CURRENT open tasks of the
+    // The adapter's rendering: the CURRENT open tasks of the
     // collapsed batch. The reminder kinds are delivery metadata; the copy
     // carries the task titles only, bounded by the shared fragment limit.
     const ordered = work.tasks;
@@ -425,7 +425,7 @@ export function composePushPayload(
     return {
       v: 1,
       kind: "clarification",
-      // The glossary and H1's surface name this concept "Sprawa do
+      // The glossary and the surface name this concept "Sprawa do
       // wyjaśnienia"; the notification voice uses the same name.
       title: `Sprawa do wyjaśnienia: ${scopeNameOf(scope)}`,
       body: `${fragmentOf(first.question)}${more}`,
@@ -483,7 +483,7 @@ export function ttlSecondsOf(): number {
 }
 
 /**
- * The stored payload a terminal suppression leaves behind (R3): non-content
+ * The stored payload a terminal suppression leaves behind: non-content
  * data only, no preview text and no routing ids, because the work will
  * never transport. Deleted content must not survive even as evidence of
  * what COULD have been sent.

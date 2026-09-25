@@ -1,5 +1,5 @@
 /**
- * The gateway scheduled handler (I2): the cron-trigger entry that makes the
+ * The gateway scheduled handler: the cron-trigger entry that makes the
  * Worker the external heartbeat prober.
  *
  * Wired as the `scheduled` export of the Worker entry (the wrangler cron

@@ -1,11 +1,11 @@
 /**
- * The work feature (H2): the /praca record surface for tasks, checklists
+ * The work feature: the /praca record surface for tasks, checklists
  * and events of the company's projects.
  *
  * JSX-free on purpose (createElement only), like the sibling surfaces: the
  * host feature registry chain stays importable by the node test programs.
  *
- * Every change rides C4's checked dispatch (`work/functions:dispatchWork`),
+ * Every change rides the checked dispatch (`work/functions:dispatchWork`),
  * the SAME operation surface the agent uses: create/update tasks with
  * coordinator/executor/dates, explicit task states (Do zrobienia, W toku,
  * Czeka z powodem, Wykonane, Anulowane), one-level checklist points whose
@@ -18,7 +18,7 @@
  * clock), an unknown or disputed bound term renders as such, and tasks of
  * CLOSED projects stay listed with their obligations. The record deep
  * links `?zadanie=<id>` / `?zdarzenie=<id>` reuse the same param keys the
- * Co teraz screen owns (G4's calendar-copy parity).
+ * Co teraz screen owns (the calendar-copy parity).
  */
 
 import { createElement, useEffect, useState, type ReactNode } from "react";
@@ -61,7 +61,7 @@ export interface ProjectJoin {
   readonly closed: boolean;
 }
 
-/** Builds the project join map from C1's catalog read (active + closed). */
+/** Builds the project join map from the catalog read (active + closed). */
 export function projectJoinOf(catalog: ProjectsOverview): Map<string, ProjectJoin> {
   const join = new Map<string, ProjectJoin>();
   for (const project of [...catalog.active, ...catalog.closed]) {

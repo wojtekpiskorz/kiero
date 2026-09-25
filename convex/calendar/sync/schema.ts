@@ -1,8 +1,7 @@
 /**
- * Calendar sync tables (G3, issue #47).
+ * Calendar sync tables.
  *
- * Owning implementer: G3 (reconciliation of writes, unknown outcomes,
- * reconnects). G2's `calendarCopies` already carries the semantic identity,
+ * `calendarCopies` already carries the semantic identity,
  * the remote id, the desired revision and the personal-hide bookkeeping;
  * the tables here complete the remote ledger the issue names:
  *
@@ -14,10 +13,10 @@
  *   effect may have happened, exactly the state reconciliation consumes.
  *   The row also carries the observation cache (the managed fields Google
  *   answered with) and the timing pair (`desiredAtMs`/`completedAtMs`)
- *   J4's 95%-within-60-seconds evaluation reads — recorded, never claimed
- *   before J4.
+ *   the 95%-within-60-seconds evaluation reads — recorded, never claimed
+ *   before device qualification.
  * - `calendarProofEvents`: the FAKE Google Calendar's event store (the
- *   guarded proof fixtures only, the G1/A3 echo pattern; written solely by
+ *   guarded proof fixtures only, the echo pattern; written solely by
  *   `KIERO_G1_PROOF_ENABLED`-guarded fixtures, never by business paths).
  *
  * Tables: calendarSyncAttempts, calendarProofEvents.
@@ -43,7 +42,7 @@ export const SYNC_LEG_KINDS = [
 export type SyncLegKind = (typeof SYNC_LEG_KINDS)[number];
 
 /**
- * A leg's outcome — the A3 `ExternalOutcome` vocabulary, PINNED by type to
+ * A leg's outcome — the `ExternalOutcome` vocabulary, PINNED by type to
  * @kiero/runtime so the attempt rows and the durable-job outcome columns
  * can never disagree about what "uncertain" means. The row validator is
  * built from this list.
@@ -97,7 +96,7 @@ export const calendarSyncTables = {
     hiddenBasis: v.boolean(),
     desiredPayloadHash: v.optional(v.string()),
     /**
-     * The copy's `updatedAtMs` at leg start (the J4 latency basis).
+     * The copy's `updatedAtMs` at leg start (the latency basis).
      * `updatedAtMs` moves only on desire changes (create, correction,
      * withdrawal, hide, restore); ledger completions never touch it, so a
      * reconnect rebuild or drift leg measures from the desire revision,
@@ -124,7 +123,7 @@ export const calendarSyncTables = {
   /**
    * The fake Google Calendar's event store (PROOF FIXTURE ONLY). Written
    * exclusively by the guarded fixtures in ./proofHttp.ts — the same
-   * clearly-labeled stand-in pattern as G1's fake token/calendar
+   * clearly-labeled stand-in pattern as the fake token/calendar
    * endpoints; the no-duplicate-effect proofs count effects here.
    */
   calendarProofEvents: defineTable({

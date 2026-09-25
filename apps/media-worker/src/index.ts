@@ -1,5 +1,5 @@
 /**
- * @kiero/media-worker: the EU media Container executor entry (D6).
+ * @kiero/media-worker: the EU media Container executor entry.
  *
  * This file is deliberately THIN: the entire protocol — bearer guard, the
  * S3-credential reader construction, ranged byte discipline and the status
@@ -14,14 +14,14 @@
  *   + port forwarding) and injects the Worker's secret names into the
  *   container process env — values never live in the repo.
  *
- * Deploy state (observed live by D6): the container builds, deploys and
+ * Deploy state (observed live): the container builds, deploys and
  * serves on the current account — no Workers-Paid blocker exists. What
  * honestly does NOT exist yet:
  * - the media-bucket S3 API token (dashboard-issued) — until the values are
  *   injected, every byte operation answers the typed `not_configured`
  *   refusal, never a fake success.
  *
- * FFmpeg conversion of non-WAV containers (R30) runs ONLY in the container
+ * FFmpeg conversion of non-WAV containers runs ONLY in the container
  * process (src/container-main.ts verifies the binary and injects the
  * converter); this Worker surface refuses non-WAV audio with
  * `format_requires_container` — an isolate cannot spawn a process.

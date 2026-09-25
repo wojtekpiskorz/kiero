@@ -1,5 +1,5 @@
 /**
- * The barebones application shell (A4).
+ * The barebones application shell.
  *
  * Plain semantic chrome only (execution charter: "The unstyled UI uses
  * semantic forms, buttons, lists and plain status/error text"): a header

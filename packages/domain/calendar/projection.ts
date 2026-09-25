@@ -1,9 +1,9 @@
 /**
- * Deterministic Calendar projection rules (G2, pure): which task deadlines
+ * Deterministic Calendar projection rules (pure): which task deadlines
  * and event times deserve a copy in one boss's "Kalendarz Kiero w Google",
  * and what that copy's managed content is.
  *
- * Rules encoded here (issue #46; issue #14 resolution; CONTEXT.md
+ * Rules encoded here (CONTEXT.md
  * "Kalendarz Kiero w Google" / "Kopia kalendarzowa" / "Znacznik terminu"):
  *
  * - Projection is PERSONAL: planned company events plus OPEN tasks (Do
@@ -98,7 +98,7 @@ export function projectSelected(selection: ProjectSelection, projectId: string):
 }
 
 // ---------------------------------------------------------------------------
-// Subject eligibility (personal scope; issue #14: "Połączenie i zakres
+// Subject eligibility (personal scope: "Połączenie i zakres
 // osobisty").
 // ---------------------------------------------------------------------------
 
@@ -252,7 +252,7 @@ export function termRevisionId(binding: TermBindingView | null): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Polish copy text (managed fields Kiero owns; issue #14 "Zawartość i
+// Polish copy text (managed fields Kiero owns "Zawartość i
 // ustawienia kopii").
 // ---------------------------------------------------------------------------
 
@@ -368,7 +368,7 @@ export interface DesiredGoogleEvent {
   /**
    * New copies start without Google event reminders (Kiero's own reminder
    * system owns them); a managed UPDATE never re-sends this field, so
-   * personally added reminders survive (G3's reconciliation contract).
+   * personally added reminders survive (the reconciliation contract).
    * The list is ALWAYS empty by construction (both construction sites below
    * pass the literal `[]`); typed `string[]` so the schema validator and
    * this interface pin against each other exactly.
@@ -487,7 +487,7 @@ export function desiredEvent(
 }
 
 // ---------------------------------------------------------------------------
-// Deterministic copy identity (issue #46: one stable projection identity
+// Deterministic copy identity (one stable projection identity
 // per user/company and Google account; task and related event separate).
 // ---------------------------------------------------------------------------
 

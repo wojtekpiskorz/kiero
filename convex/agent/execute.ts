@@ -1,36 +1,37 @@
 /**
- * The checked executions of the answer flow (E6): one internal mutation
+ * The checked executions of the answer flow: one internal mutation
  * per write tool, each running the SAME checked domain path the UI uses —
  * never a raw write.
  *
- * Identity is the E3 precedent ("Działa w zakresie uprawnień użytkownika i
+ * Identity is the precedent ("Działa w zakresie uprawnień użytkownika i
  * firmy", issue 8): the agent acts through the QUESTION SOURCE AUTHOR's
  * server-resolved session — never client input, never a fabricated
  * identity — so every execution lands inside the asker's firm permissions.
  *
- * - clarifications: `memory.raiseClarification` through the C2 dispatch
+ * - clarifications: `memory.raiseClarification` through the dispatch
  *   (fragment-typed conflicting evidence; publishes `memory.
- *   clarificationRaised`, the event vocabulary F2 consumes);
+ *   clarificationRaised`, the event vocabulary notification intents consume);
  * - clarification resolution: `memory.resolveClarification` through the
- *   same dispatch, with author, note and — R1 (issue #126) — the cited
+ *   same dispatch, with author, note and the cited
  *   evidence validated against the current ledger (company-owned ACTIVE
  *   source, matching fragment) and persisted with the resolution;
- * - domain changes: C4's `performChangeTask`/`performChangeEvent` cores —
+ * - domain changes: `performChangeTask`/`performChangeEvent` cores —
  *   the exact implementations the registered `work.changeTask`/
  *   `work.changeEvent` dispatches run after decode and policy — with the
  *   question source as the recorded evidence basis (`basisSourceId`);
- * - extension values: `memory.validateExtensionValue` through the C3
- *   dispatch (the operation C3 declared "for E6 tools");
+ * - extension values: `memory.validateExtensionValue` through the extensions
+ *   dispatch (declared for the agent tools);
  * - the staleness recheck: current revision counters versus the run's
  *   load-time snapshot (`decideAnswerFreshness`).
  *
- * R2 (issue #127) adds the ONE agent-entry rule to every execution above:
+ * R2 adds the ONE agent-entry rule to every execution above:
  * the question source's accepted LIFECYCLE decides, not row existence — a
  * retained tombstone (permanent deletion) refuses the execution with the
  * typed `question_source_not_active` code before any write or event, and
  * the staleness recheck ABORTS on it so a computed answer can never land
- * over a deleted world. Cited evidence was already lifecycle-checked by R1
- * (`checkResolutionEvidenceReference`); the raise path now refuses an
+ * over a deleted world. Cited evidence was already lifecycle-checked by the
+ * clarification evidence check (`checkResolutionEvidenceReference`); the raise
+ * path now refuses an
  * inactive conflicting-evidence source the same way.
  */
 
@@ -77,7 +78,7 @@ interface EvidenceWire {
 
 /**
  * Resolves one evidence reference to a fragment id (ensuring it when new).
- * R2 (issue #127): only an ACTIVE company source can anchor evidence
+ * Only an ACTIVE company source can anchor evidence
  * (`requireActiveSource`, the one dead-source predicate) — a retained
  * tombstone is a dead anchor, never a place to ensure a fragment.
  */
@@ -99,7 +100,7 @@ async function ensureEvidenceFragment(
   }
   const extractionId = await resolveTextExtraction(db, source._id, null);
   if (extractionId === null) {
-    // No text extraction exists for this source (D1 seeds text rows, so
+    // No text extraction exists for this source (accepted text sources seed text rows, so
     // this is a genuine anomaly): the evidence cannot be anchored at all.
     throw new Error("agent: text_extraction_missing");
   }
@@ -114,7 +115,7 @@ async function ensureEvidenceFragment(
 }
 
 // ---------------------------------------------------------------------------
-// The one agent-entry preamble (R2, issue #127).
+// The one agent-entry preamble (R2).
 // ---------------------------------------------------------------------------
 
 /** The typed refusals the question-source preamble can return. */
@@ -133,7 +134,7 @@ export type QuestionSourceEntry =
   | { readonly ok: false; readonly error: QuestionSourceRefusal };
 
 /**
- * R2 (issue #127): the ONE preamble every checked execution shares — the
+ * The ONE preamble every checked execution shares — the
  * question source's accepted LIFECYCLE decides, not row existence (a
  * retained tombstone refuses with the typed `question_source_not_active`
  * code), and the author's server-resolved session must exist. Callers wrap
@@ -158,7 +159,7 @@ async function requireQuestionSourceSession(
 }
 
 // ---------------------------------------------------------------------------
-// Clarifications (Sprawa do wyjaśnienia, source-backed through C2).
+// Clarifications (Sprawa do wyjaśnienia, source-backed through the findings lane).
 // ---------------------------------------------------------------------------
 
 /** The checked raise execution's input (exported for the deterministic tests). */
@@ -179,7 +180,7 @@ export interface ExecuteClarificationInput {
  * The checked raise execution body (R2): the QUESTION source must be
  * ACTIVE (a retained tombstone refuses with a typed code — late work
  * publishes nothing), every conflicting-evidence source must be active
- * too, and the final command runs the C2 dispatch whose own fragment
+ * too, and the final command runs the dispatch whose own fragment
  * checks re-verify the same lifecycle (each layer checks end to end).
  */
 export async function executeClarificationCore(
@@ -188,7 +189,7 @@ export async function executeClarificationCore(
 ): Promise<ResultEnvelope> {
   const entry = await requireQuestionSourceSession(ctx.db, args.questionSourceId);
   if (!entry.ok) {
-    // R2 (issue #127): a tombstone between model work and commit is a typed
+    // A tombstone between model work and commit is a typed
     // refusal — no row, no event, nothing published over the deleted world.
     return okResult({ outcome: "failed", error: entry.error });
   }
@@ -268,7 +269,7 @@ interface NormalizedEvidenceReference {
 }
 
 /**
- * R1 (issue #126): validates the run's resolve evidence against the
+ * Validates the run's resolve evidence against the
  * CURRENT ledger state and normalizes it to durable references. Pass 1
  * validates every reference BEFORE anything is ensured or written, through
  * the ONE shared per-reference rule (../memory/findings/references —
@@ -332,7 +333,7 @@ export interface ResolvedEvidenceHandles {
 }
 
 /**
- * R1 (issue #126): maps cited ledger handles to the FINAL wire references
+ * Maps cited ledger handles to the FINAL wire references
  * `executeResolveClarification` receives — deduplicated, first-occurrence
  * order, the optional-spread shape produced ONCE (no intermediate
  * nulls-shaped pass to re-map). Pure over the run's evidence ledger; the
@@ -376,7 +377,7 @@ export interface ExecuteResolveClarificationInput {
 }
 
 /**
- * The checked resolve execution body (R1): resolves the cited evidence
+ * The checked resolve execution body: resolves the cited evidence
  * against the current ledger, refuses atomically on any invalid reference,
  * and runs `memory.resolveClarification` with the normalized references so
  * the resolution transaction persists them with its basis.
@@ -387,7 +388,7 @@ export async function executeResolveClarificationCore(
 ): Promise<ResultEnvelope> {
   const entry = await requireQuestionSourceSession(ctx.db, args.questionSourceId);
   if (!entry.ok) {
-    // R2 (issue #127): the accepted lifecycle, not row existence — a late
+    // The accepted lifecycle, not row existence — a late
     // resolve over a tombstoned question world refuses, publishes nothing.
     return okResult({ outcome: "failed", error: entry.error });
   }
@@ -447,7 +448,7 @@ export const executeResolveClarification = internalMutation({
 });
 
 // ---------------------------------------------------------------------------
-// Domain changes through C4's checked cores (the question source = basis).
+// Domain changes through the checked cores (the question source = basis).
 // ---------------------------------------------------------------------------
 
 export const executeWorkChange = internalMutation({
@@ -459,7 +460,7 @@ export const executeWorkChange = internalMutation({
   handler: async (ctx, args): Promise<ResultEnvelope> => {
     const entry = await requireQuestionSourceSession(ctx.db, args.questionSourceId);
     if (!entry.ok) {
-      // R2 (issue #127): one agent-entry rule — every checked execution
+      // One agent-entry rule — every checked execution
       // refuses a tombstoned question source (existence alone lies).
       return okResult({ outcome: "failed", error: entry.error });
     }
@@ -504,7 +505,7 @@ export const executeWorkChange = internalMutation({
 });
 
 // ---------------------------------------------------------------------------
-// Extension values: C3's validate-value operation for E6 tools.
+// Extension values: the validate-value operation for agent tools.
 // ---------------------------------------------------------------------------
 
 export const executeExtensionValidate = internalMutation({
@@ -516,7 +517,7 @@ export const executeExtensionValidate = internalMutation({
   handler: async (ctx, args): Promise<ResultEnvelope> => {
     const entry = await requireQuestionSourceSession(ctx.db, args.questionSourceId);
     if (!entry.ok) {
-      // R2 (issue #127): the one agent-entry rule (see executeWorkChange).
+      // The one agent-entry rule (see executeWorkChange).
       return okResult({ outcome: "failed", error: entry.error });
     }
     const { session } = entry;
@@ -562,7 +563,7 @@ export async function stalenessRecheckCore(
     };
   }
   if (source.lifecycle !== "active") {
-    // R2 (issue #127): I4 RETAINS a tombstone row, so existence alone
+    // Deletion RETAINS a tombstone row, so existence alone
     // would let a computed answer land over a permanently deleted world.
     // The accepted lifecycle decides: a tombstone never counts as active.
     return {

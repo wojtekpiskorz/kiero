@@ -1,5 +1,5 @@
 /**
- * The email-change panel (B2): request (requires recent authentication,
+ * The email-change panel: request (requires recent authentication,
  * enforced server-side) then confirm with the code mailed to the NEW
  * address. A failed confirmation changes nothing server-side; the panel
  * says so honestly by clearing its own state on failure.

@@ -1,5 +1,5 @@
 /**
- * Platform operation handlers and dispatch wiring (A3).
+ * Platform operation handlers and dispatch wiring.
  *
  * The SAME checked path (@kiero/runtime dispatchCommand) serves direct
  * Convex function calls (Convex Auth identity) and Worker bridge calls

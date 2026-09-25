@@ -1,5 +1,5 @@
 /**
- * The Convex deletion-bridge client (I4): how the gateway's purge route
+ * The Convex deletion-bridge client: how the gateway's purge route
  * resolves the AUTHORITATIVE media object keys of one deletion record.
  *
  * The Worker's own service credential authenticates the bridge call; the

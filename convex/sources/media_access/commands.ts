@@ -1,13 +1,13 @@
 /**
- * Sources media-access callable entries (D3).
+ * Sources media-access callable entries.
  *
  * `mediaAccessFor` (internal query): the per-user channel's read
  * resolution the gateway's media routes consult on EVERY request. The HTTP
  * boundary (`./http.ts`) forwards the browser's Authorization header
- * verbatim; Convex propagates it into this query's `ctx.auth`, where B1's
+ * verbatim; Convex propagates it into this query's `ctx.auth`, where the
  * live-session resolution and the canonical chain resolve the acting user
  * (live session -> active membership -> company) — the same identity path
- * as `uploadStateFor` (D2). A revoked session or membership answers the
+ * as `uploadStateFor`. A revoked session or membership answers the
  * sanitized `unauthenticated` refusal BEFORE any attachment row is read,
  * and the tenant-scoped resolution (access.ts) answers the uniform
  * `not_found` for anything the caller may not read — both before the

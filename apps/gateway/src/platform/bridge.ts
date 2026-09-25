@@ -1,5 +1,5 @@
 /**
- * The Convex bridge client (A3; transport exported for lane bridges by D2):
+ * The Convex bridge client (its transport is shared by the lane bridges):
  * how Worker calls reach the backend.
  *
  * Every gateway call to the backend carries the verified service identity
@@ -19,7 +19,7 @@
  * credential verbatim. The transport itself is credential-agnostic — it
  * requires only the backend URL; `callPlatform` keeps the service
  * credential's own presence guard.
- * (I3 prerequisite repair, flagged: a service-token presence check HERE
+ * (A service-token presence check HERE
  * broke every USER-credential channel — uploads, media reads, export
  * downloads — on any gateway deployed per infra/bindings/gateway-worker.md,
  * which binds no KIERO_SERVICE_TOKEN; the i3 live proof observed every
@@ -78,11 +78,10 @@ export async function postBridge(
   // An envelope is an answer, any other 404 is a missing route: Convex
   // boundaries map not_found envelopes to HTTP 404 (envelopeHttpStatus),
   // and masking that as route-missing would turn every legitimate
-  // not-found refusal into a sanitized 503 (D3's media channel is the
+  // not-found refusal into a sanitized 503 (the media channel is the
   // first lane whose envelopes cross here). Decode first; the ONE 404
   // check decides only when decoding produced nothing (Convex answers an
   // unknown route with a plain-text 404 that cannot decode).
-  // (D3 amendment, flagged.)
   let payload: unknown;
   let jsonParsed = true;
   try {

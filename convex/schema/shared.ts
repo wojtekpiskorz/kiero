@@ -16,7 +16,7 @@
  *
  * The runtime half of the proof (decoded value → encode → Convex JSON wire →
  * decode → equal value; malformed input rejected by the Effect decoder) lives
- * in tests/contracts. Deployment-time Convex validator enforcement is A3's
+ * in tests/contracts. Deployment-time Convex validator enforcement is the
  * proof; the pinned convex 1.45.0 exposes no untyped local validate entry.
  *
  * Timestamps: table columns record trusted system time as epoch milliseconds
@@ -24,7 +24,7 @@
  * form within the encoded value itself. Revision counters are `float64`
  * (document counts are far below 2^53).
  *
- * Candidate definitions until A3 certifies them.
+ * Candidate definitions until platform certifies them.
  */
 
 import { v, type Validator } from "convex/values";
@@ -56,7 +56,7 @@ export type ValueValidator<T> = Validator<T, "required", string>;
 /**
  * One closed string vocabulary's validator, built from its constant list —
  * the single spelling schema fragments AND argument validators share (the
- * R25 review's dedup: the helper previously lived copy-per-fragment, so
+ * Deduplicated: the helper previously lived copy-per-fragment, so
  * vocabulary drift failed only where a copy happened to exist).
  */
 export function vocabularyOf<T extends string>(kinds: readonly T[]): ValueValidator<T> {
@@ -69,7 +69,7 @@ export function vocabularyOf<T extends string>(kinds: readonly T[]): ValueValida
 // schema's Encoded type; changing either side without the other fails here.
 // ---------------------------------------------------------------------------
 
-// C5 amendment (additive, flagged): the `updating` variant joins the union —
+// The `updating` variant joins the union —
 // the updating-until-revalidated state for dependent inferred conclusions
 // whose basis moved (withdrawal/correction). The Encoded type pin forces
 // this line to exist exactly when the contracts side gains the variant.
@@ -172,7 +172,7 @@ const findingValueValidator: ValueValidator<Encoded<typeof FindingValue>> =
   v.union(
     v.object({ _tag: v.literal("temporal"), temporal: temporalValueValidator }),
     v.object({ _tag: v.literal("money"), money: moneyValueValidator }),
-    // C3 amendment (additive, flagged): the extension branch carries the
+    // The extension branch carries the
     // extensionVersions row it validates against — pinned to the contracts
     // Encoded type, so the two sides cannot drift.
     v.object({
@@ -257,7 +257,7 @@ export const shared = {
   exportId: v.id("exports"),
   gmAccessGrantId: v.id("gmAccessGrants"),
   searchIndexGenerationId: v.id("searchIndexGenerations"),
-  // I4 append (flagged, one line, the sibling pattern): the deletion
+  // The deletion
   // ledger's row reference (convex/operations/deletion/ owns the table).
   deletionRecordId: v.id("deletionRecords"),
 

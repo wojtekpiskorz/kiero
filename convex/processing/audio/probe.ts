@@ -1,20 +1,20 @@
 /**
- * D6 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, the D1/D2 pattern; see convex/sources/probe_shared.ts).
+ * Transcription dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable, the pattern; see convex/sources/probe_shared.ts).
  *
  * No business shortcuts exist here: every entry resolves the CALLER's
  * identity from the caller's own verified Convex Auth credential and runs
  * the REAL order/registration/inspection code against the caller's tenant.
- * The entries exist so the D6 evidence can drive the durable flow on the
+ * The entries exist so the evidence can drive the durable flow on the
  * real deployment:
  *
  * - `probeOrderTranscript`: the order transaction as the caller (the same
- *   entry E3's extract executor will call internally).
+ *   entry the extract executor will call internally).
  * - `probeArmSegmentFailure` / `probeDisarmSegmentFailure`: the interrupt
- *   fixture — a deterministic per-segment failure marker (A3's armed-stage
+ *   fixture — a deterministic per-segment failure marker (the armed-stage
  *   pattern) so transcribe -> interrupt -> resume is real, not a replay
  *   artifact.
- * - `probeResumeTranscript`: the sanctioned resume — re-running the order
+ * - `probeResumeTranscript`: the resume — re-running the order
  *   entry re-queues the definitely-failed job (bounded by its attempts).
  * - `probeTranscriptState`: the caller's tenant-scoped inspection the
  *   evidence asserts on (orders, segment checkpoints, platform steps and
@@ -161,7 +161,7 @@ export const probeArmSegmentFailure = action({
   },
 });
 
-// --- the sanctioned resume ----------------------------------------------------
+// --- the resume ----------------------------------------------------
 
 export const resumeAsCaller = internalMutation({
   args: { transcriptId: v.string() },
@@ -329,7 +329,7 @@ export const transcriptInspection = internalQuery({
   },
 });
 
-/** The caller's tenant-scoped D6 inspection (guarded read). */
+/** The caller's tenant-scoped transcription inspection (guarded read). */
 export const probeTranscriptState = action({
   args: { transcriptId: v.optional(v.string()) },
   handler: async (ctx, args): Promise<ResultEnvelope> => {

@@ -1,9 +1,9 @@
 /**
- * The firm-export protocol (I3): the ONE definition of the export lane's
+ * The firm-export protocol: the ONE definition of the export lane's
  * vocabulary on every side of the deployment boundary. The Convex boundary
  * (./http.ts, ./access.ts, ./executor.ts), the export Worker
  * (apps/export-worker) and the gateway download route
- * (apps/gateway/src/exports) import it directly, the D2/D3 shared-home
+ * (apps/gateway/src/exports) import it directly, the shared-home
  * ruling: mirrors of these schemas anywhere else are hazards, not copies.
  *
  * It stays out of @kiero/contracts because it is this lane's boundary
@@ -20,7 +20,7 @@
 /** The archive format the published bytes declare (bump on any layout change). */
 export const ARCHIVE_SCHEMA_VERSION = "kiero-export/1" as const;
 
-/** Downloads stay available this long after completion (issue #55). */
+/** Downloads stay available this long after completion. */
 export const EXPORT_AVAILABILITY_MS = 24 * 60 * 60 * 1000;
 
 /** Per-snapshot bounds; exceeding any one fails the build closed. */

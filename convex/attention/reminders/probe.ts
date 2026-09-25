@@ -1,5 +1,5 @@
 /**
- * F4 task-reminder dev proofs (guarded by the deployment's
+ * Task-reminder dev proofs (guarded by the deployment's
  * KIERO_PROBE_ENABLED variable; shared plumbing in
  * convex/attention/probe_shared.ts).
  *
@@ -17,7 +17,7 @@
  *   evidence script asserts on.
  * - `probeSeedDatedTask`: the dated-task fixture the live evidence needs
  *   from OTHER lanes' modules (a deadline finding + its current revision +
- *   the task row, written directly - the C4 `c4ProofSeedWitnessedSource`
+ *   the task row, written directly - the `c4ProofSeedWitnessedSource`
  *   lease-workaround precedent; proof domains only, the REAL task and
  *   finding flows stay their owning lanes' checked paths).
  * - `probeRepublishTaskChanged`: duplicate-event injection - republishes a

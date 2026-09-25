@@ -1,5 +1,5 @@
 /**
- * Task-reminder command entries (F4).
+ * Task-reminder command entries.
  *
  * Two callable entries, one checked dispatch (the lane pattern):
  *
@@ -34,7 +34,7 @@ export const evaluateDueRemindersCommand = mutation({
 
 /**
  * The service path's transactional entries: the verified service session
- * id substitutes the bearer-verified identity (the A3 bridge pattern).
+ * id substitutes the bearer-verified identity (the bridge pattern).
  */
 export const snoozeTaskRemindersTransaction = internalMutation({
   args: { envelope: v.any(), serviceSessionId: v.string() },

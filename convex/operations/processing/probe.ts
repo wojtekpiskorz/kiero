@@ -1,7 +1,7 @@
 /**
- * Guarded H4 proof fixtures (dev deployment only).
+ * Guarded processing-inspection proof fixtures (dev deployment only).
  *
- * Same pattern as the B1..B4/E3 probes: an ACTION checks the deployment
+ * Same pattern as the access and analysis probes: an ACTION checks the deployment
  * guard variable (`KIERO_H4_PROOF_ENABLED === "1"`) and runs internal reads
  * reachable only from this module. Nothing here is a product surface: the
  * entries exist so the evidence script can assert on (1) the protected GM
@@ -28,7 +28,7 @@ function disabled(): ResultEnvelope {
 
 /**
  * The sanitized GM audit tail since a timestamp (this lane's rows carry
- * gmGrantId; the read stays bounded by the window like B4's tail read).
+ * gmGrantId; the read stays bounded by the window like the tail read).
  */
 export const h4AuditTailInternal = internalMutation({
   args: { sinceMs: v.float64() },

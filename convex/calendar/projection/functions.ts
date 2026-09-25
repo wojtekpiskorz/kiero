@@ -1,22 +1,22 @@
 /**
- * The G2 Convex function surface (generated-call APIs).
+ * The Calendar projection Convex function surface (generated-call APIs).
  *
  * `runProjectionPass` is the deterministic projection driver: for one (or
- * every) connection it rechecks the connection PER PASS — first G1's
+ * every) connection it rechecks the connection PER PASS — first the
  * credential capability (ONE bounded refresh attempt, whose `unknown`
  * outcome means "do not publish, do not retry blindly"), then the
  * transaction's own row/membership recheck — and only a healthy pass
  * writes desired states. Scheduling the pass (cron, outbox consumer or
- * G3's sync loop) is deliberately NOT owned here: one durable consumer
+ * the sync loop) is deliberately NOT owned here: one durable consumer
  * edge per event is the certified platform shape today and the work.* fan-out
- * question is flagged in C4's report, so the pass is an explicit seam G3
+ * question is flagged in the report, so the pass is an explicit seam reconciliation
  * and the joins trigger.
  *
  * `dispatchCalendarProjection` carries the certified personal-hide
- * operation (`calendar.setCopyHidden`) and, since G5 (issue #107), the
+ * operation (`calendar.setCopyHidden`) and the
  * personal project-selection write (`calendar.setSelection`); the reads
  * below expose the boss's EFFECTIVE selection. `calendar.reconcileCopy`
- * stays unimplemented here (G3's lane) and fails closed `unsupported`.
+ * stays unimplemented here and fails closed `unsupported`.
  */
 
 import { v } from "convex/values";
@@ -76,7 +76,7 @@ export const runProjectionPass = internalAction({
     const results: ConnectionPassResult[] = [];
     for (const connectionId of ids) {
       // The per-pass connection recheck: the refresh capability also
-      // materializes the membership-loss stop durably (G1's lazy edge).
+      // materializes the membership-loss stop durably (the lazy edge).
       const refresh = await ctx.runAction(
         internal.calendar.connection.functions.refreshCredentials,
         { connectionId },
@@ -119,11 +119,11 @@ export const dispatchCalendarProjection = mutation({
 });
 
 // ---------------------------------------------------------------------------
-// Reads: the actor's own projection state, and the G3 desired-state seam.
+// Reads: the actor's own projection state, and the desired-state seam.
 // ---------------------------------------------------------------------------
 
 /**
- * The boss's EFFECTIVE selection view (G5): the stored column when present,
+ * The boss's EFFECTIVE selection view: the stored column when present,
  * the all-projects default otherwise. Explicit selections always carry a
  * (possibly empty) list: an explicit row without ids reads as the honest
  * empty opt-out, the same shape `calendar.setSelection` returns.
@@ -142,8 +142,8 @@ function effectiveSelection(
 /**
  * Authenticated: the actor's own copies and sync state — the honest
  * "pending changes / needs reconnect" signal, the personal-hide surface
- * and the effective project selection (G5) the settings screen and the
- * J4 interval consume.
+ * and the effective project selection the settings screen and the
+ * device-qualification interval consume.
  */
 export const projectionOverview = query({
   args: {},
@@ -207,8 +207,8 @@ export const projectionOverview = query({
 });
 
 /**
- * The G3 consumption seam: one connection's complete desired-state rows
- * (managed payload, hide flag, remote ledger) — exactly the inputs G3's
+ * The consumption seam: one connection's complete desired-state rows
+ * (managed payload, hide flag, remote ledger) — exactly the inputs the
  * reconciliation diffs against Google.
  */
 export const desiredCopiesForConnection = internalQuery({

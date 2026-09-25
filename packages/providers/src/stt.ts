@@ -1,5 +1,5 @@
 /**
- * The speech-to-text adapter (E2) over OpenRouter's dedicated transcription
+ * The speech-to-text adapter over OpenRouter's dedicated transcription
  * endpoint (`/api/v1/audio/transcriptions` via `@openrouter/sdk`).
  *
  * STT routing differs from chat (STT research facts): provider order and
@@ -9,9 +9,9 @@
  * attempt, over the shared ordered-route runner (./runner.ts). The JSON
  * base64 request shape is used (not 25MB-limited multipart).
  *
- * Honest limitation recorded for D6: this JSON endpoint returns text and
+ * Honest limitation recorded for transcription: this JSON endpoint returns text and
  * usage only — no segment/word timestamps. Segment timing must come from the
- * segmentation D6 owns (per-segment requests anchored to original audio
+ * segmentation transcription owns (per-segment requests anchored to original audio
  * offsets), never from inventing timestamps here. The transcript is verbatim
  * provider output: cleanup is not this adapter's business.
  */
@@ -100,7 +100,7 @@ function usageObservation(value: SttTranscription) {
 
 /**
  * Runs ONE transcription attempt against one target (no fallback
- * decisions). The retained E8 owner decision keeps STT on OpenRouter
+ * decisions). The retained owner decision keeps STT on OpenRouter
  * exclusively: no supported direct DeepSeek transcription endpoint exists,
  * so the attempt is an OpenRouter client call whatever qualifier the frozen
  * route carries (the STT order only ever says `openrouter`).

@@ -9,7 +9,7 @@
  * keeps open-vocabulary validators (and every pre-existing caller)
  * compiling unchanged.
  *
- * C4 coordinated amendment (flagged, additive): the code type parameter.
+ * The code type parameter lets the work domain reuse it.
  */
 
 export type Validated<T, C extends string = string> =

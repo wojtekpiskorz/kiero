@@ -1,5 +1,5 @@
 /**
- * Platform module surface (A3 sequential amendment to the A2 baseline).
+ * Platform module surface (platform sequential amendment to the baseline).
  *
  * The platform owns no business work. These entries exist so the composition
  * proof's functions validate through the same registry every other module
@@ -13,7 +13,7 @@
  * - `platform.outboxState` is the tenant-scoped observability read the
  *   evidence scripts use (delivery states, jobs, external effects).
  *
- * Amended by A3 during certification; see the certification note in
+ * Amended by platform during certification; see the certification note in
  * docs/implementation/contracts/README.md.
  */
 

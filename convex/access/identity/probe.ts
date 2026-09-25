@@ -1,7 +1,7 @@
 /**
- * Guarded B1 proof fixtures (dev deployment only).
+ * Guarded identity proof fixtures (dev deployment only).
  *
- * Same pattern as the A3 probe (convex/platform/probe.ts): queries and
+ * Same pattern as the probe (convex/platform/probe.ts): queries and
  * mutations cannot read deployment variables, so every entry here is an
  * ACTION that checks `KIERO_B1_PROOF_ENABLED === "1"` and then runs an
  * internal mutation that is only reachable from this module.

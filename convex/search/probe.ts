@@ -1,12 +1,12 @@
 /**
- * E5 guarded dev proofs (the A3 probe pattern; KIERO_PROBE_ENABLED plus this
+ * Search guarded dev proofs (the probe pattern; KIERO_PROBE_ENABLED plus this
  * lane's own KIERO_E5_PROOF_ENABLED for the fixtures that write rows).
  *
  * Every action resolves the default service session (or an explicitly seeded
  * one) and runs the SAME checked dispatch or internal entry production uses:
  * no development-auth shortcut, no client-supplied identity. The fixture
  * seeds (the second-company isolation fixture and the minimal STT transcript
- * fixture) follow the D1 seeding precedent: server-side rows, honestly
+ * fixture) follow the seeding precedent: server-side rows, honestly
  * labeled, never reachable as client inputs.
  *
  * `probeInjectEmbedding` is the wrong-dimension focused verification: it
@@ -41,10 +41,10 @@ import { runEvidenceQuery } from "./query";
 import type { ScopedContext } from "./views";
 import type { IndexRowInput } from "./records";
 
-/** The E5 tenant-isolation fixture account (seeded by ./probeSeedIsolation). */
+/** The tenant-isolation fixture account (seeded by ./probeSeedIsolation). */
 export const ISOLATION_EMAIL = "e5-isolation@kiero.invalid";
 
-/** The E5 tenant-isolation fixture company name. */
+/** The tenant-isolation fixture company name. */
 export const ISOLATION_COMPANY = "Kiero Dev Proof E5 (search isolation)";
 
 /** This lane's own fixture guard (writes labeled proof rows). */
@@ -206,7 +206,7 @@ export const probeSeedIsolation = action({
 });
 
 /**
- * Seeds the minimal COMPLETED STT fixture for one source (the D6 tables with
+ * Seeds the minimal COMPLETED STT fixture for one source (the tables with
  * honestly-labeled proof metadata): upload, audio attachment, representation,
  * the stt extraction version on the source's analysis run, the complete
  * transcript order, two verbatim Polish segments and their audio-interval

@@ -1,5 +1,5 @@
 /**
- * Membership transactions (B3): the write halves of the cores, each inside
+ * Membership transactions: the write halves of the cores, each inside
  * ONE Convex mutation.
  *
  * Entry ways, one core each (no drift by construction):
@@ -7,21 +7,21 @@
  * - company-scoped operations (`createInvitation` delivers its email from
  *   the action wrapper, everything else straight through) run through the
  *   typed command dispatch (./dispatch.ts): envelope decode -> registry ->
- *   B1 identity resolution (provision-or-refresh + the canonical chain MY
- *   membership rows complete) -> the B3 policy -> contract input decode ->
+ *   identity resolution (provision-or-refresh + the canonical chain MY
+ *   membership rows complete) -> the policy -> contract input decode ->
  *   handler;
  * - admission operations (`createCompany`, `acceptInvitation`,
  *   `rejectInvitation`) serve a VERIFIED person who by definition has no
  *   active firm yet — the canonical chain resolves no company scope for
  *   them, so these run through the identity-layer entries (./functions.ts)
- *   that resolve the live session (B1's provision-or-refresh), decode the
+ *   that resolve the live session (the provision-or-refresh), decode the
  *   SAME contract entries and run the SAME cores with the SAME closed
- *   errors. This is exactly B1's own pattern for its membership-less
+ *   errors. This is exactly its own pattern for its membership-less
  *   surface (revokeSession): the runtime's dispatch requires a company
  *   scope, so the admission leg enters one seam earlier. Everything that
  *   CAN go through the company-scoped dispatch does.
  *
- * ATOMICITY: like D1, every step that can throw (registry lookups, schema
+ * ATOMICITY: like source acceptance, every step that can throw (registry lookups, schema
  * decodes, hashing) runs BEFORE the first insert/patch; between the first
  * write and the return only pre-validated writes and total decodes of
  * transaction-generated values remain. Revocation patches the membership,
@@ -81,7 +81,7 @@ export type CreateInvitationInput = Schema.Schema.Type<typeof createInvitationEn
 export type RejectInvitationInput = Schema.Schema.Type<typeof rejectInvitationEntry.input>;
 export type AcceptInvitationInput = Schema.Schema.Type<typeof acceptInvitationEntry.input>;
 
-/** Retry policy of the registered revocation cleanup (bounded, like A3/D1). */
+/** Retry policy of the registered revocation cleanup (bounded, like the platform and source acceptance). */
 export const CLEANUP_RETRY_POLICY = { maxAttempts: 3, backoffBaseMs: 2_000 } as const;
 
 /** The verified-person half the admission transactions need. */
@@ -98,7 +98,7 @@ function bridgedId<T extends string>(value: T | null, what: string): T {
 }
 
 function membershipView(row: Doc<"memberships">): MembershipViewWithTime {
-  // parseTableId is the proved id bridge (A3): row ids are Convex ids, the
+  // parseTableId is the proved id bridge: row ids are Convex ids, the
   // cores speak the contracts' branded ids; both are the same string.
   return {
     _id: bridgedId(parseTableId("memberships", row._id), "memberships"),
@@ -297,7 +297,7 @@ export async function performRevokeInvitation(
 }
 
 /**
- * The admission transaction (issue #22): acceptance atomically validates
+ * The admission transaction: acceptance atomically validates
  * the target address, expiry, revocation, use count and the
  * one-active-company rule, then inserts the membership, marks the
  * invitation used and publishes `access.membershipAccepted` — in ONE
@@ -455,7 +455,7 @@ export async function performChangeMembershipRole(
 }
 
 /**
- * Membership revocation / leaving (issue #22): administrators revoke any
+ * Membership revocation / leaving: administrators revoke any
  * member, a plain member revokes only their own row; the final
  * administrator can neither leave nor be revoked. The row survives with
  * state `revoked` (authorship and audit history preserved), current access
@@ -529,7 +529,7 @@ export async function performRevokeMembership(
 }
 
 /**
- * The atomic administration transfer (issue #22): promote the target member
+ * The atomic administration transfer: promote the target member
  * and demote the acting administrator in ONE transaction. Because both
  * patches commit together, the company can never dip below one
  * administrator between two separate role changes, and two racing

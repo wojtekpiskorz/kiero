@@ -1,13 +1,13 @@
 /**
- * The G3 Convex function surface (generated-call APIs).
+ * The Calendar sync Convex function surface (generated-call APIs).
  *
- * `runCalendarSyncPass` is the reconciliation driver G2's module docs name
- * ("an explicit seam G3 and the joins trigger"): per connection it runs
- * G2's REAL projection pass first (one bounded credential refresh + one
+ * `runCalendarSyncPass` is the reconciliation driver the module docs name
+ * (an explicit seam the joins trigger): per connection it runs
+ * the REAL projection pass first (one bounded credential refresh + one
  * atomic desired-state transaction), then reconciles every copy with ONE
- * bounded Google leg each (the A3 echo template: prepare -> external leg
+ * bounded Google leg each (the echo template: prepare -> external leg
  * -> record). Suspended connections (refresh unknown/lost, membership
- * stopped) contribute ZERO Google legs — the honest suspension G2 already
+ * stopped) contribute ZERO Google legs — the honest suspension projection already
  * wrote stays authoritative.
  *
  * `runReconcileOutcomeAttempt` is the durable `calendar.reconcile_outcome`
@@ -16,7 +16,7 @@
  *
  * `syncOverview` is the status export the issue names (last success,
  * pending, failed, reconnect-needed, possible-cleanup-remains); the
- * timing basis for J4's 95%-within-60-seconds evaluation stays on the
+ * timing basis for the 95%-within-60-seconds evaluation stays on the
  * attempt rows (`desiredAtMs`/`completedAtMs`) — recorded, never claimed
  * here.
  */
@@ -58,7 +58,7 @@ function denialError(reason: string): never {
 }
 
 // ---------------------------------------------------------------------------
-// The credential capability seam (G1's refresh, reused per leg batch).
+// The credential capability seam (the refresh, reused per leg batch).
 // ---------------------------------------------------------------------------
 
 /** The sealed credential read the sync actions open in memory. */
@@ -96,10 +96,10 @@ const TOKEN_FRESHNESS_MARGIN_MS = 60_000;
 
 /**
  * Obtains a working access token for one connection: the SEALED bundle
- * while it is comfortably fresh, otherwise G1's ONE bounded refresh
+ * while it is comfortably fresh, otherwise the ONE bounded refresh
  * attempt first (its `unknown` outcome means "do not publish, do not
  * retry" — handed back as `refresh_unknown`). Sealed material only ever
- * opens in the action's memory, exactly like G1's refresh capability.
+ * opens in the action's memory, exactly like the refresh capability.
  */
 async function freshAccessToken(
   ctx: ActionCtx,
@@ -339,7 +339,7 @@ export const copyConnectionOf = internalQuery({
 
 /**
  * Runs ONE reconciliation pass for one connection (or every connection of
- * the deployment). Per connection: G2's REAL projection pass (credential
+ * the deployment). Per connection: the REAL projection pass (credential
  * recheck + desired state), then ONE bounded leg per copy. Convergence is
  * across passes: a converged copy answers `none` and issues no call, so
  * repeated passes over unchanged state make ZERO external calls.
@@ -517,17 +517,18 @@ export const jobInputForReconcile = internalQuery({
 });
 
 // ---------------------------------------------------------------------------
-// Status export (G4/H4/I2/I4/I6 consumption; the boss's own view).
+// Status export (settings, processing inspection, telemetry, deletion and
+// restore consume it; the boss's own view).
 // ---------------------------------------------------------------------------
 
 /**
  * Authenticated: the actor's own sync status — last success, pending,
  * failed, reconnect-needed and possible-cleanup-remains. The
- * save-to-Google acceptance timing for J4's 95%-within-60-seconds
+ * save-to-Google acceptance timing for the 95%-within-60-seconds
  * evaluation is NOT aggregated here: a derived number measured neither
- * "last" nor save-only (the round-2 review flagged the old
+ * "last" nor save-only (a review flagged the old
  * max-latency-over-all-attempts reduce), and a percentile needs the
- * attempt rows anyway — J4 reads their `desiredAtMs`/`completedAtMs`
+ * attempt rows anyway — device qualification reads their `desiredAtMs`/`completedAtMs`
  * pairs directly.
  */
 export const syncOverview = query({

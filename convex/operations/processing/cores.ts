@@ -1,9 +1,9 @@
 /**
- * GM processing decision cores (H4): the pure, timestamp-free decisions
+ * GM processing decision cores: the pure, timestamp-free decisions
  * behind audited processing inspection and the retry/reanalysis controls.
  *
  * Everything here is pure over plain views (no Convex types, no db), the
- * pattern the B4 cores set: the transactional halves (./operations.ts) feed
+ * pattern the cores set: the transactional halves (./operations.ts) feed
  * them row snapshots, the unit tests pin them, and the live proofs exercise
  * them through the real dispatch. The decisions implement the issue's
  * authority and identity model:
@@ -90,7 +90,7 @@ export interface SourceView {
   readonly sentAtMs: number;
 }
 
-/** One I2 redacted diagnostic event snapshot (already sanitized at write). */
+/** One redacted diagnostic event snapshot (already sanitized at write). */
 export interface DiagnosticEventView {
   readonly kind: string;
   readonly metadata: ReadonlyArray<{ readonly key: string; readonly value: string }>;
@@ -118,9 +118,9 @@ export interface ProcessingBlocker {
 // ---------------------------------------------------------------------------
 
 /**
- * The workflow identity a run records on its checkpoint (the E3 analyze
+ * The workflow identity a run records on its checkpoint (the analyze
  * executor writes `{workflowId}` when it starts the workflow; the
- * completion summary preserves it). Non-JSON checkpoints (the A3 mechanical
+ * completion summary preserves it). Non-JSON checkpoints (the mechanical
  * proof's plain job key) resolve to null: honestly unresumable here.
  */
 export function parseWorkflowIdentity(checkpoint: string | null): string | null {
@@ -138,19 +138,19 @@ export function parseWorkflowIdentity(checkpoint: string | null): string | null 
 }
 
 /**
- * The reanalysis seed placeholder, pinned to E3's own spelling
+ * The reanalysis seed placeholder, pinned to its own spelling
  * (convex/processing/text/probe.ts kickReanalysis): a reanalysis run this
- * module creates is byte-identical in shape to the runs E3's own reanalysis
+ * module creates is byte-identical in shape to the runs its own reanalysis
  * path creates, and equally retryable before loadContextStage pins versions.
  */
 export const REANALYSIS_PIPELINE_PLACEHOLDER = "pending-e3";
 
 /**
  * Pipeline versions whose FAILED or PARTIALLY FAILED runs this deployment
- * can resume through the E3 analysis workflow restart seam: the current
- * text-analysis pipeline, the D1 acceptance seed an initial run carries
+ * can resume through the analysis workflow restart seam: the current
+ * text-analysis pipeline, the acceptance seed an initial run carries
  * before loadContextStage pins it, and the reanalysis placeholder above.
- * Anything else (the A3 mechanical proof, dev fixtures, future versions) is
+ * Anything else (the mechanical proof, dev fixtures, future versions) is
  * refused as unsupported; this surface never claims to resume a workflow
  * it does not own.
  */
@@ -303,9 +303,9 @@ export function decideReanalysisTarget(args: {
 // ---------------------------------------------------------------------------
 
 /**
- * Step kinds that are probe plumbing, not pipeline stages: the A3/E3
+ * Step kinds that are probe plumbing, not pipeline stages: the platform/analysis
  * failure-marker rows live outside the stage sequences. They are excluded
- * from the inspection stage list exactly like E3's own state read excludes
+ * from the inspection stage list exactly like its own state read excludes
  * them (it counts them separately); the panel shows real stages only.
  */
 const MARKER_STEP_KINDS = new Set(["failure_marker", "outcome_failure_marker"]);
@@ -379,10 +379,10 @@ export function deriveBlockers(args: {
 }
 
 /**
- * The run's redacted diagnostics: I2 diagnostic events whose sanitized
+ * The run's redacted diagnostics: diagnostic events whose sanitized
  * metadata names this run or this source (the incident scan writes
  * ops.processing.* events keyed by runId/sourceId). Rows arrive ALREADY
- * sanitized (the only writer of diagnosticEvents is I2's redaction path);
+ * sanitized (the only writer of diagnosticEvents is the redaction path);
  * this filter never widens what it returns.
  */
 export function diagnosticsForTarget(

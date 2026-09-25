@@ -1,12 +1,12 @@
 /**
- * Membership command dispatch wiring (B3): the SAME checked path A3 proved
- * and B1/D1 reuse, with this lane's handler registry and policy.
+ * Membership command dispatch wiring: the SAME checked path the platform proved
+ * and identity and sources reuse, with this lane's handler registry and policy.
  *
  * Three entry kinds, one core set (no drift by construction):
  *
  * 1. `dispatchMembershipCommand` — the typed command dispatch for
  *    company-scoped operations (revokeInvitation, changeMembershipRole,
- *    revokeMembership, transferAdministration). Context resolution is B1's
+ *    revokeMembership, transferAdministration). Context resolution is the
  *    write path: provision-or-refresh the live session, then the canonical
  *    chain (user -> earliest active membership -> company) that THIS lane's
  *    membership rows complete. A verified person without an active firm
@@ -17,14 +17,14 @@
  *    must happen OUTSIDE the transaction (mutations cannot fetch). It runs
  *    the full dispatch inside the mutation, captures the single-use code in
  *    the transaction's closure and hands it to the action wrapper
- *    (./functions.ts), which delivers through the B1 Resend adapter and
+ *    (./functions.ts), which delivers through the Resend adapter and
  *    composes the honest delivery state into the client envelope. The code
  *    never crosses a client boundary.
  *
  * 3. `dispatchAdmissionCommand` — `createCompany`, `acceptInvitation`,
  *    `rejectInvitation`: the checked admission path for a verified person
  *    who has no active firm yet. The runtime dispatch REQUIRES a
- *    company-scoped RequestContext, so (exactly like B1's own
+ *    company-scoped RequestContext, so (exactly like its own
  *    membership-less revokeSession surface) these entries run the same
  *    envelope decode, the same contract input decode, the same sanitized
  *    error surface and the same cores one seam earlier, over the verified
@@ -138,8 +138,8 @@ export function membershipHandlers(): HandlerRegistry<MutationCtx> {
 
 /**
  * Dispatches one company-scoped membership command envelope inside ONE
- * mutation transaction, through the checked path with B1's identity source
- * and the B3 policy. Unimplemented operations fail closed `unsupported`.
+ * mutation transaction, through the checked path with the identity source
+ * and the policy. Unimplemented operations fail closed `unsupported`.
  */
 export async function dispatchMembershipCommand(
   ctx: MutationCtx,
@@ -209,7 +209,7 @@ export interface AdmissionContext {
 /**
  * The checked admission dispatch for verified, membership-less persons:
  * envelope decode -> operation must be an admission operation -> live
- * session resolution (B1's provision-or-refresh; every admission command
+ * session resolution (the provision-or-refresh; every admission command
  * refreshes session activity like every other command) -> contract input
  * decode -> the core. Sanitization and closed errors identical to the
  * runtime dispatch.

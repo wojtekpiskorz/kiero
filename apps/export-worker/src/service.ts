@@ -1,6 +1,6 @@
 /**
- * The export worker's protocol (I3): `/exports/build`, `/exports/cleanup`
- * and `/healthz`, one handler for every surface (the D6 three-surfaces
+ * The export worker's protocol: `/exports/build`, `/exports/cleanup`
+ * and `/healthz`, one handler for every surface (the three-surfaces
  * discipline; the worker entry calls exactly this).
  *
  * AUTHORIZATION: the ONLY callers are this deployment's Convex functions

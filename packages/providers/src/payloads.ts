@@ -1,10 +1,10 @@
 /**
- * Serializable per-route payload contracts (E2).
+ * Serializable per-route payload contracts.
  *
  * These are the JSON-shaped requests the `integrations.executeModelCall`
  * operation accepts per route id: bounded, serializable subsets of the typed
  * adapter requests, with NO model, provider or dimensions fields anywhere.
- * In-process consumers (E3+/D6/E5) call the typed adapter interfaces
+ * In-process consumers call the typed adapter interfaces
  * directly; these payload contracts exist so a checked Convex operation can prove and
  * exercise the routes without shipping schema code over the wire.
  */
@@ -84,7 +84,7 @@ export type ProviderPayload = Schema.Schema.Type<typeof ProviderPayload>;
 
 /**
  * The pinned structured-output contract used by the serializable vision and
- * probe paths: bounded text claims only. Real extraction contracts (E4) are
+ * probe paths: bounded text claims only. Real extraction contracts are
  * richer and stay in-process with the typed adapter.
  */
 export const ProbeExtractionSchema = Schema.Struct({

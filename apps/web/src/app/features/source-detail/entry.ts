@@ -1,18 +1,18 @@
 /**
- * Source-detail feature entry (A4 host wiring point, H3's sanctioned
+ * Source-detail feature entry (a host wiring point).
  * addition).
  *
  * "Źródło" is the full source-history route: the immutable original with
  * its lifecycle and withdrawal record, every retained representation,
  * transcript/OCR segments with their time/coordinate anchors, the
- * paginated evidence chain with corrections and C5's recomputation
- * status, and media loads exclusively through D3's authorized channel.
+ * paginated evidence chain with corrections and the recomputation
+ * status, and media loads exclusively through the authorized channel.
  * It opens from the canonical `/?zrodlo=<id>` deep link family
  * (`/zrodlo?zrodlo=<id>`), search results and memory evidence links.
  *
- * Consumed operations are the commands the surface issues: C5's audited
- * withdrawal and F1's read marking. The dossier/evidence reads ride this
- * lane's own public queries (the H3-flagged sources/read appends).
+ * Consumed operations are the commands the surface issues: the audited
+ * withdrawal and the read marking. The dossier/evidence reads ride this
+ * lane's own public queries (the sources/read appends).
  */
 
 import { createElement } from "react";

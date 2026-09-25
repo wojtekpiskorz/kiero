@@ -1,15 +1,15 @@
 /**
- * The barebones membership feature (B3): sign-in gate + company admission
+ * The barebones membership feature: sign-in gate + company admission
  * + member administration, all through the checked dispatch entries
  * (convex/access/membership/functions.ts).
  *
  * JSX-free on purpose (createElement only): the host feature registry
  * chain (app-features composed from the per-feature entry modules) is
  * imported by the root node test programs, which compile without a JSX
- * flag. The sign-in leg is B1's own shared, JSX-free gate
+ * flag. The sign-in leg is its own shared, JSX-free gate
  * (../sign-in/SignInGate.ts) composed with this surface as the
  * authenticated continuation — one sign-in implementation, no
- * transcription; the membership surface is the B3 part.
+ * transcription; the membership surface is the part.
  *
  * The unauthenticated visitor reaches sign-in here; the authenticated
  * member reaches the membership surface. No styling, semantic controls
@@ -128,7 +128,7 @@ function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): Rea
   });
 }
 
-/** Authentication gate: B1's shared sign-in surface; members continue here. */
+/** Authentication gate: the shared sign-in surface; members continue here. */
 function MembershipGate(): ReactNode {
   return createElement(AuthenticatedGate, {
     continuation: () => createElement(MembershipSurface),
@@ -147,7 +147,7 @@ function MembershipSurface(): ReactNode {
   const { signOut } = useAuthActions();
   const [signingOut, setSigningOut] = useState(false);
 
-  // B1's SessionPanel pattern: this query errors exactly when THIS session
+  // the SessionPanel pattern: this query errors exactly when THIS session
   // stopped resolving — the revocation lifecycle this feature ships makes
   // that path ORDINARY (membership revoked -> the durable cleanup revokes
   // the registry row while the token still verifies; upstream signed out;

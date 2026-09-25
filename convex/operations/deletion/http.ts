@@ -1,5 +1,5 @@
 /**
- * The deletion lane's HTTP boundary (I4), registered by convex/http.ts
+ * The deletion lane's HTTP boundary, registered by convex/http.ts
  * through the composition append pattern (imports only).
  *
  * `/operations/deletion/bridge` (POST): the service-credentialed purge

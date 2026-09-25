@@ -1,5 +1,5 @@
 /**
- * The PWA update module (I7): fills A4's prepared UpdateEntryModule slot
+ * The PWA update module: fills the prepared UpdateEntryModule slot
  * and composes the whole safe-update flow.
  *
  * The order is the issue's bounded solution, verbatim: DETECT a new
@@ -13,13 +13,13 @@
  *    work holds, input settled, page visible). This module NEVER
  *    auto-reloads: the reload happens solely on the prompt's button.
  * 3. PREPARE (once, before the first prompt shows): the client draft
- *    store migrates to the current record schema (D4's store is read
+ *    store migrates to the current record schema (the store is read
  *    through IndexedDB, never edited); the prompt's Polish copy can then
  *    honestly say the szkic stays recoverable.
  * 4. RELOAD (user click only): dispatch the pagehide flush contract so
- *    any lagging debounced text persists (D4's composer listens on the
+ *    any lagging debounced text persists (the composer listens on the
  *    window), re-run prepare, give the IndexedDB commit its settle
- *    window, then reload. The real pagehide of the reload fires D4's
+ *    window, then reload. The real pagehide of the reload fires the
  *    flush again natively; the waiting worker activates as the old
  *    client goes away (no skipWaiting exists or is needed).
  *
@@ -28,7 +28,7 @@
  * the flow state, never deferred, and never rendered by this module
  * (they belong to the auth surfaces).
  *
- * Structural DOM types throughout (the A4 pattern) so node-side test
+ * Structural DOM types throughout so node-side test
  * programs import this chain without a DOM lib.
  */
 
@@ -288,7 +288,7 @@ export async function startUpdateFlow(
 
   const performUpdate = async (): Promise<void> => {
     reloads += 1;
-    // The flush contract: D4's composer flushes lagging debounced text on
+    // The flush contract: the composer flushes lagging debounced text on
     // pagehide; dispatching it now (same task as the click, before the
     // reload begins) gives that write its head start. The reload's own
     // pagehide fires the same listener natively.
@@ -408,11 +408,11 @@ export async function startUpdateFlow(
 }
 
 /**
- * Builds the composition entry (A4's prepared slot) around its version
+ * Builds the composition entry (the prepared slot) around its version
  * source: attaching it together with the service worker script starts
  * the safe-update flow for that worker's scope. This module never
  * registers a worker itself and never modifies the shipped worker
- * script (F3 owns /sw.js). The source arrives here, at attach time
+ * script (/sw.js belongs to the push module). The source arrives here, at attach time
  * (main.tsx passes the typed config seam's answer); a null source means
  * no handshake leg, which is honest for a backend-less host.
  */

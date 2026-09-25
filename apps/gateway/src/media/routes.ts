@@ -1,14 +1,14 @@
 /**
- * Gateway media routes (D3): the authorized retained-media read surface.
+ * Gateway media routes: the authorized retained-media read surface.
  *
  * Two parameterized GET routes, both carrying the END USER's credential
- * (the D2 per-user channel pattern):
+ * (the per-user channel pattern):
  *
  * - `GET /media/attachments/<attachmentId>` — the canonical read: the
  *   SERVER resolves which representation serves the bytes (retained when
  *   verified, else the verified received record) through Convex.
  * - `GET /media/representations/<representationId>` — the exact-version
- *   read E4's media anchors and I3/I5's export/backup readers address.
+ *   read the media anchors and the export/backup readers address.
  *
  * Every request — full, ranged, conditional — follows ONE checked path:
  *
@@ -27,7 +27,7 @@
  * serve these bytes without re-running this check.
  *
  * Registration rides the composition contract: this lane supplies a
- * `RouteProvider` whose `match` owns the parameterized paths (the seam D2
+ * `RouteProvider` whose `match` owns the parameterized paths (the seam the uploads lane
  * built; `GatewayRoute.method` GET|POST already covers reads — HEAD would
  * be a named cross-lane prerequisite, and browsers seek audio with ranged
  * GETs).

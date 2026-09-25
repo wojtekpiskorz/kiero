@@ -1,5 +1,5 @@
 /**
- * Pure temporal resolution rules for findings (C2, "Value contracts":
+ * Pure temporal resolution rules for findings ("Value contracts":
  * temporal values; issue 8: "Daty względne").
  *
  * A relative expression ("jutro", "w piątek") is resolved ONCE, against the
@@ -153,8 +153,8 @@ function timezoneOffsetMs(instantMs: number, timeZone: string): number {
  * the exact inverse of `localDateOfInstant` at whole minutes. Two-pass
  * (guess the offset, correct, re-check) so a minute inside or beside a DST
  * transition resolves the way schedulers expect. One definition shared by
- * every scheduling reader of this package (F1's quiet-hours windows and
- * F4's reminder slots); private per-lane copies would drift.
+ * every scheduling reader of this package (the quiet-hours windows and
+ * the reminder slots); private per-lane copies would drift.
  */
 export function instantOfLocalMinute(
   day: ResolvedDay,

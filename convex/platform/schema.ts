@@ -1,9 +1,7 @@
 /**
- * Platform durable-execution tables (A2 candidate fragment, amended by A3
- * during certification).
+ * Platform durable-execution tables.
  *
- * Owning implementer: A3 (executor composition proof), H4 (inspection/
- * retry), D6/E2 (pipeline stages). Convex Workflow / the native scheduler is
+ * Convex Workflow / the native scheduler is
  * the one canonical durable engine; these tables are its inspectable state.
  *
  * Retry preserves source identity and compatible run semantics. Reanalysis
@@ -11,7 +9,7 @@
  * are opaque to the schema (workflow-owned strings); attempts keep provider
  * routing evidence for GM inspection.
  *
- * A3 certification amendments to the A2 candidate (see the certification
+ * Certification amendments to the candidate (see the certification
  * note in docs/implementation/contracts/README.md):
  * - `durableJobs.by_jobKey` index (job-key dedup lookup inside the
  *   registration transaction) and `lastErrorKind`/`finishedAtMs` outcome
@@ -42,12 +40,12 @@ const durableJobKind: ValueValidator<Encoded<typeof DurableJobKind>> = v.union(
   v.literal("processing.extract_fragments"),
   v.literal("processing.analyze_change_plan"),
   v.literal("processing.normalize_photo"),
-  // E4 amendment (flagged coordinated change): the multimodal-join kind.
+  // The multimodal-join kind.
   v.literal("processing.join_multimodal"),
   v.literal("memory.publish_change_set"),
   v.literal("memory.recompute_dependents"),
   v.literal("attention.evaluate_due_intents"),
-  // F4 amendment (flagged shared-file change): the task-reminder scheduling
+  // The task-reminder scheduling
   // job kind joins the closed union (the contracts DurableJobKind is the
   // authority; the typecheck pins equality).
   v.literal("attention.schedule_task_reminders"),
@@ -204,7 +202,7 @@ export const platformTables = {
     .index("by_dedup", ["dedupKey"]),
 
   /**
-   * A3 amendment: observable ledger of effects that left the transaction.
+   * Observable ledger of effects that left the transaction.
    * Written by the external stand-in (the echo endpoint) itself, one row per
    * HTTP call it actually received; it does not dedup. The
    * no-duplicate-effect proof counts rows per `dedupKey`: correct replay and

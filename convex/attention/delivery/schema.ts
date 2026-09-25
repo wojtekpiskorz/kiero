@@ -1,14 +1,13 @@
 /**
- * Durable notification delivery tables (A2 candidate, certified by A3).
+ * Durable notification delivery tables.
  *
- * Owning implementers: F2 (intents, batching, quiet hours), F3 (push
- * delivery). Intents are durable before any external delivery; rights,
+ * Intents are durable before any external delivery; rights,
  * freshness and business state are rechecked before sending. Semantic
  * deduplication identity prevents duplicate publication after timeout.
  *
- * F2 amendment (issue #42, flagged on the F1 precedent): the certified A2
+ * The certified
  * candidate carried only clarification/task_reminder/confirmation intents,
- * but the accepted notification decision (issue 7 resolution) makes the
+ * but the accepted notification decision makes the
  * ORDINARY source-entry notification the primary durable intent: it starts
  * at durable all-attachment acceptance, waits for the terminal assignment
  * classification, batches per recipient and scope for 60 seconds from
@@ -27,19 +26,19 @@
  *   about at delivery (one summary per recipient and scope bucket, never a
  *   replay of stale items); absent until the intent reaches `delivered`.
  * - `deliveredAtMs`: when the due delivery decision handed the intent to
- *   the delivery adapter seam (F3 owns what happens after).
- * - `by_source` index: the per-source intent listing the probes and F3's
+ *   the delivery adapter seam (web push owns what happens after).
+ * - `by_source` index: the per-source intent listing the probes and the
  *   export read.
  *
- * F3 amendment (issue #43, flagged): `pushSubscriptions` gains the
+ * `pushSubscriptions` gains the
  * user/session/company binding columns and `by_endpoint` (see the table
- * comment); F3's per-device delivery rows live in its own fragment
+ * comment); the per-device delivery rows live in its own fragment
  * (`convex/attention/push/schema.ts`, pushDeliveries).
  *
- * F3 review repair (PR #104 round 1, flagged append): `by_revoked` over
+ * `by_revoked` over
  * `revokedAtMs` lets the hygiene sweep query the not-yet-revoked range, so
  * disabled rows leave the swept window and the bounded pass converges
- * (the F2 `by_due` precedent: rows exit the queried range as they settle).
+ * (the `by_due` precedent: rows exit the queried range as they settle).
  *
  * Tables: notificationIntents, pushSubscriptions, notificationAttempts.
  */
@@ -88,9 +87,7 @@ export const deliveryTables = {
     .index("by_source", ["sourceId"]),
 
   /** Current device subscription of one user for web push. */
-  // F3 amendment (issue #43, flagged in the sibling pattern - this
-  // fragment's header names F3 as the co-owning implementer of push
-  // delivery, and this table is the push transport's registry): the
+  // This table is the push transport's registry: the
   // subscription binds to the CURRENT user, device/session and company
   // context at registration (never to anything a client asserts), so
   // delivery can deny a revoked session or membership before any cleanup

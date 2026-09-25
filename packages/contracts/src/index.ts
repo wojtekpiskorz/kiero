@@ -1,8 +1,7 @@
 /**
  * @kiero/contracts: candidate typed contracts for Kiero core.
  *
- * Defined by A2 ("Define candidate typed contracts and modular schema
- * ownership"). This package owns:
+ * This package owns:
  *
  * - the semantic value contracts (knowledge state, temporal values, money,
  *   typed extension values) decoded with Effect Schema 4;
@@ -13,7 +12,7 @@
  * - the module surface declarations (operation/event names per module) and
  *   the feature/executor/event-consumer registration entries.
  *
- * These are CANDIDATES until A3 proves the actual validation and runtime
+ * These are CANDIDATES until platform proves the actual validation and runtime
  * conversion and certifies this baseline; production consumers start only
  * behind that gate. Nothing here implements business work: dispatching an
  * unimplemented operation fails closed with the `unsupported` closed error.

@@ -1,6 +1,6 @@
 /**
- * The `attention.schedule_task_reminders` executor (F4): the durable
- * reaction to the task events this lane consumes (issue 44: "Consume C4
+ * The `attention.schedule_task_reminders` executor: the durable
+ * reaction to the task events this lane consumes ("Consume task
  * current task/event contracts").
  *
  * The outbox drain projects each consumed event onto this job kind with a

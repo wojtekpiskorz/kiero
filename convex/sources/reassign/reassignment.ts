@@ -1,7 +1,6 @@
 /**
- * Source project reassignment: the E7 transaction body plus its pure
- * decisions (issue #115, the operation H3's dossier named as its missing
- * prerequisite).
+ * Source project reassignment: the transaction body plus its pure
+ * decisions.
  *
  * The boss moves one "Wiadomość źródłowa" between projects or to/from
  * company-general by declaring the COMPLETE new project set. ONE Convex
@@ -12,7 +11,7 @@
  *   (a withdrawn source keeps its historical placement, reassignment
  *   never rewrites withdrawal's history) and every referenced project —
  *   declared OR observed — is the company's own;
- * - R4 (issue #129): the command's REQUIRED `expectedProjectIds`
+ * - The command's REQUIRED `expectedProjectIds`
  *   precondition names the complete set the editor observed; a mismatch
  *   with the current committed set refuses the typed
  *   `source_placement_stale` conflict BEFORE any write, event or
@@ -37,7 +36,7 @@
  * snapshot, lifecycle and read state stay exactly as they were
  * ("Niezmienny po wysłaniu wpis użytkownika"; reassignment keeps read
  * state, CONTEXT.md's own note on the links table). The dependent
- * findings' re-assessment does NOT run inline: the registered C5 executor
+ * findings' re-assessment does NOT run inline: the registered recompute executor
  * (the memory findings lane's marking core,
  * convex/memory/findings/reassignment.ts) performs the scope marking in
  * its own transaction.
@@ -77,7 +76,7 @@ export type ReassignSourceInput = Schema.Schema.Type<typeof reassignSourceEntry.
 /** The result type of `sources.reassignSource` (the saved receipt). */
 export type ReassignSourceReceipt = Schema.Schema.Type<typeof reassignSourceEntry.result>;
 
-/** Retry policy of the registered scope re-assessment (bounded, like C5's). */
+/** Retry policy of the registered scope re-assessment (bounded, like recompute). */
 export const REASSIGN_RETRY_POLICY = { maxAttempts: 3, backoffBaseMs: 2_000 } as const;
 
 /** Bounded reassignment: at most this many distinct projects per source. */
@@ -123,7 +122,7 @@ export function sameLinkSet<ProjectId extends string>(
 
 /**
  * A representative table id used only by the pre-insert decode templates
- * (the D1/withdrawal pattern): proves the event payload, executor input
+ * (the acceptance/withdrawal pattern) proves the event payload, executor input
  * and receipt schemas still accept the exact shapes this transaction
  * constructs, BEFORE anything is written.
  */
@@ -131,7 +130,7 @@ const REGISTRATION_TEMPLATE_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f";
 
 /**
  * Resolves everything that can THROW during registration BEFORE the first
- * write (the D1 discipline): a failure here is a typed validation error
+ * write (the discipline): a failure here is a typed validation error
  * with nothing committed, while the same failure after the first delete or
  * insert would commit a partial reassignment (a moved link with no event
  * and no recomputation reaction).
@@ -244,7 +243,7 @@ export async function performReassignment(
   }
 
   // --- the two project sets the command carries: ONE resolution rule -------
-  // The declared replacement and the observed-placement precondition (R4, a
+  // The declared replacement and the observed-placement precondition (a
   // REQUIRED contract key) resolve through the SAME company-project rule:
   // a foreign or unknown reference in EITHER set refuses BEFORE any write
   // and never exposes placement, and the comparison ignores ordering and

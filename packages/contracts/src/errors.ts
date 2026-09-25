@@ -10,7 +10,8 @@
  *
  * `unsupported` is the honest failure of contract placeholders: until a lane
  * implements an operation, invoking it fails closed with `unsupported` and
- * never claims business work. Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
+ * never claims business work. Certified by platform on 2026-09-09
+ * (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";

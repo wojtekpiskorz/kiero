@@ -1,8 +1,8 @@
 /**
  * The photo-normalization protocol: step schemas and the PURE decisions of
- * the D5 images lane.
+ * the images lane.
  *
- * Convex owns the durable job (`processing.normalize_photo`, the A2/A3 job
+ * Convex owns the durable job (`processing.normalize_photo`, the job
  * vocabulary) and the representation ledger rows; the gateway Worker owns
  * R2 and the normalizer execution (the Cloudflare Images binding selected
  * by Q210, or the configured remote normalizer stand-in while the binding
@@ -34,7 +34,7 @@
  * without a deployment; the live proofs run the same functions through the
  * real Convex deployment, Worker and R2 bucket.
  *
- * SHARED-HOME DECISION (D2's pattern): this file is the ONE definition of
+ * SHARED-HOME DECISION: this file is the ONE definition of
  * the images protocol on BOTH sides of the deployment boundary — the Convex
  * functions import it directly, and the gateway Worker imports it exactly
  * like the existing pure Convex-directory modules it already ships
@@ -82,9 +82,9 @@ export const THUMBNAIL_QUALITY = 75;
 export const QUALITY_MIN_INPUT_BYTES = 256 * 1024;
 export const QUALITY_MAX_OUTPUT_RATIO = 1.0;
 
-/** Transform version of the D5 normalized archival representation. */
+/** Transform version of the normalized archival representation. */
 export const NORMALIZE_TRANSFORM_VERSION = "d5.normalize/1";
-/** Transform version of the D5 derived thumbnail. */
+/** Transform version of the derived thumbnail. */
 export const THUMBNAIL_TRANSFORM_VERSION = "d5.thumbnail/1";
 /**
  * Transform version of the explicit retained-original exception: the
@@ -400,7 +400,7 @@ export function compareTransformVersions(a: string, b: string): number {
 
 /**
  * The deterministic CURRENT retained representation of one attachment (what
- * E4's vision anchors and D3's reads must resolve to): verified normalized
+ * the vision anchors and the reads must resolve to): verified normalized
  * rows win over the retained-original exception; among verified normalized
  * rows the greatest transform version wins (numeric-aware version
  * precedence, then creation time, then id — a stable total order), so
@@ -569,7 +569,7 @@ export const RecordedRepresentation = Schema.Struct({
 export type RecordedRepresentation = Schema.Schema.Type<typeof RecordedRepresentation>;
 
 /**
- * The received original's pixel space on an exception row (R24): decoded
+ * The received original's pixel space on an exception row: decoded
  * from the original bytes when the bounded header resolves, absent when it
  * does not — never a stand-in. Vision region validation over a
  * retained-original fallback needs exactly this coordinate space.

@@ -1,8 +1,8 @@
 /**
- * The client-side draft schema migration (I7): the "persist/migrate the
+ * The client-side draft schema migration: the "persist/migrate the
  * local draft FIRST" half of the PWA update order.
  *
- * The draft store belongs to D4 (apps/web/src/storage/drafts/store.ts);
+ * The draft store lives in (apps/web/src/storage/drafts/store.ts);
  * this module never edits it. It operates on the SAME database through
  * the browser's IndexedDB with its own structural types: enumerate every
  * `<userId>#draft` record, run the versioned migration steps, and write
@@ -17,14 +17,14 @@
  * migration never destroys the thing it cannot understand).
  */
 
-/** Mirrors D4's private DB/store names; tests/i7 drift-guard both. */
-// The mirrored D4 constants (round 2): the migration opens the SAME
-// database D4's composer owns, so the name, store and version drift-guard
+/** Mirrors the private DB/store names; tests/i7 drift-guard both. */
+// The mirrored draft-store constants: the migration opens the SAME
+// database the composer owns, so the name, store and version drift-guard
 // against apps/web/src/storage/drafts/store.ts (its DB_NAME/STORE/DB_VERSION).
 export const DRAFTS_DB_NAME = "kiero-drafts";
 export const DRAFTS_STORE_NAME = "entries";
 export const DRAFTS_DB_VERSION = 1;
-/** Every draft metadata record key ends with this suffix (D4's convention). */
+/** Every draft metadata record key ends with this suffix (convention). */
 export const DRAFT_KEY_SUFFIX = "#draft";
 
 /** The record schema version this client writes and migrates to. */
@@ -88,7 +88,7 @@ export const DRAFT_RECORD_VERSION_FIELD = "draftSchemaVersion";
 
 /**
  * v0 -> v1: a record written before this module existed may lack any of
- * the optional-with-default fields D4's surface null-checks. Missing
+ * the optional-with-default fields the surface null-checks. Missing
  * fields become their honest defaults; every other field (known or not)
  * is preserved verbatim; unknown fields survive forward-compatibly.
  */
@@ -219,9 +219,9 @@ export async function migrateBrowserDraftStore(
     };
   }
   return new Promise<DraftMigrationReport>((resolve) => {
-    // Probe first, with NO side effect (round 3): even a versionless
+    // Probe first, with NO side effect: even a versionless
     // open CREATES a nonexistent database, which would poison the profile
-    // for D4's own open (its onupgradeneeded never fires on the
+    // for its own open (its onupgradeneeded never fires on the
     // now-existing version-1 database). indexedDB.databases() answers
     // existence without opening; where it is unavailable, the fallback
     // probe opens and DELETES what it just created. A database that does

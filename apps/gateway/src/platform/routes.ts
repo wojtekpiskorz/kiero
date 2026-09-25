@@ -1,5 +1,5 @@
 /**
- * Gateway platform routes (A3).
+ * Gateway platform routes.
  *
  * The fixed route table the Worker serves for the platform lane:
  *

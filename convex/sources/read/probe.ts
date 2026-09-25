@@ -1,6 +1,6 @@
 /**
- * D1 conversation-view dev proofs (guarded by KIERO_PROBE_ENABLED, like the
- * A3 platform probes; shared plumbing lives in
+ * Conversation-view dev proofs (guarded by KIERO_PROBE_ENABLED, like the
+ * Platform probes; shared plumbing lives in
  * convex/sources/probe_shared.ts).
  *
  * Each action resolves the default service session (or an explicitly seeded
@@ -81,11 +81,11 @@ export const probeSourceDetail = action({
   },
 });
 
-// --- H3 exposition probes (additive, flagged; the same guard) ------------------
+// --- exposition probes (the same guard) ------------------
 //
 // The dossier + evidence reads and this lane's own fixture seeds: an image
 // OCR fixture (attachment + verified retained representation + completed
-// vision order with pixel-anchored observations + fragments) in the E5
+// vision order with pixel-anchored observations + fragments) in the search
 // transcript-fixture style — honestly labeled proof rows, never reachable
 // as client inputs. Reads stay under KIERO_PROBE_ENABLED; the seeds that
 // WRITE rows additionally need this lane's KIERO_H3_PROOF_ENABLED.
@@ -190,7 +190,7 @@ export const seedImageOcr = internalMutation({
     });
     // The retained normalized image: verified durable, with its OWN
     // dimensions defining the coordinate space the anchors resolve in, and
-    // the r2:etag-prefixed content hash D3's grant resolution reads (the
+    // the r2:etag-prefixed content hash the grant resolution reads (the
     // ledger receipt that lets the channel cross-check the live object).
     const representationId = await ctx.db.insert("mediaRepresentations", {
       attachmentId,

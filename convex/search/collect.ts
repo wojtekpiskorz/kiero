@@ -1,18 +1,18 @@
 /**
- * Index work collection (E5): which canonical texts one generation pass
- * indexes, resolved from the CURRENT canonical rows (D1 sources/extractions/
- * fragments, D6 transcripts, C2 current finding revisions).
+ * Index work collection: which canonical texts one generation pass
+ * indexes, resolved from the CURRENT canonical rows (sources/extractions/
+ * fragments, transcripts, current finding revisions).
  *
- * Coverage (issue #39 "message text, transcript and OCR"):
+ * Coverage (message text, transcript and OCR):
  * - message text: every ACTIVE source's author text, anchored to its
- *   whole-source text fragment when E3's extract stage has ensured one (a
+ *   whole-source text fragment when the extract stage has ensured one (a
  *   source accepted but not yet processed is still indexed, anchored to the
  *   source alone: the canonical link is the source id);
- * - transcript: every completed D6 order's per-segment audio-interval
+ * - transcript: every completed transcript order's per-segment audio-interval
  *   fragments, each with its verbatim segment text (and a whole-source STT
  *   fragment, when one exists, over the concatenated transcript);
- * - OCR: vision-kind extraction fragments are indexed from E4's completed
- *   order record (`observationsJson`, the verbatim observation texts; H3
+ * - OCR: vision-kind extraction fragments are indexed from the completed
+ *   order record (`observationsJson`, the verbatim observation texts; the source history
  *   completion of the gap this collector first disclosed): each
  *   image_region fragment whose exact region matches one observation is
  *   indexed anchored to that fragment. Fragments without a matching
@@ -69,8 +69,8 @@ function segmentTextFor(
 }
 
 /**
- * The verbatim OCR observations of one completed vision order (H3 append):
- * E4's durable `observationsJson` record, bounded and fail-soft — a missing
+ * The verbatim OCR observations of one completed vision order:
+ * the durable `observationsJson` record, bounded and fail-soft — a missing
  * or malformed record lists empty, so those fragments stay counted and
  * skipped instead of blocking the pass.
  */
@@ -203,8 +203,8 @@ export async function collectGenerationWork(
         }
         continue;
       }
-      // Vision (OCR) fragments: H3 completion (flagged append on E5's
-      // collector). E4's completed vision orders now carry the canonical
+      // Vision (OCR) fragments.
+      // The completed vision orders now carry the canonical
       // observation texts (observationsJson, the verbatim record the joined
       // analysis reads), so each image_region fragment whose EXACT region
       // matches one observation is indexed anchored to that fragment — the

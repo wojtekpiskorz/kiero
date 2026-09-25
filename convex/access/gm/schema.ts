@@ -1,15 +1,15 @@
 /**
- * Audited GM access tables (A2 candidate, certified by A3; amended by B4).
+ * Audited GM access tables.
  *
- * Owning implementer: B4 (explicit audited GM access). GM is a global
+ * GM is a global
  * operator permission separate from company membership ("GM", CONTEXT.md);
  * entry is explicit, reason-carrying and audited, and GM activity stays out
  * of alpha success metrics (every GM-written audit row carries the grant id,
  * which is the exclusion tag).
  *
- * B4 amendment (issue #23):
+ * Notes:
  *
- * - `gmAccessGrants` keeps the A3-certified shape: ONE row per audited GM
+ * - `gmAccessGrants` keeps the certified shape: ONE row per audited GM
  *   mode interval; an OPEN row is the current GM authority. Grants never
  *   expire by time ("time elapsed alone does not end it") and never confer
  *   membership; only `access.exitGmMode` closes one.

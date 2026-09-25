@@ -1,19 +1,19 @@
 /**
- * Guarded G3 proof fixtures (dev deployment only).
+ * Guarded Calendar reconciliation proof fixtures (dev deployment only).
  *
- * Same pattern as G2's projection proof (and B1's probe before it): an
+ * Same pattern as the projection proof (and the probe before it): an
  * ACTION checks the deployment guard variable
  * (`KIERO_G3_PROOF_ENABLED === "1"`) and runs internal functions reachable
  * only from this module. On any other deployment the variable is absent
  * and every entry fails closed.
  *
  * Why these exist (honest scope): the owner has not supplied Google OAuth
- * client credentials (the same owner action B1/G1/G2 recorded), so no
+ * client credentials (a recorded owner action), so no
  * proof can walk the real accounts.google.com consent or the real
- * Calendar API. The live evidence runs the REAL sync engine — G2's
- * projection pass, G1's credential capability, and G3's own prepare ->
+ * Calendar API. The live evidence runs the REAL sync engine — the
+ * projection pass, the credential capability, and its own prepare ->
  * bounded leg -> record loop — against the deployment's clearly-labeled
- * fake Google Calendar events API (./proofHttp.ts, G1's guarded fake
+ * fake Google Calendar events API (./proofHttp.ts, the guarded fake
  * extended with events). These fixtures only READ state and invoke the
  * pass explicitly. The live REAL-Google legs stay BLOCKED-owner-action.
  *
@@ -150,7 +150,7 @@ export const g3ProofSyncState = action({
 
 /**
  * The guarded entry that runs the REAL sync pass action for one connection
- * (or every connection): G2's projection pass plus G3's per-copy bounded
+ * (or every connection): the projection pass plus the per-copy bounded
  * legs, exactly as the cron safety net and the joins will trigger it.
  */
 export const g3ProofRunSyncPass = action({

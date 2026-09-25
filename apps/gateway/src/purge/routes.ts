@@ -1,10 +1,10 @@
 /**
- * Gateway purge channel (I4): the service-credentialed R2 deletion route
+ * Gateway purge channel: the service-credentialed R2 deletion route
  * the Convex deletion executor's external action calls.
  *
  *   POST /purge/media   { deletionRecordId }
  *
- * ONE checked path (the D2/D3 channel discipline):
+ * ONE checked path (the channel discipline):
  *
  * 1. the bearer is verified against this Worker's KIERO_SERVICE_TOKEN
  *    (digest compare; the ONE shared credential-check home) - the Convex

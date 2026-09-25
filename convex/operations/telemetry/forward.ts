@@ -1,5 +1,5 @@
 /**
- * The sink-forward outcome model (R27, issue #235).
+ * The sink-forward outcome model.
  *
  * PURE MODULE, single definition: the closed status-class vocabulary for the
  * Convex->Axiom ingest leg, the classification of a `SinkIngestResult` into
@@ -8,7 +8,7 @@
  * Why this module exists: the telemetry tick dropped the
  * `SinkIngestResult` (`cron.ts`'s forwardRecentToSink), so a refused or
  * unreachable forward was indistinguishable from a forward that never ran -
- * every dashboard silence since I11's qualification is explained by that gap.
+ * every dashboard silence since the qualification is explained by that gap.
  * The bounded repair (this issue) records the outcome DURABLY: status class
  * only, never response bodies, credential values or token material.
  *

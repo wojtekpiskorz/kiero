@@ -1,5 +1,5 @@
 /**
- * The final core composition entry, web half (J2, issue #61).
+ * The final core composition entry, web half.
  *
  * The full-flow join owns this explicit cross-module composition: ONE
  * module that composes the complete core feature list of the barebones
@@ -10,22 +10,22 @@
  * What the join changed (and what this module pins):
  *
  * - the company conversation stays the default route and the FIRST entry,
- *   and now carries ALL capture modes (D4's recoverable-draft composer:
- *   text, one recording, photos, voice-only sends) plus E6's answer loop
+ *   and now carries ALL capture modes (the recoverable-draft composer:
+ *   text, one recording, photos, voice-only sends) plus the answer loop
  *   ("Zapytaj agenta" per message);
  * - the separate /wpis capture route RETIRES: no `capture.composer` entry
  *   composes anywhere in the core list;
  * - every other core surface stays reachable through its own mounted
  *   module entry (memory, search, source dossier, Co teraz, work,
  *   extensions, projects, membership, GM, GM processing, push settings);
- * - R16 (issue #198) withheld the Calendar connection surface from the
+ * - the Calendar connection surface is withheld from the
  *   v1 host: the owner deferred the Google Calendar integration beyond
  *   v1 (ADR docs/adr/calendar-deferral-2026-09.md), so the entry stays
  *   registered as pending (a recorded deferral, its honest Polish note
  *   in the entry) while the composed output drops it from routes and
  *   navigation (see {@link FULL_CORE_DEFERRED_FEATURE_IDS}).
  *
- * `app-features.ts` (A4's one shared wiring file) delegates to
+ * `app-features.ts` (the one shared wiring file) delegates to
  * {@link fullCoreAppFeatures}; the composition semantics live HERE, in
  * the join's owned path, per the charter's "joins own explicit
  * cross-module composition".
@@ -45,10 +45,9 @@ import { notificationsFeatureEntry } from "../app/features/notifications/entry";
 import { gmProcessingFeatureEntry } from "../app/features/gm/processing-entry";
 import { searchFeatureEntry } from "../app/features/search/entry";
 import { sourceDetailFeatureEntry } from "../app/features/source-detail/entry";
-// I3's sanctioned append (flagged, issue #55): the firm-export surface.
+// The firm-export surface.
 import { exportsFeatureEntry } from "../app/features/exports/entry";
-// I4's sanctioned append (flagged, issue #56, the I3 precedent): the
-// permanent-deletion surface (impact preview, confirmation, cleanup status).
+// The permanent-deletion surface (impact preview, confirmation, cleanup status).
 import { dataDeletionFeatureEntry } from "../app/features/data-deletion/entry";
 
 /** The mounted feature ids the complete core must compose, in order. */
@@ -65,12 +64,12 @@ export const FULL_CORE_FEATURE_IDS: readonly string[] = [
   "access.gm",
   "operations.processing",
   "attention.push",
-  // I4's sanctioned append (flagged, issue #56): the deletion surface.
+  // The deletion surface.
   "operations.deletion",
 ];
 
 /**
- * Core surfaces the owner deferred beyond v1 (R16, issue #198; ADR
+ * Core surfaces the owner deferred beyond v1 (ADR
  * docs/adr/calendar-deferral-2026-09.md). Each id must stay composed as
  * a pending entry (the registry enforces the honest Polish pendingNote),
  * so a deferral stays recorded instead of silently missing, but the
@@ -109,7 +108,7 @@ export interface FullCoreProblem {
  * the host imports this at startup, so a lost surface fails the boot, not
  * a user's click.
  *
- * R16 (issue #198): the returned list is the v1 host composition the
+ * The returned list is the v1 host composition the
  * router and navigation derive from, so surfaces deferred beyond v1
  * ({@link FULL_CORE_DEFERRED_FEATURE_IDS}) are withheld here (pending
  * entry, no route, no navigation entry) without any router or shell
@@ -142,7 +141,7 @@ export function fullCoreAppFeatures(): readonly AppFeatureEntry[] {
   return composed.filter((entry) => !withheldFromV1(entry));
 }
 
-/** True when a pending entry records a deferral beyond v1 (R16). */
+/** True when a pending entry records a deferral beyond v1. */
 function withheldFromV1(entry: AppFeatureEntry): boolean {
   return (
     entry.implementation === "pending" &&
@@ -165,7 +164,7 @@ function fullCoreProblems(entries: readonly AppFeatureEntry[]): FullCoreProblem[
   }
   // Presence over both lists: a listed surface that silently leaves the
   // composition is drift, whether it must be mounted (the core) or
-  // pending (a recorded deferral beyond v1, R16).
+  // pending (a recorded deferral beyond v1).
   const entriesById = new Map(entries.map((entry) => [entry.featureId as string, entry]));
   for (const id of FULL_CORE_FEATURE_IDS) {
     const entry = entriesById.get(id);

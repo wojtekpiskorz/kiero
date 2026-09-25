@@ -3,9 +3,9 @@
  *
  * One home for every email Kiero sends through the Resend adapter
  * (architecture: Integrations "send application email"; Resend selected in
- * Q209). B1 owns the sign-in code template and the shared rendering; B3
- * owns finalizing the invitation template through the same adapter; B2
- * added the linking-ceremony and email-change code templates (same shape:
+ * Q209): the sign-in code template and the shared rendering, the
+ * invitation template through the same adapter, and the
+ * linking-ceremony and email-change code templates (same shape:
  * code, expiry, nothing else).
  *
  * The renderer is pure and unit-tested: outputs carry the code, the
@@ -30,20 +30,20 @@ export interface SignInCodeEmail {
 
 export interface InvitationEmail {
   readonly kind: "invitation_code";
-  /** Company name extending the invitation (B3 wires real values). */
+  /** Company name extending the invitation (membership wires real values). */
   readonly companyName: string;
   readonly code: string;
   readonly expiresAtMs: number;
 }
 
-/** B2: the one-time code proving control of a method inside a linking ceremony. */
+/** The one-time code proving control of a method inside a linking ceremony. */
 export interface MethodLinkCodeEmail {
   readonly kind: "method_link_code";
   readonly code: string;
   readonly expiresAtMs: number;
 }
 
-/** B2: the one-time code confirming a new address during an email change. */
+/** The one-time code confirming a new address during an email change. */
 export interface EmailChangeCodeEmail {
   readonly kind: "email_change_code";
   readonly code: string;

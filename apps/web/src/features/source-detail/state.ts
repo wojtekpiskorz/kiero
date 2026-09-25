@@ -1,5 +1,5 @@
 /**
- * Source-detail feature state (H3): Polish copy, the anchor/representation
+ * Source-detail feature state: Polish copy, the anchor/representation
  * vocabularies and the closed-error hints for the source-history surface.
  *
  * Label maps are TYPED by the wire schemas the exposition read carries
@@ -62,7 +62,7 @@ export const sourceDetailCopy = {
   withdrawSaving: "Wycofywanie…",
   withdrawDone:
     "Źródło wycofane. Treść i historia pozostają; zależne ustalenia są oznaczane do ponownego rozpatrzenia.",
-  // Reassignment (E7): the control mounts now that the certified operation exists.
+  // Reassignment: the control mounts now that the certified operation exists.
   reassignmentHeading: "Przypisanie do projektów",
   reassignmentIntro:
     "Przenieś tę wiadomość między projektami albo do wiedzy ogólnej firmy. Wiadomość zachowuje jedność: rozmowy projektowe pokazują ten sam oryginał, a stan przeczytania pozostaje. Ustalenia oparte na tej wiadomości, które dotyczą zdjętego projektu, są ponownie rozpatrywane.",
@@ -73,7 +73,7 @@ export const sourceDetailCopy = {
   reassignmentDone:
     "Przypisanie zapisane. Rozmowy projektowe pokazują już nowe rozmieszczenie; zależne ustalenia są ponownie rozpatrywane.",
   reassignmentUnchanged: "To przypisanie jest już aktualne, nie ma czego zapisywać.",
-  // R4 (issue #129): another boss reassigned this source after this form
+  // Another boss reassigned this source after this form
   // loaded; the selection above has been reset to the current server choice.
   reassignmentStale:
     "Przypisanie źródła zmieniło się. Odświeżyliśmy aktualny wybór. Sprawdź go i zapisz ponownie.",
@@ -164,7 +164,7 @@ export const lifecycleLabels: Record<SourceExpositionRow["lifecycle"], string> =
   purged: "trwale usunięta",
 };
 
-/** Processing-state labels reuse D1's own vocabulary (the same derivation). */
+/** Processing-state labels reuse its own vocabulary (the same derivation). */
 export const processingStateLabels: Record<SourceExpositionRow["processingState"], string> = {
   accepted: "przyjęta",
   processing: "przetwarzana",
@@ -173,19 +173,19 @@ export const processingStateLabels: Record<SourceExpositionRow["processingState"
   failed: "niepowodzenie przetwarzania",
 };
 
-/** Transcript-state labels (D6's order vocabulary). */
+/** Transcript-state labels (the order vocabulary). */
 export const transcriptStateLabels: Record<
   SourceExpositionRow["transcripts"][number]["state"],
   string
 > = sourceDetailCopy.transcriptStateLabels;
 
-/** Vision-order-state labels (E4's order vocabulary). */
+/** Vision-order-state labels (the order vocabulary). */
 export const visionStateLabels: Record<
   SourceExpositionRow["visionOrders"][number]["state"],
   string
 > = sourceDetailCopy.visionStateLabels;
 
-/** Representation-role labels (D5's role vocabulary). */
+/** Representation-role labels (the role vocabulary). */
 export const representationRoleLabels: Record<
   SourceExpositionRow["attachments"][number]["representations"][number]["role"],
   string

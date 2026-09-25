@@ -1,5 +1,5 @@
 /**
- * The tenant-filtered analysis-context loader (E3): protocol step 6 —
+ * The tenant-filtered analysis-context loader: protocol step 6 —
  * "Read relevant current structured state, discover evidence with
  * tenant-filtered retrieval ... and record the revisions used in a change
  * plan. Similarity does not establish truth."
@@ -9,9 +9,9 @@
  * bounded recent-source previews. The findings' revision counters ARE the
  * recorded input-revision version: the publish stage passes them as the
  * caller expectations of `memory.publishChangeSet`, which is how a newer
- * correction refuses a stale plan (C2's guard; issue #8 precedence).
+ * correction refuses a stale plan (the guard precedence).
  *
- * No vector search yet (E5 owns it): retrieval here is bounded tenant-
+ * No vector search yet: retrieval here is bounded tenant-
  * filtered listing, and similarity would anyway never establish truth.
  */
 

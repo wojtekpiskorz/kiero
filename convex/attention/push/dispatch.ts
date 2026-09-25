@@ -1,6 +1,6 @@
 /**
- * Web Push command dispatch wiring (F3): the SAME checked path every lane
- * uses, with this lane's handler registry (the F1/F2 precedent).
+ * Web Push command dispatch wiring: the SAME checked path every lane
+ * uses, with this lane's handler registry.
  *
  * `dispatchPushCommand` is @kiero/runtime's `dispatchCommand` over the
  * canonical context resolution and the platform authorization seam,

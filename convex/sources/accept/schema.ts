@@ -1,9 +1,5 @@
 /**
- * Source acceptance, project links, extractions and fragments
- * (A2 candidate, certified by A3; completed by D1 for text acceptance).
- *
- * Owning implementers: D1 (accept and publish views), E3/E4 (extraction
- * joins), C5 (withdrawal reads), I3/I4 (export/deletion reads).
+ * Source acceptance, project links, extractions and fragments.
  *
  * One immutable logical source with one original: the user-authored text,
  * authorship and send-time snapshot never change; lifecycle transitions
@@ -12,7 +8,7 @@
  * same original rather than copying it. Each new STT/vision version is
  * another immutable extraction; historical evidence never silently moves.
  *
- * D1 amendments (the owning lane completes the candidate fragment):
+ * Notes (the owning lane completes the candidate fragment):
  * - `sources.acceptanceKey`/`acceptanceFingerprint`: the client-generated
  *   logical-source key (the command idempotency key) and a fingerprint of
  *   the first accepted logical payload. A replay of the key returns the same
@@ -57,9 +53,9 @@ export const acceptTables = {
     withdrawnReason: v.optional(v.string()),
     withdrawnAtMs: v.optional(shared.tsMs),
     /**
-     * C5 amendment (additive, flagged): the user who executed the explicit
+     * The user who executed the explicit
      * withdrawal — "withdrawal records actor, time and reason on the same
-     * immutable D1 source" (issue #28). The recomputation's marking
+     * immutable source". The recomputation's marking
      * revisions record the same actor.
      */
     withdrawnByUserId: v.optional(shared.userId),

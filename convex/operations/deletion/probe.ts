@@ -1,6 +1,6 @@
 /**
- * I4 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
- * variable, the D1/D3/I3 probe pattern). No business work happens here; the
+ * Deletion dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * variable, the probe pattern). No business work happens here; the
  * entries let the live evidence run against the REAL dev deployment, the
  * REAL gateway Worker and the REAL EU media bucket.
  *
@@ -18,7 +18,7 @@
  *   purge route, with an explicit URL override (the proof drives the REAL
  *   deployed route without touching deployment env).
  * - `probePurgeTick`: forces the 24-hour tracking pass's decision now.
- * - `probeRetryPurgeStage` (R2, issue #127): returns one COMPLETED stage
+ * - `probeRetryPurgeStage` (R2): returns one COMPLETED stage
  *   of a fully purged record to the interruption state and replays the
  *   REAL executor, the per-stage idempotency evidence surface (admin
  *   caller only).
@@ -111,10 +111,10 @@ export const probePurgeTick = internalMutation({
   },
 });
 
-// --- R2 per-stage retry evidence surface (issue #127) ------------------------------
+// --- R2 per-stage retry evidence surface ------------------------------
 
 /**
- * The per-stage retry core (unit-tested through the I4 harness): on one
+ * The per-stage retry core (unit-tested through the harness): on one
  * FULLY PURGED record, returns the named stage to the visible interruption
  * state a refused attempt leaves, then re-runs the REAL durable executor.
  * The replayed stage body must converge to the same purged state with no

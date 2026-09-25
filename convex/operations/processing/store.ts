@@ -1,7 +1,7 @@
 /**
- * The GM processing transaction store surface (H4).
+ * The GM processing transaction store surface.
  *
- * Extends B4's `GmTx` (the GM authority reads/writes: grant, company,
+ * Extends `GmTx` (the GM authority reads/writes: grant, company,
  * activation, audit) with the processing reads and writes this lane's
  * transactional cores need, following the same discipline: plain-string ids
  * (the Convex adapter normalizes branded ids exactly once), direct
@@ -25,7 +25,7 @@ import type {
   StepView,
 } from "./cores";
 
-/** The GM processing audit row (B4's shape plus this lane's target). */
+/** The GM processing audit row (the shape plus this lane's target). */
 export interface GmProcessingAuditRow {
   readonly actorUserId: string;
   readonly gmGrantId: string;

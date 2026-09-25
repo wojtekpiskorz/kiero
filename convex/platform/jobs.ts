@@ -1,9 +1,9 @@
 /**
- * The durable job executor entry (A3).
+ * The durable job executor entry.
  *
  * `runDurableJob` is the single scheduled consumer of every `durableJobs`
  * row. It decodes the job input against the kind's executor schema from the
- * composed A2/A3 registry, applies the common idempotent execution rules and
+ * composed registry, applies the common idempotent execution rules and
  * dispatches to the registered implementation:
  *
  * - succeeded rows replay as no-ops (idempotency);

@@ -1,5 +1,5 @@
 /**
- * The backup protocol surface (I5): ONE handler shared by the container's
+ * The backup protocol surface: ONE handler shared by the container's
  * HTTP entry and every test/proof driver.
  *
  * - `GET /healthz`: the honest channel summary (credential PRESENCE by

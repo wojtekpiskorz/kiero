@@ -1,6 +1,6 @@
 /**
- * Durable notification-intent model (F2): the PURE decision core the
- * evaluator runs (issue 42: "durable notification intents and an
+ * Durable notification-intent model: the PURE decision core the
+ * evaluator runs ("durable notification intents and an
  * idempotent evaluator").
  *
  * Everything here is deterministic over its inputs — no Convex, no clock,
@@ -8,7 +8,7 @@
  * terminal-assignment classification, the scope-bucket grouping and the
  * collapsed-summary shape are unit-testable without a deployment
  * (tests/f2/delivery.test.ts) while ./operations.ts re-runs the SAME
- * functions inside its transactions over live rows (the F1 `evaluation.ts`
+ * functions inside its transactions over live rows (the `evaluation.ts`
  * precedent).
  *
  * Semantics pinned by the accepted notification decision (issue 7
@@ -23,7 +23,7 @@
  * - While assignment is still pending the send WAITS even past the window
  *   ("Jeśli po 60 sekundach nie znamy jeszcze odbiorców, wysyłka czeka na
  *   wynik przypisania"); pending analysis is never treated as an unassigned
- *   company source (issue 42 acceptance).
+ *   company source.
  * - Company-entry rules apply only after terminal unassigned
  *   classification or terminal analysis failure; later assignment sends no
  *   second source notification (structural: terminal intents stay
@@ -31,7 +31,7 @@
  * - A mixed-project source is ONE notification for the person ("zachowując
  *   jedno powiadomienie o źródle"), batched in its own scope bucket — never
  *   duplicated per project.
- * - Quiet hours DEFER delivery to `nextQuietHoursEndMs` (F1's seam); the
+ * - Quiet hours DEFER delivery to `nextQuietHoursEndMs`; the
  *   deferral never replays stale items, it re-collapses the current batch.
  */
 
@@ -54,9 +54,9 @@ export interface LatestRunView {
 }
 
 /**
- * The generic assignment/agent-message classification (issue 42: "Consume
+ * The generic assignment/agent-message classification ("Consume
  * the generic assignment/agent-message state contract, independent of media
- * implementation. E4 later emits the same terminal states").
+ * implementation. Multimodal extraction emits the same terminal states").
  *
  * - `pending`: no run yet, or the latest run is still running/superseded
  *   without a successor — never a company entry in this state.
@@ -73,7 +73,7 @@ export type AssignmentResolution =
 
 /**
  * Classifies one source's assignment from its latest processing run and
- * current project links. PURE: the evaluator feeds it live rows; E4's
+ * current project links. PURE: the evaluator feeds it live rows; the
  * later media runs emit the same terminal states.
  */
 export function resolveAssignment(
@@ -84,7 +84,7 @@ export function resolveAssignment(
     return { state: "pending" };
   }
   if (latestRun.state === "failed") {
-    // Terminal analysis failure: company-entry rules (issue 42).
+    // Terminal analysis failure: company-entry rules.
     return { state: "company" };
   }
   return linkedProjectIds.length === 0
@@ -141,7 +141,7 @@ export interface BatchSummary {
 }
 
 /**
- * The closed death-reason vocabulary recorded on suppressed intents. F1's
+ * The closed death-reason vocabulary recorded on suppressed intents. The
  * personal-decision suppression reasons are members verbatim (quiet hours
  * never suppress — they defer), so the evaluator records the seam's reason
  * directly.
@@ -154,7 +154,7 @@ export const SUPPRESSED_REASONS = [
   "own_entry",
   "muted_project",
   "muted_company_entries",
-  // F4's reminder mute shares the column; unreachable for this lane's
+  // the reminder mute shares the column; unreachable for this lane's
   // kinds today (the seam only checks it for task reminders).
   "muted_task_reminders",
 ] as const;

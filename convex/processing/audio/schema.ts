@@ -1,14 +1,11 @@
 /**
- * Audio transcript tables (D6 fragment: resumable long-audio STT).
- *
- * Owning implementer: D6 (segmentation + per-segment durable STT), E3/E4
- * consume the extraction versions and fragments; H4 inspects the rows.
+ * Audio transcript tables (resumable long-audio STT).
  *
  * Vocabulary pins (architecture + CONTEXT.md):
  * - One "Wiadomość źródłowa" keeps ONE original audio attachment; segment
  *   processing NEVER creates new source messages. `audioTranscripts` rows
  *   are processing orders over an accepted attachment, not messages.
- * - Browser chunks (client slicing), R2 upload parts (D2's multipart
+ * - Browser chunks (client slicing), R2 upload parts (the multipart
  *   manifest) and STT segments (these rows) are DISTINCT vocabularies.
  * - The segment manifest (index, startMs, endMs over the ORIGINAL audio
  *   timeline) is immutable once planned: rows are inserted once and only
@@ -17,9 +14,9 @@
  *   immutable `extractions` version — coordinates never silently move.
  * - A complete transcript requires EVERY required segment; anything less
  *   leaves the order `pending`/`partial` (never a fake `complete`), which
- *   is the visible state E3's coverage model and E4's joins consume.
+ *   is the visible state the coverage model and the joins consume.
  *
- * D6 registration of the fragment (the sanctioned small coordinated change
+ * Registration of the fragment (the small coordinated change
  * named in docs/implementation/contracts/README.md): the two table names
  * are added to `TABLE_ID_NAMES` in @kiero/contracts and the composition
  * import/spread in convex/schema.ts.
@@ -37,7 +34,7 @@ const bytesChannel = v.union(
   v.literal("media_worker"),
   /**
    * Guarded dev-proof channel only: the proof script supplies the SAME
-   * bytes it uploaded through D2 (length- and sha-pinned at order time),
+   * bytes it uploaded through the uploads lane (length- and sha-pinned at order time),
    * because the container runtime + R2 S3 token are BLOCKED owner actions.
    * Rows record this channel honestly; production flows never use it.
    */
@@ -58,9 +55,9 @@ export const audioTables = {
     representationId: shared.mediaRepresentationId,
     /** The source's initial analysis run; the extraction version lands on it. */
     processingRunId: shared.processingRunId,
-    /** D6 pipeline version of this order (immutable per order). */
+    /** Transcription pipeline version of this order (immutable per order). */
     pipelineVersion: v.string(),
-    /** E2 routing configuration the STT route ran under (immutable per order). */
+    /** Provider routing configuration the STT route ran under (immutable per order). */
     sttRoutingVersion: v.string(),
     /** Canonical segmentation config JSON (immutable per order). */
     segmentationConfigJson: v.string(),
@@ -119,7 +116,7 @@ export const audioTables = {
     endMs: v.float64(),
     durationMs: v.float64(),
     state: v.union(
-      // No "running" state (review finding 3): D6 never wrote it — an
+      // No "running" state: transcription never writes it — an
       // interrupted pass leaves the segment `pending`, which resume retries.
       v.literal("pending"),
       v.literal("succeeded"),

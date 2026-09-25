@@ -1,24 +1,24 @@
 /**
- * The outbox drain (A3; multi-edge row semantics decided by D5): the bridge
+ * The outbox drain (with multi-edge row semantics): the bridge
  * between published events and durable consumer work.
  *
  * Drain runs as a scheduled internal mutation. For each pending outbox row
- * it looks up the registered consumer edges for that event name in the A2/A3
+ * it looks up the registered consumer edges for that event name in the
  * composed registry and registers the matching durable job (the reaction is
  * durable, never inline). A publisher that already registered the work
  * atomically in its own transaction (same dedup key) is recognized and not
  * double-registered. Events with no registered consumer edge are marked
  * delivered immediately (nothing awaits them).
  *
- * ROW SEMANTICS UNDER MULTI-EDGE FAN-OUT (the D5 decision, 2026-09-10): the
+ * ROW SEMANTICS UNDER MULTI-EDGE FAN-OUT: the
  * outbox row is the PUBLICATION RECORD, and the DRAIN owns its terminal
  * transition - `delivered` once every registered edge's reaction is
  * registered. Per-reaction outcomes live on the `durableJobs` rows (state,
- * externalOutcome, attempts, finishedAtMs - the A3 round-2 outcome
- * carriers; H3 inspects those, not this row). No row waits `in_flight` for
+ * externalOutcome, attempts, finishedAtMs - the outcome
+ * carriers; inspection reads those, not this row). No row waits `in_flight` for
  * a completing executor, because under fan-out one row cannot represent
  * several executors' outcomes. Executors whose projections carry the row's
- * dedup identity (echo, B3's cleanup) still flip their own row - those
+ * dedup identity (echo, the cleanup) still flip their own row - those
  * flips are idempotent writes on a row the drain already delivered. The
  * TERMINAL-failure path intentionally flips a delivered row to `failed`
  * as a loud per-reaction alert (the incident scan reads it); that is a
@@ -84,8 +84,8 @@ function projectOneEdge(
       },
     };
   }
-  // E3 registration (issue #37 owns this edge's projection): an accepted
-  // source drains into `processing.extract_fragments`. The certified D1
+  // An accepted
+  // source drains into `processing.extract_fragments`. The certified
   // payload carries no extractionId (the acceptance transaction already
   // registered the job itself, with the real id, under the SAME dedup
   // key), so the projection hands `null` and the executor resolves the
@@ -102,10 +102,10 @@ function projectOneEdge(
       dedupKey: rowDedupKey,
     };
   }
-  // B3 registration (issue #22 owns the declared consumer proof): the two
+  // The two
   // access-revocation edges project onto `access.cleanup_revocation`. The
   // membership payload carries its revocation instant and the successor
-  // policy; the session payload (B1's shape) leaves the instant to the
+  // policy; the session payload leaves the instant to the
   // executor. The row's dedup identity is also the job's, so a publisher
   // that already registered the cleanup atomically (revocation transaction,
   // convex/access/membership/operations.ts) collapses onto that row here.
@@ -144,10 +144,10 @@ function projectOneEdge(
       dedupKey: rowDedupKey,
     };
   }
-  // E4 registration (issue #38 owns these edges' projections): the accepted
+  // The accepted
   // source projects onto the multimodal join (STT ordering + the joined
   // partial-safe analysis; the executor resolves the source's initial
-  // analysis run from `null`, the way D6's orders anchor), and a requested
+  // analysis run from `null`, the way the orders anchor), and a requested
   // reanalysis projects onto the kicker's NEW run so a mixed source re-joins
   // its extraction outcomes. Dedup keys derive from the payload's source
   // identity, never the row's, so the acceptance publisher and this edge
@@ -176,12 +176,12 @@ function projectOneEdge(
       dedupKey: `processing.join_multimodal:${String(payload.sourceId)}`,
     };
   }
-  // C5 registration (issue #28 owns these edges' projections): withdrawal
+  // Withdrawal
   // and every finding revision drain into `memory.recompute_dependents`.
   // The withdrawal payload carries its reason; the publisher (the withdrawal
   // transaction) already registered the job itself with the real actor
   // under the SAME dedup key, so this projection collapses onto that row.
-  // AMPLIFICATION NOTE (for H3's incident scanning): the `memory.findingRevised`
+  // AMPLIFICATION NOTE (for the incident scanning): the `memory.findingRevised`
   // edge fires one durable walk per revision - including the cascade's own
   // markings, most of which no-op. Accepted for alpha volume; per-reaction
   // outcomes live on the durableJobs rows, and the walk is one bounded
@@ -201,7 +201,7 @@ function projectOneEdge(
         dedupKey: rowDedupKey,
       };
     }
-    // E7 registration (issue #115 owns this edge's projection): a project
+    // A project
     // reassignment drains into the scope re-assessment cause. The publisher
     // (the reassignment transaction) already registered the job itself with
     // the real reassigning actor under the SAME dedup key, so this
@@ -250,7 +250,7 @@ function projectOneEdge(
       dedupKey: rowDedupKey,
     };
   }
-  // D5 registration (issue #33 owns the declared consumer proof): the
+  // The
   // accepted-source payload projects onto `processing.normalize_photo`
   // (architecture protocol step 4: normalize accepted photos before ordinary
   // vision). The dedup key is derived from the PAYLOAD's source id, NOT the
@@ -268,7 +268,7 @@ function projectOneEdge(
       dedupKey: `processing.normalize_photo:${String(payload.sourceId)}`,
     };
   }
-  // G3 registration (issue #47 owns this declared consumer proof): a
+  // A
   // recorded Calendar outcome change projects onto ONE bounded
   // reconciliation of that copy - the durable observation that resolves
   // unknown outcomes (never a blind retry; the executor's uncertain
@@ -282,7 +282,7 @@ function projectOneEdge(
       dedupKey: rowDedupKey,
     };
   }
-  // F2 registration (issue #42 owns these edges' projections): the three
+  // The three
   // intent-source events project onto `attention.evaluate_due_intents`.
   // The dedup keys are derived from each event's SUBJECT (source,
   // clarification, change set), never the outbox row - the acceptance row's
@@ -329,13 +329,13 @@ function projectOneEdge(
       dedupKey: `attention.evaluate_due_intents:changeset:${String(payload.changeSetId)}`,
     };
   }
-  // I4 registration (issue #56 owns this edge's projection): a committed
+  // A committed
   // source purge drains into `deletion.purge_source`. The purge transaction
   // registers the job itself with the REAL ledger record id under the SAME
   // dedup key, so this projection collapses onto the publisher's row; the
   // certified payload carries no record id, so `null` means "resolve the
   // source's content-free source_purge ledger row in-company" (exactly one
-  // exists; the E3 extractFragmentsInput precedent).
+  // exists; the extractFragmentsInput precedent).
   if (jobKind === "deletion.purge_source") {
     return {
       kind: "job",
@@ -347,9 +347,9 @@ function projectOneEdge(
       dedupKey: rowDedupKey,
     };
   }
-  // E5 registration (issue #39 owns these declared consumer proofs): the
+  // The
   // derived search rows' lifecycle refreshes. The dedup keys derive from each
-  // event's SUBJECT plus the refresh mode (the F2 precedent), never the
+  // event's SUBJECT plus the refresh mode, never the
   // outbox row: a withdrawal drops the source's index rows in every
   // non-retired generation, a purge does the same, and a revised finding
   // rebuilds its rows from the CURRENT revision. `generationId: null` is the
@@ -381,7 +381,7 @@ function projectOneEdge(
       dedupKey: `search.index_generation:refresh_finding:${String(payload.findingId)}`,
     };
   }
-  // F3 registration (issue #43 owns this declared consumer proof): every
+  // Every
   // DELIVERED notification intent drains into the web-push transport.
   // The dedup identity is the intent itself, so a replayed or
   // differently-keyed duplicate event collapses onto the same per-device
@@ -395,12 +395,12 @@ function projectOneEdge(
       dedupKey: `attention.deliver_push:${String(payload.notificationIntentId)}`,
     };
   }
-  // F4 registration (issue #44 owns these edges' projections): the task and
+  // The task and
   // bound-deadline events project onto `attention.schedule_task_reminders`.
   // The work dedup keys ride the ROW's identity (the work lane's canonical
   // key carries the task revision, so every DISTINCT change registers its
   // own job while event replays collapse); the finding-revised key is
-  // payload-derived instead, because that event fans out to C5's recompute
+  // payload-derived instead, because that event fans out to the recompute
   // walk too and one dedup key may never carry two job kinds.
   if (jobKind === "attention.schedule_task_reminders") {
     if (eventName === "memory.findingRevised") {
@@ -424,7 +424,7 @@ function projectOneEdge(
 /**
  * Projects one event payload onto EVERY registered consumer edge of that
  * event (one projection per edge; events without edges report themselves as
- * `no_consumer`). D5 amendment: an event may now carry SEVERAL consumer
+ * `no_consumer`). An event may now carry SEVERAL consumer
  * edges (`sources.sourceAccepted` fans out to both extract and normalize);
  * the drain registers each edge's durable reaction independently. Edges
  * whose owning lane has not registered a projection yet still report

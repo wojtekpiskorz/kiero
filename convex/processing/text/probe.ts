@@ -1,10 +1,10 @@
 /**
- * E3 dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
+ * Text-analysis dev-proof surface (guarded by the deployment's KIERO_PROBE_ENABLED
  * variable; shared plumbing from convex/sources/probe_shared.ts).
  *
- * No business work happens here; these entries exist so the E3 evidence
+ * No business work happens here; these entries exist so the evidence
  * runs against the REAL dev deployment without a development-auth
- * shortcut, through the same guarded-action pattern A3/D1/C2 use:
+ * shortcut, through the same guarded-action pattern the platform, sources and findings probes use:
  *
  * - `probeAnalysisState`: the tenant-scoped inspection read the evidence
  *   script asserts on — run (with versions and checkpoint), steps (the
@@ -13,7 +13,7 @@
  * - `probeKickReanalysis`: creates a linked NEW run for a source and
  *   publishes `operations.reanalysisRequested` (the drain's registered
  *   consumer edge registers the analyze job — the cross-module path).
- * - `probeArmAnalysisFailure` / `probeDisarmAnalysisFailure`: the A3
+ * - `probeArmAnalysisFailure` / `probeDisarmAnalysisFailure`: the platform
  *   failure-marker pattern over one stage sequence (the crash proofs).
  * - `probeRestartAnalysis`: restarts a failed analysis workflow from its
  *   journal, proving replay without duplicate revisions.

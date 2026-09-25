@@ -1,5 +1,5 @@
 /**
- * readCurrentFindings (C2): current knowledge without replaying the
+ * readCurrentFindings: current knowledge without replaying the
  * conversation.
  *
  * One current-findings row in its WIRE form: `value` and `knowledgeState`

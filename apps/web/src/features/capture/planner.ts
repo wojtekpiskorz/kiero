@@ -1,6 +1,6 @@
 /**
- * Pure capture planning (D4): how one logical message's attachments map
- * onto the D2 resumable-upload protocol, with NO I/O.
+ * Pure capture planning: how one logical message's attachments map
+ * onto the resumable-upload protocol, with NO I/O.
  *
  * The ONE definition of the protocol bounds is the shared pure module the
  * gateway also imports (convex/sources/uploads/protocol.ts); this planner
@@ -12,7 +12,7 @@
  *   (R2 requires every non-last part to be at least that size; a small
  *   attachment is ONE part);
  * - the prepare declaration's `parts` bound is the MAXIMUM part number any
- *   attachment may use (per-attachment numbering starts at 1 — see D2's
+ *   attachment may use (per-attachment numbering starts at 1 — see the
  *   recordPartTransaction), so the declared bound is the max over
  *   attachments, never the sum;
  * - the declared `mediaKinds` array is canonical (audio first, then one
@@ -20,7 +20,7 @@
  *   under the SAME multiset, so the client's declaration must be a pure
  *   function of the draft;
  * - resume planning subtracts the server's recorded part manifest from the
- *   plan: only missing parts travel again (the D2 resume contract).
+ *   plan: only missing parts travel again (the resume contract).
  */
 
 import { MAX_ATTACHMENTS, MIN_PART_BYTES } from "../../../../../convex/sources/uploads/protocol";

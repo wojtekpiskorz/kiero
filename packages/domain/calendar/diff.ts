@@ -1,8 +1,8 @@
 /**
- * Desired-state diffing (G2 pure): reconcile the copies one connection
+ * Desired-state diffing (pure): reconcile the copies one connection
  * ALREADY has against the desired copies its current derivation produces.
  *
- * This is the seam G3 completes against Google: every outcome here is an
+ * This is the seam reconciliation completes against Google: every outcome here is an
  * idempotent decision (create / update / withdraw / none) with a stable
  * semantic id, so a repeated pass over unchanged data produces zero
  * actions ("kolejne próby synchronizacji tego samego obiektu nie tworzą

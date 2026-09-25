@@ -1,8 +1,8 @@
 /**
- * Calendar sync transactions (G3): the write halves of the pure decision
+ * Calendar sync transactions: the write halves of the pure decision
  * cores, each inside ONE Convex mutation.
  *
- * The A3 echo template, applied per copy: `prepareCopyAttempt` decides the
+ * The echo template, applied per copy: `prepareCopyAttempt` decides the
  * ONE bounded leg and durably records the attempt with outcome `unknown`
  * BEFORE the external call runs (a crash in between honestly leaves an
  * uncertain attempt — the effect may have happened); the CLAIM on the
@@ -15,7 +15,7 @@
  * observation durably.
  *
  * Desire fields (desiredState, payload, withdrawReason) are NEVER written
- * here: G2's projection pass is their only writer. G3 owns exactly the
+ * here: the projection pass is their only writer. Reconciliation owns exactly the
  * remote ledger (googleEventId, remoteOutcome), the detected-personal-hide
  * columns (hidden/hiddenOrigin/hiddenAtMs — the same columns
  * `calendar.setCopyHidden` writes; the projection pass never touches them)
@@ -220,7 +220,7 @@ export const prepareCopyAttempt = internalMutation({
     if (connection === null) {
       return { kind: "suspend", reason: "connection_not_connected" };
     }
-    // The per-attempt stop rules (issue #47): no leg leaves the
+    // The per-attempt stop rules: no leg leaves the
     // transaction for a row whose firm is no longer the boss's active firm
     // (membership revocation) or whose connection is not healthy.
     const activeCompanyId = await earliestActiveCompanyId(ctx.db, connection.userId);
@@ -231,7 +231,7 @@ export const prepareCopyAttempt = internalMutation({
       return { kind: "suspend", reason: "connection_not_connected" };
     }
     const facts = await attemptFactsOf(ctx.db, copy);
-    // The concurrent-prepare guard (round-2 finding 1): while ONE attempt
+    // The concurrent-prepare guard: while ONE attempt
     // of this copy is open (unknown, incomplete, fresh), every other
     // prepare declines — the open attempt's own completion owns the next
     // move. This is what makes the copy-row claim below airtight: the
@@ -262,7 +262,7 @@ export const prepareCopyAttempt = internalMutation({
     // The dedup key is minted from the PERSISTED claim sequence, never
     // from a read-then-used row count: two racing prepares that both read
     // `creates: 0` would mint the same key, and Convex has no unique
-    // secondary index to reject the twin insert (round-2 finding 1).
+    // secondary index to reject the twin insert.
     const claim = nextAttemptClaim(copy.syncAttemptSeq ?? null, facts.recorded);
     const attemptDedupKey = `calendar-sync-attempt:${copy._id}:${copy.semanticId}:${leg.leg}:${claim.seq}`;
     const nowMs = Date.now();
@@ -295,7 +295,7 @@ export const prepareCopyAttempt = internalMutation({
     // same leg twice (the explicit-reconcile-vs-cron and the
     // click-per-job dispatch paths all funnel through here). Only the
     // counter is written: this is neither a desire change nor a ledger
-    // fact, and touching `updatedAtMs` would rebase the attempt's J4
+    // fact, and touching `updatedAtMs` would rebase the attempt's qualification
     // latency basis (`desiredAtMs` snapshots it at leg start).
     await ctx.db.patch(args.copyId, { syncAttemptSeq: claim.nextSeq });
     return {
@@ -324,7 +324,7 @@ export type LegResult =
 
 /**
  * The LegResult argument validator, built from the same shapes the pure
- * cores consume (G1's completeCallbackTransaction standard: no `v.any()`,
+ * cores consume (completeCallbackTransaction standard: no `v.any()`,
  * no cast — the transition and hide detection run on VALIDATED input).
  */
 const legResultValue: ValueValidator<LegResult> = v.union(
@@ -419,7 +419,7 @@ export interface CompleteCopyAttemptArgs {
 }
 
 /**
- * The completion transaction as a plain function (the D2 helper-function
+ * The completion transaction as a plain function (the helper-function
  * convention): tests/g3/operations.test.ts drives it over the in-memory db
  * to pin the desire-clock invariant above.
  */
@@ -495,7 +495,7 @@ export async function performCompleteCopyAttempt(
   // accelerates one durable observation, and so does an UNCERTAIN
   // MUTATION (an unknown/timeout after a possible success — the timeout
   // word names a bounded-deadline hit) even when the ledger word stays
-  // `unknown` — G2 initializes new copies as unknown, so the uncertain
+  // `unknown` — projection initializes new copies as unknown, so the uncertain
   // signal itself is the reconcile trigger. An uncertain OBSERVATION
   // deliberately publishes nothing: nothing was written, the mutation
   // gate already blocks on it, and publishing would let a flaky network
@@ -562,10 +562,10 @@ export const completeCopyAttempt = internalMutation({
  * Marks the connection `error/calendar_access_lost`: the dedicated
  * calendar answered 401/403/404 at its own scope, which Google documents
  * as deleted OR inaccessible — recovery is the boss's explicit RECREATE
- * decision (G1's authorization mode), never an automatic second calendar
+ * decision (the authorization mode), never an automatic second calendar
  * (docs/research/google-calendar-reconnect-facts.md).
  *
- * FLAGGED cross-lane write: the connection row is G1's table, and the
+ * FLAGGED cross-lane write: the connection row is the table, and the
  * issue's own scope sanctions exactly this transition ("404-ambiguity ->
  * calendar_access_lost + the explicit recreate path"). Only the state
  * reason columns are patched; credentials and identity stay untouched (the
@@ -634,7 +634,7 @@ export const completeReconcileJob = internalMutation({
 });
 
 // ---------------------------------------------------------------------------
-// Sync-state transitions (G3's half of the shared sync row).
+// Sync-state transitions (the half of the shared sync row).
 // ---------------------------------------------------------------------------
 
 export const beginSyncPassTransaction = internalMutation({

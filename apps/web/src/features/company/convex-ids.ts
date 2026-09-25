@@ -1,5 +1,5 @@
 /**
- * The two brandings of one id value (H1 review round 1): the contract's
+ * The two brandings of one id value: the contract's
  * `TableId<T>` brand (what decoded rows and parseTableId carry) and
  * Convex's generated `Id<T>` brand (what the generated query and mutation
  * args require). Both brand the SAME wire string; converting between them

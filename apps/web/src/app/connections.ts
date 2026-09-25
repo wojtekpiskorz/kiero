@@ -1,8 +1,8 @@
 /**
- * Client connection wiring (A4).
+ * Client connection wiring.
  *
  * Builds the TanStack Query + Convex React-Query adapter stack exactly as
- * A3 proved it (docs/evidence/platform/README.md, proof1 V8): one
+ * Proved in docs/evidence/platform/README.md (proof1 V8): one
  * `ConvexQueryClient` owning the live WebSocket subscriptions, one
  * `QueryClient` whose default `queryKeyHashFn`/`queryFn` route
  * `convexQuery(...)` options through the adapter.
@@ -10,7 +10,7 @@
  * Without a configured backend URL there is no Convex client at all: the
  * returned `convexQueryClient` is null and the host renders the
  * disconnected state. In the browser the adapter's subscription path works
- * as-is (A3 note: only Node needs the documented window shim).
+ * as-is (only Node needs the documented window shim).
  */
 
 import { QueryClient } from "@tanstack/react-query";
@@ -39,7 +39,7 @@ export function createAppConnections(config: AppConfig): AppConnections {
       queries: {
         queryKeyHashFn: convexQueryClient.hashFn(),
         queryFn: convexQueryClient.queryFn(),
-        // Convex queries are live subscriptions (A3 proof V8: reactive
+        // Convex queries are live subscriptions (platform proof V8: reactive
         // push, no invalidation), so they never go stale between pushes.
         staleTime: Infinity,
       },

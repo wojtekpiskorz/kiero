@@ -1,7 +1,7 @@
 /**
- * Web Push delivery tables (F3).
+ * Web Push delivery tables.
  *
- * Owning implementer: F3 (push transport). One row per (notification
+ * One row per (notification
  * intent, push subscription): the per-device delivery with its exact
  * payload and settled transport outcome. This is the idempotency the
  * bounded solution demands - "semantic intent plus subscription" - so a
@@ -9,11 +9,11 @@
  * `attention.intentDelivered` event can never re-send to a device that
  * already received (or terminally failed to receive) the notification.
  *
- * The push subscription table itself lives in the F2 delivery fragment
- * (`convex/attention/delivery/schema.ts`, whose header names F3 as the
- * co-owning implementer of push delivery); F3's flagged amendment there
+ * The push subscription table itself lives in the delivery fragment
+ * (`convex/attention/delivery/schema.ts`, whose header names web push as the
+ * co-owning implementer of push delivery); the flagged amendment there
  * adds the user/session/company binding. Attempt history rows stay in
- * F2's `notificationAttempts` (the shared external-attempt ledger the
+ * `notificationAttempts` (the shared external-attempt ledger the
  * schema comments assign to this lane's export read).
  *
  * Tables: pushDeliveries, pushProofDevices (proof-only).
@@ -27,9 +27,9 @@ export const pushTables = {
   /**
    * One per-device delivery of one delivered notification intent.
    * `pending` rows await or repeat a transport leg; `delivered` and
-   * `failed` are terminal; `unknown` is the echo/G3 uncertain state
+   * `failed` are terminal; `unknown` is the echo/Calendar uncertain state
    * (timeout-after-send): it blocks blind re-sends because the device
-   * may already have shown the notification. R3 (issue #128) adds the
+   * may already have shown the notification. The row also carries the
    * terminal `suppressed` state: permanent deletion (and the prepare's
    * own lifecycle preflight) terminally suppresses affected UNSENT work
    * and replaces its stored payload with non-content data. Only `pending`
@@ -66,7 +66,7 @@ export const pushTables = {
     .index("by_company_state", ["companyId", "state"]),
 
   /**
-   * PROOF-ONLY fake push service devices (F3, the G3 calendarProofEvents
+   * PROOF-ONLY fake push service devices (the calendarProofEvents
    * precedent): the guarded dev-evidence store for the browser-side half
    * of the protocol - device keypairs, auth secrets and the recorded
    * (decrypted) messages the live proof asserts on. Never read by any

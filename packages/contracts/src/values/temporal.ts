@@ -13,7 +13,7 @@
  *   precision and role: proposed / internal / agreed / actual.
  * - Ranges keep justified bounds; an open bound stays open (encoded `null`).
  *
- * Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
+ * Certified by platform on 2026-09-09 (docs/implementation/contracts/README.md).
  */
 
 import { Schema } from "effect";
@@ -108,7 +108,7 @@ const boundsInOrder = (value: RangeBounds): value is RangeBounds =>
  * the other variants so `TemporalValue.shape` is uniformly discriminable on
  * `_tag` (day | month | year | date_time | range).
  *
- * Cross-precision bound ordering (A3 certification, resolving the A2
+ * Cross-precision bound ordering (platform certification, resolving the
  * deferral): when both bounds are present, the start's period must not begin
  * after the end's period. Comparison is by period START, so
  * start=2026-05-10/end=2026-05 is rejected (the month begins before the

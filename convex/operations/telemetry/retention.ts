@@ -1,5 +1,5 @@
 /**
- * The retention windowing model (I2).
+ * The retention windowing model.
  *
  * PURE MODULE. The accepted window for redacted technical events is 30 days
  * ("Thirty-day retention applies to diagnostics actually ingested"). The

@@ -1,17 +1,17 @@
 /**
- * The barebones GM processing feature (H4): the audited processing
+ * The barebones GM processing feature: the audited processing
  * inspector and the GM retry controls; inspection of one processing run
  * (canonical stages, attempts with the approved model route, versions,
- * derived changes, I2 redacted diagnostics, derived blockers), failed-stage
+ * derived changes, redacted diagnostics, derived blockers), failed-stage
  * retry that preserves run identity, and deliberate reanalysis as a linked
  * new run; all through the checked dispatch entry
- * (convex/operations/processing/functions.ts) under B4's explicit GM mode.
+ * (convex/operations/processing/functions.ts) under the explicit GM mode.
  *
  * JSX-free on purpose (createElement only): the host feature registry
  * chain is imported by the node test programs, which compile without a JSX
  * flag. No styling, semantic controls only (the UX/UI track owns
  * presentation); the active GM mode is visually unmistakable; a persistent
- * banner heading rendered before every other section (B4's banner copy).
+ * banner heading rendered before every other section (the banner copy).
  *
  * This surface deliberately issues NO source-read marking and NO usage
  * mutation: inspection changes boss authorship, read state and alpha
@@ -134,7 +134,7 @@ function ConvexConnectedRoot({ convexUrl }: { readonly convexUrl: string }): Rea
   });
 }
 
-/** Authentication gate: B1's shared sign-in surface; the operator continues here. */
+/** Authentication gate: the shared sign-in surface; the operator continues here. */
 function ProcessingGate(): ReactNode {
   return createElement(AuthenticatedGate, { continuation: () => createElement(GmProcessingSurface) });
 }
@@ -407,7 +407,7 @@ function ActiveGmProcessingSurface({
   return createElement(
     "section",
     null,
-    // The unmistakable banner: B4's GM-mode identification contract.
+    // The unmistakable banner: the GM-mode identification contract.
     createElement(
       "header",
       { role: "banner" },

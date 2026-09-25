@@ -1,9 +1,9 @@
 /**
- * The scope re-assessment marking of one project reassignment (E7, issue
- * #115): the memory-side reaction C5's durable executor invokes for the
+ * The scope re-assessment marking of one project reassignment (
+ * #115): the memory-side reaction the durable executor invokes for the
  * `source_reassigned` cause; the reassignment twin of
  * `markWithdrawnSupport` (./withdrawal.ts), living in the memory lane it
- * writes (review round 1 moved it from the sources lane: it touches only
+ * writes (moved it from the sources lane: it touches only
  * findings, findingRevisions and `memory.findingRevised`, and its commit
  * loop is the ONE shared marking-commit core, ./marking.ts).
  *
@@ -11,7 +11,7 @@
  * stays `active`, its evidence still witnesses what it witnessed. What the
  * link change invalidates is the SCOPE of findings whose placement in a
  * project conversation rested on the source's link to that project. Per
- * C5's rules ("A correction to one fragment or project assignment narrows
+ * the rules ("A correction to one fragment or project assignment narrows
  * the affected graph"):
  *
  * - only findings scoped to a project that is NO LONGER linked are
@@ -28,7 +28,7 @@
  *   knowledge state becomes updating-until-revalidated (visible, excluded
  *   from automation, never discarded), full history stays intact;
  * - the marked findings' linked re-analysis is registered by the executor
- *   through E3's seam (a re-analysis reads the source's CURRENT links and
+ *   through the seam (a re-analysis reads the source's CURRENT links and
  *   re-derives placement), so revalidation replaces the marking.
  *
  * The candidates are located through two bounded, indexed walks: the
@@ -41,8 +41,8 @@
  * every level in its own bounded transaction.
  *
  * The pure decision ({@link decideScopeReassessment}) lives here beside
- * the core so tests prove it without a deployment (the C5 precedent);
- * review round 1 folded the WHOLE narrowing rule into it (scope kind,
+ * the core so tests prove it without a deployment; it holds the WHOLE
+ * narrowing rule (scope kind,
  * scope project and the source's current links are its inputs), so the
  * branch that runs in production is exactly the branch the unit tests
  * prove. This module is the transactional core.
@@ -120,7 +120,7 @@ export type ScopeReassessmentDecision =
     };
 
 /**
- * The WHOLE narrowing rule in one place (review round 1: the caller's
+ * The WHOLE narrowing rule in one place (the caller's
  * pre-filter and the decision's `scope_still_linked` branch were two
  * halves of one rule, the second unreachable in production).
  */
@@ -193,7 +193,7 @@ export function scopeUpdatingReason(sourceId: Id<"sources">): string {
  * transaction: every marking (revision + projection patch) and its
  * `memory.findingRevised` event commit together with everything else, or
  * not at all. Everything that can refuse runs before the first write.
- * Returns the typed marking outcome (review round 1: the ok payload is
+ * Returns the typed marking outcome (the ok payload is
  * typed, the executor re-asserts nothing).
  */
 export async function markReassignedScope(

@@ -1,5 +1,5 @@
 /**
- * The gateway heartbeat (I2): the external prober role in backend-silence
+ * The gateway heartbeat: the external prober role in backend-silence
  * detection.
  *
  * The Worker cron trigger (`scheduled` in the entry, configured by the
@@ -13,7 +13,7 @@
  * - Sink-side: the monitor alerts when heartbeat EVENTS stop arriving at
  *   the observability sink - a condition Convex can never report itself.
  *
- * ONE emission point per signal (round-1 repair): the heartbeat endpoint's
+ * ONE emission point per signal: the heartbeat endpoint's
  * `recordHeartbeat` emits the single `ops.health.heartbeat` event (it is
  * the only sink path for non-gateway probers too); the gateway client only
  * records the ledger row and never emits a second event for the same ping.

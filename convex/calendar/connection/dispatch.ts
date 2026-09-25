@@ -1,7 +1,7 @@
 /**
- * Calendar connection command dispatch wiring (G1): the SAME checked path
- * A3 proved and B1/B3/D1 reuse, with this lane's handler registry and
- * policy.
+ * Calendar connection command dispatch wiring: the SAME checked path
+ * the platform proved and identity, membership and sources reuse, with this
+ * lane's handler registry and policy.
  *
  * The registry implements exactly the two certified calendar connection
  * operations (packages/contracts/src/modules/calendar.ts):
@@ -16,7 +16,7 @@
  *   stop publishing, record unconfirmed cleanup) with a tenant-checked
  *   connection id (a foreign row is not_found, no existence leak).
  *
- * Everything resolves through B1's identity source (provision-or-refresh,
+ * Everything resolves through the identity source (provision-or-refresh,
  * then the canonical user -> earliest active membership -> company chain),
  * so a revoked membership fails `unauthenticated` before any handler runs.
  */
@@ -32,7 +32,7 @@ import { performConnectCalendar, performDisconnectCalendar } from "./operations"
 export const connectCalendarEntry = calendarOperations["calendar.connectCalendar"];
 export const disconnectCalendarEntry = calendarOperations["calendar.disconnectCalendar"];
 
-/** G1's registered policy: the certified membership semantics, unchanged. */
+/** the registered policy: the certified membership semantics, unchanged. */
 export const calendarLanePolicy: AccessPolicy = {
   policyId: "calendar.g1-connection-v1",
   authorize: async (context, request) => {
@@ -64,8 +64,8 @@ export function calendarHandlers(): HandlerRegistry<MutationCtx> {
 
 /**
  * Dispatches one calendar connection command envelope inside ONE mutation
- * transaction, through the checked path with B1's identity source and the
- * G1 policy. Unimplemented operations fail closed `unsupported`.
+ * transaction, through the checked path with the identity source and the
+ * connection policy. Unimplemented operations fail closed `unsupported`.
  */
 export async function dispatchCalendarCommand(
   ctx: MutationCtx,

@@ -12,9 +12,10 @@
  *
  * Omission in a patch means "no change". Clearing, withdrawal and conflict
  * are explicit operations with their own provenance: an arbitrary model
- * `null` never erases a fact. Certified by A3 on 2026-09-09 (docs/implementation/contracts/README.md).
+ * `null` never erases a fact. Certified by platform on 2026-09-09
+ * (docs/implementation/contracts/README.md).
  *
- * C5 amendment (issue #28, additive, flagged on the B3 precedent): the
+ * The
  * `updating` variant is the "updating until revalidated" state the
  * architecture's processing protocol names for dependent inferred
  * conclusions after their basis moved (withdrawal or correction): the value

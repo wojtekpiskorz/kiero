@@ -1,5 +1,5 @@
 /**
- * The staged plan's shared vocabulary (C2): the row shape the
+ * The staged plan's shared vocabulary: the row shape the
  * publicationGroups table stores between prepare and publish, and the pure
  * conversions between that shape and the checks from @kiero/domain.
  *

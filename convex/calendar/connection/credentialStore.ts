@@ -1,5 +1,5 @@
 /**
- * Calendar credential storage (G1): the at-rest home of the Google tokens.
+ * Calendar credential storage: the at-rest home of the Google tokens.
  *
  * Convex has no built-in per-field encryption, so this module implements
  * AES-256-GCM envelope encryption with a deployment-held key: the key lives

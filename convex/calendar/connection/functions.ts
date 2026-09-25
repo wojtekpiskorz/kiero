@@ -1,7 +1,7 @@
 /**
- * The G1 Convex function surface (generated-call APIs).
+ * The Calendar connection Convex function surface (generated-call APIs).
  *
- * The status read and the typed command dispatch follow the B1/B3 pattern
+ * The status read and the typed command dispatch follow the pattern
  * (generated API + canonical resolution). The OAuth START has two
  * identity-verified entries over ONE implementation (`performStartAuthorization`
  * in ./operations.ts): the HTTP boundary (`POST /calendar/oauth/start`,
@@ -11,7 +11,7 @@
  * `CONVEX_SITE_URL`). Both resolve the user/company scope through the SAME
  * canonical chain and never trust a client-supplied redirect.
  *
- * `refreshCredentials` is the credential capability G2/G3 consume: ONE
+ * `refreshCredentials` is the credential capability projection and reconciliation consume: ONE
  * bounded refresh attempt with the echo uncertainty semantics (never a
  * retry loop), returning the typed outcome for the caller's own
  * reconciliation decisions.
@@ -132,7 +132,7 @@ export const startAuthorization = mutation({
     }
     const resolved = await resolveSubjectScope(ctx.db, identity.subject, Date.now());
     if (resolved === null) {
-      // Sign-in alone never confers a company scope (the B3 rule).
+      // Sign-in alone never confers a company scope (the rule).
       return errorResult(forbiddenError("no_company_scope", "company"));
     }
     const config = calendarOAuthConfig(process.env);
@@ -169,7 +169,7 @@ export const startAuthorization = mutation({
 // Status (the barebones UI read).
 // ---------------------------------------------------------------------------
 
-/** The typed connection state G2/G3 and the Polish screen consume. */
+/** The typed connection state projection, reconciliation and the Polish screen consume. */
 export interface CalendarConnectionStatus {
   readonly state: "unavailable_no_company" | "pending_authorization" | "connected" | "disconnected" | "error";
   /** The row id (null before any connection ever existed). */
@@ -199,13 +199,13 @@ export interface CalendarConnectionStatus {
  * `unavailable_no_company` — sign-in and identity are never this table's
  * business (disconnect leaves every login method untouched).
  *
- * Membership re-check (issue #45: membership loss follows the stop/cleanup
+ * Membership re-check (membership loss follows the stop/cleanup
  * path): a row whose firm is no longer the actor's active firm reads as
  * the honest membership-lost STOP even before any write persists it — no
  * credential capability, no stale binding data, reconnect offered (the
  * restart re-scopes the row to the actor's current firm). The durable
  * stop lands on the next persisting operation (refresh, callback,
- * dispatch); the event-driven fan-out from B3's revocation is a named
+ * dispatch); the event-driven fan-out from the revocation is a named
  * prerequisite on the access lane.
  */
 export const calendarStatus = query({
@@ -340,7 +340,7 @@ export const dispatchCalendar = mutation({
 });
 
 // ---------------------------------------------------------------------------
-// Credential capability (G2/G3 consumer surface).
+// Credential capability (projection/reconciliation consumer surface).
 // ---------------------------------------------------------------------------
 
 /** One refresh attempt's typed result for the projection/reconciliation lanes. */
@@ -360,14 +360,14 @@ export interface RefreshResult {
  * connected row whose firm is no longer the user's active firm is STOPPED
  * here (credentials cleared, unconfirmed cleanup recorded, the
  * `calendar.disconnected` event published) and answers `membership_lost` —
- * G2 must treat that as "stop publishing; the user reconnects for their
+ * Projection must treat that as "stop publishing; the user reconnects for their
  * current firm".
  *
  * Uncertain outcomes are reported and recorded (updatedAtMs only) — never
  * retried here; a definite invalid_grant marks the connection
- * `error/refresh_failed` (the documented >1-week Testing-mode shape). G2
+ * `error/refresh_failed` (the documented >1-week Testing-mode shape). Projection
  * must treat `unknown` as "do not publish, do not retry blindly" and hand
- * the decision to reconciliation (G3).
+ * the decision to reconciliation.
  */
 export const refreshCredentials = internalAction({
   args: { connectionId: v.string() },
@@ -379,7 +379,7 @@ export const refreshCredentials = internalAction({
     if (loaded === null) {
       return { outcome: "no_connection" };
     }
-    // The revocation path (issue #45: membership loss follows the
+    // The revocation path (membership loss follows the
     // stop/cleanup path): the row's firm must still be the user's active
     // firm, or the connection stops before any Google leg runs.
     if (loaded.activeCompanyId === null || loaded.activeCompanyId !== loaded.companyId) {

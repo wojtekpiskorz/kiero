@@ -1,5 +1,5 @@
 /**
- * The chat adapter over two transports (E2; split by E8): DIRECT DeepSeek
+ * The chat adapter over two transports: DIRECT DeepSeek
  * for the primary chat/vision position, the pinned
  * `@tanstack/ai-openrouter` adapter for the authorized fallback positions.
  *
@@ -29,7 +29,7 @@
  * anything is returned. Structured output requests pin schema-constrained
  * generation on BOTH transports — strict `json_schema` through OpenRouter,
  * `text.format json_schema` through the direct Responses wire — converted
- * through the A3 runtime's `toolJsonSchemaForStructuredOutput` (the proved
+ * through the runtime's `toolJsonSchemaForStructuredOutput` (the proved
  * conversion path; tool input schemas use `toolJsonSchema`). Provider
  * output that does not decode fails closed — it never falls back to
  * another model (see ./failures.ts).
@@ -79,8 +79,8 @@ export interface OpenRouterCredentials {
 
 /**
  * The server-held OpenRouter key from the environment; presence only, never
- * its value. E5 append (flagged coordinated change): the canonical reader;
- * the copies in D6's audio executor, E3's analyze and the ai dispatch are
+ * its value. The canonical reader;
+ * the copies in the audio executor, the analyze and the ai dispatch are
  * proposed follow-ups for their own lanes.
  */
 export function openRouterCredentialsFromEnv(): OpenRouterCredentials | null {
@@ -92,7 +92,7 @@ export function openRouterCredentialsFromEnv(): OpenRouterCredentials | null {
 }
 
 /**
- * Credentials for the chat/vision roles after the E8 split. The OpenRouter
+ * Credentials for the chat/vision roles after the split. The OpenRouter
  * key stays in its legacy position (it serves the authorized fallback
  * positions AND the retained STT/embeddings roles, so every existing wiring
  * site keeps working unchanged); the direct DeepSeek key rides along when
@@ -165,11 +165,11 @@ export type ChatMessagePart =
 
 /**
  * One declared tool. The input codec is an Effect Schema contract: it is
- * converted to the JSON Schema the provider receives (A3 `toolJsonSchema`)
+ * converted to the JSON Schema the provider receives (platform `toolJsonSchema`)
  * and every returned argument object is decoded through it before the caller
  * can consume the call. The provider never receives an execute function;
  * executing a checked domain operation from tool arguments is the consumer's
- * (E3+/E6) responsibility through the same dispatch every other command uses.
+ *  responsibility through the same dispatch every other command uses.
  */
 export interface ChatToolSpec<I = unknown> {
   readonly name: string;
@@ -206,7 +206,7 @@ export interface ChatRequest {
 /**
  * The structured chat request: the same turn plus a REQUIRED output codec,
  * in the style of `ChatToolSpec<I>`. The request pins schema-constrained
- * generation converted from this codec (A3 `toolJsonSchemaForStructuredOutput`)
+ * generation converted from this codec (platform `toolJsonSchemaForStructuredOutput`)
  * and the completion text must decode through it. With tools declared, the
  * model may still answer with tool calls, so the value type is
  * `Output | ChatTurnResult`.
@@ -543,7 +543,7 @@ async function deepSeekChatAttempt(
 /**
  * Runs ONE OpenRouter chat attempt against one model through the pinned
  * TanStack adapter: pure request mapping over the shared bounded-attempt
- * skeleton. Unchanged from E2 apart from the provider-qualified call
+ * skeleton. Unchanged apart from the provider-qualified call
  * shape; it now serves the authorized fallback positions.
  */
 async function openRouterChatAttempt(
@@ -593,13 +593,13 @@ async function openRouterChatAttempt(
       abortController: abort,
       // Silent logger: the adapter's default logs provider chunks and raw
       // tool arguments on error; diagnostics stay closed unless explicitly
-      // opened by an operations owner (I2).
+      // opened by an operations owner.
       logger: resolveDebugOption(false),
       modelOptions: {
         // Capability-aware routing: exclude providers that do not support
         // the parameters this request uses (schema/tools).
         //
-        // Recorded live finding (E2 probes, 2026-09-09): sending
+        // Recorded live finding (provider probes, 2026-09-09): sending
         // `maxCompletionTokens` together with `requireParameters: true`
         // excluded EVERY GLM endpoint ("No endpoints found that can handle
         // the requested parameters"), so this adapter never sends an output
@@ -619,7 +619,7 @@ async function openRouterChatAttempt(
  * on the target's supplier. A `deepseek` target without a resolvable direct
  * credential fails TERMINALLY as `unauthenticated`: a missing primary key
  * is a configuration problem that must surface, never a silent reroute to
- * the OpenRouter fallback (routing decision record, E8 amendment).
+ * the OpenRouter fallback (routing decision record).
  */
 export async function chatAttempt(
   credentials: ChatTurnCredentials,

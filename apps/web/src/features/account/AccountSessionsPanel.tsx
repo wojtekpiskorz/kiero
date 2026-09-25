@@ -1,8 +1,8 @@
 /**
- * The device-session panel of the account feature (B2): the multi-device
- * session view over B1's registry (`listMySessions`, with its honest
- * upstream states), per-device revocation through B1's live-session
- * operation, and "revoke every OTHER device" through the B2 loop over the
+ * The device-session panel of the account feature: the multi-device
+ * session view over the registry (`listMySessions`, with its honest
+ * upstream states), per-device revocation through the live-session
+ * operation, and "revoke every OTHER device" through the loop over the
  * same canonical core. Every label renders from ./state.ts
  * (`accountCopy` — the single copy home).
  */

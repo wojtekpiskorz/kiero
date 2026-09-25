@@ -1,11 +1,11 @@
 /**
- * Gateway export download route (I3): the authorized, bounded-streaming
+ * Gateway export download route: the authorized, bounded-streaming
  * archive read surface, ONE parameterized GET route:
  *
  *   GET /exports/<exportId>/download
  *
  * Every request — full, ranged, conditional — follows ONE checked path (the
- * D3 media-route discipline): browser credential -> `/operations/exports/
+ * media-route discipline): browser credential -> `/operations/exports/
  * access` on Convex (live session, active membership, CURRENT
  * administrator, tenant scope, lifecycle window, linked-source purge check;
  * the uniform not-found discloses nothing) -> the ledger grant (object key,

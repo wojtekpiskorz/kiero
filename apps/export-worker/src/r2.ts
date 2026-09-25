@@ -1,7 +1,7 @@
 /**
- * Bucket plumbing for the export worker (I3): the ZIP writer's multipart
+ * Bucket plumbing for the export worker: the ZIP writer's multipart
  * sink, the media read and the archive delete, ALL through the S3-compatible
- * endpoint with the media bucket token (the I1 environment contract:
+ * endpoint with the media bucket token (the environment contract:
  * export workers hold no R2 binding and no backup credentials; see
  * infra/bindings/media-export-workers.md).
  *

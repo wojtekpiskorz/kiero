@@ -1,9 +1,9 @@
 /**
- * Search feature state (H3): Polish copy, the coverage disclosure
+ * Search feature state: Polish copy, the coverage disclosure
  * vocabulary and the closed-error hints for the search surface.
  *
  * The coverage literal is displayed VERBATIM ("full" | "text_only" |
- * "degraded", the E5 contract) beside its Polish explanation, because the
+ * "degraded", the contract) beside its Polish explanation, because the
  * issue pins that semantic-gap disclosure: `text_only` and `degraded` say
  * plainly that absence of a hit is not absence of a fact. Label maps are
  * TYPED by the contract's literal unions so a vocabulary change fails the
@@ -38,7 +38,7 @@ export const searchCopy = {
   dateHint: "Zakres dnia rozumiany jest od początku dnia od do końca dnia do.",
   submitButton: "Szukaj",
   searching: "Szukanie…",
-  // Coverage disclosure (the E5 contract literal, shown verbatim)
+  // Coverage disclosure (the contract literal, shown verbatim)
   coverageLabel: "Tryb wyszukiwania",
   coverageLabels: {
     full: "pełne (tekst i semantyka)",
@@ -80,7 +80,7 @@ export const searchCopy = {
 // Coverage rendering (the verbatim literal + the honest note)
 // ---------------------------------------------------------------------------
 
-/** The coverage literal E5 declares (typed pin: a new literal fails build). */
+/** The coverage literal the search backend declares (typed pin: a new literal fails build). */
 export type CoverageLiteral = "full" | "text_only" | "degraded";
 
 /** The coverage line: the verbatim literal plus its Polish explanation. */

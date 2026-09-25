@@ -1,5 +1,5 @@
 /**
- * The extension value recording and correction sections (H2).
+ * The extension value recording and correction sections.
  *
  * Recording one value is deliberately the full evidence-backed path, not a
  * free write: the boss's statement first becomes a REAL accepted source
@@ -7,7 +7,7 @@
  * the SAME one-key loop the conversation rides, so a lost-response resubmit
  * converges on one source), then ONE staged change set carries the typed
  * value with that source as its evidence witness, and the publish commits
- * atomically. Corrections ride C2's audited command with the revision the
+ * atomically. Corrections ride the audited command with the revision the
  * boss actually saw.
  *
  * JSX-free (createElement only), node-importable like the rest.

@@ -1,12 +1,12 @@
 /**
- * Task state rules (C4 domain half, pure).
+ * Task state rules (domain half, pure).
  *
  * Vocabulary ("Stan zadania", CONTEXT.md): Do zrobienia, W toku, Czeka,
  * Wykonane, Anulowane. The machine tokens come from the certified contract
  * surface (`TaskState` in @kiero/contracts); this module owns their Polish
  * rendering and every rule over them.
  *
- * Rules encoded here (issue 9, "Checklista i niezależne zakończenie
+ * Rules encoded here ("Checklista i niezależne zakończenie
  * zadania"):
  *
  * - "Czeka" is a KNOWN obstacle with a SAVED reason: entering it without a

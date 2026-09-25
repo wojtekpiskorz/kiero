@@ -1,8 +1,8 @@
 /**
- * Memory feature state (H1): Polish copy, the wire-value renderers for
+ * Memory feature state: Polish copy, the wire-value renderers for
  * finding rows, and the memory-specific error hints for the memory surface.
  *
- * Split from the conversation feature's state in review round 1: the copy,
+ * Split from the conversation feature's state: the copy,
  * renderers and hints here serve only "Pamięć", so the feature owns them
  * like every other feature owns its state. The renderers decode the
  * ENCODED (wire) forms the public reads carry through the exported
@@ -14,7 +14,7 @@
  * `not_specified` tax basis stays visible, and a conflicted or updating
  * finding can never read as settled.
  *
- * C5's `updating` knowledge state ("wymaga ponownego potwierdzenia —
+ * `updating` knowledge state ("wymaga ponownego potwierdzenia —
  * podstawa się zmieniła") is rendered here with its reason: such a finding
  * is visibly NOT a settled fact and blocks affected automation.
  *
@@ -51,7 +51,7 @@ export const memoryCopy = {
   intro:
     "Aktualne ustalenia odczytane bez powtórnego czytania rozmowy. Każde ustalenie ma swoje źródło i historię zmian.",
   // The session-checking label every company surface renders while a gated
-  // query resolves (NOT the sign-in-code copy; review round 1's drift fix).
+  // query resolves (NOT the sign-in-code copy).
   checkingSession: "Sprawdzamy Twoją sesję…",
   scopeLabel: "Zakres pamięci",
   scopeCompany: "Firma",
@@ -66,10 +66,10 @@ export const memoryCopy = {
     publication: "publikacja z wiadomości",
     correction: "korekta",
     withdrawal_marking: "oznaczenie po wycofaniu źródła",
-    // E7 amendment (additive, flagged): a project reassignment's scope
+    // A project reassignment's scope
     // re-assessment marking, rendered honestly (never as a withdrawal).
     reassignment_marking: "oznaczenie po przypisaniu źródła do innych projektów",
-    // I4 amendment (additive, flagged, the E7 precedent): a permanent
+    // A permanent
     // deletion's support-removal marking.
     purge_marking: "oznaczenie po trwałym usunięciu źródła",
   } as const,
@@ -86,7 +86,7 @@ export const memoryCopy = {
   evidenceWholeSource: "cała wiadomość",
   noEvidence: "Brak dowodów źródłowych przy tej rewizji.",
   sourceLinkLabel: "wiadomość źródłowa",
-  // Direct correction (C2's audited command)
+  // Direct correction (the audited command)
   correctButton: "Korekta bezpośrednia",
   correctHeading: "Korekta bezpośrednia ustalenia",
   correctIntro:
@@ -212,7 +212,7 @@ export function findingValueLabel(value: unknown): string {
 
 /**
  * Renders one finding's knowledge state; the wire form decodes through the
- * contract's `KnowledgeState` first. `conflicted` and `updating` (C5) are
+ * contract's `KnowledgeState` first. `conflicted` and `updating` are
  * the two states that must never read as settled facts — their labels say
  * so explicitly, with the recorded reason.
  */

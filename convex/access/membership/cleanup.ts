@@ -1,8 +1,8 @@
 /**
- * The access-revocation cleanup executor (B3): `access.cleanup_revocation`.
+ * The access-revocation cleanup executor: `access.cleanup_revocation`.
  *
  * This is the declared durable consumer of `access.membershipRevoked` and
- * `access.sessionRevoked` (the registry edges from A2/A3): revocation ends
+ * `access.sessionRevoked` (the registry edges): revocation ends
  * current access IMMEDIATELY and structurally — the canonical resolution
  * re-reads the membership/session rows on every request — while this
  * executor performs the follow-up fan-out that cannot belong to any single
@@ -11,11 +11,11 @@
  * - membership revocation: the removed boss's device sessions are revoked
  *   on the app registry, so even identity-layer reads reflect the removal
  *   and a still-valid upstream token stops resolving. Their person row,
- *   authorship and audit history are untouched (issue #22).
- * - session revocation (B1's own event): the registry row was already
+ *   authorship and audit history are untouched.
+ * - session revocation (its own event): the registry row was already
  *   revoked by the revoking mutation itself; the executor records that the
  *   consumer edge observed it — no derived access existed to purge yet
- *   (media/file caches belong to D3, push to F3; they recheck current
+ *   (media/file caches belong to media reads, push to web push; they recheck current
  *   authorization on every request rather than trusting cleanup).
  *
  * Every consumer checks current authorization independently of this job's
@@ -44,7 +44,7 @@ export const cleanupRevocationExecutor: JobExecutor = {
         return { outcome: "failed", errorKind: "membership_id_missing", retryable: false };
       }
       // normalizeId is the proved bridge between branded contract ids and
-      // Convex ids (A3); a malformed id is a hard failure, never retried.
+      // Convex ids; a malformed id is a hard failure, never retried.
       const membershipId = ctx.db.normalizeId("memberships", input.membershipId);
       if (membershipId === null) {
         return { outcome: "failed", errorKind: "membership_id_malformed", retryable: false };

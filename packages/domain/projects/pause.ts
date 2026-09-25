@@ -1,5 +1,5 @@
 /**
- * Project pause rules (C1 domain half, pure).
+ * Project pause rules (domain half, pure).
  *
  * Vocabulary ("Wstrzymanie projektu", CONTEXT.md): a temporary break in work
  * with a stated reason and an optional proposed resume date. It is SEPARATE

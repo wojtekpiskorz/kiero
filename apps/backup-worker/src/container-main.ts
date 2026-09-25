@@ -1,6 +1,6 @@
 /**
- * The EU container's own HTTP entry (I5): a zero-dependency Node server the
- * Dockerfile starts on $PORT (the D6 container-main pattern). Cloudflare
+ * The EU container's own HTTP entry: a zero-dependency Node server the
+ * Dockerfile starts on $PORT (the container-main pattern). Cloudflare
  * Containers proxy HTTP to this process through the app's Durable Object,
  * and the protocol it serves is the ONE shared handler
  * (./backup-service.ts) with the REAL deps built from the container env

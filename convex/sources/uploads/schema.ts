@@ -1,9 +1,5 @@
 /**
- * Upload and retained-media tables (A2 candidate, certified by A3;
- * completed by D2 for resumable uploads and the acceptance gate).
- *
- * Owning implementers: D2 (resumable uploads and atomic acceptance),
- * D5 (photo normalization and retained representations), D3 (range reads).
+ * Upload and retained-media tables.
  *
  * A source is accepted only after all required attachments are durable;
  * finalized objects cannot be overwritten by stale retries (server-owned
@@ -12,8 +8,8 @@
  * verified, and is kept on unsupported conversion, failure or unresolved
  * quality.
  *
- * D2 amendments (the owning lane completes the candidate fragment; every
- * added column is OPTIONAL so D1's text-only seed fixtures stay valid):
+ * Notes (the owning lane completes the candidate fragment; every
+ * added column is OPTIONAL so the text-only seed fixtures stay valid):
  *
  * - `uploads.draftId/attachmentCount/declaredKinds/declaredParts`: the
  *   client's stable draft identity and its declaration (media kinds and the
@@ -22,7 +18,7 @@
  * - `uploads.lastActivityAtMs`: the reconciliation grace anchor. Every
  *   protocol step (begin, part, complete, finalize, acceptance) refreshes
  *   it, so a delayed legitimate retry is never garbage-collected.
- * - `uploads.acceptedSourceId`: set inside the D1 acceptance transaction
+ * - `uploads.acceptedSourceId`: set inside the acceptance transaction
  *   (with the attachments' `sourceId`), atomically with the source. An
  *   accepted upload is never collected by orphan reconciliation.
  * - `uploads.orphanedAtMs`: when reconciliation marked the upload orphaned.
@@ -34,7 +30,7 @@
  *
  * Vocabulary (architecture protocol step 2): browser chunks are the client's
  * slicing concern; R2 parts are the multipart identities this ledger
- * records; media segments are D6's processing units over accepted audio.
+ * records; media segments are the processing units over accepted audio.
  *
  * Tables: uploads, attachments, mediaRepresentations.
  */
@@ -117,7 +113,7 @@ export const uploadsTables = {
     /**
      * Canonical JSON part manifest, ascending by partNumber:
      * [{partNumber, etag, bytes, sha256Hex, receivedAtMs}]. R2 parts, not
-     * browser chunks (client slicing) and not media segments (D6).
+     * browser chunks (client slicing) and not media segments.
      */
     partsJson: v.optional(v.string()),
     /** Durable R2 completion + readability verification time (gateway-verified). */
@@ -143,25 +139,24 @@ export const uploadsTables = {
     verifiedAtMs: v.optional(shared.tsMs),
     createdAtMs: shared.tsMs,
     /**
-     * D5 amendment (the fragment's "+D5" ownership in the contracts
-     * manifest): object size in bytes of this representation's R2 object.
+     * Object size in bytes of this representation's R2 object.
      */
     bytes: v.optional(v.float64()),
-    /** D5: the representation's content type (e.g. `image/webp`). */
+    /** The representation's content type (e.g. `image/webp`). */
     mimeType: v.optional(v.string()),
     /**
-     * D5: present once the temporary received bytes were removed AFTER the
+     * Present once the temporary received bytes were removed AFTER the
      * retained representation verified durable (the row stays as the
      * provenance record of what was received).
      */
     removedAtMs: v.optional(shared.tsMs),
     /**
-     * D5: the typed honest outcome that kept the RECEIVED original as the
+     * The typed honest outcome that kept the RECEIVED original as the
      * retained representation (the CONTEXT.md exception). Closed vocabulary
      * owned by convex/processing/images/protocol.ts (pinned at runtime by
      * tests/d5, the fragments.test.ts pattern for fragment-local unions).
      */
-    // R24: the executor's HTTP status on conversion_failed (entitlement and
+    // The executor's HTTP status on conversion_failed (entitlement and
     // decode failures become distinguishable in the durable record).
     exceptionFailureStatus: v.optional(v.number()),
     exceptionKind: v.optional(

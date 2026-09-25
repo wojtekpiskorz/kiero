@@ -1,9 +1,9 @@
 /**
- * The export channel's wire schemas (I3): the Effect-Schema definitions the
+ * The export channel's wire schemas: the Effect-Schema definitions the
  * Convex boundary and the gateway route decode against. They live beside
  * the pure protocol (./protocol.ts) so the worker container's zero-dependency
  * half can import the constants and helpers WITHOUT pulling `effect` into
- * the container image (the D6 zero-dependency ruling, applied to exports).
+ * the container image (the zero-dependency ruling, applied to exports).
  */
 
 import { Schema } from "effect";

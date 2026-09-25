@@ -1,5 +1,5 @@
 /**
- * Server-owned provider routing configuration (E2; amended by E8).
+ * Server-owned provider routing configuration.
  *
  * The accepted routing per role is application configuration, exactly as
  * selected in the routing decision record
@@ -11,13 +11,13 @@
  * - images: DIRECT DeepSeek `deepseek-flash` (native vision) -> the same two
  *   OpenRouter vision-capable models
  * - speech-to-text: OpenRouter `microsoft/mai-transcribe-2` with
- *   `openai/whisper-large-v3` as the designated backup (retained by the E8
+ *   `openai/whisper-large-v3` as the designated backup (retained by the provider-split
  *   owner decision; STT routing differs from chat)
  * - embeddings: OpenRouter `qwen/qwen3-embedding-8b`, native 4096 dimensions
- *   as the versioned initial proof baseline (retained by the E8 owner
+ *   as the versioned initial proof baseline (retained by the owner
  *   decision)
  *
- * E8 amendment (issue #170, owner decision recorded 2026-09-14): direct
+ * Direct
  * DeepSeek serves chat and vision; OpenRouter is EXPLICITLY AUTHORIZED as the
  * chat/vision FALLBACK provider. A duplicated Flash alias through OpenRouter
  * does not count as an independent fallback, so the former
@@ -40,7 +40,7 @@
 export const ROUTING_CONFIG_VERSION = "e8.0" as const;
 
 /**
- * The two AI suppliers after the E8 split. `deepseek` is the direct DeepSeek
+ * The two AI suppliers after the split. `deepseek` is the direct DeepSeek
  * API (https://api.deepseek.com, DEEPSEEK_API_KEY); `openrouter` is the
  * retained OpenRouter integration (OPENROUTER_API_KEY) serving STT,
  * embeddings and the authorized chat/vision fallback positions.
@@ -89,7 +89,7 @@ export const CHAT_MODEL_ORDER = [
 
 /**
  * Image-extraction order: direct DeepSeek first (native V4.1 Flash vision),
- * then the two vision-capable OpenRouter models. The E2 text-only DeepSeek
+ * then the two vision-capable OpenRouter models. The text-only DeepSeek
  * exclusion is obsolete for the direct model; the removed OpenRouter slug
  * stays excluded (text-only AND a duplicated Flash alias).
  */
@@ -145,7 +145,7 @@ export interface ModelRoute {
   readonly order: readonly [RouteTarget, ...RouteTarget[]];
 }
 
-/** The frozen routing table keyed by the A2 contract route ids. */
+/** The frozen routing table keyed by the contract route ids. */
 export const PROVIDER_ROUTING = {
   chat_analysis: { order: CHAT_MODEL_ORDER },
   vision_extraction: { order: VISION_MODEL_ORDER },

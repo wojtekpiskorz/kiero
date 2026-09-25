@@ -1,7 +1,7 @@
 /**
- * @kiero/export-worker: the EU export Container executor entry (I3).
+ * @kiero/export-worker: the EU export Container executor entry.
  *
- * Thin by design (the D6 media-worker discipline): the whole protocol —
+ * Thin by design (the media-worker discipline): the whole protocol —
  * the service bearer guard, the Convex build-channel client, the streaming
  * ZIP assembly and the cleanup route — lives once in ./service.ts
  * (`handleBuild`, `handleCleanup`, `handleHealth`). Three surfaces, one
@@ -13,7 +13,7 @@
  *   inside the EU container with the S3 media token in its runtime env;
  * - tests and the guarded proof drive the handler functions directly.
  *
- * The environment contract (I1, infra/bindings/media-export-workers.md):
+ * The environment contract (infra/bindings/media-export-workers.md):
  * this worker holds NO R2 binding and NO backup-bucket credentials — the
  * bucket is addressed via the media S3 token only (R2_MEDIA_*), forwarded
  * into the container env by NAME; values never live in the repo.

@@ -1,31 +1,31 @@
 /**
- * Source withdrawal as a durable operation (C5): the explicit transition
- * "Szef może jawnie wycofać źródło" (issue 8) plus the atomic registration
+ * Source withdrawal as a durable operation: the explicit transition
+ * "Szef może jawnie wycofać źródło" plus the atomic registration
  * of dependency-aware recomputation.
  *
  * ONE Convex mutation does everything ("Withdrawal records actor, time and
- * reason on the same immutable D1 source, then schedules bounded
+ * reason on the same immutable source, then schedules bounded
  * recomputation groups"):
  *
  * - guard: the source belongs to the actor's company and is still `active`
  *   (withdrawal is an explicit operation; conflict detection alone is not
  *   withdrawal, and an already withdrawn/purged source refuses);
- * - patch the immutable D1 source row: `lifecycle: withdrawn` with the
+ * - patch the immutable source row: `lifecycle: withdrawn` with the
  *   reason, time and the acting user — the row keeps its authorship,
  *   content and full history ("Jej wcześniejsza rola i przyczyna korekty
  *   pozostają częścią historii");
  * - publish the canonical `sources.sourceWithdrawn` event;
  * - register the durable `memory.recompute_dependents` job ATOMICICALLY
  *   under the SAME dedup key, so the outbox drain's projection collapses
- *   onto this registration (the D1 acceptance pattern): the recomputation
+ *   onto this registration (the acceptance pattern): the recomputation
  *   reaction can never be lost, and a replay never double-registers.
  *
  * The marking of affected findings does NOT run inline: the registered
  * executor (./executor.ts) performs the witness-based marking in its own
- * transaction — the same pure decision C2's `performWithdrawalMarking`
+ * transaction — the same pure decision `performWithdrawalMarking`
  * runs, taken tenant+actor directly so the deferred reaction cannot die on
- * live-session availability (review round 1, MAJOR 2). Marking follows
- * withdrawal, never ahead of it (C2's rule), and the whole reaction is
+ * live-session availability. Marking follows
+ * withdrawal, never ahead of it (the rule), and the whole reaction is
  * durable, retryable and inspectable.
  */
 
@@ -54,7 +54,7 @@ export const withdrawSourceEntry = sourcesOperations["sources.withdrawSource"];
 /** The input type of `sources.withdrawSource` as decoded by the checked path. */
 export type WithdrawSourceInput = Schema.Schema.Type<typeof withdrawSourceEntry.input>;
 
-/** Retry policy of the registered recomputation (bounded, like D1's). */
+/** Retry policy of the registered recomputation (bounded, like source acceptance). */
 export const RECOMPUTE_RETRY_POLICY = { maxAttempts: 3, backoffBaseMs: 2_000 } as const;
 
 /** Pipeline version recorded on the reanalysis runs recomputation creates. */
@@ -62,7 +62,7 @@ export const RECOMPUTE_PIPELINE_VERSION = "c5.recompute/1";
 
 /**
  * A representative table id used only by the pre-insert decode templates
- * (D1's pattern): proves the event payload, executor input and receipt
+ * proves the event payload, executor input and receipt
  * schemas still accept the exact shapes this transaction constructs,
  * BEFORE anything is written.
  */
@@ -70,7 +70,7 @@ const REGISTRATION_TEMPLATE_ID = "k57d4a8eq2x9w7c1vbn8hj6t0a5q3z2f";
 
 /**
  * Everything that can throw or refuse during registration, resolved BEFORE
- * the first write (the D1 acceptance discipline): a failure here leaves
+ * the first write (the acceptance discipline): a failure here leaves
  * nothing committed, while the same failure after the patch would commit a
  * withdrawn source with no recomputation reaction.
  */

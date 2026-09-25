@@ -1,8 +1,7 @@
 /**
- * Access linking tables (B2 fragment).
+ * Access linking tables (linking fragment).
  *
- * Owning implementer: B2 (verified account linking, email change, manual
- * recovery). The linking ceremony is EXPLICIT state, never derived from
+ * The linking ceremony is EXPLICIT state, never derived from
  * email equality (docs/research/auth-identity-facts.md): one row per
  * attempt records which method proofs are fresh, and the commit transition
  * happens exactly once per attempt. Convex optimistic concurrency over the
@@ -17,8 +16,8 @@
  *   `users.email`, repoints the email-code provider account and rejects
  *   pending ceremonies atomically; a failed confirmation writes nothing.
  * - `accountRecoveries`: the manual-recovery audit record ("podstawa
- *   weryfikacji" + who performed it + what was invalidated). B2 defines
- *   the checked recovery command and keeps its invoker unavailable; B4
+ *   weryfikacji" + who performed it + what was invalidated). This lane defines
+ *   the checked recovery command and keeps its invoker unavailable; GM access
  *   supplies the only alpha GM authority.
  *
  * Tables: linkingAttempts, emailChangeRequests, accountRecoveries.

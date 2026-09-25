@@ -1,5 +1,5 @@
 /**
- * Notification-preference command dispatch wiring (F1): the SAME checked
+ * Notification-preference command dispatch wiring: the SAME checked
  * path every lane uses, with this lane's handler registry.
  *
  * `dispatchPreferencesCommand` is @kiero/runtime's `dispatchCommand` over

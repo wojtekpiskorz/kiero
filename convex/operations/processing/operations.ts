@@ -1,10 +1,10 @@
 /**
- * GM processing transactions (H4): the write halves of the cores, each
+ * GM processing transactions: the write halves of the cores, each
  * inside ONE Convex mutation; and each writing its protected audit row in
- * the SAME transaction as its effect (the B4 atomicity contract: real GM
+ * the SAME transaction as its effect (the atomicity contract: real GM
  * actor, grant, basis, command outcome, target revision and timestamps).
  *
- * ATOMICITY (B4's discipline): every step that can throw (lookups, schema
+ * ATOMICITY (the discipline): every step that can throw (lookups, schema
  * decodes) runs BEFORE the first write; between the first write and the
  * return only pre-validated writes and total decodes of transaction-
  * generated values remain. DENIED attempts under a VALID authority still
@@ -12,7 +12,7 @@
  * refusals; attempts without any open grant have no grant to attribute and
  * fail closed (nothing GM-attributable happened).
  *
- * Authority is B4's, consumed not duplicated: the acting grant and the
+ * Authority comes from GM access, consumed not duplicated: the acting grant and the
  * per-company access (open grant + existing company + OPEN alpha
  * activation) are re-derived inside every transaction, so racing an exit,
  * an alpha-ending or a revocation denies at commit (OCC-serialized).
@@ -67,14 +67,14 @@ export const inspectProcessingRunEntry = operationsOperations["operations.inspec
 export const retryProcessingStepEntry = operationsOperations["operations.retryProcessingStep"];
 export const requestReanalysisEntry = operationsOperations["operations.requestReanalysis"];
 
-/** Reads the acting grant in-transaction; B4's current-authority rule. */
+/** Reads the acting grant in-transaction; the current-authority rule. */
 async function actingGrantOpen(tx: ProcessingTx, authority: GmAuthority): Promise<boolean> {
   const grant = await tx.grantById(authority.grantId);
   return grant !== null && grant.userId === authority.userId && gmGrantOpen(grant);
 }
 
 /**
- * The single writer of this lane's protected audit row: B4's single-writer
+ * The single writer of this lane's protected audit row: the single-writer
  * shape (the `audit` helper in access/gm/operations.ts, whose only
  * `insertAudit` call site it is), extended with the operator's stated
  * target revision and the operation's run scope. This is the ONLY
@@ -143,7 +143,7 @@ async function refuseProcessing(
   );
 }
 
-/** The per-company authority decision over one target company (B4's rule). */
+/** The per-company authority decision over one target company (rule). */
 async function companyAccess(
   tx: ProcessingTx,
   args: { readonly grantOpen: boolean; readonly companyId: string },
@@ -176,7 +176,7 @@ async function companyAccess(
  * The audited GM inspection read over one processing run: the canonical
  * run/step/attempt records (with versions and the approved model route),
  * the protected source detail (ids and states, never content), the run's
- * durable jobs, the source's derived change sets, the I2 redacted
+ * durable jobs, the source's derived change sets, the redacted
  * diagnostics naming this run/source, and the derived blocker list.
  */
 export async function performInspectProcessingRun(
@@ -442,7 +442,7 @@ export async function performRetryProcessingStep(
  * The audited GM reanalysis request: creates a linked NEW run over the same
  * immutable source and publishes `operations.reanalysisRequested` (the
  * registered consumer edge registers the analysis job; the workflow pins
- * the server-approved E3/E2 versions itself; no model selection exists
+ * the server-approved analysis/routing versions itself; no model selection exists
  * anywhere in this path). Provenance is the new run's own: kind
  * "reanalysis" plus the link to the run it repeats.
  */
@@ -533,5 +533,5 @@ export async function performRequestReanalysis(
   );
 }
 
-// Re-exported so the dispatch's refusal path shares B4's denial spellings.
+// Re-exported so the dispatch's refusal path shares the denial spellings.
 export { COMPANY_NOT_FOUND, GM_MODE_NOT_ACTIVE };
