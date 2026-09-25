@@ -8,5 +8,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    // Several suites import the whole app or run the in-process Convex
+    // backend (tests/integration); on a loaded machine they pass 5 s.
+    testTimeout: 30_000,
   },
 });
